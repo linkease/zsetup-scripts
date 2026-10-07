@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "scripts-0.1.0",
+  "config_version": "scripts-0.1.1",
   "installers": [
     {
       "application": "fastnet",
@@ -8,7 +8,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "apps/fastnet/install.sh",
-      "path": "fastnet/0.1.0/install.sh",
+      "path": "fastnet/0.1.1/install.sh",
       "background": false
     },
     {
@@ -17,7 +17,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "apps/fastnet/install.sh",
-      "path": "fastnet/0.1.0/install.sh",
+      "path": "fastnet/0.1.1/install.sh",
       "background": false
     },
     {
@@ -26,7 +26,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "apps/fastnet/install.sh",
-      "path": "fastnet/0.1.0/install.sh",
+      "path": "fastnet/0.1.1/install.sh",
       "background": false
     },
     {
@@ -35,7 +35,7 @@
       "package_manager": "opkg",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -44,7 +44,7 @@
       "package_manager": "opkg",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -53,7 +53,7 @@
       "package_manager": "opkg",
       "arch": "armv7",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -62,7 +62,7 @@
       "package_manager": "opkg",
       "arch": "mipsel",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -71,7 +71,7 @@
       "package_manager": "apk",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -80,7 +80,7 @@
       "package_manager": "apk",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -89,7 +89,7 @@
       "package_manager": "apk",
       "arch": "armv7",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -98,7 +98,7 @@
       "package_manager": "apk",
       "arch": "mipsel",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -107,7 +107,7 @@
       "package_manager": "apt",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -116,7 +116,7 @@
       "package_manager": "apt",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -125,7 +125,7 @@
       "package_manager": "apt",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -134,7 +134,7 @@
       "package_manager": "apt",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -143,7 +143,7 @@
       "package_manager": "yum",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -152,7 +152,7 @@
       "package_manager": "yum",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -161,7 +161,7 @@
       "package_manager": "dnf",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -170,7 +170,7 @@
       "package_manager": "dnf",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -179,7 +179,7 @@
       "package_manager": "yum",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -188,7 +188,7 @@
       "package_manager": "yum",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -197,7 +197,7 @@
       "package_manager": "dnf",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -206,7 +206,7 @@
       "package_manager": "dnf",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -215,7 +215,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     },
     {
@@ -224,7 +224,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "apps/ddnsto/install.sh",
-      "path": "ddnsto/0.1.0/install.sh",
+      "path": "ddnsto/0.1.1/install.sh",
       "background": false
     }
   ]

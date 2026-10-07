@@ -12,11 +12,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    common = (ROOT / "lib/bootstrap.sh").read_text()
+    common = (ROOT / "lib/bootstrap.sh").read_text().rstrip() + "\n\n"
     for app in ("fastnet", "ddnsto"):
         folder = ROOT / "apps" / app
         content = common + "\n# Business logic: maintained in apps/" + app + "/business.sh\n"
-        content += (folder / "business.sh").read_text()
+        content += (folder / "business.sh").read_text().rstrip() + "\n\n"
         content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n    bootstrap_zsetup\n"
         content += "    status \"      zsetup $RESCUE_VERSION is ready\"\n    ZSETUP_BIN=$ACTIVE_ZSETUP\n"
         content += "    ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}\n"

@@ -56,4 +56,3 @@ fastnet_install() {
     status "[4/4] Starting FastNet..."
     exec "$cache_file" "$@"
 }
-

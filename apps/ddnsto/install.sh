@@ -521,6 +521,7 @@ ddnsto_install() {
     trap - EXIT HUP INT TERM
 }
 
+
 bootstrap_and_run() {
     status "[1/4] Checking zsetup..."
     bootstrap_zsetup

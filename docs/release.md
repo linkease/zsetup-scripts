@@ -66,7 +66,7 @@ python3 -B scripts/package-release.py \
 | 文件 | 规则 |
 |---|---|
 | `binary/zsetup/0.2.3/` | 复用六个不可变 release 文件，包含 SHA256SUMS/manifest |
-| `binary/{fastnet,ddnsto}/0.1.0/install.sh` | 不可变业务入口；配置引用它，并记录真实 SHA256/size |
+| `binary/{fastnet,ddnsto}/0.1.1/install.sh` | 不可变业务入口；配置引用它，并记录真实 SHA256/size |
 | `binary/{fastnet,ddnsto}/install.sh` | 用户一键入口，可变指针内容，与当前索引脚本完全同字节 |
 | `binary/zsetup/config.json` | 完整 Product Configuration schema 1；不与本地字段合并 |
 | `binary/zsetup/stable` | exact zsetup version；最后激活 |

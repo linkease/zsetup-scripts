@@ -246,4 +246,3 @@ bootstrap_zsetup() {
     rm -f "$stable_file" "$sums_file" 2>/dev/null || true
     [ "$metadata_scheme" = https ] || echo "zsetup: insecure HTTP bootstrap completed with user consent" >&2
 }
-
