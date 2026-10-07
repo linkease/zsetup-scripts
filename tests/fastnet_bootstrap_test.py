@@ -81,7 +81,7 @@ cp "$WEB_ROOT/$relative" "$out"
 """)
         minimal_bin = root / "minimal-bin"
         minimal_bin.mkdir()
-        for name in ("sh", "cp", "mkdir", "chmod", "mv", "sed", "unlink"):
+        for name in ("sh", "cp", "mkdir", "chmod", "mv", "sed", "unlink", "rm"):
             target = shutil.which(name)
             assert target is not None
             (minimal_bin / name).symlink_to(target)
