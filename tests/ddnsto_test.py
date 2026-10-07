@@ -5,6 +5,8 @@ import http.server
 import io
 import json
 import os
+import signal
+import time
 from pathlib import Path
 import ssl
 import subprocess
@@ -123,6 +125,7 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
                 "ZSETUP_BOOTSTRAP_BASES": base, "ZSETUP_ROOT": str(root / "rescue"),
                 "ZSETUP_WORK_DIR": str(root / "work"), "DDNSTO_BIN_PATH": str(root / "installed/ddnsto"),
                 "DDNSTO_SERVICE_PATH": str(bindir / "service"), "DDNSTO_MEM_MB": "512",
+                "DDNSTO_CONFIG_PATH": str(root / "legacy-config"),
                 "TEST_LOG": str(root / "log"), "FETCH_LOG": str(root / "fetch"),
                 "BOOTSTRAP_WEB": str(bootstrap_web), "ZSETUP_CONFIG": str(config_path),
                 "ZSETUP_CONFIG_CACHE": str(root / "config-cache"), "ZSETUP_MANAGED_ROOT": str(root / "managed"),
@@ -163,6 +166,25 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
                 assert bad.returncode == 2, bad
             missing_token = run([], indexed=True)
             assert missing_token.returncode == 2, missing_token
+            # Root legacy names execute the same installer and setup adapts its token argument.
+            setup_env = env | {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "openwrt", "ZSETUP_PACKAGE_MANAGER": "opkg", "ZSETUP_ARCH": "x86_64"}
+            setup = subprocess.run(["sh", str(ROOT / "setup_ddnsto.sh"), token], env=setup_env, text=True, capture_output=True, timeout=60)
+            assert setup.returncode == 0, setup
+            assert "uci set ddnsto.@ddnsto[0].token=fixture token" in (root / "log").read_text()
+            assert not list((root / "installed").glob(".ddnsto-backup.*"))
+            # Kill shell while a business-owned dependency is waiting; its transaction must be reaped.
+            blocked = root / "blocking-zsetup"
+            executable(blocked, '#!/bin/sh\nif [ "${1:-}" = download ]; then : > "$BLOCK_READY"; sleep 1; exit 13; fi\nexit 97\n')
+            ready = root / "ready"
+            proc = subprocess.Popen(["sh", str(SCRIPT), "--token", token], env=env | {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "ubuntu", "ZSETUP_PACKAGE_MANAGER": "apt", "ZSETUP_ARCH": "x86_64", "ZSETUP_BIN": str(blocked), "BLOCK_READY": str(ready)}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            deadline = time.monotonic() + 5
+            while not ready.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert ready.exists()
+            proc.send_signal(signal.SIGTERM)
+            _out, _err = proc.communicate(timeout=5)
+            assert proc.returncode == 143, (proc.returncode, _err)
+            assert not list((root / "work").glob(".transaction.*"))
             # Metadata checksum mismatch fails before any package manager mutation.
             prefix = "/binary/ddnsto/openwrt/standard/4.2.3/"
             old_sums = bodies[prefix + "SHA256SUMS"]
