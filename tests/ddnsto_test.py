@@ -20,7 +20,7 @@ ZSETUP = Path(sys.argv[1]).resolve()
 TUNNEL = Path(sys.argv[2]).resolve()
 CERT = TUNNEL / "runtime-zig/third-part/mbedtls/framework/data_files"
 SCRIPT = ROOT / "apps/ddnsto/install.sh"
-BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\n'
+BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\nif [ "${1:-}" = stop ]; then exit "${STOP_FAIL:-0}"; fi\n'
 
 
 def executable(path, content):
@@ -153,6 +153,10 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             start_failure = run(["--token", token], {"START_FAIL": "24"}, indexed=True)
             assert start_failure.returncode == 24 and "restoring previous binary" in start_failure.stderr, start_failure
             assert installed.read_bytes() == before
+            stop_failure = run(["--token", token], {"STOP_FAIL": "25"}, indexed=True)
+            assert stop_failure.returncode == 25, stop_failure
+            assert installed.read_bytes() == before
+            assert not list((root / "installed").glob(".ddnsto-backup.*"))
             for pm in ("opkg", "apk"):
                 for arch in ("x86_64", "aarch64", "armv7", "mipsel"):
                     result = run(["--token", token, "--force-version", "standard"], {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "openwrt", "ZSETUP_PACKAGE_MANAGER": pm, "ZSETUP_ARCH": arch})

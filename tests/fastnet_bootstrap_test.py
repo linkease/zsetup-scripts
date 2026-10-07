@@ -160,9 +160,17 @@ cp "$WEB_ROOT/$relative" "$out"
         sums = release / "SHA256SUMS"
         sums.write_text(f"{'0' * 64}  zsetup-linux-x86_64\n", encoding="ascii")
         mismatch = run("https-checksum-mismatch")
+        assert not list((root / "https-checksum-mismatch/work").rglob(".zsetup-download.*"))
+        assert not list((root / "https-checksum-mismatch/work").rglob(".stable.*"))
         assert mismatch.returncode != 0 and "checksum mismatch" in mismatch.stderr
         sums.write_text(f"{digest}  zsetup-linux-x86_64\n", encoding="ascii")
 
+        stable = web / "binary/zsetup/stable"
+        stable.write_text("0.2.2\n")
+        old = run("old-version", answer="n")
+        assert old.returncode != 0
+        assert not any(url.endswith("zsetup-linux-x86_64") for url in (root / "old-version/fetch.log").read_text().splitlines())
+        stable.write_text(f"{VERSION}\n")
         declined = run("decline", fail_https=True, answer="n")
         assert declined.returncode != 0 and "declined" in declined.stderr
         assert not any(url.startswith("http://") for url in (root / "decline/fetch.log").read_text().splitlines())
