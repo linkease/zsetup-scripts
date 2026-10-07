@@ -1,0 +1,1 @@
+apps/fastnet/install.sh

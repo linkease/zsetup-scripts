@@ -1,0 +1,1 @@
+apps/ddnsto/install.sh
