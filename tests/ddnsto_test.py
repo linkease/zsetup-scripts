@@ -18,7 +18,7 @@ ZSETUP = Path(sys.argv[1]).resolve()
 TUNNEL = Path(sys.argv[2]).resolve()
 CERT = TUNNEL / "runtime-zig/third-part/mbedtls/framework/data_files"
 SCRIPT = ROOT / "apps/ddnsto/install.sh"
-BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nexit "${START_FAIL:-0}"\n'
+BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\n'
 
 
 def executable(path, content):
@@ -148,7 +148,7 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             installed = root / "installed/ddnsto"
             before = installed.read_bytes()
             start_failure = run(["--token", token], {"START_FAIL": "24"}, indexed=True)
-            assert start_failure.returncode == 24, start_failure
+            assert start_failure.returncode == 24 and "restoring previous binary" in start_failure.stderr, start_failure
             assert installed.read_bytes() == before
             for pm in ("opkg", "apk"):
                 for arch in ("x86_64", "aarch64", "armv7", "mipsel"):
