@@ -25,7 +25,9 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]
     for app in ("fastnet", "ddnsto"):
         record = next(r for r in config["installers"] if r["application"] == app)
-        assert record["path"].startswith(f"{app}/0.1.0/")
+        catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
+        assert record["path"] == catalog_record["path"]
+        assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
         assert (binary / record["path"]).read_bytes() == (binary / app / "install.sh").read_bytes()
     def select(app, os_name, pm, arch):
         matches = [r for r in config["installers"] if r["application"] == app and all(r[k] in ("*", v) for k,v in (("os", os_name), ("package_manager", pm), ("arch", arch)))]
