@@ -27,6 +27,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto"}
     assert not any(r["application"] == "fastpve" for r in config["installers"])
     assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "zsetup"}
+    assert not (binary / "legacy").exists()
     assert not any(p.name in {"business.sh", "main.sh", "README.md"} or p.suffix == ".py" for p in binary.rglob("*"))
 
     for record in config["installers"] + config["stable_zsetup"]["artifacts"]:
@@ -77,6 +78,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert (output / "scripts-release-manifest.json").is_file()
     with tarfile.open(next(output.glob("*.tar.gz"))) as archive:
         assert not any(name.endswith((".ipk", ".apk", ".tar.gz")) for name in archive.getnames())
+        assert not any("legacy" in Path(name).parts for name in archive.getnames())
     # A changed immutable path is rejected before any config or stable pointer update.
     immutable = binary / config["installers"][0]["path"]
     immutable.write_text("corrupt immutable version")

@@ -183,9 +183,11 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
                 assert bad.returncode == 2, bad
             missing_token = run([], indexed=True)
             assert missing_token.returncode == 2, missing_token
-            # Root legacy names execute the same installer and setup adapts its token argument.
+            # Published compatibility names execute the current installer and setup adapts its token argument.
             setup_env = env | {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "openwrt", "ZSETUP_PACKAGE_MANAGER": "opkg", "ZSETUP_ARCH": "x86_64"}
-            setup = subprocess.run(["sh", str(ROOT / "setup_ddnsto.sh"), token], env=setup_env, text=True, capture_output=True, timeout=60)
+            setup_entry = root / "setup_ddnsto.sh"
+            setup_entry.write_bytes(SCRIPT.read_bytes())
+            setup = subprocess.run(["sh", str(setup_entry), token], env=setup_env, text=True, capture_output=True, timeout=60)
             assert setup.returncode == 0, setup
             assert "uci set ddnsto.@ddnsto[0].token=fixture token" in (root / "log").read_text()
             assert not list((root / "installed").glob(".ddnsto-backup.*"))
