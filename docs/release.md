@@ -15,14 +15,21 @@ cd /path/to/linkease-tunnel/zsetup
 cd /path/to/zsetup-scripts
 python3 -B scripts/build-entrypoints.py
 sh scripts/check.sh /path/to/linkease-tunnel/zsetup
-python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup
+python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --collect-ddnsto --require-production-ready
 ```
 
-输出 `dist/release/binary/`、`scripts-release-manifest.json`、`PACKAGE-SHA256SUMS` 和确定性 tar.gz。缺少 DDNSTO 业务产物时，manifest 明确标记 `development-ddnsto-artifacts-required`；这样的开发包可用于审查索引与入口，不能投入公网。打包器复用 zsetup 的 `check-release-artifacts.sh` 和 `generate-product-config.py --installer-catalog catalog.json`；原 `--fastnet-script` 和 S6 暂存流程仍可使用。
+输出 `dist/release/binary/`、`scripts-release-manifest.json`、`PACKAGE-SHA256SUMS` 和确定性 tar.gz。使用 `--collect-ddnsto` 时按旧脚本 CDN 路径采集已有产物，自动计算并保存摘要；无须用户另行整理产物清单。不传采集选项或已有目录时只生成开发包，manifest 为 `development-ddnsto-artifacts-required`。打包器复用 zsetup 的 `check-release-artifacts.sh` 和 `generate-product-config.py --installer-catalog catalog.json`；原 `--fastnet-script` 和 S6 暂存流程仍可使用。
 
 ## DDNSTO 业务产物输入
 
-准备由业务方确认的目录，不自动复制/下载未经确认的在线包：
+旧脚本已确定业务来源、版本指针与文件名。用户要求继续沿用这些来源；采集由现有 zsetup download 执行，HTTPS 三个 primary 竞速、fw.koolcenter.com 最终 fallback 保持不变。不会执行下载的程序或安装真实包：
+
+```sh
+python3 -B scripts/collect-ddnsto-artifacts.py \
+  --zsetup-bin /path/to/linkease-tunnel/zsetup/dist/release/zsetup-linux-x86_64
+```
+
+默认输出 `dist/ddnsto-artifacts/`，包含以下目录、自动生成的 artifacts.json 和 acquisition.json。后者记录采集时间、来源 URL 组、版本、大小与摘要：
 
 ```text
 artifacts.json
@@ -37,19 +44,19 @@ linux-binary/ddnsto-standard-4.2.3.tar.gz
 
 Linux archive 必须含 `ddnsto-standard-4.2.3/ddnsto.x86_64` 与 `.aarch64` 普通文件。其他已确认版本可追加，脚本用 DDNSTO_VERSION 指定。旧 CDN 的 LuCI 包在可变根目录，新安装将其快照与主包放在相同不可变版本目录，避免在一次安装中混用不同发布。
 
-`artifacts.json` 格式如下；所有文件（包括两个版本指针）必须有真实摘要，示例不提供假摘要：
+采集工具自动生成 `artifacts.json`。它也支持维护者提供既有目录；格式如下，所有文件（包括两个版本指针）记录实际摘要：
 
 ```json
 {
   "schema_version": 1,
-  "provenance": "业务仓库 commit / release 与审批来源",
+  "provenance": "旧脚本 commit / 发布来源与 HTTPS 采集记录",
   "files": [
-    {"path": "openwrt/VERSION", "sha256": "业务方确认的真实64位小写摘要"}
+    {"path": "openwrt/VERSION", "sha256": "采集文件计算得到的真实64位小写摘要"}
   ]
 }
 ```
 
-补齐全部文件后，打包器逐个检查批准摘要，再生成各版本的 SHA256SUMS 和 Linux tar 的 SHA256SUMS。摘要不会在设备上依赖系统 openssl/sha256sum；Business Installer 通过 HTTPS 取得 checksum metadata，然后使用 zsetup 内置 SHA256 校验每个新包。目录和记录缺项、摘要不符、同版本已有不同字节时，在修改配置指针前拒绝发布包。
+采集完成后，打包器逐个核对本地文件与采集摘要，再生成各版本的 SHA256SUMS 和 Linux tar 的 SHA256SUMS。旧 CDN 不需要预先提供 checksum metadata。LuCI/语言包只从旧根目录下载一次，再分别复制到对应 Lite/Standard 版本目录；全部 23 次下载汇集 27 个发布文件。重复采集如果同版本文件变了，会拒绝替换旧快照。摘要不会在设备上依赖系统 openssl/sha256sum；Business Installer 通过 HTTPS 取得 checksum metadata，然后使用 zsetup 内置 SHA256 校验每个新包。目录和记录缺项、摘要不符、同版本已有不同字节时，在修改配置指针前拒绝发布包。
 
 ```sh
 python3 -B scripts/package-release.py \
@@ -81,6 +88,6 @@ python3 -B scripts/package-release.py \
 
 回滚：保存上一份完整配置及可变入口/业务版本指针，用原子 rename 恢复完整集合，stable 最后回退；不可变目录保留。只改 version 字符串却不同时回退 artifacts/min_version 是无效配置。客户端尚在运行的脚本持有原字节，不再下载自己。
 
-本次只交付可审查暂存产物、隔离测试与提交；生产需要确认的业务产物、设备 canary 和明确目标发布操作。旧源仓库和线上入口保持原状。
+本次只交付可审查暂存产物、隔离测试与提交；生产候选已可从既有产物自动生成，公网切换仍需设备 canary 和明确目标发布操作。旧源仓库和线上入口保持原状。
 
 本地打包要求 Python 3.11+、Git、POSIX shell，以及 zsetup 发布检查器所要求的 binutils/UPX 等现有工具。它们是维护者构建依赖，不增加设备首次安装的下载器或 SHA 工具依赖。

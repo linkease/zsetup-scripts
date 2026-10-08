@@ -103,7 +103,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--zsetup-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "dist/release")
-    parser.add_argument("--ddnsto-artifacts", type=Path)
+    inputs = parser.add_mutually_exclusive_group()
+    inputs.add_argument("--ddnsto-artifacts", type=Path)
+    inputs.add_argument("--collect-ddnsto", action="store_true", help="capture artifacts from the proven legacy CDN paths through zsetup")
     parser.add_argument("--require-production-ready", action="store_true")
     args = parser.parse_args()
     zroot = args.zsetup_root.resolve()
@@ -120,11 +122,14 @@ def main():
     components = [int(v) for v in version.split(".")]
     if components < [0, 2, 3]:
         raise ValueError("zsetup >= 0.2.3 required (Race budget fix)")
-    if args.require_production_ready and not args.ddnsto_artifacts:
-        raise ValueError("production package requires approved DDNSTO artifacts and digest inventory")
+    if args.require_production_ready and not (args.ddnsto_artifacts or args.collect_ddnsto):
+        raise ValueError("production package requires DDNSTO artifacts; use --collect-ddnsto or --ddnsto-artifacts")
     scripts_dirty, zsetup_dirty = tree_dirty(ROOT), tree_dirty(zroot)
     if args.require_production_ready and (scripts_dirty or zsetup_dirty):
         raise ValueError("production candidate requires clean scripts and zsetup source trees")
+    if args.collect_ddnsto:
+        args.ddnsto_artifacts = output.parent / "ddnsto-artifacts"
+        subprocess.run(["python3", "-B", str(ROOT / "scripts/collect-ddnsto-artifacts.py"), "--zsetup-bin", str(release / "zsetup-linux-x86_64"), "--output", str(args.ddnsto_artifacts)], check=True)
     catalog = json.loads((ROOT / "catalog.json").read_text())
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".release-", dir=output.parent) as temporary:

@@ -8,4 +8,4 @@
 - Test with local HTTPS fixtures, fake package managers and isolated work/install paths. Never execute a real OpenWrt package or change a host service as a test.
 - Add behavior tests before production edits; keep test-only and implementation commits separate. Run `sh scripts/check.sh ZSETUP_ROOT` after meaningful changes.
 - Do not rewrite a running shell script in place. Generated entries and package pointers must be installed atomically.
-- Production candidates require approved DDNSTO bytes/digests, immutable paths, matching config/size/SHA256 and device canary. Local test success is not production publication evidence.
+- The user has authorized continuing the proven DDNSTO installer/CDN sources. Collect existing bytes through zsetup with scripts/collect-ddnsto-artifacts.py and compute release digests; absent upstream SHA256SUMS is not an artifact blocker or an extra approval requirement. Production candidates still preserve immutable paths, matching config/size/SHA256 and device canary. Local test success is not production publication evidence.

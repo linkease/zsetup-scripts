@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-08T00:32:54.560912+00:00",
+  "source_reference": "ddnsto_all_in_one_script@13bfb75",
+  "zsetup": "zsetup 0.2.3",
+  "versions": {
+    "standard": "4.2.6",
+    "lite": "4.2.2",
+    "linux": "4.2.3"
+  },
+  "primary_bases": [
+    "https://dl.istoreos.com/binary/ddnsto",
+    "https://fw.d4ctech.com/binary/ddnsto",
+    "https://fw20.koolcenter.com/binary/ddnsto"
+  ],
+  "fallback_base": "https://fw.koolcenter.com/binary/ddnsto",
+  "files": [
+    {
+      "path": "linux-binary/ddnsto-standard-4.2.3.tar.gz",
+      "sha256": "b982ebd38e8c145d955049eb5b73960c01941bc05f084c3a2115dfca2b6eea6e",
+      "size": 16265464,
+      "source_path": "linux-binary/ddnsto-standard-4.2.3.tar.gz"
+    },
+    {
+      "path": "openwrt/VERSION",
+      "sha256": "cb78466e2e52cefb9b096ef555577db27b5271864355e8faea65666bca1597e9",
+      "size": 6,
+      "source_path": "openwrt/VERSION"
+    },
+    {
+      "path": "openwrt/VERSION_LITE",
+      "sha256": "1467d465785bff74035e6f7cc652495a7a5f0c4e182e0d16c0db514beea967de",
+      "size": 6,
+      "source_path": "openwrt/VERSION_LITE"
+    },
+    {
+      "path": "openwrt/lite-apk/4.2.2/ddnsto_aarch64.apk",
+      "sha256": "fa8715e298357b1f194fd303b7bc53fe97fc2d62847099c8942fb1d833c44bba",
+      "size": 794329,
+      "source_path": "openwrt/lite-apk/4.2.2/ddnsto_aarch64.apk"
+    },
+    {
+      "path": "openwrt/lite-apk/4.2.2/ddnsto_arm.apk",
+      "sha256": "a0d748be8936b8515a4a83e624529ee9873728c434b44e330e03159e2f7fd4b4",
+      "size": 738445,
+      "source_path": "openwrt/lite-apk/4.2.2/ddnsto_arm.apk"
+    },
+    {
+      "path": "openwrt/lite-apk/4.2.2/ddnsto_mipsel.apk",
+      "sha256": "34cf69a86b7c22993e974d54b973ad65eda9a81b59b79a77eff68140bf3f421d",
+      "size": 824083,
+      "source_path": "openwrt/lite-apk/4.2.2/ddnsto_mipsel.apk"
+    },
+    {
+      "path": "openwrt/lite-apk/4.2.2/ddnsto_x86_64.apk",
+      "sha256": "291a24cb1e8e821f127ad08249bcfbc1517501189b895fbad261c950e2aa0abf",
+      "size": 744342,
+      "source_path": "openwrt/lite-apk/4.2.2/ddnsto_x86_64.apk"
+    },
+    {
+      "path": "openwrt/lite-apk/4.2.2/luci-app-ddnsto.apk",
+      "sha256": "74c1905d95ec90077cd3f4b4d907782c093ad977f0c7c4c93137190106e1e566",
+      "size": 72839,
+      "source_path": "openwrt/luci-app-ddnsto.apk"
+    },
+    {
+      "path": "openwrt/lite-apk/4.2.2/luci-i18n-ddnsto-zh-cn.apk",
+      "sha256": "96fcf176a2d2be9d3ad85d0687d5f0adaa37282be4cb0c95cee609c6dde60fb4",
+      "size": 1296,
+      "source_path": "openwrt/luci-i18n-ddnsto-zh-cn.apk"
+    },
+    {
+      "path": "openwrt/lite/4.2.2/ddnsto_aarch64.ipk",
+      "sha256": "4f1542dc9e8f14a2da69800190e2d2b5f20288c96c2067eb1ada62e9d9999d0c",
+      "size": 795542,
+      "source_path": "openwrt/lite/4.2.2/ddnsto_aarch64.ipk"
+    },
+    {
+      "path": "openwrt/lite/4.2.2/ddnsto_arm.ipk",
+      "sha256": "3ccdc5100c4e43e7a75a6fd1cbfd5718e8ba7fce40ac4626da83487db2f3ea96",
+      "size": 738219,
+      "source_path": "openwrt/lite/4.2.2/ddnsto_arm.ipk"
+    },
+    {
+      "path": "openwrt/lite/4.2.2/ddnsto_mipsel.ipk",
+      "sha256": "22df2e1f8c9238e861954778d9b48f149660ee7b0fd8639b1e73731454209fbe",
+      "size": 824105,
+      "source_path": "openwrt/lite/4.2.2/ddnsto_mipsel.ipk"
+    },
+    {
+      "path": "openwrt/lite/4.2.2/ddnsto_x86_64.ipk",
+      "sha256": "1434d56a8122d4fdb470a744a512373741307631fabde0a31e37733984461ca4",
+      "size": 744476,
+      "source_path": "openwrt/lite/4.2.2/ddnsto_x86_64.ipk"
+    },
+    {
+      "path": "openwrt/lite/4.2.2/luci-app-ddnsto.ipk",
+      "sha256": "f3c87b000e7ec6ed640783232354b7462a274323d5edd5d2cc857c03192bda13",
+      "size": 73126,
+      "source_path": "openwrt/luci-app-ddnsto.ipk"
+    },
+    {
+      "path": "openwrt/lite/4.2.2/luci-i18n-ddnsto-zh-cn.ipk",
+      "sha256": "6c5f3e287b70704181769f23b1775c064bf1d4bf2c6ee1fb0a226377478c1a04",
+      "size": 1411,
+      "source_path": "openwrt/luci-i18n-ddnsto-zh-cn.ipk"
+    },
+    {
+      "path": "openwrt/standard-apk/4.2.6/ddnsto_aarch64.apk",
+      "sha256": "55e0d89060bbd8d6df3ca473ca114f257dd1312587ea703963ce812877e7a509",
+      "size": 4043075,
+      "source_path": "openwrt/standard-apk/4.2.6/ddnsto_aarch64.apk"
+    },
+    {
+      "path": "openwrt/standard-apk/4.2.6/ddnsto_arm.apk",
+      "sha256": "a90951eb323a19f79964b597af9cdefbb728e675b8077c0fd115fa061011f62a",
+      "size": 3921102,
+      "source_path": "openwrt/standard-apk/4.2.6/ddnsto_arm.apk"
+    },
+    {
+      "path": "openwrt/standard-apk/4.2.6/ddnsto_mipsel.apk",
+      "sha256": "ebd0f3eeed46ec8f45a585b0e49403725fbd18a48de42d9ed0380609ed0d76ed",
+      "size": 3908015,
+      "source_path": "openwrt/standard-apk/4.2.6/ddnsto_mipsel.apk"
+    },
+    {
+      "path": "openwrt/standard-apk/4.2.6/ddnsto_x86_64.apk",
+      "sha256": "470e4ea428f897cc8e38f7528b9387b0dd7373d5c727ef334e1d79c8dead7da2",
+      "size": 4242017,
+      "source_path": "openwrt/standard-apk/4.2.6/ddnsto_x86_64.apk"
+    },
+    {
+      "path": "openwrt/standard-apk/4.2.6/luci-app-ddnsto.apk",
+      "sha256": "74c1905d95ec90077cd3f4b4d907782c093ad977f0c7c4c93137190106e1e566",
+      "size": 72839,
+      "source_path": "openwrt/luci-app-ddnsto.apk"
+    },
+    {
+      "path": "openwrt/standard-apk/4.2.6/luci-i18n-ddnsto-zh-cn.apk",
+      "sha256": "96fcf176a2d2be9d3ad85d0687d5f0adaa37282be4cb0c95cee609c6dde60fb4",
+      "size": 1296,
+      "source_path": "openwrt/luci-i18n-ddnsto-zh-cn.apk"
+    },
+    {
+      "path": "openwrt/standard/4.2.6/ddnsto_aarch64.ipk",
+      "sha256": "413aef536307542e08fde749af9c9b5db239280fb2cdee5f48ced5cb61ef545a",
+      "size": 4059819,
+      "source_path": "openwrt/standard/4.2.6/ddnsto_aarch64.ipk"
+    },
+    {
+      "path": "openwrt/standard/4.2.6/ddnsto_arm.ipk",
+      "sha256": "167ff8ba20965f72471bf8be9a1010eb776ca54b336033d807bb83c19e1f3917",
+      "size": 3918174,
+      "source_path": "openwrt/standard/4.2.6/ddnsto_arm.ipk"
+    },
+    {
+      "path": "openwrt/standard/4.2.6/ddnsto_mipsel.ipk",
+      "sha256": "9a0c740708cb1ede7e680112bcec5c9dad9f00739ef8587b334f305898d2763c",
+      "size": 3905133,
+      "source_path": "openwrt/standard/4.2.6/ddnsto_mipsel.ipk"
+    },
+    {
+      "path": "openwrt/standard/4.2.6/ddnsto_x86_64.ipk",
+      "sha256": "a7d868da03dea6e6e9b4cb02bc6f2ccfa31d2eeba62f0ac088338bc83e31e9eb",
+      "size": 4240881,
+      "source_path": "openwrt/standard/4.2.6/ddnsto_x86_64.ipk"
+    },
+    {
+      "path": "openwrt/standard/4.2.6/luci-app-ddnsto.ipk",
+      "sha256": "f3c87b000e7ec6ed640783232354b7462a274323d5edd5d2cc857c03192bda13",
+      "size": 73126,
+      "source_path": "openwrt/luci-app-ddnsto.ipk"
+    },
+    {
+      "path": "openwrt/standard/4.2.6/luci-i18n-ddnsto-zh-cn.ipk",
+      "sha256": "6c5f3e287b70704181769f23b1775c064bf1d4bf2c6ee1fb0a226377478c1a04",
+      "size": 1411,
+      "source_path": "openwrt/luci-i18n-ddnsto-zh-cn.ipk"
+    }
+  ]
+}

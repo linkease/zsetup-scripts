@@ -18,7 +18,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
 
-**当前状态：本地迁移/测试版本，尚未公网发布。** FastNet 原线上入口继续保留。DDNSTO 新索引及脚本需同时发布确认的业务产物和 SHA256 元数据；旧公网目录缺少本契约要求的摘要，新脚本会安全失败，不能提前替换线上脚本。请先看 [发布流程](docs/release.md)。
+**当前状态：完整产物候选，尚未公网发布。** FastNet/DDNSTO 原线上入口继续保留。发布工具按旧 DDNSTO 脚本的版本和路径采集现有产物，自动计算 SHA256 并生成元数据，不要求旧 CDN 预先提供摘要清单。新入口、配置和元数据一起发布；步骤见 [发布流程](docs/release.md)。
 
 | 应用标识 | 支持平台 | 架构 | 业务参数与交互 |
 |---|---|---|---|
@@ -36,7 +36,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 ```sh
 python3 -B scripts/build-entrypoints.py
 sh scripts/check.sh /path/to/linkease-tunnel/zsetup
-python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup
+python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --collect-ddnsto --require-production-ready
 ```
 
-第三条只生成开发暂存包；生产候选必须提供确认的 DDNSTO 产物。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。
+第三条直接从既有 CDN 采集 DDNSTO 并生成完整候选；需在干净提交后运行。已有采集目录可用 `--ddnsto-artifacts DIR` 复用，不必重新下载。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。

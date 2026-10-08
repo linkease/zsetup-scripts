@@ -18,7 +18,7 @@
 
 依赖：首次 zsetup bootstrap 需要 curl/wget；系统 SHA256 工具仅可选附加校验。后续下载不依赖这些程序。FastNet 需要基础 POSIX 工具并启动自己的菜单。DDNSTO OpenWrt 需要 opkg/apk、awk/tr、uci（传 token 时）、init 脚本、pgrep（请求状态检查时）；Linux 需要 tar、基础文件工具、root 或 sudo（目标目录不可写时）。首次脚本获取和安装权限不能凭空消除。
 
-公网只读检查：`https://fw.koolcenter.com/binary/ddnsto/openwrt/VERSION` 返回 4.2.6；同目录 SHA256SUMS 与 `ddnsto/linux-binary/SHA256SUMS` 返回 HTTP 404。因此生产迁移需要业务方确认的产物及摘要，禁止用空 digest、跳过验证或虚构发布物替代。
+公网只读检查：`https://fw.koolcenter.com/binary/ddnsto/openwrt/VERSION` 返回 4.2.6；同目录 SHA256SUMS 与 `ddnsto/linux-binary/SHA256SUMS` 返回 HTTP 404。2026-10-08 复核旧脚本的实际产物路径均可取得；用户明确要求延续已有来源，现已通过 zsetup HTTPS 采集现有产物并计算/记录摘要。没有远端 SHA256SUMS 不表示缺少产物；完整记录见 verification-2026-10-08.md。
 
 执行顺序：盘点 → 迁移及双入口 → 配置/不可变发布包 → AI/扩展文档 → 自检/证据。验收包括 POSIX 语法、原 FastNet 测试、新 DDNSTO 业务矩阵、真实 zsetup install、本地缓存复用、失败前不改业务、临时目录清理、参数/进度、索引与文件 digest/size、可重复打包和不可变冲突拒绝。每个失败项最多三次修复，有证据后才继续。
 
