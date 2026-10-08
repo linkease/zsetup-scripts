@@ -32,3 +32,5 @@
 2026-10-08 发布职责修正：产品安装包由业务流程提前部署在服务器。本仓库已移除 DDNSTO 采集器及产品打包，统一发布只包含安装入口、zsetup 与配置；以上采集记录保留为历史证据，不是当前构建步骤。设备安装继续从服务器下载版本/SHA256SUMS/产品并进行校验。
 
 2026-10-08 历史脚本归档：根目录五个兼容符号链接已移除；legacy/ 保存源业务仓库 13bfb7580416487fda17d3d93d72bf6d25eb9800 的五份原始脚本及摘要，仅供历史参考。此前根目录别名的描述为迁移历史；当前本地入口为 fastnet/install.sh、ddnsto/install.sh，服务器兼容 URL 继续由当前入口生成。
+
+2026-10-08 命名规范更新：当前业务入口为 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh；构建和安装索引统一采用 APP/APP-install.sh。脚本发布版本为 0.1.4（scripts-0.1.4），native 仍为 0.2.4。原 /binary/APP/install.sh 及 DDNSTO 历史 URL 发布同字节兼容副本；原不可变目录与 legacy 历史快照保留。

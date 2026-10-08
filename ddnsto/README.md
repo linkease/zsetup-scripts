@@ -1,28 +1,29 @@
 # DDNSTO
 
-Linux/OpenWrt 的唯一统一入口为 `install.sh`，由本目录 `business.sh`、`main.sh` 和共享 `../lib/bootstrap.sh` 生成。Windows 和 macOS 使用同目录的原生入口 `install.ps1` 与 `install-macos.sh`；它们直接安装已发布的 DDNSTO CLI 归档，并各自注册平台服务生命周期。依赖 zsetup >=0.2.4 的统一入口仍只适用于 POSIX/Linux/OpenWrt。
+Linux/OpenWrt 的统一入口为 `ddnsto-install.sh`，由本目录 `business.sh`、`main.sh` 和共享 `../lib/bootstrap.sh` 生成；普通执行和 `zsetup install ddnsto` 使用同一业务实现。Windows 和 macOS 使用同目录的原生入口 `install.ps1` 与 `install-macos.sh`，安装已发布的 DDNSTO CLI 归档并注册平台服务。Linux/OpenWrt 入口依赖 zsetup >=0.2.4，不调用 awk/sed。
 
 发布后用户入口：
 
 ```sh
 zsetup install ddnsto -- --token 'YOUR_TOKEN'
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --token 'YOUR_TOKEN'
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/ddnsto-install.sh)" -- --token 'YOUR_TOKEN'
 ```
 
 OpenWrt 支持 opkg/apk × x86_64/aarch64/armv7/mipsel；总内存低于 900 MiB 自动选 Lite，可传 `--force-version lite|standard`。token 可选；`--verify-status` 请求服务检查。Linux 支持 x86_64/aarch64，默认 Standard 4.2.3，无终端时必须提供 token。Windows 入口支持 x86_64 CLI 4.2.1，在 Windows 10 x64 WOW64 / PowerShell 5.1 验证范围内使用计划任务启动；macOS 入口支持 Intel/Apple Silicon CLI 4.2.1，使用用户级 launchd。Windows/macOS 的 4.2.1 归档 SHA256 固定在入口脚本中，升级新版本前必须更新脚本、测试和发布配置。参数、退出码及交互详情见 [统一协议](../docs/ai-contract.md)。
 
 本模块包含：
 
-- business.sh/main.sh/install.sh：维护源码与唯一生成入口。
-- release.py：将同一 install.sh 发布到旧兼容 URL；产品包不在本仓库构建或打包。
+- business.sh/main.sh/ddnsto-install.sh：维护源码与唯一生成入口。
+- release.py：将同一 ddnsto-install.sh 发布到旧兼容 URL；产品包不在本仓库构建或打包。
 - tests/：通过隔离 HTTPS 产品服务器验证双入口、平台、参数、缓存、进度和失败回收。
 
-服务器完整模块目录（产品文件由业务发布流程提前部署，本仓库仅发布 install.sh 及兼容入口）：
+服务器完整模块目录（产品文件由业务发布流程提前部署，本仓库仅发布 ddnsto-install.sh 及兼容入口）：
 
 ```text
 binary/ddnsto/
-  0.1.3/install.sh
-  install.sh
+  0.1.4/ddnsto-install.sh
+  ddnsto-install.sh
+  install.sh          # 原 URL 的同字节兼容副本
   openwrt/VERSION
   openwrt/VERSION_LITE
   openwrt/<standard|lite|standard-apk|lite-apk>/<VERSION>/包与 SHA256SUMS
@@ -32,7 +33,7 @@ binary/ddnsto/
   linux-binary/install_ddnsto_linux.sh
 ```
 
-兼容 URL 发布为与 install.sh 相同的实际文件，无须服务器支持符号链接。旧源仓库与已上线旧文件不得在迁移验证前删除。仓库中的历史源码位于 [legacy/](../legacy/README.md)，不进入发布包；当前入口为 ddnsto/install.sh。business/main、Python 工具、测试和 README 不发布。
+兼容 URL 发布为与 ddnsto-install.sh 相同的实际文件，无须服务器支持符号链接。旧源仓库与已上线旧文件不得在迁移验证前删除。仓库中的历史源码位于 [legacy/](../legacy/README.md)，不进入发布包；当前入口为 ddnsto/ddnsto-install.sh。business/main、Python 工具、测试和 README 不发布。
 
 模块命令（从仓库根目录执行）：
 

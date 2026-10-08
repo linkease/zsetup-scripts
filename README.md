@@ -12,8 +12,8 @@ zsetup install ddnsto -- --token 'YOUR_TOKEN'
 设备没有 zsetup，发布完成后的一条命令入口：
 
 ```sh
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastnet/install.sh)"
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --token 'YOUR_TOKEN'
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastnet/fastnet-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/ddnsto-install.sh)" -- --token 'YOUR_TOKEN'
 ```
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
@@ -35,8 +35,8 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 
 ```text
 zsetup-scripts/
-  fastnet/          # business.sh、main.sh、install.sh、README、tests/
-  ddnsto/           # Linux/OpenWrt install.sh；Windows install.ps1；macOS install-macos.sh
+  fastnet/          # fastnet-install.sh、business.sh、main.sh、README、tests/
+  ddnsto/           # ddnsto-install.sh、Windows/macOS 入口、业务源码、测试、release.py
   legacy/           # 原仓库旧脚本快照与来源说明，仅供历史参考
   lib/              # 共享 shell bootstrap
   scripts/          # 统一生成、打包与验收
@@ -45,7 +45,7 @@ zsetup-scripts/
   catalog.json      # 统一安装索引的构建输入
 ```
 
-共享 bootstrap 构建时嵌入各模块的唯一 install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/install.sh、ddnsto/install.sh 或 zsetup install，原业务仓库保持不变。
+共享 bootstrap 构建时嵌入各模块的唯一 APP-install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh 或 zsetup install，原业务仓库保持不变。
 
 正式服务器部署 `dist/release/binary/` 中的三个目录：`fastnet/`、`ddnsto/`、`zsetup/`，映射到站点 `/binary/`。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变，共享完整配置在 zsetup/config.json。目录映射、首个新服务器的业务产物要求及发布顺序见 [发布流程](docs/release.md)。
 

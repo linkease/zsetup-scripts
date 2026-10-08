@@ -29,7 +29,7 @@ def main():
         content += "    export ZSETUP_BIN ZSETUP_ARCH ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK\n"
         content += f"    {app}_install \"$@\"\n}}\n\n"
         content += (folder / "main.sh").read_text()
-        output = folder / "install.sh"
+        output = folder / f"{app}-install.sh"
         if args.check:
             if not output.is_file() or output.read_text() != content:
                 raise SystemExit(f"stale generated entry: {output}")

@@ -63,7 +63,7 @@ def main():
             parts = file.relative_to(previous_binary).parts
             if len(parts) != 3 or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", parts[1]) or parts[1] in {".", "..", "stable", "latest"}:
                 continue
-            if (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] == "install.sh"):
+            if (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] in {"install.sh", f"{parts[0]}-install.sh"}):
                 copy_immutable(file, binary.joinpath(*parts))
         # Refuse replacing any previously staged immutable executable or installer.
         for file in sorted(release.iterdir()):
@@ -71,12 +71,14 @@ def main():
         for record in catalog["installers"]:
             copy_immutable(ROOT / record["script"], binary / record["path"])
         for app in sorted(applications):
-            shutil.copy2(ROOT / app / "install.sh", binary / app / "install.sh")
+            installer = ROOT / app / f"{app}-install.sh"
+            shutil.copy2(installer, binary / app / installer.name)
+            shutil.copy2(installer, binary / app / "install.sh")  # Existing public URL.
         # Native desktop entrypoints are public business installers, but are
         # not zsetup POSIX catalog entries and therefore are copied explicitly.
         for relative in ("install.ps1", "install-macos.sh"):
             copy_immutable(ROOT / "ddnsto" / relative, binary / "ddnsto" / relative)
-        DDNSTO["copy_compat_installers"](ROOT / "ddnsto/install.sh", binary / "ddnsto")
+        DDNSTO["copy_compat_installers"](ROOT / "ddnsto/ddnsto-install.sh", binary / "ddnsto")
         subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(release), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
         (binary / "zsetup/stable").write_text(version + "\n")
         evidence = {

@@ -2,7 +2,7 @@
 
 业务发布流程提前把 FastNet/DDNSTO 产品、版本信息和真实 SHA256 元数据放到服务器。设备上的业务脚本按平台和架构选择产品，调用 zsetup 下载、校验、复用缓存，然后完成业务安装。本仓库维护安装脚本和统一安装索引，不采集、缓存或重新打包产品。
 
-依赖权威 zsetup 源码和现有构建能力，最低版本 0.2.4。复用原生版本/SHA256 元数据读取、总内存探测和 download/context/run/install；保留 0.2.3 Race 预算及 DoH/UDP 解析修复。本次没有修改下载内核或业务脚本字节，脚本版本仍为 0.1.3，config_version 为 scripts-0.1.3。
+依赖权威 zsetup 源码和现有构建能力，最低版本 0.2.4。复用原生版本/SHA256 元数据读取、总内存探测和 download/context/run/install；保留 0.2.3 Race 预算及 DoH/UDP 解析修复。统一入口命名为 APP/APP-install.sh，发布脚本版本为 0.1.4，config_version 为 scripts-0.1.4；native 保持 0.2.4。此前脚本及 native 不可变目录保留原字节。
 
 ## 本地构建
 
@@ -27,15 +27,16 @@ manifest 的 business_artifacts 标记业务服务器发布所有权及 included
 | 文件 | 规则 |
 |---|---|
 | binary/zsetup/0.2.4/ | 权威 native release 的六个不可变文件，包括 SHA256SUMS/manifest |
-| binary/{fastnet,ddnsto}/0.1.3/install.sh | 不可变业务入口；索引记录真实 SHA256/size |
-| binary/{fastnet,ddnsto}/install.sh | 可变用户入口，与当前索引脚本同字节 |
+| binary/APP/0.1.4/APP-install.sh | 不可变业务入口；索引记录真实 SHA256/size |
+| binary/APP/APP-install.sh | 可变用户入口，与当前索引脚本同字节 |
+| binary/APP/install.sh | 原用户 URL 的同字节兼容副本，不单独维护业务代码 |
 | binary/ddnsto/install.ps1、install-macos.sh | Windows/macOS 原生业务入口；使用已发布客户端归档，不在本仓库内复制客户端二进制 |
 | binary/zsetup/config.json | 完整配置，不进行字段合并 |
 | binary/zsetup/stable | 精确 native 版本，最后激活 |
 | binary/ddnsto/openwrt/install_ddnsto.sh、install_ddnsto_business.sh、setup_ddnsto.sh | 相同 DDNSTO 入口字节的兼容副本 |
 | binary/ddnsto/linux-binary/install_ddnsto_linux.sh | 相同 DDNSTO 入口字节的兼容副本 |
 
-APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/install.sh 生成实际文件，不依赖历史快照或符号链接。Windows/macOS 原生入口由打包器显式复制；脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
+APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/ddnsto-install.sh 生成实际文件，不依赖历史快照或符号链接。Windows/macOS 原生入口由打包器显式复制；脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
 
 ## 服务器提前提供的产品
 
@@ -68,7 +69,7 @@ opkg 使用 ipk，apk 使用带 -apk 的目录和 apk 包。OpenWrt 主包、LuC
 1. 业务发布流程先完成各站点产品及版本/SHA256 元数据。确认对应系统、包管理器和架构路径可读取，内容/摘要一致。
 2. 将本仓库 tar 放入受控部署 staging，解包并验证 PACKAGE-SHA256SUMS。按 binary/ 相对路径增量部署到网站 /binary/，保留已有产品和历史版本；不得使用同步删除。
 3. 先部署并回读不可变 native/业务脚本，拒绝同版本字节冲突；设备 canary 验证两种入口和回滚。随后原子切换用户/兼容入口、完整 config.json，stable 最后激活。
-4. 四站点同步并完成回读后公布升级。immutable 路径可长期缓存；install.sh、config、stable、业务 VERSION/version.txt 和未版本化 SHA256SUMS 使用 no-cache。
+4. 四站点同步并完成回读后公布升级。immutable 路径可长期缓存；APP-install.sh、兼容 install.sh、config、stable、业务 VERSION/version.txt 和未版本化 SHA256SUMS 使用 no-cache。
 
 回滚恢复上一份完整配置、可变入口和所需业务指针，stable 最后回退；保留不可变文件。配置 stable/min_version/artifacts 必须一致，不仅修改版本字符串。
 

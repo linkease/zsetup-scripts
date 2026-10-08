@@ -12,6 +12,6 @@
 | install_ddnsto_linux.sh | Linux 两架构安装 | 0dbb19088fd4aae18c597c8f5455eaf28b4ef3bbd5adac7f551b85077c572c86 |
 | setup_ddnsto.sh | 旧入口调用、token 配置和状态检查 | 53b69f9d7a6d287405c6ba88fb891f78ab362cdbb964dbf73c62d0bc83a8ff52 |
 
-当前维护和调用入口是 [fastnet/install.sh](../fastnet/install.sh)、[ddnsto/install.sh](../ddnsto/install.sh)，也可使用 zsetup install fastnet/ddnsto。下载协议、校验与依赖以这些现行入口为准，历史脚本保留当时的实现。
+当前维护和调用入口是 [fastnet/fastnet-install.sh](../fastnet/fastnet-install.sh)、[ddnsto/ddnsto-install.sh](../ddnsto/ddnsto-install.sh)，也可使用 zsetup install fastnet/ddnsto。下载协议、校验与依赖以这些现行入口为准，历史脚本保留当时的实现。
 
 原业务仓库与线上旧 URL 保留；线上兼容入口由当前 DDNSTO 安装脚本生成，同名快照不参与生成。详见 [发布流程](../docs/release.md)。

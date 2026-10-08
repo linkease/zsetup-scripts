@@ -1,8 +1,8 @@
-# Included at build time; only install.sh is a public installer.
+# Included at build time; only ddnsto-install.sh is a public installer.
 ddnsto_error() { printf 'DDNSTO: %s\n' "$*" >&2; }
 
 ddnsto_usage() {
-    printf '%s\n' 'Usage: install.sh [--token TOKEN] [--force-version lite|standard] [--verify-status]' \
+    printf '%s\n' 'Usage: ddnsto-install.sh [--token TOKEN] [--force-version lite|standard] [--verify-status]' \
         'OpenWrt: token optional; automatic Lite selection below 900 MB.' \
         'Linux x86_64/aarch64: --token required without an interactive terminal.'
 }
