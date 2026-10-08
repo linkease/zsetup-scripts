@@ -23,3 +23,5 @@
 执行顺序：盘点 → 迁移及双入口 → 配置/不可变发布包 → AI/扩展文档 → 自检/证据。验收包括 POSIX 语法、原 FastNet 测试、新 DDNSTO 业务矩阵、真实 zsetup install、本地缓存复用、失败前不改业务、临时目录清理、参数/进度、索引与文件 digest/size、可重复打包和不可变冲突拒绝。每个失败项最多三次修复，有证据后才继续。
 
 源旧 `mips` 无条件匹配改成检查 `/bin/sh` ELF 的 EI_DATA（需要 od），确认 little-endian 后才选择 **mipsel**；zsetup 只发布 little-endian ABI，未知/大端 MIPS 不能安全安装。旧任意 `arm`/未知 Linux 的支持声明也不能替代已确认 ABI。此类目标、真实四架构 OpenWrt 安装与公网四站点切换仍需设备/发布验证。
+
+2026-10-08 依赖精简更新：脚本 0.1.2 要求 zsetup >=0.2.4；FastNet/DDNSTO 已去除 awk/sed，业务版本/SHA256 使用 native metadata，总内存使用 native context。上述迁移初期依赖段落中的 awk 描述已被此版本替代。完整证据见 [去除 awk/sed 验证](verification-2026-10-08-no-awk-sed.md)。
