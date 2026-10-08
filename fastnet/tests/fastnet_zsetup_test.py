@@ -17,7 +17,6 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parents[1] / "install.sh"
 ZSETUP = Path(sys.argv[1])
 TUNNEL_ROOT = Path(sys.argv[2])
-CERT_DIR = TUNNEL_ROOT / "runtime-zig/third-part/mbedtls/framework/data_files"
 BINARY = b"""#!/bin/sh
 if [ "${1:-}" = version ]; then echo 'FastNet fixture'; exit 0; fi
 printf '%s\n' "$*" > "$FASTNET_TEST_OUTPUT"
@@ -57,9 +56,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    # Use numeric loopback and a matching TLS certificate; no public DNS in this fixture.
+    cert_tmp = tempfile.TemporaryDirectory(prefix="installer-loopback-tls-")
+    cert_dir = Path(cert_tmp.name)
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                    "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
+                    "-keyout", str(cert_dir / "server.key"), "-out", str(cert_dir / "server.crt")],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    tls.load_cert_chain(CERT_DIR / "server5.crt", CERT_DIR / "server5.key")
+    tls.load_cert_chain(cert_dir / "server.crt", cert_dir / "server.key")
     server.socket = tls.wrap_socket(server.socket, server_side=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -67,7 +73,7 @@ def main() -> None:
         with tempfile.TemporaryDirectory(prefix="fastnet-zsetup-") as tmp_text:
             tmp = Path(tmp_text)
             output = tmp / "args"
-            base = f"https://localhost:{server.server_address[1]}/binary"
+            base = f"https://127.0.0.1:{server.server_address[1]}/binary"
             config = {
                 "schema_version": 1,
                 "config_version": "fastnet-fixture-1",
@@ -95,7 +101,7 @@ def main() -> None:
             env = os.environ | {
                 "ZSETUP_BIN": str(ZSETUP),
                 "ZSETUP_ARCH": "x86_64",
-                "ZSETUP_CA_FILE": str(CERT_DIR / "test-ca2.crt"),
+                "ZSETUP_CA_FILE": str(cert_dir / "server.crt"),
                 "ZSETUP_WORK_DIR": str(tmp / "work"),
                 "FASTNET_TEST_OUTPUT": str(output),
                 "ZSETUP_CONFIG": str(config_path),
@@ -124,6 +130,7 @@ def main() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+        cert_tmp.cleanup()
 
     print("FastNet single installer: zsetup mode, metadata, verified binary, args and reuse passed")
 

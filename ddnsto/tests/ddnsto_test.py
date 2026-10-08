@@ -18,7 +18,6 @@ import threading
 ROOT = Path(__file__).resolve().parents[2]
 ZSETUP = Path(sys.argv[1]).resolve()
 TUNNEL = Path(sys.argv[2]).resolve()
-CERT = TUNNEL / "runtime-zig/third-part/mbedtls/framework/data_files"
 SCRIPT = ROOT / "ddnsto/install.sh"
 BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\nif [ "${1:-}" = stop ]; then exit "${STOP_FAIL:-0}"; fi\n'
 
@@ -49,16 +48,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def main():
     assert SCRIPT.is_file(), "DDNSTO unified entry is missing"
+    # Use numeric loopback and a matching TLS certificate; no public DNS in this fixture.
+    cert_tmp = tempfile.TemporaryDirectory(prefix="installer-loopback-tls-")
+    cert_dir = Path(cert_tmp.name)
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                    "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
+                    "-keyout", str(cert_dir / "server.key"), "-out", str(cert_dir / "server.crt")],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    tls.load_cert_chain(CERT / "server5.crt", CERT / "server5.key")
+    tls.load_cert_chain(cert_dir / "server.crt", cert_dir / "server.key")
     server.socket = tls.wrap_socket(server.socket, server_side=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
         with tempfile.TemporaryDirectory(prefix="ddnsto-contract-") as tmp:
             root = Path(tmp)
-            base = f"https://localhost:{server.server_address[1]}/binary"
+            base = f"https://127.0.0.1:{server.server_address[1]}/binary"
             bodies = Handler.bodies
             bodies["/binary/ddnsto/install.sh"] = SCRIPT.read_bytes()
             bodies["/binary/zsetup/stable"] = b"0.2.4\n"
@@ -122,7 +128,7 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             config_path.write_text(json.dumps(config))
             env = os.environ | {
                 "PATH": f"{bindir}:/usr/bin:/bin", "ZSETUP_BIN": str(ZSETUP),
-                "ZSETUP_CA_FILE": str(CERT / "test-ca2.crt"),
+                "ZSETUP_CA_FILE": str(cert_dir / "server.crt"),
                 "ZSETUP_SOURCE_BASES": base, "ZSETUP_SOURCE_FALLBACK": "",
                 "ZSETUP_BOOTSTRAP_BASES": base, "ZSETUP_ROOT": str(root / "rescue"),
                 "ZSETUP_WORK_DIR": str(root / "work"), "DDNSTO_BIN_PATH": str(root / "installed/ddnsto"),
@@ -212,6 +218,7 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             assert not list((root / "rescue").rglob(".zsetup-download.*"))
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)
+        cert_tmp.cleanup()
     print("DDNSTO: direct/index, opkg/apk x 4 arch, Linux, token, Lite/Standard, cache, progress and failures passed")
 
 
