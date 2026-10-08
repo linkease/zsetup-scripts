@@ -7,12 +7,14 @@ import hashlib
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "apps/fastnet/install.sh"
 VERSION = "9.8.7"
+METADATA_ZSETUP = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path("/projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup/dist/release/zsetup-linux-x86_64")
 
 
 def executable(path: Path, text: str) -> None:
@@ -31,6 +33,7 @@ def main() -> None:
         executable(payload, f"""#!/bin/sh
 if [ "${{1:-}}" = --version ]; then echo 'zsetup {VERSION}'; exit 0; fi
 printf '%s\\n' "$*" >> "$ZSETUP_COMMAND_LOG"
+if [ "${{1:-}}" = metadata ]; then exec "$TEST_METADATA_ZSETUP" "$@"; fi
 if [ "${{1:-}}" = download ]; then
     shift
     output=
@@ -81,7 +84,7 @@ cp "$WEB_ROOT/$relative" "$out"
 """)
         minimal_bin = root / "minimal-bin"
         minimal_bin.mkdir()
-        for name in ("sh", "cp", "mkdir", "chmod", "mv", "sed", "unlink", "rm"):
+        for name in ("sh", "cp", "mkdir", "chmod", "mv", "unlink", "rm"):
             target = shutil.which(name)
             assert target is not None
             (minimal_bin / name).symlink_to(target)
@@ -109,6 +112,7 @@ cp "$WEB_ROOT/$relative" "$out"
                 "ZSETUP_COMMAND_LOG": str(command_log),
                 "FASTNET_TEST_LOG": str(install_log),
                 "FASTNET_FIXTURES": str(web),
+                "TEST_METADATA_ZSETUP": str(METADATA_ZSETUP),
                 "ZSETUP_ROOT": str(case / "work"),
                 "ZSETUP_WORK_DIR": str(case / "fastnet-work"),
                 "ZSETUP_BOOTSTRAP_BASES": bases,
@@ -131,7 +135,7 @@ cp "$WEB_ROOT/$relative" "$out"
         assert all(url.startswith("https://") for url in reuse_urls)
         assert not any(url.endswith("zsetup-linux-x86_64") for url in reuse_urls)
         reuse_commands = (root / "reuse/zsetup.log").read_text(encoding="utf-8").splitlines()
-        assert reuse_commands and all(command.startswith("download ") for command in reuse_commands)
+        assert reuse_commands and all(command.startswith(("download ", "metadata ")) for command in reuse_commands)
         assert (root / "reuse/install.log").read_text(encoding="utf-8").strip() == "reuse"
 
         malformed = run("malformed", bases="https://bad.test/binary https://mirror.test/binary")
@@ -150,7 +154,7 @@ cp "$WEB_ROOT/$relative" "$out"
         assert "[4/4] Starting FastNet" in downloaded.stderr, downloaded.stderr
         assert (root / "https/install.log").read_text(encoding="utf-8").strip() == "https"
         https_commands = (root / "https/zsetup.log").read_text(encoding="utf-8").splitlines()
-        assert https_commands and all(command.startswith("download ") for command in https_commands)
+        assert https_commands and all(command.startswith(("download ", "metadata ")) for command in https_commands)
         assert all(url.startswith("https://") for url in (root / "https/fetch.log").read_text().splitlines())
 
         no_hash = run("https-no-hash-tools", without_hash_tools=True)

@@ -41,7 +41,7 @@ import os,json,sys,shutil
 from pathlib import Path
 args=sys.argv[1:]
 if args == ['--version']:
- print('zsetup 0.2.3'); sys.exit(0)
+ print('zsetup 0.2.4'); sys.exit(0)
 assert args[0]=='download', args
 with open(os.environ['COMMAND_LOG'],'a') as stream: stream.write(json.dumps(args)+'\\n')
 output=Path(args[args.index('-o')+1])
@@ -84,7 +84,7 @@ shutil.copyfile(Path(os.environ['WEB_ROOT'])/relative,output)
         name = f"zsetup-linux-{arch}"
         (release / name).write_bytes(binary.read_bytes()); (release / name).chmod(0o755)
         records.append({"name": name, "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "size": binary.stat().st_size})
-    (release / "release-manifest.json").write_text(json.dumps({"version": "0.2.3", "source_commit": "fixture", "artifacts": records}))
+    (release / "release-manifest.json").write_text(json.dumps({"version": "0.2.4", "source_commit": "fixture", "artifacts": records}))
     (release / "SHA256SUMS").write_text(''.join(f"{r['sha256']}  {r['name']}\n" for r in records))
     subprocess.run(["git", "init", "-q", str(zroot)], check=True)
     subprocess.run(["git", "-C", str(zroot), "add", "."], check=True)

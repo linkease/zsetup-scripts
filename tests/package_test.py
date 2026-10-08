@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     subprocess.run(argv, check=True)
     binary = output / "binary"
     config = json.loads((binary / "zsetup/config.json").read_text())
-    assert config["stable_zsetup"]["version"] == "0.2.3"
+    assert config["stable_zsetup"]["version"] == "0.2.4"
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto"}
     assert not any(r["application"] == "fastpve" for r in config["installers"])
     for record in config["installers"] + config["stable_zsetup"]["artifacts"]:

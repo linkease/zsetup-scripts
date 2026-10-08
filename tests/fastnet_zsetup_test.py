@@ -73,14 +73,14 @@ def main() -> None:
                 "config_version": "fastnet-fixture-1",
                 "source_groups": [{"id": "fixture", "primary_bases": [base]}],
                 "stable_zsetup": {
-                    "version": "0.2.3", "source_group": "fixture",
+                    "version": "0.2.4", "source_group": "fixture",
                     "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00" * 32, "size": 1}],
                 },
                 "installers": [{
                     "application": "fastnet", "os": "*", "package_manager": "*", "arch": "*",
                     "source_group": "fixture", "path": "fastnet/install.sh",
                     "sha256": hashlib.sha256(BUSINESS).hexdigest(), "size": len(BUSINESS),
-                    "background": False, "min_version": "0.2.3",
+                    "background": False, "min_version": "0.2.4",
                 }],
             }
             config_path = tmp / "config.json"

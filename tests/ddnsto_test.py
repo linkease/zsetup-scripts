@@ -61,10 +61,10 @@ def main():
             base = f"https://localhost:{server.server_address[1]}/binary"
             bodies = Handler.bodies
             bodies["/binary/ddnsto/install.sh"] = SCRIPT.read_bytes()
-            bodies["/binary/zsetup/stable"] = b"0.2.3\n"
+            bodies["/binary/zsetup/stable"] = b"0.2.4\n"
             payload = ZSETUP.read_bytes()
-            bodies["/binary/zsetup/0.2.3/zsetup-linux-x86_64"] = payload
-            bodies["/binary/zsetup/0.2.3/SHA256SUMS"] = f"{hashlib.sha256(payload).hexdigest()}  zsetup-linux-x86_64\n".encode()
+            bodies["/binary/zsetup/0.2.4/zsetup-linux-x86_64"] = payload
+            bodies["/binary/zsetup/0.2.4/SHA256SUMS"] = f"{hashlib.sha256(payload).hexdigest()}  zsetup-linux-x86_64\n".encode()
             archive = io.BytesIO()
             with tarfile.open(fileobj=archive, mode="w:gz") as tar:
                 member = tarfile.TarInfo("ddnsto-standard-4.2.3/ddnsto.x86_64")
@@ -85,6 +85,8 @@ def main():
                     bodies[prefix + "SHA256SUMS"] = "".join(f"{hashlib.sha256(bodies[prefix+name]).hexdigest()}  {name}\n" for name in names).encode()
             bindir = root / "bin"
             bindir.mkdir()
+            for dependency in ("awk", "sed"):
+                executable(bindir / dependency, '#!/bin/sh\nprintf "forbidden dependency\\n" >&2\nexit 99\n')
             executable(bindir / "opkg", '#!/bin/sh\nprintf "opkg %s\\n" "$*" >> "$TEST_LOG"\n[ "${1:-}" != install ] || [ "${PKG_FAIL:-0}" = 0 ] || exit 23\n')
             executable(bindir / "apk", '#!/bin/sh\nprintf "apk %s\\n" "$*" >> "$TEST_LOG"\n[ "${1:-}" != add ] || [ "${PKG_FAIL:-0}" = 0 ] || exit 23\n')
             executable(bindir / "ddnsto", '#!/bin/sh\necho "DDNSTO fixture"\n')
@@ -113,8 +115,8 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             config = {
                 "schema_version": 1, "config_version": "ddnsto-fixture-1",
                 "source_groups": [{"id": "fixture", "primary_bases": [base]}],
-                "stable_zsetup": {"version": "0.2.3", "source_group": "fixture", "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00"*32, "size": 1}]},
-                "installers": [{"application": "ddnsto", "os": "*", "package_manager": "*", "arch": "*", "source_group": "fixture", "path": "ddnsto/install.sh", "sha256": hashlib.sha256(SCRIPT.read_bytes()).hexdigest(), "size": SCRIPT.stat().st_size, "background": False, "min_version": "0.2.3"}],
+                "stable_zsetup": {"version": "0.2.4", "source_group": "fixture", "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00"*32, "size": 1}]},
+                "installers": [{"application": "ddnsto", "os": "*", "package_manager": "*", "arch": "*", "source_group": "fixture", "path": "ddnsto/install.sh", "sha256": hashlib.sha256(SCRIPT.read_bytes()).hexdigest(), "size": SCRIPT.stat().st_size, "background": False, "min_version": "0.2.4"}],
             }
             config_path = root / "config.json"
             config_path.write_text(json.dumps(config))
@@ -165,6 +167,11 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             assert lite.returncode == 0, lite
             assert "Lite" in lite.stderr, lite.stderr
             assert any("/lite/" in path for path in Handler.counts)
+            # Business thresholds consume native facts; unknown memory preserves Standard.
+            for memory, selected in (("899", "lite"), ("900", "standard"), ("unknown", "standard")):
+                chosen = run([], {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "openwrt", "ZSETUP_PACKAGE_MANAGER": "opkg", "ZSETUP_ARCH": "x86_64", "DDNSTO_MEM_MB": "", "ZSETUP_MEMORY_TOTAL_MB": memory})
+                assert chosen.returncode == 0 and f"Checking DDNSTO {selected} version" in chosen.stderr, chosen
+
             for args, override in ((["--token"], {}), (["--bogus"], {}), ([], {"ZSETUP_OS": "asuswrt", "ZSETUP_PACKAGE_MANAGER": "opkg"}), ([], {"ZSETUP_OS": "openwrt", "ZSETUP_PACKAGE_MANAGER": "opkg", "ZSETUP_ARCH": "mips"})):
                 bad = run(args, {"ZSETUP_INSTALLER_MODE": "1"} | override)
                 assert bad.returncode == 2, bad
