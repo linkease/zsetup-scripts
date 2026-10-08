@@ -18,6 +18,9 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert config["stable_zsetup"]["version"] == "0.2.4"
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto"}
     assert not any(r["application"] == "fastpve" for r in config["installers"])
+    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "zsetup"}
+    assert not any(p.name in {"business.sh", "main.sh", "README.md"} or p.suffix == ".py" for p in binary.rglob("*"))
+
     for record in config["installers"] + config["stable_zsetup"]["artifacts"]:
         path = binary / record["path"]
         assert path.is_file()
