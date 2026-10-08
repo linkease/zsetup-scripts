@@ -14,6 +14,7 @@ for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_tes
     assert not (ROOT / "apps" / app).exists(), "one canonical module directory required"
 assert (ROOT / "ddnsto/release.py").is_file()
 assert (ROOT / "ddnsto/collect-artifacts.py").is_file()
+assert (ROOT / "scripts/collect-ddnsto-artifacts.py").resolve(strict=True) == ROOT / "ddnsto/collect-artifacts.py"
 for filename, app in (("fastnet-install.sh", "fastnet"), ("install_ddnsto.sh", "ddnsto"), ("install_ddnsto_linux.sh", "ddnsto"), ("install_ddnsto_business.sh", "ddnsto"), ("setup_ddnsto.sh", "ddnsto")):
     assert (ROOT / filename).resolve(strict=True) == ROOT / app / "install.sh"
 for record in json.loads((ROOT / "catalog.json").read_text())["installers"]:
