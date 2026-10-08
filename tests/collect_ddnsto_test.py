@@ -70,6 +70,30 @@ shutil.copyfile(Path(os.environ['WEB_ROOT'])/relative,output)
         for primary in ('https://dl.istoreos.com/', 'https://fw.d4ctech.com/', 'https://fw20.koolcenter.com/'):
             assert any(value.startswith(primary) for value in args)
         assert not any(value.startswith('http://') for value in args)
+    # One-command packaging composes collection and the existing config generator.
+    zroot = root / "zsetup-root"
+    (zroot / "dist/release").mkdir(parents=True)
+    (zroot / "scripts").mkdir()
+    checker = zroot / "scripts/check-release-artifacts.sh"
+    checker.write_text("#!/bin/sh\nexit 0\n"); checker.chmod(0o755)
+    original_generator = Path("/projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup/scripts/generate-product-config.py")
+    (zroot / "scripts/generate-product-config.py").symlink_to(original_generator)
+    release = zroot / "dist/release"
+    records = []
+    for arch in ("x86_64", "aarch64", "armv7", "mipsel"):
+        name = f"zsetup-linux-{arch}"
+        (release / name).write_bytes(binary.read_bytes()); (release / name).chmod(0o755)
+        records.append({"name": name, "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "size": binary.stat().st_size})
+    (release / "release-manifest.json").write_text(json.dumps({"version": "0.2.3", "source_commit": "fixture", "artifacts": records}))
+    (release / "SHA256SUMS").write_text(''.join(f"{r['sha256']}  {r['name']}\n" for r in records))
+    subprocess.run(["git", "init", "-q", str(zroot)], check=True)
+    subprocess.run(["git", "-C", str(zroot), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(zroot), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-qm", "fixture"], check=True)
+    package = root / "release"
+    packaged = subprocess.run(["python3", "-B", str(ROOT / "scripts/package-release.py"), "--zsetup-root", str(zroot), "--collect-ddnsto", "--output", str(package)], env=env, capture_output=True, text=True)
+    assert packaged.returncode == 0, packaged
+    assert (package / "binary/ddnsto/openwrt/standard/4.2.6/SHA256SUMS").is_file()
+    assert json.loads((package / "scripts-release-manifest.json").read_text())["readiness"] == "artifacts-verified-canary-required"
     before = (output / "artifacts.json").read_bytes()
     failed = subprocess.run(command, env=env | {"FAIL_PATH": "openwrt/standard/4.2.6/ddnsto_x86_64.ipk"}, capture_output=True)
     assert failed.returncode != 0
