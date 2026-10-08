@@ -14,7 +14,7 @@ import threading
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "install.sh"
+SCRIPT = Path(__file__).resolve().parents[1] / "fastnet-install.sh"
 ZSETUP = Path(sys.argv[1])
 TUNNEL_ROOT = Path(sys.argv[2])
 BINARY = b"""#!/bin/sh
@@ -41,7 +41,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             type(self).no_cache = self.headers.get("Cache-Control") == "no-cache"
         elif self.path == "/binary/fastnet/FastNet-1.2.3.amd64":
             body = BINARY
-        elif self.path == "/binary/fastnet/install.sh":
+        elif self.path == "/binary/fastnet/fastnet-install.sh":
             body = BUSINESS
         else:
             self.send_error(404)
@@ -84,7 +84,7 @@ def main() -> None:
                 },
                 "installers": [{
                     "application": "fastnet", "os": "*", "package_manager": "*", "arch": "*",
-                    "source_group": "fixture", "path": "fastnet/install.sh",
+                    "source_group": "fixture", "path": "fastnet/fastnet-install.sh",
                     "sha256": hashlib.sha256(BUSINESS).hexdigest(), "size": len(BUSINESS),
                     "background": False, "min_version": "0.2.4",
                 }],

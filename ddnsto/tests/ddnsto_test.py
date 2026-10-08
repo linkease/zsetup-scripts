@@ -18,7 +18,7 @@ import threading
 ROOT = Path(__file__).resolve().parents[2]
 ZSETUP = Path(sys.argv[1]).resolve()
 TUNNEL = Path(sys.argv[2]).resolve()
-SCRIPT = ROOT / "ddnsto/install.sh"
+SCRIPT = ROOT / "ddnsto/ddnsto-install.sh"
 BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\nif [ "${1:-}" = stop ]; then exit "${STOP_FAIL:-0}"; fi\n'
 
 
@@ -66,7 +66,7 @@ def main():
             root = Path(tmp)
             base = f"https://127.0.0.1:{server.server_address[1]}/binary"
             bodies = Handler.bodies
-            bodies["/binary/ddnsto/install.sh"] = SCRIPT.read_bytes()
+            bodies["/binary/ddnsto/ddnsto-install.sh"] = SCRIPT.read_bytes()
             bodies["/binary/zsetup/stable"] = b"0.2.4\n"
             payload = ZSETUP.read_bytes()
             bodies["/binary/zsetup/0.2.4/zsetup-linux-x86_64"] = payload
@@ -122,7 +122,7 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
                 "schema_version": 1, "config_version": "ddnsto-fixture-1",
                 "source_groups": [{"id": "fixture", "primary_bases": [base]}],
                 "stable_zsetup": {"version": "0.2.4", "source_group": "fixture", "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00"*32, "size": 1}]},
-                "installers": [{"application": "ddnsto", "os": "*", "package_manager": "*", "arch": "*", "source_group": "fixture", "path": "ddnsto/install.sh", "sha256": hashlib.sha256(SCRIPT.read_bytes()).hexdigest(), "size": SCRIPT.stat().st_size, "background": False, "min_version": "0.2.4"}],
+                "installers": [{"application": "ddnsto", "os": "*", "package_manager": "*", "arch": "*", "source_group": "fixture", "path": "ddnsto/ddnsto-install.sh", "sha256": hashlib.sha256(SCRIPT.read_bytes()).hexdigest(), "size": SCRIPT.stat().st_size, "background": False, "min_version": "0.2.4"}],
             }
             config_path = root / "config.json"
             config_path.write_text(json.dumps(config))
@@ -149,7 +149,7 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             assert direct.returncode == 0, direct
             assert all(step in direct.stderr for step in ("[1/4]", "[2/4]", "[3/4]", "[4/4]")), direct.stderr
             assert "-u\nfixture token\n-daemon" in (root / "log").read_text()
-            assert Handler.counts.get("/binary/ddnsto/install.sh", 0) == 0
+            assert Handler.counts.get("/binary/ddnsto/ddnsto-install.sh", 0) == 0
             archive_path = "/binary/ddnsto/linux-binary/ddnsto-standard-4.2.3.tar.gz"
             count = Handler.counts[archive_path]
             indexed = run(["--token", token], indexed=True)

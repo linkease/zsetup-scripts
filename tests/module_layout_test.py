@@ -8,8 +8,9 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",))):
     module = ROOT / app
-    for filename in ("business.sh", "main.sh", "install.sh", "README.md"):
+    for filename in ("business.sh", "main.sh", f"{app}-install.sh", "README.md"):
         assert (module / filename).is_file(), f"missing {app}/{filename}"
+    assert not (module / "install.sh").exists(), "one maintained installer filename per business"
     for filename in tests:
         assert (module / "tests" / filename).is_file(), f"missing {app}/tests/{filename}"
     assert not (ROOT / "apps" / app).exists(), "one canonical module directory required"
@@ -29,7 +30,7 @@ for filename, digest in expected.items():
     assert hashlib.sha256((ROOT / "legacy" / filename).read_bytes()).hexdigest() == digest
 for record in json.loads((ROOT / "catalog.json").read_text())["installers"]:
     app = record["application"]
-    assert record["script"] == f"{app}/install.sh"
-    assert record["path"] == f"{app}/0.1.3/install.sh"
+    assert record["script"] == f"{app}/{app}-install.sh"
+    assert record["path"] == f"{app}/0.1.4/{app}-install.sh"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")

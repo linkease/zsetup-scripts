@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert not (output.parent / "ddnsto-artifacts").exists()
     assert not any(p.suffix in {".ipk", ".apk", ".gz"} for p in binary.rglob("*"))
     for relative in ("openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh", "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh"):
-        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/install.sh").read_bytes()
+        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/ddnsto-install.sh").read_bytes()
     for relative in ("install.ps1", "install-macos.sh"):
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
     config = json.loads((binary / "zsetup/config.json").read_text())
@@ -42,7 +42,11 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        assert (binary / record["path"]).read_bytes() == (binary / app / "install.sh").read_bytes()
+        assert record["path"] == f"{app}/0.1.4/{app}-install.sh"
+        current = binary / app / f"{app}-install.sh"
+        assert (binary / record["path"]).read_bytes() == current.read_bytes()
+        # Historical public URL remains an identical compatibility copy.
+        assert (binary / app / "install.sh").read_bytes() == current.read_bytes()
     def select(app, os_name, pm, arch):
         matches = [r for r in config["installers"] if r["application"] == app and all(r[k] in ("*", v) for k,v in (("os", os_name), ("package_manager", pm), ("arch", arch)))]
         assert len(matches) == 1, (app, os_name, pm, arch, matches)
@@ -70,12 +74,15 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     historical = binary / "ddnsto/0.0.9/install.sh"
     historical.parent.mkdir(parents=True)
     historical.write_bytes(b"historical immutable installer")
+    historical_named = binary / "ddnsto/0.0.9/ddnsto-install.sh"
+    historical_named.write_bytes(b"historical named installer")
     historical_native = binary / "zsetup/0.0.9/zsetup-linux-x86_64"
     historical_native.parent.mkdir(parents=True)
     historical_native.write_bytes(b"historical immutable native")
     subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)
     assert not stale.exists() and not pointer.exists()
     assert historical.read_bytes() == b"historical immutable installer"
+    assert historical_named.read_bytes() == b"historical named installer"
     assert historical_native.read_bytes() == b"historical immutable native"
     assert (output / "scripts-release-manifest.json").is_file()
     with tarfile.open(next(output.glob("*.tar.gz"))) as archive:
