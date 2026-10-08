@@ -4,7 +4,7 @@
 - Read `docs/inventory.md`, `docs/release.md`, `docs/ai-contract.md`, and the owning zsetup product principles/config/lifecycle/release documents before changing behavior.
 - `lib/bootstrap.sh` is the shared shell bootstrap source extracted from tested FastNet. `scripts/build-entrypoints.py` embeds it; generated `apps/APP/install.sh` is the only public entry. Edit maintained sources, regenerate, then use `--check`.
 - Root legacy names are symlinks. The source DDNSTO repository and existing live URLs must remain until explicit migration verification.
-- Preserve zsetup >=0.2.3, three HTTPS primaries and the final fallback. Only shell bootstrap may prompt for HTTP after exhausting HTTPS. Do not add unattended downgrade or external SHA dependencies to normal installation.
+- Scripts 0.1.2 require zsetup >=0.2.4 for native metadata/memory, preserving the 0.2.3 Race/DNS fixes, three HTTPS primaries and the final fallback. Only shell bootstrap may prompt for HTTP after exhausting HTTPS. Do not add unattended downgrade or external SHA dependencies to normal installation.
 - Test with local HTTPS fixtures, fake package managers and isolated work/install paths. Never execute a real OpenWrt package or change a host service as a test.
 - Add behavior tests before production edits; keep test-only and implementation commits separate. Run `sh scripts/check.sh ZSETUP_ROOT` after meaningful changes.
 - Do not rewrite a running shell script in place. Generated entries and package pointers must be installed atomically.

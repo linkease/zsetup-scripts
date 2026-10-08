@@ -29,8 +29,8 @@ fastnet_install() {
     version_file="$work_dir/version.txt"
     status "[2/4] Checking FastNet version..."
     fastnet_download version.txt "$version_file" "" 1
-    version=$(sed -n 's/^VERSION=//p' "$version_file" | sed -n '1p')
-    expected_sha=$(sed -n "s/^${sha_key}=//p" "$version_file" | sed -n '1p')
+    version=$("$ZSETUP_BIN" metadata version "$version_file" VERSION)
+    expected_sha=$("$ZSETUP_BIN" metadata sha256 "$version_file" "$sha_key")
     if [ -z "$version" ] || [ -z "$expected_sha" ]; then
         echo "FastNet: version metadata is incomplete" >&2
         return 11

@@ -1,6 +1,6 @@
 # zsetup-scripts
 
-FastNet、DDNSTO 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup/README.md)，最低版本 **0.2.3**。
+FastNet、DDNSTO 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup/README.md)，最低版本 **0.2.4**。
 
 设备已有 zsetup：
 

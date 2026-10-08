@@ -14,3 +14,5 @@
 | fastpve | 源仓库无脚本、辅助文件或测试；未加入安装索引 | 权威源码/commit、业务 owner、Proxmox/PVE 版本和 CPU 矩阵、root/服务影响、参数/交互/退出码、安装/升级/回滚逻辑、真实产物 URL/SHA256、隔离 PVE 测试环境 |
 | LinkEase/KSpeeder 等 | 本次源仓库没有相应 installer | 相同输入；不能仅凭产品名编造安装逻辑 |
 | DDNSTO 泛 ARM/MIPS、其他 Linux | 当前 zsetup ABI 或 context 无法证明覆盖 | 具体 ABI/字节序、可执行发布物与设备测试；不使用 arch=* 掩盖缺口 |
+
+新增业务统一通过 `zsetup context get memory_total_mb` 读取总内存，通过 `zsetup metadata version FILE [KEY]` 和 `zsetup metadata sha256 FILE NAME` 读取已下载的版本与摘要。只读取普通、最多 16 KiB 的数据文件；不要 source/eval 网络元数据，也不要自行复制 awk/sed 解析器。使用这些能力时最低版本为 0.2.4。

@@ -118,7 +118,7 @@ read_stable_version() {
     case "$compatibility_major:$compatibility_minor:$compatibility_patch" in *[!0123456789:]*|::*|*::*) return 1 ;; esac
     if [ "$compatibility_major" -eq 0 ]; then
         [ "$compatibility_minor" -ge 2 ] || return 1
-        if [ "$compatibility_minor" -eq 2 ]; then [ "$compatibility_patch" -ge 3 ] || return 1; fi
+        if [ "$compatibility_minor" -eq 2 ]; then [ "$compatibility_patch" -ge 4 ] || return 1; fi
     fi
 }
 
@@ -280,8 +280,8 @@ fastnet_install() {
     version_file="$work_dir/version.txt"
     status "[2/4] Checking FastNet version..."
     fastnet_download version.txt "$version_file" "" 1
-    version=$(sed -n 's/^VERSION=//p' "$version_file" | sed -n '1p')
-    expected_sha=$(sed -n "s/^${sha_key}=//p" "$version_file" | sed -n '1p')
+    version=$("$ZSETUP_BIN" metadata version "$version_file" VERSION)
+    expected_sha=$("$ZSETUP_BIN" metadata sha256 "$version_file" "$sha_key")
     if [ -z "$version" ] || [ -z "$expected_sha" ]; then
         echo "FastNet: version metadata is incomplete" >&2
         return 11

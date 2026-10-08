@@ -120,8 +120,8 @@ def main():
     manifest = json.loads((release / "release-manifest.json").read_text())
     version = manifest["version"]
     components = [int(v) for v in version.split(".")]
-    if components < [0, 2, 3]:
-        raise ValueError("zsetup >= 0.2.3 required (Race budget fix)")
+    if components < [0, 2, 4]:
+        raise ValueError("zsetup >= 0.2.4 required (native metadata and memory facts)")
     if args.require_production_ready and not (args.ddnsto_artifacts or args.collect_ddnsto):
         raise ValueError("production package requires DDNSTO artifacts; use --collect-ddnsto or --ddnsto-artifacts")
     scripts_dirty, zsetup_dirty = tree_dirty(ROOT), tree_dirty(zroot)

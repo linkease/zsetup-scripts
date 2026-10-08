@@ -1,6 +1,6 @@
 # 构建、配置与发布
 
-依赖权威 zsetup 源码和工具，最低版本 0.2.3。它修复 Race 预算与 DNS fallback 链不匹配的问题；本仓库不复制 runtime，不重写 Race/DoH/UDP/HTTPS 下载器，也不重新分发另一个实现。现有四架构 zsetup 的构建仍在其仓库执行：
+依赖权威 zsetup 源码和工具，最低版本 0.2.4。新脚本依赖其原生版本/SHA256 元数据读取和总内存字段，并保留 0.2.3 修复的 Race 预算与 DNS fallback 链；本仓库不复制 runtime，不重写 Race/DoH/UDP/HTTPS 下载器，也不重新分发另一个实现。现有四架构 zsetup 的构建仍在其仓库执行：
 
 ```sh
 cd /path/to/linkease-tunnel/zsetup
@@ -72,8 +72,8 @@ python3 -B scripts/package-release.py \
 
 | 文件 | 规则 |
 |---|---|
-| `binary/zsetup/0.2.3/` | 复用六个不可变 release 文件，包含 SHA256SUMS/manifest |
-| `binary/{fastnet,ddnsto}/0.1.1/install.sh` | 不可变业务入口；配置引用它，并记录真实 SHA256/size |
+| `binary/zsetup/0.2.4/` | 复用六个不可变 release 文件，包含 SHA256SUMS/manifest |
+| `binary/{fastnet,ddnsto}/0.1.2/install.sh` | 不可变业务入口；配置引用它，并记录真实 SHA256/size |
 | `binary/{fastnet,ddnsto}/install.sh` | 用户一键入口，可变指针内容，与当前索引脚本完全同字节 |
 | `binary/zsetup/config.json` | 完整 Product Configuration schema 1；不与本地字段合并 |
 | `binary/zsetup/stable` | exact zsetup version；最后激活 |
@@ -91,3 +91,5 @@ python3 -B scripts/package-release.py \
 本次只交付可审查暂存产物、隔离测试与提交；生产候选已可从既有产物自动生成，公网切换仍需设备 canary 和明确目标发布操作。旧源仓库和线上入口保持原状。
 
 本地打包要求 Python 3.11+、Git、POSIX shell，以及 zsetup 发布检查器所要求的 binutils/UPX 等现有工具。它们是维护者构建依赖，不增加设备首次安装的下载器或 SHA 工具依赖。
+
+当前脚本版本为 0.1.2（config_version `scripts-0.1.2`），最低 native 版本为 0.2.4。此前 0.1.1/0.2.3 不可变目录保持原字节；新脚本不能配旧 native 产物。此版本设备端不再调用 awk/sed；维护端 Python/Git/UPX 等依赖不变。

@@ -118,7 +118,7 @@ read_stable_version() {
     case "$compatibility_major:$compatibility_minor:$compatibility_patch" in *[!0123456789:]*|::*|*::*) return 1 ;; esac
     if [ "$compatibility_major" -eq 0 ]; then
         [ "$compatibility_minor" -ge 2 ] || return 1
-        if [ "$compatibility_minor" -eq 2 ]; then [ "$compatibility_patch" -ge 3 ] || return 1; fi
+        if [ "$compatibility_minor" -eq 2 ]; then [ "$compatibility_patch" -ge 4 ] || return 1; fi
     fi
 }
 
@@ -313,12 +313,9 @@ ddnsto_verified_download() {
 }
 
 ddnsto_checksum() {
-    checksum=$(awk -v name="$2" '$2 == name && NF == 2 {print $1; count++} END {if (count != 1) exit 1}' "$1") || {
-        ddnsto_error "missing or duplicate SHA256 for $2; publish verified business metadata"; return 11;
+    "$ZSETUP_BIN" metadata sha256 "$1" "$2" || {
+        ddnsto_error "invalid, missing or duplicate SHA256 for $2"; return 11;
     }
-    [ "${#checksum}" = 64 ] || { ddnsto_error 'invalid SHA256 metadata'; return 11; }
-    case "$checksum" in *[!0123456789abcdefABCDEF]*) ddnsto_error 'invalid SHA256 metadata'; return 11 ;; esac
-    printf '%s\n' "$checksum"
 }
 
 ddnsto_rollback() {
@@ -360,7 +357,7 @@ ddnsto_openwrt() {
     esac
     SELECTED_VERSION=$FORCE_VERSION
     if [ -z "$SELECTED_VERSION" ]; then
-        mem_mb=${DDNSTO_MEM_MB:-$(awk '/^MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo)}
+        mem_mb=${DDNSTO_MEM_MB:-${ZSETUP_MEMORY_TOTAL_MB:-$("$ZSETUP_BIN" context get memory_total_mb)}}
         case "$mem_mb" in ''|*[!0123456789]*) mem_mb=0 ;; esac
         if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 900 ]; then SELECTED_VERSION=lite; else SELECTED_VERSION=standard; fi
     fi
@@ -368,7 +365,7 @@ ddnsto_openwrt() {
     version_pointer=VERSION
     [ "$SELECTED_VERSION" != lite ] || version_pointer=VERSION_LITE
     ddnsto_download "openwrt/$version_pointer" "$transaction_dir/version" '' 1
-    version_num=$(tr -d '[:space:]' < "$transaction_dir/version")
+    version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version")
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid version metadata'; return 11 ;; esac
     version_folder=$SELECTED_VERSION
     [ "$pkg_ext" != apk ] || version_folder="$version_folder-apk"
