@@ -5,6 +5,7 @@ import gzip
 import json
 from pathlib import Path
 import runpy
+import re
 import shutil
 import subprocess
 import tarfile
@@ -28,10 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--zsetup-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "dist/release")
-    inputs = parser.add_mutually_exclusive_group()
-    inputs.add_argument("--ddnsto-artifacts", type=Path)
-    inputs.add_argument("--collect-ddnsto", action="store_true", help="capture artifacts from the proven legacy CDN paths through zsetup")
-    parser.add_argument("--require-production-ready", action="store_true")
+    parser.add_argument("--require-clean", action="store_true", help="require committed scripts and zsetup sources; server verification remains a separate release step")
     args = parser.parse_args()
     zroot = args.zsetup_root.resolve()
     output = args.output.resolve()
@@ -47,30 +45,32 @@ def main():
     components = [int(v) for v in version.split(".")]
     if components < [0, 2, 4]:
         raise ValueError("zsetup >= 0.2.4 required (native metadata and memory facts)")
-    if args.require_production_ready and not (args.ddnsto_artifacts or args.collect_ddnsto):
-        raise ValueError("production package requires DDNSTO artifacts; use --collect-ddnsto or --ddnsto-artifacts")
     scripts_dirty, zsetup_dirty = tree_dirty(ROOT), tree_dirty(zroot)
-    if args.require_production_ready and (scripts_dirty or zsetup_dirty):
+    if args.require_clean and (scripts_dirty or zsetup_dirty):
         raise ValueError("production candidate requires clean scripts and zsetup source trees")
-    if args.collect_ddnsto:
-        args.ddnsto_artifacts = output.parent / "ddnsto-artifacts"
-        subprocess.run(["python3", "-B", str(ROOT / "ddnsto/collect-artifacts.py"), "--zsetup-bin", str(release / "zsetup-linux-x86_64"), "--output", str(args.ddnsto_artifacts)], check=True)
     catalog = json.loads((ROOT / "catalog.json").read_text())
+    applications = {record["application"] for record in catalog["installers"]}
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".release-", dir=output.parent) as temporary:
         staging = Path(temporary)
         binary = staging / "binary"
-        if (output / "binary").exists():
-            shutil.copytree(output / "binary", binary)
+        # Keep immutable installer/native history only. Products already live on the server.
+        previous_binary = output / "binary"
+        native_names = {file.name for file in release.iterdir()}
+        for file in sorted(previous_binary.rglob("*")):
+            if not file.is_file():
+                continue
+            parts = file.relative_to(previous_binary).parts
+            if len(parts) != 3 or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", parts[1]) or parts[1] in {".", "..", "stable", "latest"}:
+                continue
+            if (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] == "install.sh"):
+                copy_immutable(file, binary.joinpath(*parts))
         # Refuse replacing any previously staged immutable executable or installer.
         for file in sorted(release.iterdir()):
             copy_immutable(file, binary / "zsetup" / version / file.name)
         for record in catalog["installers"]:
             copy_immutable(ROOT / record["script"], binary / record["path"])
-        provenance = None
-        if args.ddnsto_artifacts:
-            provenance = DDNSTO["copy_ddnsto_artifacts"](args.ddnsto_artifacts.resolve(), binary / "ddnsto")
-        for app in sorted({r["application"] for r in catalog["installers"]}):
+        for app in sorted(applications):
             shutil.copy2(ROOT / app / "install.sh", binary / app / "install.sh")
         DDNSTO["copy_compat_installers"](ROOT / "ddnsto/install.sh", binary / "ddnsto")
         subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(release), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
@@ -80,8 +80,9 @@ def main():
             "scripts_commit": git_commit(ROOT), "zsetup_commit": git_commit(zroot),
             "scripts_tree_dirty": scripts_dirty, "zsetup_tree_dirty": zsetup_dirty,
             "zsetup_release_source_commit": manifest["source_commit"],
-            "zsetup_version": version, "ddnsto_provenance": provenance,
-            "readiness": "artifacts-verified-canary-required" if provenance else "development-ddnsto-artifacts-required",
+            "zsetup_version": version,
+            "business_artifacts": {"owner": "business-server-release", "included": False},
+            "readiness": "server-artifacts-and-canary-unverified",
             "files": [{"path": str(file.relative_to(staging)), "size": file.stat().st_size, "sha256": digest(file)} for file in sorted(binary.rglob("*")) if file.is_file()],
         }
         (staging / "scripts-release-manifest.json").write_text(json.dumps(evidence, indent=2) + "\n")

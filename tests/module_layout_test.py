@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py", "collect_ddnsto_test.py", "artifact_package_test.py"))):
+for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",))):
     module = ROOT / app
     for filename in ("business.sh", "main.sh", "install.sh", "README.md"):
         assert (module / filename).is_file(), f"missing {app}/{filename}"
@@ -13,8 +13,6 @@ for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_tes
         assert (module / "tests" / filename).is_file(), f"missing {app}/tests/{filename}"
     assert not (ROOT / "apps" / app).exists(), "one canonical module directory required"
 assert (ROOT / "ddnsto/release.py").is_file()
-assert (ROOT / "ddnsto/collect-artifacts.py").is_file()
-assert (ROOT / "scripts/collect-ddnsto-artifacts.py").resolve(strict=True) == ROOT / "ddnsto/collect-artifacts.py"
 for filename, app in (("fastnet-install.sh", "fastnet"), ("install_ddnsto.sh", "ddnsto"), ("install_ddnsto_linux.sh", "ddnsto"), ("install_ddnsto_business.sh", "ddnsto"), ("setup_ddnsto.sh", "ddnsto")):
     assert (ROOT / filename).resolve(strict=True) == ROOT / app / "install.sh"
 for record in json.loads((ROOT / "catalog.json").read_text())["installers"]:

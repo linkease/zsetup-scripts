@@ -18,7 +18,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
 
-**当前状态：完整产物候选，尚未公网发布。** FastNet/DDNSTO 原线上入口继续保留。发布工具按旧 DDNSTO 脚本的版本和路径采集现有产物，自动计算 SHA256 并生成元数据，不要求旧 CDN 预先提供摘要清单。新入口、配置和元数据一起发布；步骤见 [发布流程](docs/release.md)。
+**当前状态：安装脚本与配置候选，尚未公网发布。** FastNet/DDNSTO 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。原线上入口继续保留；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
 
 | 应用标识 | 支持平台 | 架构 | 业务参数与交互 |
 |---|---|---|---|
@@ -29,12 +29,12 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
 
-业务按根目录模块组织：[fastnet/](fastnet/README.md)、[ddnsto/](ddnsto/README.md) 各自拥有业务脚本、测试和说明；DDNSTO 的采集及业务打包规则也位于 ddnsto/。公共 lib/scripts/tests/docs 仅保留共享 bootstrap、统一构建、跨模块验证与协议文档。
+业务按根目录模块组织：[fastnet/](fastnet/README.md)、[ddnsto/](ddnsto/README.md) 各自拥有业务脚本、测试和说明；DDNSTO 的兼容入口发布规则也位于 ddnsto/。公共 lib/scripts/tests/docs 仅保留共享 bootstrap、统一构建、跨模块验证与协议文档。
 
 ```text
 zsetup-scripts/
   fastnet/          # business.sh、main.sh、install.sh、README、tests/
-  ddnsto/           # 同上，另有 collect-artifacts.py、release.py
+  ddnsto/           # 同上，另有兼容 URL 发布规则 release.py
   lib/              # 共享 shell bootstrap
   scripts/          # 统一生成、打包与验收
   tests/            # 仓库布局与统一发布包测试
@@ -51,7 +51,7 @@ zsetup-scripts/
 ```sh
 python3 -B scripts/build-entrypoints.py
 sh scripts/check.sh /path/to/linkease-tunnel/zsetup
-python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --collect-ddnsto --require-production-ready
+python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --require-clean
 ```
 
-第三条直接从既有 CDN 采集 DDNSTO 并生成完整候选；需在干净提交后运行。已有采集目录可用 `--ddnsto-artifacts DIR` 复用，不必重新下载。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。
+第三条在干净提交后生成安装脚本、zsetup 和配置候选，不访问产品服务器、不需要本地产品文件。dist/release 是本仓库的发布输出，dist/evidence 是验证日志；不再生成 ddnsto-artifacts。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。

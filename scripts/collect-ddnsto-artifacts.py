@@ -1,1 +1,0 @@
-../ddnsto/collect-artifacts.py

@@ -11,5 +11,3 @@ python3 -B "$root/fastnet/tests/fastnet_bootstrap_test.py" "$zroot/dist/release/
 python3 -B "$root/fastnet/tests/fastnet_zsetup_test.py" "$zroot/dist/release/zsetup-linux-x86_64" "$tunnel_root"
 sh "$root/tests/test_zsetup_integration.sh" "$zroot/dist/release" "$tunnel_root"
 python3 -B "$root/tests/package_test.py" "$zroot"
-python3 -B "$root/ddnsto/tests/artifact_package_test.py" "$zroot"
-python3 -B "$root/ddnsto/tests/collect_ddnsto_test.py"

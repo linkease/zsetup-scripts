@@ -14,11 +14,10 @@ OpenWrt 支持 opkg/apk × x86_64/aarch64/armv7/mipsel；总内存低于 900 MiB
 本模块包含：
 
 - business.sh/main.sh/install.sh：维护源码与唯一生成入口。
-- collect-artifacts.py：沿用已验证旧 CDN，通过 zsetup HTTPS 采集已有包并计算摘要。
-- release.py：校验业务输入、Linux tar 成员及摘要，生成版本化业务目录。共享摘要/不可变复制复用 scripts/release_common.py。
-- tests/：双入口、平台、参数、缓存、失败回收、采集和业务打包测试。
+- release.py：将同一 install.sh 发布到旧兼容 URL；产品包不在本仓库构建或打包。
+- tests/：通过隔离 HTTPS 产品服务器验证双入口、平台、参数、缓存、进度和失败回收。
 
-服务器模块目录：
+服务器完整模块目录（产品文件由业务发布流程提前部署，本仓库仅发布 install.sh 及兼容入口）：
 
 ```text
 binary/ddnsto/
@@ -38,10 +37,7 @@ binary/ddnsto/
 模块命令（从仓库根目录执行）：
 
 ```sh
-python3 -B ddnsto/collect-artifacts.py --zsetup-bin /path/to/zsetup/dist/release/zsetup-linux-x86_64
 python3 -B ddnsto/tests/ddnsto_test.py /path/to/zsetup/dist/release/zsetup-linux-x86_64 /path/to/linkease-tunnel
-python3 -B ddnsto/tests/artifact_package_test.py /path/to/zsetup
-python3 -B ddnsto/tests/collect_ddnsto_test.py
 ```
 
-已有产物目录可直接交给统一 package-release.py 的 --ddnsto-artifacts，避免重复网络采集。完整配置必须与 FastNet、native zsetup 一起生成；发布顺序见 [发布文档](../docs/release.md)。
+业务发布者从其实际发布字节生成 SHA256SUMS，并先部署 OpenWrt 每个版本目录中的主包、LuCI/语言包和摘要，以及 Linux tar 和摘要，最后更新 VERSION/VERSION_LITE。安装脚本只从服务器读取版本和摘要，再调用 zsetup download 校验产品。完整安装配置仍与 FastNet、native zsetup 一起生成；发布顺序见 [发布文档](../docs/release.md)。

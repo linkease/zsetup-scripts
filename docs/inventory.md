@@ -27,4 +27,6 @@
 2026-10-08 依赖精简更新：脚本 0.1.2 要求 zsetup >=0.2.4；FastNet/DDNSTO 已去除 awk/sed，业务版本/SHA256 使用 native metadata，总内存使用 native context。上述迁移初期依赖段落中的 awk 描述已被此版本替代。完整证据见 [去除 awk/sed 验证](verification-2026-10-08-no-awk-sed.md)。
 
 
-2026-10-08 模块目录更新：唯一维护目录改为根 fastnet/、ddnsto/；原 apps/ 已移除。各模块收拢 business/main/install、README 和 tests；DDNSTO 同时拥有 collect-artifacts.py、release.py。共享 lib/scripts、统一 catalog 和跨业务 tests 保留在根目录。旧根文件名继续链接到唯一模块入口，线上 URL 不变；当前脚本版本为 0.1.3，native 复用 0.2.4。此前盘点中的 apps/... 与旧 tests/... 是历史路径，当前命令见各模块 README。
+2026-10-08 模块目录更新：唯一维护目录改为根 fastnet/、ddnsto/；原 apps/ 已移除。各模块收拢 business/main/install、README 和 tests；DDNSTO 拥有兼容 URL 发布规则 release.py。共享 lib/scripts、统一 catalog 和跨业务 tests 保留在根目录。旧根文件名继续链接到唯一模块入口，线上 URL 不变；当前脚本版本为 0.1.3，native 复用 0.2.4。此前盘点中的 apps/... 与旧 tests/... 是历史路径，当前命令见各模块 README。
+
+2026-10-08 发布职责修正：产品安装包由业务流程提前部署在服务器。本仓库已移除 DDNSTO 采集器及产品打包，统一发布只包含安装入口、zsetup 与配置；以上采集记录保留为历史证据，不是当前构建步骤。设备安装继续从服务器下载版本/SHA256SUMS/产品并进行校验。

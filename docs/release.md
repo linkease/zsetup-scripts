@@ -1,119 +1,76 @@
 # 构建、配置与发布
 
-依赖权威 zsetup 源码和工具，最低版本 0.2.4。新脚本依赖其原生版本/SHA256 元数据读取和总内存字段，并保留 0.2.3 修复的 Race 预算与 DNS fallback 链；本仓库不复制 runtime，不重写 Race/DoH/UDP/HTTPS 下载器，也不重新分发另一个实现。现有四架构 zsetup 的构建仍在其仓库执行：
+业务发布流程提前把 FastNet/DDNSTO 产品、版本信息和真实 SHA256 元数据放到服务器。设备上的业务脚本按平台和架构选择产品，调用 zsetup 下载、校验、复用缓存，然后完成业务安装。本仓库维护安装脚本和统一安装索引，不采集、缓存或重新打包产品。
 
-```sh
-cd /path/to/linkease-tunnel/zsetup
-./scripts/release-targets.sh
-./scripts/check-release-artifacts.sh --directory dist/release
-./scripts/run-target-smoke.sh --all
-```
+依赖权威 zsetup 源码和现有构建能力，最低版本 0.2.4。复用原生版本/SHA256 元数据读取、总内存探测和 download/context/run/install；保留 0.2.3 Race 预算及 DoH/UDP 解析修复。本次没有修改下载内核或业务脚本字节，脚本版本仍为 0.1.3，config_version 为 scripts-0.1.3。
 
-业务变动不要求重编同版本 zsetup；复用已验证的不可变 release。共享 bootstrap 与单业务脚本生成后先执行测试。业务脚本字节变化必须递增 catalog 的 `APP/VERSION/install.sh` 和 config_version；禁止用新字节覆写旧版本。
+## 本地构建
+
+业务变动不要求重编同版本 zsetup，复用已验证的不可变 release；若需要新 native 版本，在 zsetup 仓库执行既有 release-targets.sh、check-release-artifacts.sh、run-target-smoke.sh。无需下载任何 DDNSTO 产品来构建安装脚本发布包。
 
 ```sh
 cd /path/to/zsetup-scripts
 python3 -B scripts/build-entrypoints.py
 sh scripts/check.sh /path/to/linkease-tunnel/zsetup
-python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --collect-ddnsto --require-production-ready
-```
-
-输出 `dist/release/binary/`、`scripts-release-manifest.json`、`PACKAGE-SHA256SUMS` 和确定性 tar.gz。使用 `--collect-ddnsto` 时按旧脚本 CDN 路径采集已有产物，自动计算并保存摘要；无须用户另行整理产物清单。不传采集选项或已有目录时只生成开发包，manifest 为 `development-ddnsto-artifacts-required`。打包器复用 zsetup 的 `check-release-artifacts.sh` 和 `generate-product-config.py --installer-catalog catalog.json`；原 `--fastnet-script` 和 S6 暂存流程仍可使用。
-
-## DDNSTO 业务产物输入
-
-旧脚本已确定业务来源、版本指针与文件名。用户要求继续沿用这些来源；采集由现有 zsetup download 执行，HTTPS 三个 primary 竞速、fw.koolcenter.com 最终 fallback 保持不变。不会执行下载的程序或安装真实包：
-
-```sh
-python3 -B ddnsto/collect-artifacts.py \
-  --zsetup-bin /path/to/linkease-tunnel/zsetup/dist/release/zsetup-linux-x86_64
-```
-
-默认输出 `dist/ddnsto-artifacts/`，包含以下目录、自动生成的 artifacts.json 和 acquisition.json。后者记录采集时间、来源 URL 组、版本、大小与摘要：
-
-```text
-artifacts.json
-openwrt/VERSION
-openwrt/VERSION_LITE
-openwrt/lite/<VERSION_LITE>/{ddnsto_x86_64,ddnsto_aarch64,ddnsto_arm,ddnsto_mipsel,luci-app-ddnsto,luci-i18n-ddnsto-zh-cn}.ipk
-openwrt/standard/<VERSION>/同样六个 .ipk
-openwrt/lite-apk/<VERSION_LITE>/同样六个 .apk
-openwrt/standard-apk/<VERSION>/同样六个 .apk
-linux-binary/ddnsto-standard-4.2.3.tar.gz
-```
-
-Linux archive 必须含 `ddnsto-standard-4.2.3/ddnsto.x86_64` 与 `.aarch64` 普通文件。其他已确认版本可追加，脚本用 DDNSTO_VERSION 指定。旧 CDN 的 LuCI 包在可变根目录，新安装将其快照与主包放在相同不可变版本目录，避免在一次安装中混用不同发布。
-
-采集工具自动生成 `artifacts.json`。它也支持维护者提供既有目录；格式如下，所有文件（包括两个版本指针）记录实际摘要：
-
-```json
-{
-  "schema_version": 1,
-  "provenance": "旧脚本 commit / 发布来源与 HTTPS 采集记录",
-  "files": [
-    {"path": "openwrt/VERSION", "sha256": "采集文件计算得到的真实64位小写摘要"}
-  ]
-}
-```
-
-采集完成后，打包器逐个核对本地文件与采集摘要，再生成各版本的 SHA256SUMS 和 Linux tar 的 SHA256SUMS。旧 CDN 不需要预先提供 checksum metadata。LuCI/语言包只从旧根目录下载一次，再分别复制到对应 Lite/Standard 版本目录；全部 23 次下载汇集 27 个发布文件。重复采集如果同版本文件变了，会拒绝替换旧快照。摘要不会在设备上依赖系统 openssl/sha256sum；Business Installer 通过 HTTPS 取得 checksum metadata，然后使用 zsetup 内置 SHA256 校验每个新包。目录和记录缺项、摘要不符、同版本已有不同字节时，在修改配置指针前拒绝发布包。
-
-```sh
-python3 -B scripts/package-release.py \
-  --zsetup-root /path/to/linkease-tunnel/zsetup \
-  --ddnsto-artifacts /path/to/approved-ddnsto-artifacts \
-  --require-production-ready
+python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --require-clean
 (cd dist/release && sha256sum -c PACKAGE-SHA256SUMS)
 ```
 
-这里的 production-ready 指构建输入完整且代码提交干净；manifest 仍标记 `artifacts-verified-canary-required`。真实设备安装、网络故障、回滚与观察窗口仍需完成。不要把测试造的 package bytes 用作生产输入。
+`--require-clean` 检查两个源码目录已经提交；不传时允许开发构建，manifest 明确记录 dirty 状态。旧的 --collect-ddnsto、--ddnsto-artifacts 和 --require-production-ready 已移除。打包不访问产品服务器；测试通过隔离 HTTPS fixture 提供产品，不执行真实系统安装。
 
-## 发布布局和切换顺序
+输出 dist/release/binary/、scripts-release-manifest.json、PACKAGE-SHA256SUMS 和确定性 tar.gz；dist/evidence/ 存放测试日志。两者都被 Git 忽略。打包器复用 zsetup 的 check-release-artifacts.sh 和 generate-product-config.py，摘要/大小从实际脚本及 native 发布字节生成，沿用完整 Product Configuration schema 1。
+
+manifest 的 business_artifacts 标记业务服务器发布所有权及 included=false，readiness 固定为 server-artifacts-and-canary-unverified。本地构建不证明线上产品/元数据可用或设备 canary 通过。再次构建只保留历史不可变安装脚本和 native release，不带入旧候选中的产品包、业务版本指针或业务 SHA256SUMS；更新的是本地候选，不会删除服务器任何文件。
+
+## 本仓库发布布局
 
 | 文件 | 规则 |
 |---|---|
-| `binary/zsetup/0.2.4/` | 复用六个不可变 release 文件，包含 SHA256SUMS/manifest |
-| `binary/{fastnet,ddnsto}/0.1.3/install.sh` | 不可变业务入口；配置引用它，并记录真实 SHA256/size |
-| `binary/{fastnet,ddnsto}/install.sh` | 用户一键入口，可变指针内容，与当前索引脚本完全同字节 |
-| `binary/zsetup/config.json` | 完整 Product Configuration schema 1；不与本地字段合并 |
-| `binary/zsetup/stable` | exact zsetup version；最后激活 |
-| `binary/ddnsto/openwrt/{VERSION,VERSION_LITE}` | 业务版本指针；各版本包和 SHA256SUMS 先部署 |
-| DDNSTO 旧安装 URL | 兼容副本，业务代码不重复维护；切换必须完成迁移验证 |
+| binary/zsetup/0.2.4/ | 权威 native release 的六个不可变文件，包括 SHA256SUMS/manifest |
+| binary/{fastnet,ddnsto}/0.1.3/install.sh | 不可变业务入口；索引记录真实 SHA256/size |
+| binary/{fastnet,ddnsto}/install.sh | 可变用户入口，与当前索引脚本同字节 |
+| binary/zsetup/config.json | 完整配置，不进行字段合并 |
+| binary/zsetup/stable | 精确 native 版本，最后激活 |
+| binary/ddnsto/openwrt/install_ddnsto.sh、install_ddnsto_business.sh、setup_ddnsto.sh | 相同 DDNSTO 入口字节的兼容副本 |
+| binary/ddnsto/linux-binary/install_ddnsto_linux.sh | 相同 DDNSTO 入口字节的兼容副本 |
 
-三个 primary 固定是 `dl.istoreos.com`、`fw.d4ctech.com`、`fw20.koolcenter.com`，最终 fallback 固定是 `fw.koolcenter.com`。zsetup installer 明确选择 OS/包管理器/架构，不用一条 wildcard 声称支持所有 DDNSTO 平台。
+APP/business.sh、main.sh、lib/、Python 工具、测试和 README 均不上传网站。根目录旧文件名只是本地兼容链接，服务器部署实际生成的文件，不要求符号链接支持。脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
 
-打包工具不上传公网，不修改服务。原 zsetup `upload-fw-koolcenter.sh` **只识别旧 S6 FastNet 布局**，不能用它直接上传新的多业务包。上线时在受控运维流程里把包放到远端同文件系统 staging，验 PACKAGE-SHA256SUMS；依次部署不可变 zsetup/业务脚本/业务包及摘要，然后业务版本与用户入口，再完整 config.json，stable 最后。各可变文件同文件系统原子 rename，不允许在新版指针前缺少目标文件。版本目录有冲突时拒绝覆盖。
+## 服务器提前提供的产品
 
-跨站点：先完成四站点所有 Artifact 的 HTTPS 内容/摘要、大小、路径与缓存头回读，再激活各指针；不同站点尚未同步时不公布升级。建议不可变路径 `Cache-Control: public, max-age=31536000, immutable`；config/stable/VERSION 使用 no-cache。更新配置的 stable version 与其 artifacts/min_version 必须一致。
+以下路径位于站点 /binary/ 下，由各业务发布流程准备。每个候选 URL 必须返回相同字节，产品摘要由发布者从实际产品计算；不为未取得的字节虚构摘要，不关闭校验。
 
-回滚：保存上一份完整配置及可变入口/业务版本指针，用原子 rename 恢复完整集合，stable 最后回退；不可变目录保留。只改 version 字符串却不同时回退 artifacts/min_version 是无效配置。客户端尚在运行的脚本持有原字节，不再下载自己。
+FastNet：fastnet/version.txt，以及它声明的 FastNet-<VERSION>.amd64、.arm64、.armv7 和匹配 SHA256。格式保持现有业务协议。
 
-本次只交付可审查暂存产物、隔离测试与提交；生产候选已可从既有产物自动生成，公网切换仍需设备 canary 和明确目标发布操作。旧源仓库和线上入口保持原状。
+DDNSTO：
 
-本地打包要求 Python 3.11+、Git、POSIX shell，以及 zsetup 发布检查器所要求的 binutils/UPX 等现有工具。它们是维护者构建依赖，不增加设备首次安装的下载器或 SHA 工具依赖。
+```text
+ddnsto/openwrt/VERSION
+ddnsto/openwrt/VERSION_LITE
+ddnsto/openwrt/<standard|lite|standard-apk|lite-apk>/<VERSION>/
+  ddnsto_<x86_64|aarch64|arm|mipsel>.<ipk|apk>
+  luci-app-ddnsto.<ipk|apk>
+  luci-i18n-ddnsto-zh-cn.<ipk|apk>
+  SHA256SUMS
+ddnsto/linux-binary/ddnsto-standard-4.2.3.tar.gz
+ddnsto/linux-binary/SHA256SUMS
+```
 
-当前脚本版本为 0.1.3（config_version `scripts-0.1.3`），最低 native 版本为 0.2.4。此前 0.1.1/0.2.3 不可变目录保持原字节；新脚本不能配旧 native 产物。此版本设备端不再调用 awk/sed；维护端 Python/Git/UPX 等依赖不变。
+opkg 使用 ipk，apk 使用带 -apk 的目录和 apk 包。OpenWrt 主包、LuCI 包、语言包及 SHA256SUMS 放在同一个不可变版本目录，全部完成后才更新 VERSION/VERSION_LITE。Linux tar 包含 ddnsto-standard-4.2.3/ddnsto.x86_64 和 ddnsto.aarch64 普通文件；其他已发布版本可通过 DDNSTO_VERSION 选择，并有对应摘要。SHA256SUMS 使用标准的 `64位十六进制摘要  文件名` 格式；安装端由 zsetup metadata 读取，zsetup download 内置校验，不依赖系统 awk/sed/openssl/sha256sum。
 
+旧 CDN 已有产品的历史检查记录位于 docs/verification-2026-10-08.md。当时部分 checksum 元数据尚未提供，LuCI 包位于可变根目录；新入口上线时业务发布者应补齐上面的版本目录及元数据。已有产品无需搬回本仓库，不把“缺少元数据”等同于“缺少产品”。历史摘要记录仅供核对，当前打包器不读取或发布它们。
 
-## 业务模块与正式服务器目录
+## 正式服务器切换
 
-源码 `fastnet/`、`ddnsto/` 与正式 URL `/binary/fastnet/`、`/binary/ddnsto/` 对应，但只上传发布工具选出的文件；不得直接把仓库文件夹整体同步到网站。
+固定 primary 为 dl.istoreos.com、fw.d4ctech.com、fw20.koolcenter.com；fw.koolcenter.com 为最终 fallback。HTTPS 与 shell 首次自举的明确确认规则保持不变。
 
-| 源码职责 | 发布目录 | 正式入口 |
-|---|---|---|
-| fastnet/install.sh、业务测试/说明 | binary/fastnet/0.1.3/install.sh、binary/fastnet/install.sh | /binary/fastnet/install.sh |
-| ddnsto/install.sh、release.py、采集/业务测试 | binary/ddnsto/0.1.3/install.sh、业务包/摘要、兼容入口 | /binary/ddnsto/install.sh |
-| lib/bootstrap.sh、公共构建工具 | 已嵌入业务入口，不单独发布 | 无 |
-| 权威 zsetup release + 根 catalog.json | binary/zsetup/0.2.4/、config.json、stable | zsetup install APP |
+1. 业务发布流程先完成各站点产品及版本/SHA256 元数据。确认对应系统、包管理器和架构路径可读取，内容/摘要一致。
+2. 将本仓库 tar 放入受控部署 staging，解包并验证 PACKAGE-SHA256SUMS。按 binary/ 相对路径增量部署到网站 /binary/，保留已有产品和历史版本；不得使用同步删除。
+3. 先部署并回读不可变 native/业务脚本，拒绝同版本字节冲突；设备 canary 验证两种入口和回滚。随后原子切换用户/兼容入口、完整 config.json，stable 最后激活。
+4. 四站点同步并完成回读后公布升级。immutable 路径可长期缓存；install.sh、config、stable、业务 VERSION/version.txt 和未版本化 SHA256SUMS 使用 no-cache。
 
-服务器所需文件已集中到 dist/release/binary/{fastnet,ddnsto,zsetup}/；PACKAGE-SHA256SUMS 与 scripts-release-manifest.json 用于部署审核，放在部署 staging/记录目录。确定性 tar.gz 为传输包，解包后校验，按 binary/ 下的相对路径部署到实际网站的 /binary/ 目录。
+回滚恢复上一份完整配置、可变入口和所需业务指针，stable 最后回退；保留不可变文件。配置 stable/min_version/artifacts 必须一致，不仅修改版本字符串。
 
-上传按文件增量进行，保留服务器已有文件和历史版本。FastNet 的 version.txt 及与其中 SHA256 匹配的各架构二进制由其既有发布流程提供，本仓库只打包 FastNet 安装脚本；新服务器必须预先取得这些产物。DDNSTO 与 native zsetup 的必需产物随完整候选包提供。禁止用清空目录或同步删除的方式部署。
+当前工具只生成本地候选，不上传公网、不更改服务。原 zsetup upload-fw-koolcenter.sh 只接受旧 S6 FastNet 布局，不能直接上传本多业务包。实际部署需要具体服务器、网站路径、上传方式、站点回源关系及 canary 设备。
 
-激活顺序：上传并逐站核对不可变 native/业务脚本/业务包和 SHA256 → 确认 FastNet 既有产物可用 → 更新业务版本与公开入口/兼容入口 → 原子更新完整 config.json → stable 最后。所有 primary 与 final fallback 都完成回读后，再对用户公布；保留前一完整配置和可变指针集合用于回滚。
-
-版本路径设置 immutable 缓存；install.sh、config.json、stable、业务 VERSION/version.txt 和未版本化 SHA256SUMS 使用 no-cache。内部 business.sh/main.sh、Python 维护工具、tests、README 不进入静态网站。
-
-开始实际部署前需具备目标服务器、/binary/ 对应的文件系统路径、上传方式/账号、四站点回源关系与 canary 设备。本次整理生成可审查本地候选，不连接未知正式服务器。
-
-旧维护命令 scripts/collect-ddnsto-artifacts.py 保留为 ddnsto/collect-artifacts.py 的兼容符号链接；业务采集实现只维护在模块中。
+维护者构建依赖仍为 Python 3.11+、Git、POSIX shell 和权威 native release 检查器所要求的现有 binutils/UPX 等工具，不增加设备安装依赖。
