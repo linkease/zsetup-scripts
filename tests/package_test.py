@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 ZROOT = Path(sys.argv[1]).resolve()
@@ -14,6 +15,13 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     argv = ["python3", "-B", str(ROOT / "scripts/package-release.py"), "--zsetup-root", str(ZROOT), "--output", str(output)]
     subprocess.run(argv, check=True)
     binary = output / "binary"
+    manifest = json.loads((output / "scripts-release-manifest.json").read_text())
+    assert manifest["readiness"] == "server-artifacts-and-canary-unverified"
+    assert manifest["business_artifacts"] == {"owner": "business-server-release", "included": False}
+    assert not (output.parent / "ddnsto-artifacts").exists()
+    assert not any(p.suffix in {".ipk", ".apk", ".gz"} for p in binary.rglob("*"))
+    for relative in ("openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh", "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh"):
+        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/install.sh").read_bytes()
     config = json.loads((binary / "zsetup/config.json").read_text())
     assert config["stable_zsetup"]["version"] == "0.2.4"
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto"}
@@ -50,6 +58,25 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     first = archive.read_bytes()
     subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)
     assert next(output.glob("*.tar.gz")).read_bytes() == first
+    # A previous aggregate package must not pull server-owned products into this release.
+    stale = binary / "ddnsto/openwrt/standard/4.2.6/ddnsto_x86_64.ipk"
+    stale.parent.mkdir(parents=True, exist_ok=True)
+    stale.write_bytes(b"previous locally bundled product")
+    pointer = binary / "ddnsto/openwrt/VERSION"
+    pointer.write_text("4.2.6\n")
+    historical = binary / "ddnsto/0.0.9/install.sh"
+    historical.parent.mkdir(parents=True)
+    historical.write_bytes(b"historical immutable installer")
+    historical_native = binary / "zsetup/0.0.9/zsetup-linux-x86_64"
+    historical_native.parent.mkdir(parents=True)
+    historical_native.write_bytes(b"historical immutable native")
+    subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)
+    assert not stale.exists() and not pointer.exists()
+    assert historical.read_bytes() == b"historical immutable installer"
+    assert historical_native.read_bytes() == b"historical immutable native"
+    assert (output / "scripts-release-manifest.json").is_file()
+    with tarfile.open(next(output.glob("*.tar.gz"))) as archive:
+        assert not any(name.endswith((".ipk", ".apk", ".tar.gz")) for name in archive.getnames())
     # A changed immutable path is rejected before any config or stable pointer update.
     immutable = binary / config["installers"][0]["path"]
     immutable.write_text("corrupt immutable version")
@@ -59,4 +86,4 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert immutable.read_text() == "corrupt immutable version"
     assert (binary / "zsetup/config.json").read_bytes() == config_before
     assert not list(output.parent.glob(".release-*"))
-print("Unified release: config, platform records, SHA256, aliases, reproducibility and immutability passed")
+print("Unified release: server-owned products excluded; config, SHA256, aliases, history, reproducibility and immutability passed")
