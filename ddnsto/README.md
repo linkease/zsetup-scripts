@@ -32,7 +32,7 @@ binary/ddnsto/
   linux-binary/install_ddnsto_linux.sh
 ```
 
-兼容 URL 发布为与 install.sh 相同的实际文件，无须服务器支持符号链接。旧源仓库与已上线旧文件不得在迁移验证前删除。business/main、Python 工具、测试和 README 不发布。
+兼容 URL 发布为与 install.sh 相同的实际文件，无须服务器支持符号链接。旧源仓库与已上线旧文件不得在迁移验证前删除。仓库中的历史源码位于 [legacy/](../legacy/README.md)，不进入发布包；当前入口为 ddnsto/install.sh。business/main、Python 工具、测试和 README 不发布。
 
 模块命令（从仓库根目录执行）：
 

@@ -35,6 +35,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 zsetup-scripts/
   fastnet/          # business.sh、main.sh、install.sh、README、tests/
   ddnsto/           # 同上，另有兼容 URL 发布规则 release.py
+  legacy/           # 原仓库旧脚本快照与来源说明，仅供历史参考
   lib/              # 共享 shell bootstrap
   scripts/          # 统一生成、打包与验收
   tests/            # 仓库布局与统一发布包测试
@@ -42,7 +43,7 @@ zsetup-scripts/
   catalog.json      # 统一安装索引的构建输入
 ```
 
-共享 bootstrap 构建时嵌入各模块的唯一 install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。根目录旧脚本名继续链接到各模块 install.sh，原业务仓库保持不变。
+共享 bootstrap 构建时嵌入各模块的唯一 install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/install.sh、ddnsto/install.sh 或 zsetup install，原业务仓库保持不变。
 
 正式服务器部署 `dist/release/binary/` 中的三个目录：`fastnet/`、`ddnsto/`、`zsetup/`，映射到站点 `/binary/`。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变，共享完整配置在 zsetup/config.json。目录映射、首个新服务器的业务产物要求及发布顺序见 [发布流程](docs/release.md)。
 

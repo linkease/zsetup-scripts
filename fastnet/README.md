@@ -30,4 +30,4 @@ python3 -B fastnet/tests/fastnet_bootstrap_test.py /path/to/zsetup/dist/release/
 python3 -B fastnet/tests/fastnet_zsetup_test.py /path/to/zsetup/dist/release/zsetup-linux-x86_64 /path/to/linkease-tunnel
 ```
 
-所有命令从仓库根目录执行。共享构建、完整验收和发布顺序见 [发布文档](../docs/release.md)。根目录 fastnet-install.sh 为本模块入口的本地兼容符号链接。
+所有命令从仓库根目录执行。共享构建、完整验收和发布顺序见 [发布文档](../docs/release.md)。旧 fastnet-install.sh 源码归档在 [legacy/](../legacy/README.md) 供参考，当前入口为 fastnet/install.sh。

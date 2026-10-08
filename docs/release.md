@@ -34,7 +34,7 @@ manifest 的 business_artifacts 标记业务服务器发布所有权及 included
 | binary/ddnsto/openwrt/install_ddnsto.sh、install_ddnsto_business.sh、setup_ddnsto.sh | 相同 DDNSTO 入口字节的兼容副本 |
 | binary/ddnsto/linux-binary/install_ddnsto_linux.sh | 相同 DDNSTO 入口字节的兼容副本 |
 
-APP/business.sh、main.sh、lib/、Python 工具、测试和 README 均不上传网站。根目录旧文件名只是本地兼容链接，服务器部署实际生成的文件，不要求符号链接支持。脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
+APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/install.sh 生成实际文件，不依赖历史快照或符号链接。脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
 
 ## 服务器提前提供的产品
 
