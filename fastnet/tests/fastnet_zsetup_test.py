@@ -14,7 +14,7 @@ import threading
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "apps/fastnet/install.sh"
+SCRIPT = Path(__file__).resolve().parents[1] / "install.sh"
 ZSETUP = Path(sys.argv[1])
 TUNNEL_ROOT = Path(sys.argv[2])
 CERT_DIR = TUNNEL_ROOT / "runtime-zig/third-part/mbedtls/framework/data_files"

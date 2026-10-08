@@ -9,7 +9,7 @@ import subprocess
 import tarfile
 import tempfile
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix="collect-ddnsto-") as temporary:
     root = Path(temporary)
     web = root / "web"
@@ -54,7 +54,7 @@ shutil.copyfile(Path(os.environ['WEB_ROOT'])/relative,output)
     binary.chmod(0o755)
     output = root / "artifacts"
     env = os.environ | {"WEB_ROOT": str(web), "COMMAND_LOG": str(root / "commands")}
-    command = ["python3", "-B", str(ROOT / "scripts/collect-ddnsto-artifacts.py"), "--zsetup-bin", str(binary), "--output", str(output)]
+    command = ["python3", "-B", str(ROOT / "ddnsto/collect-artifacts.py"), "--zsetup-bin", str(binary), "--output", str(output)]
     subprocess.run(command, env=env, check=True)
     inventory = json.loads((output / "artifacts.json").read_text())
     assert len(inventory["files"]) == 27

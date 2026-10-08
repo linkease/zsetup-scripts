@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Embed the one maintained bootstrap into standalone public business entries."""
 import argparse
+import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -13,9 +15,12 @@ def main():
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     common = (ROOT / "lib/bootstrap.sh").read_text().rstrip() + "\n\n"
-    for app in ("fastnet", "ddnsto"):
-        folder = ROOT / "apps" / app
-        content = common + "\n# Business logic: maintained in apps/" + app + "/business.sh\n"
+    catalog = json.loads((ROOT / "catalog.json").read_text())
+    for app in sorted({entry["application"] for entry in catalog["installers"]}):
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", app):
+            raise ValueError("invalid application id")
+        folder = ROOT / app
+        content = common + "\n# Business logic: maintained in " + app + "/business.sh\n"
         content += (folder / "business.sh").read_text().rstrip() + "\n\n"
         content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n    bootstrap_zsetup\n"
         content += "    status \"      zsetup $RESCUE_VERSION is ready\"\n    ZSETUP_BIN=$ACTIVE_ZSETUP\n"

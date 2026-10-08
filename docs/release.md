@@ -25,7 +25,7 @@ python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zse
 旧脚本已确定业务来源、版本指针与文件名。用户要求继续沿用这些来源；采集由现有 zsetup download 执行，HTTPS 三个 primary 竞速、fw.koolcenter.com 最终 fallback 保持不变。不会执行下载的程序或安装真实包：
 
 ```sh
-python3 -B scripts/collect-ddnsto-artifacts.py \
+python3 -B ddnsto/collect-artifacts.py \
   --zsetup-bin /path/to/linkease-tunnel/zsetup/dist/release/zsetup-linux-x86_64
 ```
 
@@ -73,7 +73,7 @@ python3 -B scripts/package-release.py \
 | 文件 | 规则 |
 |---|---|
 | `binary/zsetup/0.2.4/` | 复用六个不可变 release 文件，包含 SHA256SUMS/manifest |
-| `binary/{fastnet,ddnsto}/0.1.2/install.sh` | 不可变业务入口；配置引用它，并记录真实 SHA256/size |
+| `binary/{fastnet,ddnsto}/0.1.3/install.sh` | 不可变业务入口；配置引用它，并记录真实 SHA256/size |
 | `binary/{fastnet,ddnsto}/install.sh` | 用户一键入口，可变指针内容，与当前索引脚本完全同字节 |
 | `binary/zsetup/config.json` | 完整 Product Configuration schema 1；不与本地字段合并 |
 | `binary/zsetup/stable` | exact zsetup version；最后激活 |
@@ -92,4 +92,28 @@ python3 -B scripts/package-release.py \
 
 本地打包要求 Python 3.11+、Git、POSIX shell，以及 zsetup 发布检查器所要求的 binutils/UPX 等现有工具。它们是维护者构建依赖，不增加设备首次安装的下载器或 SHA 工具依赖。
 
-当前脚本版本为 0.1.2（config_version `scripts-0.1.2`），最低 native 版本为 0.2.4。此前 0.1.1/0.2.3 不可变目录保持原字节；新脚本不能配旧 native 产物。此版本设备端不再调用 awk/sed；维护端 Python/Git/UPX 等依赖不变。
+当前脚本版本为 0.1.3（config_version `scripts-0.1.3`），最低 native 版本为 0.2.4。此前 0.1.1/0.2.3 不可变目录保持原字节；新脚本不能配旧 native 产物。此版本设备端不再调用 awk/sed；维护端 Python/Git/UPX 等依赖不变。
+
+
+## 业务模块与正式服务器目录
+
+源码 `fastnet/`、`ddnsto/` 与正式 URL `/binary/fastnet/`、`/binary/ddnsto/` 对应，但只上传发布工具选出的文件；不得直接把仓库文件夹整体同步到网站。
+
+| 源码职责 | 发布目录 | 正式入口 |
+|---|---|---|
+| fastnet/install.sh、业务测试/说明 | binary/fastnet/0.1.3/install.sh、binary/fastnet/install.sh | /binary/fastnet/install.sh |
+| ddnsto/install.sh、release.py、采集/业务测试 | binary/ddnsto/0.1.3/install.sh、业务包/摘要、兼容入口 | /binary/ddnsto/install.sh |
+| lib/bootstrap.sh、公共构建工具 | 已嵌入业务入口，不单独发布 | 无 |
+| 权威 zsetup release + 根 catalog.json | binary/zsetup/0.2.4/、config.json、stable | zsetup install APP |
+
+服务器所需文件已集中到 dist/release/binary/{fastnet,ddnsto,zsetup}/；PACKAGE-SHA256SUMS 与 scripts-release-manifest.json 用于部署审核，放在部署 staging/记录目录。确定性 tar.gz 为传输包，解包后校验，按 binary/ 下的相对路径部署到实际网站的 /binary/ 目录。
+
+上传按文件增量进行，保留服务器已有文件和历史版本。FastNet 的 version.txt 及与其中 SHA256 匹配的各架构二进制由其既有发布流程提供，本仓库只打包 FastNet 安装脚本；新服务器必须预先取得这些产物。DDNSTO 与 native zsetup 的必需产物随完整候选包提供。禁止用清空目录或同步删除的方式部署。
+
+激活顺序：上传并逐站核对不可变 native/业务脚本/业务包和 SHA256 → 确认 FastNet 既有产物可用 → 更新业务版本与公开入口/兼容入口 → 原子更新完整 config.json → stable 最后。所有 primary 与 final fallback 都完成回读后，再对用户公布；保留前一完整配置和可变指针集合用于回滚。
+
+版本路径设置 immutable 缓存；install.sh、config.json、stable、业务 VERSION/version.txt 和未版本化 SHA256SUMS 使用 no-cache。内部 business.sh/main.sh、Python 维护工具、tests、README 不进入静态网站。
+
+开始实际部署前需具备目标服务器、/binary/ 对应的文件系统路径、上传方式/账号、四站点回源关系与 canary 设备。本次整理生成可审查本地候选，不连接未知正式服务器。
+
+旧维护命令 scripts/collect-ddnsto-artifacts.py 保留为 ddnsto/collect-artifacts.py 的兼容符号链接；业务采集实现只维护在模块中。

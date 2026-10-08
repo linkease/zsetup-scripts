@@ -1,1 +1,1 @@
-apps/ddnsto/install.sh
+ddnsto/install.sh

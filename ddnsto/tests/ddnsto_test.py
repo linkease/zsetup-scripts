@@ -15,11 +15,11 @@ import tarfile
 import tempfile
 import threading
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ZSETUP = Path(sys.argv[1]).resolve()
 TUNNEL = Path(sys.argv[2]).resolve()
 CERT = TUNNEL / "runtime-zig/third-part/mbedtls/framework/data_files"
-SCRIPT = ROOT / "apps/ddnsto/install.sh"
+SCRIPT = ROOT / "ddnsto/install.sh"
 BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\nif [ "${1:-}" = stop ]; then exit "${STOP_FAIL:-0}"; fi\n'
 
 

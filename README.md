@@ -29,7 +29,22 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
 
-源码仅有 `apps/`、`lib/`、`scripts/`、`tests/`、`docs/` 五类目录。共享 bootstrap 在构建时嵌入各业务独立的 `install.sh`；业务函数在 `apps/APP/business.sh` 维护，内部文件不发布。运行中的入口不会下载自身。根目录旧脚本名为同一入口的符号链接，兼容旧文件名；原仓库保持不变。
+业务按根目录模块组织：[fastnet/](fastnet/README.md)、[ddnsto/](ddnsto/README.md) 各自拥有业务脚本、测试和说明；DDNSTO 的采集及业务打包规则也位于 ddnsto/。公共 lib/scripts/tests/docs 仅保留共享 bootstrap、统一构建、跨模块验证与协议文档。
+
+```text
+zsetup-scripts/
+  fastnet/          # business.sh、main.sh、install.sh、README、tests/
+  ddnsto/           # 同上，另有 collect-artifacts.py、release.py
+  lib/              # 共享 shell bootstrap
+  scripts/          # 统一生成、打包与验收
+  tests/            # 仓库布局与统一发布包测试
+  docs/             # 发布、扩展、AI 协议与验证证据
+  catalog.json      # 统一安装索引的构建输入
+```
+
+共享 bootstrap 构建时嵌入各模块的唯一 install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。根目录旧脚本名继续链接到各模块 install.sh，原业务仓库保持不变。
+
+正式服务器部署 `dist/release/binary/` 中的三个目录：`fastnet/`、`ddnsto/`、`zsetup/`，映射到站点 `/binary/`。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变，共享完整配置在 zsetup/config.json。目录映射、首个新服务器的业务产物要求及发布顺序见 [发布流程](docs/release.md)。
 
 开发与验收：
 

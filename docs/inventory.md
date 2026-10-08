@@ -25,3 +25,6 @@
 源旧 `mips` 无条件匹配改成检查 `/bin/sh` ELF 的 EI_DATA（需要 od），确认 little-endian 后才选择 **mipsel**；zsetup 只发布 little-endian ABI，未知/大端 MIPS 不能安全安装。旧任意 `arm`/未知 Linux 的支持声明也不能替代已确认 ABI。此类目标、真实四架构 OpenWrt 安装与公网四站点切换仍需设备/发布验证。
 
 2026-10-08 依赖精简更新：脚本 0.1.2 要求 zsetup >=0.2.4；FastNet/DDNSTO 已去除 awk/sed，业务版本/SHA256 使用 native metadata，总内存使用 native context。上述迁移初期依赖段落中的 awk 描述已被此版本替代。完整证据见 [去除 awk/sed 验证](verification-2026-10-08-no-awk-sed.md)。
+
+
+2026-10-08 模块目录更新：唯一维护目录改为根 fastnet/、ddnsto/；原 apps/ 已移除。各模块收拢 business/main/install、README 和 tests；DDNSTO 同时拥有 collect-artifacts.py、release.py。共享 lib/scripts、统一 catalog 和跨业务 tests 保留在根目录。旧根文件名继续链接到唯一模块入口，线上 URL 不变；当前脚本版本为 0.1.3，native 复用 0.2.4。此前盘点中的 apps/... 与旧 tests/... 是历史路径，当前命令见各模块 README。

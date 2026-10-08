@@ -9,7 +9,7 @@ import sys
 import tarfile
 import tempfile
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ZROOT = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix="ddnsto-artifact-package-") as tmp:
     folder = Path(tmp)

@@ -1,1 +1,1 @@
-apps/fastnet/install.sh
+fastnet/install.sh

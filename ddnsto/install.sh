@@ -248,7 +248,7 @@ bootstrap_zsetup() {
 }
 
 
-# Business logic: maintained in apps/ddnsto/business.sh
+# Business logic: maintained in ddnsto/business.sh
 # Included at build time; only install.sh is a public installer.
 ddnsto_error() { printf 'DDNSTO: %s\n' "$*" >&2; }
 

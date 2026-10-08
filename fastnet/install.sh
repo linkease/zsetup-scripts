@@ -248,7 +248,7 @@ bootstrap_zsetup() {
 }
 
 
-# Business logic: maintained in apps/fastnet/business.sh
+# Business logic: maintained in fastnet/business.sh
 fastnet_download() {
     remote_path=$1
     destination=$2

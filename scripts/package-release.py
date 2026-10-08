@@ -2,22 +2,18 @@
 """Build reviewable static release trees using the canonical zsetup generator/checker."""
 import argparse
 import gzip
-import hashlib
 import json
 from pathlib import Path
-import re
+import runpy
 import shutil
 import subprocess
 import tarfile
 import tempfile
 
+from release_common import digest, copy_immutable
+
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def digest(path):
-    with path.open("rb") as stream:
-        value = hashlib.file_digest(stream, "sha256").hexdigest()
-    return value
+DDNSTO = runpy.run_path(str(ROOT / "ddnsto/release.py"))
 
 
 def git_commit(root):
@@ -26,77 +22,6 @@ def git_commit(root):
 
 def tree_dirty(root):
     return bool(subprocess.check_output(["git", "-C", str(root), "status", "--porcelain", "--", "."], text=True).strip())
-
-
-def copy_immutable(source, destination):
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        if not destination.is_file() or digest(source) != digest(destination):
-            raise ValueError(f"immutable path has different bytes: {destination}")
-    else:
-        shutil.copy2(source, destination)
-
-
-def copy_ddnsto_artifacts(source, destination):
-    """Require complete business-owned bytes plus an approved digest inventory."""
-    inventory = json.loads((source / "artifacts.json").read_text())
-    if set(inventory) != {"schema_version", "provenance", "files"} or inventory["schema_version"] != 1 or not inventory["provenance"]:
-        raise ValueError("DDNSTO artifacts.json requires schema_version, provenance and files")
-    approved = {}
-    for record in inventory["files"]:
-        if set(record) != {"path", "sha256"}:
-            raise ValueError("invalid DDNSTO artifact record")
-        name = record["path"]
-        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_./+-]+", name) or any(part in {"", ".", ".."} for part in name.split("/")):
-            raise ValueError("invalid DDNSTO artifact path")
-        if name in approved or not re.fullmatch(r"[a-f0-9]{64}", record["sha256"]):
-            raise ValueError("duplicate path or invalid approved SHA256")
-        file = (source / name).resolve()
-        if not file.is_relative_to(source.resolve()) or not file.is_file() or digest(file) != record["sha256"]:
-            raise ValueError(f"DDNSTO approved digest mismatch: {name}")
-        approved[name] = file
-    versions = {}
-    mutable = set()
-    for variant, pointer in (("lite", "VERSION_LITE"), ("standard", "VERSION")):
-        pointer_path = "openwrt/" + pointer
-        if pointer_path not in approved:
-            raise ValueError(f"missing DDNSTO version pointer: {pointer_path}")
-        version = approved[pointer_path].read_text().strip()
-        if not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", version):
-            raise ValueError("invalid DDNSTO version")
-        versions[variant] = version
-        mutable.add(pointer_path)
-        for ext in ("ipk", "apk"):
-            folder = f"openwrt/{variant}{'-apk' if ext == 'apk' else ''}/{version}"
-            names = [f"ddnsto_{arch}.{ext}" for arch in ("x86_64", "aarch64", "arm", "mipsel")]
-            names += [f"luci-app-ddnsto.{ext}", f"luci-i18n-ddnsto-zh-cn.{ext}"]
-            for name in names:
-                if f"{folder}/{name}" not in approved:
-                    raise ValueError(f"missing DDNSTO artifact: {folder}/{name}")
-    linux_name = "linux-binary/ddnsto-standard-4.2.3.tar.gz"
-    if linux_name not in approved:
-        raise ValueError("Linux default 4.2.3 artifact missing")
-    with tarfile.open(approved[linux_name], "r:gz") as archive:
-        for arch in ("x86_64", "aarch64"):
-            member = archive.getmember(f"ddnsto-standard-4.2.3/ddnsto.{arch}")
-            if not member.isfile():
-                raise ValueError("Linux tar member must be a regular binary")
-    # Stage all approved files, then generate the digest metadata consumed by business.sh.
-    for name, file in approved.items():
-        target = destination / name
-        if name in mutable:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(file, target)
-        else:
-            copy_immutable(file, target)
-    for parent in sorted({Path(name).parent for name in approved if name not in mutable}):
-        files = sorted((name, file) for name, file in approved.items() if Path(name).parent == parent)
-        target = destination / parent / "SHA256SUMS"
-        content = "".join(f"{digest(file)}  {Path(name).name}\n" for name, file in files)
-        if str(parent) != "linux-binary" and target.exists() and target.read_text() != content:
-            raise ValueError(f"immutable DDNSTO digest metadata changed: {parent}")
-        target.write_text(content)
-    return inventory["provenance"]
 
 
 def main():
@@ -129,7 +54,7 @@ def main():
         raise ValueError("production candidate requires clean scripts and zsetup source trees")
     if args.collect_ddnsto:
         args.ddnsto_artifacts = output.parent / "ddnsto-artifacts"
-        subprocess.run(["python3", "-B", str(ROOT / "scripts/collect-ddnsto-artifacts.py"), "--zsetup-bin", str(release / "zsetup-linux-x86_64"), "--output", str(args.ddnsto_artifacts)], check=True)
+        subprocess.run(["python3", "-B", str(ROOT / "ddnsto/collect-artifacts.py"), "--zsetup-bin", str(release / "zsetup-linux-x86_64"), "--output", str(args.ddnsto_artifacts)], check=True)
     catalog = json.loads((ROOT / "catalog.json").read_text())
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".release-", dir=output.parent) as temporary:
@@ -144,14 +69,10 @@ def main():
             copy_immutable(ROOT / record["script"], binary / record["path"])
         provenance = None
         if args.ddnsto_artifacts:
-            provenance = copy_ddnsto_artifacts(args.ddnsto_artifacts.resolve(), binary / "ddnsto")
+            provenance = DDNSTO["copy_ddnsto_artifacts"](args.ddnsto_artifacts.resolve(), binary / "ddnsto")
         for app in sorted({r["application"] for r in catalog["installers"]}):
-            shutil.copy2(ROOT / "apps" / app / "install.sh", binary / app / "install.sh")
-        # Compatibility URLs carry the exact same installer, not another business implementation.
-        for name in ("install_ddnsto.sh", "install_ddnsto_linux.sh", "install_ddnsto_business.sh", "setup_ddnsto.sh"):
-            target = binary / "ddnsto" / ("linux-binary" if name == "install_ddnsto_linux.sh" else "openwrt") / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(ROOT / "apps/ddnsto/install.sh", target)
+            shutil.copy2(ROOT / app / "install.sh", binary / app / "install.sh")
+        DDNSTO["copy_compat_installers"](ROOT / "ddnsto/install.sh", binary / "ddnsto")
         subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(release), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
         (binary / "zsetup/stable").write_text(version + "\n")
         evidence = {

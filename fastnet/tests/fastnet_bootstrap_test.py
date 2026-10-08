@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "apps/fastnet/install.sh"
+SCRIPT = Path(__file__).resolve().parents[1] / "install.sh"
 VERSION = "9.8.7"
 METADATA_ZSETUP = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path("/projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup/dist/release/zsetup-linux-x86_64")
 
