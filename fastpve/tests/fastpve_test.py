@@ -150,7 +150,7 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             # Background only proves native result propagation for a mock noninteractive program.
             launched=subprocess.run([str(ZSETUP),'install','fastpve','--background','--','background'],env=env | {'PRODUCT_EXIT':'38'},capture_output=True,text=True,timeout=20)
             assert launched.returncode==0,launched
-            fields=dict(line.split('=',1) for line in launched.stdout.splitlines() if '=' in line)
+            fields=dict(line.split('=',1) for line in launched.stdout.split() if '=' in line)
             result_path=Path(fields['result']); deadline=time.monotonic()+10
             while not result_path.exists() and time.monotonic()<deadline: time.sleep(.05)
             assert result_path.read_text().strip()=='38',result_path
