@@ -1,8 +1,8 @@
 # 构建、配置与发布
 
-业务发布流程提前把 FastNet/DDNSTO 产品、版本信息和真实 SHA256 元数据放到服务器。设备上的业务脚本按平台和架构选择产品，调用 zsetup 下载、校验、复用缓存，然后完成业务安装。本仓库维护安装脚本和统一安装索引，不采集、缓存或重新打包产品。
+业务发布流程提前把 FastNet/DDNSTO/LinkEase 产品、版本信息和真实 SHA256 元数据放到服务器。设备上的业务脚本按平台和架构选择产品，调用 zsetup 下载、校验、复用缓存，然后完成业务安装。本仓库维护安装脚本和统一安装索引，不采集、缓存或重新打包产品。
 
-依赖权威 zsetup 源码和现有构建能力，最低版本 0.2.4。复用原生版本/SHA256 元数据读取、总内存探测和 download/context/run/install；保留 0.2.3 Race 预算及 DoH/UDP 解析修复。统一入口命名为 APP/APP-install.sh，发布脚本版本为 0.1.4，config_version 为 scripts-0.1.4；native 保持 0.2.4。此前脚本及 native 不可变目录保留原字节。
+依赖权威 zsetup 源码和现有构建能力，最低版本 0.2.4。复用原生版本/SHA256 元数据读取、总内存探测和 download/context/run/install；保留 0.2.3 Race 预算及 DoH/UDP 解析修复。统一入口命名为 APP/APP-install.sh，发布脚本版本为 0.1.5，config_version 为 scripts-0.1.5；native 保持 0.2.4。此前脚本及 native 不可变目录保留原字节。
 
 ## 本地构建
 
@@ -27,7 +27,7 @@ manifest 的 business_artifacts 标记业务服务器发布所有权及 included
 | 文件 | 规则 |
 |---|---|
 | binary/zsetup/0.2.4/ | 权威 native release 的六个不可变文件，包括 SHA256SUMS/manifest |
-| binary/APP/0.1.4/APP-install.sh | 不可变业务入口；索引记录真实 SHA256/size |
+| binary/APP/0.1.5/APP-install.sh | 不可变业务入口；索引记录真实 SHA256/size |
 | binary/APP/APP-install.sh | 可变用户入口，与当前索引脚本同字节 |
 | binary/APP/install.sh | 原用户 URL 的同字节兼容副本，不单独维护业务代码 |
 | binary/ddnsto/install.ps1、install-macos.sh | Windows/macOS 原生业务入口；使用已发布客户端归档，不在本仓库内复制客户端二进制 |
@@ -61,6 +61,8 @@ ddnsto/linux-binary/SHA256SUMS
 opkg 使用 ipk，apk 使用带 -apk 的目录和 apk 包。OpenWrt 主包、LuCI 包、语言包及 SHA256SUMS 放在同一个不可变版本目录，全部完成后才更新 VERSION/VERSION_LITE。Linux tar 包含 ddnsto-standard-4.2.3/ddnsto.x86_64 和 ddnsto.aarch64 普通文件；其他已发布版本可通过 DDNSTO_VERSION 选择，并有对应摘要。SHA256SUMS 使用标准的 `64位十六进制摘要  文件名` 格式；安装端由 zsetup metadata 读取，zsetup download 内置校验，不依赖系统 awk/sed/openssl/sha256sum。
 
 旧 CDN 已有产品的历史检查记录位于 docs/verification-2026-10-08.md。当时部分 checksum 元数据尚未提供，LuCI 包位于可变根目录；新入口上线时业务发布者应补齐上面的版本目录及元数据。已有产品无需搬回本仓库，不把“缺少元数据”等同于“缺少产品”。历史摘要记录仅供核对，当前打包器不读取或发布它们。
+
+LinkEase：产品位于大小写保留的 /binary/LinkEase/，安装脚本位于 /binary/linkease/。LinuxStorage/<VERSION>/ 提供原 tar、各架构 linkmount ZIP 和 SHA256SUMS；Openwrt/<VERSION>/ 提供主包、UI/语言及支持架构的依赖包和 SHA256SUMS，全部完成后更新 Openwrt/VERSION。具体文件名与归档布局见 [LinkEase 发布约定](../linkease/README.md)。现有产品可由业务发布流程组成不可变快照，本仓库只引用服务器文件，不采集或重打包。
 
 ## 正式服务器切换
 

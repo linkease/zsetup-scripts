@@ -1,12 +1,13 @@
 # zsetup-scripts
 
-FastNet、DDNSTO 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup/README.md)，最低版本 **0.2.4**。
+FastNet、DDNSTO、LinkEase 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup/README.md)，最低版本 **0.2.4**。
 
 设备已有 zsetup：
 
 ```sh
 zsetup install fastnet
 zsetup install ddnsto -- --token 'YOUR_TOKEN'
+zsetup install linkease
 ```
 
 设备没有 zsetup，发布完成后的一条命令入口：
@@ -14,11 +15,12 @@ zsetup install ddnsto -- --token 'YOUR_TOKEN'
 ```sh
 sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastnet/fastnet-install.sh)"
 sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/ddnsto-install.sh)" -- --token 'YOUR_TOKEN'
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/linkease/linkease-install.sh)"
 ```
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
 
-**当前状态：安装脚本与配置候选，尚未公网发布。** FastNet/DDNSTO 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。原线上入口继续保留；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
+**当前状态：安装脚本与配置候选，尚未公网发布。** FastNet/DDNSTO/LinkEase 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。原线上入口继续保留；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
 
 | 应用标识 | 支持平台 | 架构 | 业务参数与交互 |
 |---|---|---|---|
@@ -27,16 +29,18 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/ddnsto-install.sh)" 
 | `ddnsto` | Ubuntu/Debian apt、CentOS/RHEL yum/dnf、其他已识别 Linux | x86_64、aarch64 | 默认 Standard 4.2.3；`DDNSTO_VERSION` 可覆盖已发布版本；无终端必须传 `--token` |
 | `ddnsto` | Windows 10 x64 WOW64 / PowerShell 5.1 | x86_64 CLI | `ddnsto/install.ps1`；固定校验的 CLI 4.2.1；使用计划任务随系统启动；必须提供 `-Token` |
 | `ddnsto` | macOS | x86_64、arm64 | `ddnsto/install-macos.sh`；固定校验的 CLI 4.2.1；使用用户级 launchd；必须提供 `--token` |
+| `linkease` | OpenWrt opkg、Ubuntu/Debian、CentOS/RHEL、通用 Linux | x86_64、aarch64、armv7 | `--version VERSION` 可选；Linux 默认 1.7.5；无菜单/token 交互 |
 | `fastpve` | 待确认 | 待确认 | 未实现、未加入索引；所需输入见 [新增业务](docs/extension.md) |
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
 
-业务按根目录模块组织：[fastnet/](fastnet/README.md)、[ddnsto/](ddnsto/README.md) 各自拥有业务脚本、测试和说明；DDNSTO 的兼容入口发布规则也位于 ddnsto/。公共 lib/scripts/tests/docs 仅保留共享 bootstrap、统一构建、跨模块验证与协议文档。
+业务按根目录模块组织：[fastnet/](fastnet/README.md)、[ddnsto/](ddnsto/README.md)、[linkease/](linkease/README.md) 各自拥有业务脚本、测试和说明；DDNSTO 的兼容入口发布规则也位于 ddnsto/。公共 lib/scripts/tests/docs 仅保留共享 bootstrap、统一构建、跨模块验证与协议文档。
 
 ```text
 zsetup-scripts/
   fastnet/          # fastnet-install.sh、business.sh、main.sh、README、tests/
   ddnsto/           # ddnsto-install.sh、Windows/macOS 入口、业务源码、测试、release.py
+  linkease/         # linkease-install.sh、business.sh、main.sh、README、tests/
   legacy/           # 原仓库旧脚本快照与来源说明，仅供历史参考
   lib/              # 共享 shell bootstrap
   scripts/          # 统一生成、打包与验收
@@ -45,9 +49,9 @@ zsetup-scripts/
   catalog.json      # 统一安装索引的构建输入
 ```
 
-共享 bootstrap 构建时嵌入各模块的唯一 APP-install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh 或 zsetup install，原业务仓库保持不变。
+共享 bootstrap 构建时嵌入各模块的唯一 APP-install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh、linkease/linkease-install.sh 或 zsetup install，原业务仓库保持不变。
 
-正式服务器部署 `dist/release/binary/` 中的三个目录：`fastnet/`、`ddnsto/`、`zsetup/`，映射到站点 `/binary/`。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变，共享完整配置在 zsetup/config.json。目录映射、首个新服务器的业务产物要求及发布顺序见 [发布流程](docs/release.md)。
+正式服务器部署 `dist/release/binary/` 中的四个目录：`fastnet/`、`ddnsto/`、`linkease/`、`zsetup/`，映射到站点 `/binary/`。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变，共享完整配置在 zsetup/config.json。目录映射、首个新服务器的业务产物要求及发布顺序见 [发布流程](docs/release.md)。
 
 开发与验收：
 

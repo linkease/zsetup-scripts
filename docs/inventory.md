@@ -34,3 +34,5 @@
 2026-10-08 历史脚本归档：根目录五个兼容符号链接已移除；legacy/ 保存源业务仓库 13bfb7580416487fda17d3d93d72bf6d25eb9800 的五份原始脚本及摘要，仅供历史参考。此前根目录别名的描述为迁移历史；当前本地入口为 fastnet/install.sh、ddnsto/install.sh，服务器兼容 URL 继续由当前入口生成。
 
 2026-10-08 命名规范更新：当前业务入口为 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh；构建和安装索引统一采用 APP/APP-install.sh。脚本发布版本为 0.1.4（scripts-0.1.4），native 仍为 0.2.4。原 /binary/APP/install.sh 及 DDNSTO 历史 URL 发布同字节兼容副本；原不可变目录与 legacy 历史快照保留。
+
+2026-10-09 LinkEase 接入盘点：用户提供了未跟踪的 legacy/install_linkease_linux.sh、install_linkease_openwrt.sh（对话中的 install_llinkease_linux.sh 不存在，实际第二份为 OpenWrt）。两个原文件原样保留。Linux 原固定版本 1.7.5，三程序 + 带库 linkmount ZIP，tar/unzip、root 或 sudo、systemctl/service/init 与 --serviceControl；OpenWrt 原 opkg 三架构，三主包及 x86_64/aarch64 的 iStore linkmount/remux，无 APK/MIPS。现模块 linkease/ 复用共享 bootstrap、native metadata/context/download 与统一索引，发布脚本 0.1.5/native 0.2.4。验收增加双入口、架构/版本、全部下载前不改服务、缓存/进度、失败回滚/恢复备份、后台 result、fallback 与中断回收；产品和元数据仍由服务器提前提供。

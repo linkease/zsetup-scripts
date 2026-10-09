@@ -1,6 +1,6 @@
 # 历史安装脚本
 
-这里保存五份原始源码，用于回顾 FastNet/DDNSTO 的安装经验、调用关系和迁移依据。文件是固定历史快照，不是指向当前 install.sh 的链接；不继续维护，也不加入安装索引或发布包。验收只对这些快照做 POSIX 语法和摘要检查，不执行历史安装逻辑。
+这里保存原始源码，用于回顾 FastNet/DDNSTO 的安装经验、调用关系和迁移依据。文件是固定历史快照，不是指向当前 install.sh 的链接；不继续维护，也不加入安装索引或发布包。验收只对这些快照做 POSIX 语法和摘要检查，不执行历史安装逻辑。
 
 来源仓库：`linkease/ddnsto_all_in_one_script`。来源提交：`13bfb7580416487fda17d3d93d72bf6d25eb9800`。归档日期：2026-10-08。五个文件均通过 git show 从该提交原样取得。
 
@@ -15,3 +15,12 @@
 当前维护和调用入口是 [fastnet/fastnet-install.sh](../fastnet/fastnet-install.sh)、[ddnsto/ddnsto-install.sh](../ddnsto/ddnsto-install.sh)，也可使用 zsetup install fastnet/ddnsto。下载协议、校验与依赖以这些现行入口为准，历史脚本保留当时的实现。
 
 原业务仓库与线上旧 URL 保留；线上兼容入口由当前 DDNSTO 安装脚本生成，同名快照不参与生成。详见 [发布流程](../docs/release.md)。
+
+## 用户补充的 LinkEase 参考
+
+2026-10-09 用户提供以下两份文件，按当前输入原样归档；没有可证明的上游 commit，不补造提交归属。其现行实现位于 [linkease/linkease-install.sh](../linkease/linkease-install.sh)，同样不发布或执行历史快照。
+
+| 文件 | 原职责 | SHA256 |
+|---|---|---|
+| install_linkease_linux.sh | Linux 三程序及 linkmount ZIP/服务安装 | 19e38713db5155b00f73470c918fff6f3430ca200daa92f45063e29f861e2b87 |
+| install_linkease_openwrt.sh | OpenWrt opkg 三架构及 iStore 依赖 | efdf86db8947790ce64af67d475916d68416aed9eeb627f976089b5b9b1c0d6c |

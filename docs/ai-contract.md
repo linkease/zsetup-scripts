@@ -8,6 +8,7 @@
 | ddnsto | `zsetup install ddnsto --foreground -- --token TOKEN [--force-version lite\|standard] [--verify-status]` | OpenWrt token 可选；Linux 无终端 token 必需。Linux 不支持 lite/verify-status。前台退出码为业务结果 |
 | ddnsto/macOS | `sh ddnsto/install-macos.sh --token TOKEN [--version 4.2.1]` | 仅支持 x86_64/arm64；使用用户级 launchd；当前固定客户端归档为 4.2.1，入口会校验归档 SHA256 |
 | ddnsto/Windows | `powershell -ExecutionPolicy Bypass -File ddnsto/install.ps1 -Token TOKEN [-Version 4.2.1]` | Windows 10 x64 WOW64 / PowerShell 5.1 验证范围；使用 x86_64 CLI 和 SYSTEM 计划任务；入口会校验归档及二进制 SHA256 |
+| linkease | `zsetup install linkease --foreground -- [--version VERSION]` | 无 token/菜单交互；Linux 默认 1.7.5、OpenWrt 默认服务器 VERSION；默认前台，可后台读取最终 result；root/已配置 sudo 与 tar/unzip 或 opkg 要求见模块 README |
 | fastpve | 不调用 | 尚无源实现、参数或测试，不在索引中 |
 
 业务入口约定：0 成功；2 参数/平台不支持或缺少必需交互输入；11 业务 metadata 不完整/非法；包管理器、启动程序、zsetup download 的其他错误码原样传播；信号退出 129/130/143。zsetup 自身配置/索引/版本收敛失败通常返回 17；download 的错误类别由其既有命令协议定义，不把一切非零都解释成“业务安装失败”。不要解析人类进度文案作为成功协议。
@@ -20,6 +21,8 @@ zsetup 默认完整本地配置 `/etc/zsetup/config.json` 优先于云端；无�
 
 工程测试变量包括 ZSETUP_ROOT/WORK_DIR/BOOTSTRAP_BASES/CA_FILE、DDNSTO_BIN_PATH/SERVICE_PATH/MEM_MB；这些不是面向普通用户的安装参数。token 不写入安装器日志；真实命令行参数和 uci/业务程序如何保存凭据仍遵循业务自身契约。
 
-0.1.4 脚本要求 zsetup >=0.2.4。`context --json` 增加 `memory_total_mb`（整数 MiB，未知为 null）；字段模式为整数或 unknown。`metadata version FILE [KEY]` 与 `metadata sha256 FILE NAME` 仅读取受限本地数据；0 成功、2 参数错误、11 内容错误、12 文件错误，成功 stdout 只有一行值。DDNSTO 的 900 MiB 阈值仍由业务决定；测试可用既有 DDNSTO_MEM_MB，普通用户无需传内存参数。
+0.1.5 脚本要求 zsetup >=0.2.4。`context --json` 增加 `memory_total_mb`（整数 MiB，未知为 null）；字段模式为整数或 unknown。`metadata version FILE [KEY]` 与 `metadata sha256 FILE NAME` 仅读取受限本地数据；0 成功、2 参数错误、11 内容错误、12 文件错误，成功 stdout 只有一行值。DDNSTO 的 900 MiB 阈值仍由业务决定；测试可用既有 DDNSTO_MEM_MB，普通用户无需传内存参数。
 
-维护与直接调用入口统一命名为 APP/APP-install.sh：fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh。公开 URL 使用 /binary/APP/APP-install.sh；原 /binary/APP/install.sh 为同字节兼容副本。zsetup install 的应用标识和参数协议不变。
+维护与直接调用入口统一命名为 APP/APP-install.sh：fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh、linkease/linkease-install.sh。公开 URL 使用 /binary/APP/APP-install.sh；原 /binary/APP/install.sh 为同字节兼容副本。zsetup install 的应用标识和参数协议不变。
+
+LinkEase 只支持 opkg 的 OpenWrt 及已声明 Linux 的 x86_64/aarch64/armv7，不声明 APK/MIPS。--version 原样通过现有 install 参数协议传入；LINKEASE_VERSION 作为默认，命令行优先。Linux 安装/启动失败会恢复旧文件/服务，恢复失败保留备份并报告；opkg 部分安装结果须由包管理器恢复，不解释成完整事务回滚。详见 [LinkEase 协议](../linkease/README.md)。
