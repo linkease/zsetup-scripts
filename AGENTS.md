@@ -15,3 +15,11 @@
 - LinkEase owns its Linux multi-file/service transaction and OpenWrt opkg workflow in linkease/business.sh. Reference bytes in legacy/install_linkease_{linux,openwrt}.sh remain unchanged. APK is unproven; do not claim it in the index. Linux recovery copies are retained if rollback fails; tests never touch host services.
 
 - FastPVE owns only its PVE preflight and verified binary launcher; PVE actions/menus belong to FastPVE. Do not infer PVE major-version support or noninteractive flags from the legacy launcher. Keep the user-supplied Bash snapshot unchanged and syntax-check it with bash -n.
+
+
+## Shared Build Toolchains
+
+- The workspace's canonical toolchain root is `/projects/workspace-linkease-ubuntu/toolchains/`; set `LINKEASE_TOOLCHAIN_ROOT` to this path and inspect existing versions before downloading tools.
+- Zig host compilers, verified archives, global caches and target-specific runtime dependencies are separated there. Business scripts must not download compilers or copy runtime into this repository.
+- The owning native repository is `/projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup`; use its `scripts/prepare-toolchain.py`, `release/toolchains.json`, and `docs/plans/2026-10-09-desktop-portability.md`. The root toolchain README is another discovery entrypoint for future AI.
+- Desktop API compile success is not full zsetup/platform release support. Check the native build evidence and release status before publishing a platform installer.

@@ -67,3 +67,8 @@ python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zse
 第三条在干净提交后生成安装脚本、zsetup 和配置候选，不访问产品服务器、不需要本地产品文件。dist/release 是本仓库的发布输出，dist/evidence 是验证日志；不再生成 ddnsto-artifacts。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。
 
 跨平台 DDNSTO 入口的当前边界见 [ddnsto/README.md](ddnsto/README.md)。Windows/macOS 入口使用客户端业务发布目录中的 CLI 归档，不把客户端二进制复制进本仓库；归档版本和 SHA256 必须随业务发布物同步更新。
+
+维护者和 AI 使用的共享编译工具链位于 `/projects/workspace-linkease-ubuntu/toolchains/`，
+由原生 zsetup 仓库锁定版本、准备和复用，设置 `LINKEASE_TOOLCHAIN_ROOT` 即可指定。
+目录用途和平台状态见原生仓库 `zsetup/docs/plans/2026-10-09-desktop-portability.md`，
+工具链根目录也提供 README；业务安装脚本不需要这些编译依赖。
