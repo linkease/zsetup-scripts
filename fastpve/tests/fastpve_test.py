@@ -111,8 +111,24 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             (work/'FastPVE-0.1.8.verified').unlink()
             before=Handler.counts[product_path]
             assert run().returncode==0 and Handler.counts[product_path]>before
+            # A cache path that is a directory/symlink must never redirect atomic commits.
+            output.unlink()
+            outside=root/'outside'; outside.mkdir()
+            cached.unlink(); cached.symlink_to(outside, target_is_directory=True)
+            bad=run()
+            assert bad.returncode==2 and not output.exists() and not list(outside.iterdir()),bad
+            assert cached.is_symlink()
+            cached.unlink(); executable(cached,PRODUCT)
+            marker=work/'FastPVE-0.1.8.verified'; marker_bytes=marker.read_bytes()
+            marker.unlink(); marker.symlink_to(outside, target_is_directory=True)
+            bad=run()
+            assert bad.returncode==2 and not output.exists() and not list(outside.iterdir()),bad
+            marker.unlink(); marker.write_bytes(marker_bytes)
+            work_link=root/'work-link'; work_link.symlink_to(work, target_is_directory=True)
+            bad=run(overrides={'ZSETUP_WORK_DIR':str(work_link)})
+            assert bad.returncode==2 and not output.exists(),bad
             # All preflight errors fail before metadata/product requests or program launch.
-            output.unlink(); before=sum(Handler.counts.values())
+            output.unlink(missing_ok=True); before=sum(Handler.counts.values())
             for overrides in ({'ZSETUP_ARCH':'aarch64'},{'ZSETUP_PACKAGE_MANAGER':'opkg'},{'PVE_FAIL':'1'},{'TEST_UID':'1000'}):
                 bad=run(overrides={'ZSETUP_INSTALLER_MODE':'1'} | overrides)
                 assert bad.returncode==2 and not output.exists(),bad
