@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",))):
+for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",)), ("linkease", ("linkease_test.py",))):
     module = ROOT / app
     for filename in ("business.sh", "main.sh", f"{app}-install.sh", "README.md"):
         assert (module / filename).is_file(), f"missing {app}/{filename}"
@@ -24,6 +24,8 @@ expected = {
     "install_ddnsto.sh": "1f137a4f5ec0f76aadbf3d3dbdc8193ec93eb71f095e9110ce3881d5ef3e7707",
     "install_ddnsto_business.sh": "ddcb69decce88ba6544b268c3bb2f8d8adde533f9c197479932bd46a99d4deeb",
     "install_ddnsto_linux.sh": "0dbb19088fd4aae18c597c8f5455eaf28b4ef3bbd5adac7f551b85077c572c86",
+    "install_linkease_linux.sh": "19e38713db5155b00f73470c918fff6f3430ca200daa92f45063e29f861e2b87",
+    "install_linkease_openwrt.sh": "efdf86db8947790ce64af67d475916d68416aed9eeb627f976089b5b9b1c0d6c",
     "setup_ddnsto.sh": "53b69f9d7a6d287405c6ba88fb891f78ab362cdbb964dbf73c62d0bc83a8ff52",
 }
 for filename, digest in expected.items():
@@ -31,6 +33,6 @@ for filename, digest in expected.items():
 for record in json.loads((ROOT / "catalog.json").read_text())["installers"]:
     app = record["application"]
     assert record["script"] == f"{app}/{app}-install.sh"
-    assert record["path"] == f"{app}/0.1.4/{app}-install.sh"
+    assert record["path"] == f"{app}/0.1.5/{app}-install.sh"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")

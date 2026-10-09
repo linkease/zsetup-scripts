@@ -26,9 +26,9 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
     config = json.loads((binary / "zsetup/config.json").read_text())
     assert config["stable_zsetup"]["version"] == "0.2.4"
-    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto"}
+    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease"}
     assert not any(r["application"] == "fastpve" for r in config["installers"])
-    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "zsetup"}
+    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "zsetup"}
     assert not (binary / "legacy").exists()
     assert not any(p.name in {"business.sh", "main.sh", "README.md"} or p.suffix == ".py" for p in binary.rglob("*"))
 
@@ -37,12 +37,12 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert path.is_file()
         assert path.stat().st_size == record["size"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]
-    for app in ("fastnet", "ddnsto"):
+    for app in ("fastnet", "ddnsto", "linkease"):
         record = next(r for r in config["installers"] if r["application"] == app)
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        assert record["path"] == f"{app}/0.1.4/{app}-install.sh"
+        assert record["path"] == f"{app}/0.1.5/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()
         # Historical public URL remains an identical compatibility copy.
@@ -56,11 +56,15 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     for os_name, pm in (("ubuntu", "apt"), ("debian", "apt"), ("centos", "yum"), ("rhel", "dnf")):
         for arch in ("x86_64", "aarch64"):
             select("ddnsto", os_name, pm, arch)
+    for arch in ("x86_64", "aarch64", "armv7"):
+        select("linkease", "openwrt", "opkg", arch)
+        select("linkease", "ubuntu", "apt", arch)
+    assert not any(r["application"] == "linkease" and (r["arch"] == "mipsel" or r["os"] == "openwrt" and r["package_manager"] == "apk") for r in config["installers"])
     assert not any(r["application"] == "fastnet" and r["arch"] in ("mipsel", "*") for r in config["installers"])
     subprocess.run(["sha256sum", "-c", "PACKAGE-SHA256SUMS"], cwd=output, check=True, stdout=subprocess.DEVNULL)
     env = __import__("os").environ | {"ZSETUP_CONFIG": str(binary / "zsetup/config.json")}
     listed = subprocess.run([str(ZROOT / "dist/release/zsetup-linux-x86_64"), "install", "--list"], env=env, text=True, capture_output=True, check=True)
-    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto"}
+    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease"}
     archive = next(output.glob("*.tar.gz"))
     first = archive.read_bytes()
     subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)
