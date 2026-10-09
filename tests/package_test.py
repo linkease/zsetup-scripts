@@ -26,9 +26,8 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
     config = json.loads((binary / "zsetup/config.json").read_text())
     assert config["stable_zsetup"]["version"] == "0.2.4"
-    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease"}
-    assert not any(r["application"] == "fastpve" for r in config["installers"])
-    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "zsetup"}
+    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease", "fastpve"}
+    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "fastpve", "zsetup"}
     assert not (binary / "legacy").exists()
     assert not any(p.name in {"business.sh", "main.sh", "README.md"} or p.suffix == ".py" for p in binary.rglob("*"))
 
@@ -37,12 +36,12 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert path.is_file()
         assert path.stat().st_size == record["size"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]
-    for app in ("fastnet", "ddnsto", "linkease"):
+    for app in ("fastnet", "ddnsto", "linkease", "fastpve"):
         record = next(r for r in config["installers"] if r["application"] == app)
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        assert record["path"] == f"{app}/0.1.5/{app}-install.sh"
+        assert record["path"] == f"{app}/0.1.6/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()
         # Historical public URL remains an identical compatibility copy.
@@ -50,6 +49,11 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     def select(app, os_name, pm, arch):
         matches = [r for r in config["installers"] if r["application"] == app and all(r[k] in ("*", v) for k,v in (("os", os_name), ("package_manager", pm), ("arch", arch)))]
         assert len(matches) == 1, (app, os_name, pm, arch, matches)
+    select("fastpve", "debian", "apt", "x86_64")
+    pve_records = [r for r in config["installers"] if r["application"] == "fastpve"]
+    assert len(pve_records) == 1
+    assert (pve_records[0]["os"], pve_records[0]["package_manager"], pve_records[0]["arch"]) == ("debian", "apt", "x86_64")
+    assert not any(p.name.startswith("FastPVE-") for p in binary.rglob("*")), "product binaries belong on servers"
     for pm in ("opkg", "apk"):
         for arch in ("x86_64", "aarch64", "armv7", "mipsel"):
             select("ddnsto", "openwrt", pm, arch)
@@ -64,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     subprocess.run(["sha256sum", "-c", "PACKAGE-SHA256SUMS"], cwd=output, check=True, stdout=subprocess.DEVNULL)
     env = __import__("os").environ | {"ZSETUP_CONFIG": str(binary / "zsetup/config.json")}
     listed = subprocess.run([str(ZROOT / "dist/release/zsetup-linux-x86_64"), "install", "--list"], env=env, text=True, capture_output=True, check=True)
-    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease"}
+    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease", "fastpve"}
     archive = next(output.glob("*.tar.gz"))
     first = archive.read_bytes()
     subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)

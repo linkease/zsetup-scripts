@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",)), ("linkease", ("linkease_test.py",))):
+for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",)), ("linkease", ("linkease_test.py",)), ("fastpve", ("fastpve_test.py",))):
     module = ROOT / app
     for filename in ("business.sh", "main.sh", f"{app}-install.sh", "README.md"):
         assert (module / filename).is_file(), f"missing {app}/{filename}"
@@ -20,6 +20,7 @@ for filename, app in (("fastnet-install.sh", "fastnet"), ("install_ddnsto.sh", "
     archived = ROOT / "legacy" / filename
     assert archived.is_file() and not archived.is_symlink(), "archive actual historical source"
 expected = {
+    "fastpve-install.sh": "5a8babfcfe46c341cde7c35ebda47bafaa19b5b72d95653843e7d595f2445a97",
     "fastnet-install.sh": "21aa238f92e491887e9b7d3e7f2845796891844fce035cf4da4cdb8fe5cbc2a1",
     "install_ddnsto.sh": "1f137a4f5ec0f76aadbf3d3dbdc8193ec93eb71f095e9110ce3881d5ef3e7707",
     "install_ddnsto_business.sh": "ddcb69decce88ba6544b268c3bb2f8d8adde533f9c197479932bd46a99d4deeb",
@@ -33,6 +34,6 @@ for filename, digest in expected.items():
 for record in json.loads((ROOT / "catalog.json").read_text())["installers"]:
     app = record["application"]
     assert record["script"] == f"{app}/{app}-install.sh"
-    assert record["path"] == f"{app}/0.1.5/{app}-install.sh"
+    assert record["path"] == f"{app}/0.1.6/{app}-install.sh"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")
