@@ -138,7 +138,7 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
                               'ZSETUP_SOURCE_BASES':base,'ZSETUP_SOURCE_FALLBACK':'','ZSETUP_BOOTSTRAP_BASES':base,
                               'ZSETUP_ROOT':str(root/'bootstrap'),'ZSETUP_WORK_DIR':str(root/'work'),
                               'ZSETUP_OS':'ubuntu','ZSETUP_PACKAGE_MANAGER':'apt','ZSETUP_ARCH':'x86_64',
-                              'LINKEASE_APP_DIR':str(root/'installed'),'SERVICE_REGISTRY':str(root/'service-registration'),'TEST_STABLE':str(stable),'TEST_LOG':str(root/'log')}
+                              'LINKEASE_APP_DIR':str(root/'installed'),'LINKEASE_SERVICE_PATH':str(root/'isolated-init-service'),'SERVICE_REGISTRY':str(root/'service-registration'),'TEST_STABLE':str(stable),'TEST_LOG':str(root/'log')}
             (root/'installed').mkdir()
             def run(args=(), overrides=None, indexed=False):
                 cmd = [str(ZSETUP),'install','linkease','--foreground','--',*args] if indexed else ['sh',str(SCRIPT),*args]
