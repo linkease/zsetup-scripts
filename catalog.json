@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "scripts-0.1.5",
+  "config_version": "scripts-0.1.6",
   "installers": [
     {
       "application": "fastnet",
@@ -8,7 +8,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "fastnet/fastnet-install.sh",
-      "path": "fastnet/0.1.5/fastnet-install.sh",
+      "path": "fastnet/0.1.6/fastnet-install.sh",
       "background": false
     },
     {
@@ -17,7 +17,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "fastnet/fastnet-install.sh",
-      "path": "fastnet/0.1.5/fastnet-install.sh",
+      "path": "fastnet/0.1.6/fastnet-install.sh",
       "background": false
     },
     {
@@ -26,7 +26,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "fastnet/fastnet-install.sh",
-      "path": "fastnet/0.1.5/fastnet-install.sh",
+      "path": "fastnet/0.1.6/fastnet-install.sh",
       "background": false
     },
     {
@@ -35,7 +35,7 @@
       "package_manager": "opkg",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -44,7 +44,7 @@
       "package_manager": "opkg",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -53,7 +53,7 @@
       "package_manager": "opkg",
       "arch": "armv7",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -62,7 +62,7 @@
       "package_manager": "opkg",
       "arch": "mipsel",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -71,7 +71,7 @@
       "package_manager": "apk",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -80,7 +80,7 @@
       "package_manager": "apk",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -89,7 +89,7 @@
       "package_manager": "apk",
       "arch": "armv7",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -98,7 +98,7 @@
       "package_manager": "apk",
       "arch": "mipsel",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -107,7 +107,7 @@
       "package_manager": "apt",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -116,7 +116,7 @@
       "package_manager": "apt",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -125,7 +125,7 @@
       "package_manager": "apt",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -134,7 +134,7 @@
       "package_manager": "apt",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -143,7 +143,7 @@
       "package_manager": "yum",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -152,7 +152,7 @@
       "package_manager": "yum",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -161,7 +161,7 @@
       "package_manager": "dnf",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -170,7 +170,7 @@
       "package_manager": "dnf",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -179,7 +179,7 @@
       "package_manager": "yum",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -188,7 +188,7 @@
       "package_manager": "yum",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -197,7 +197,7 @@
       "package_manager": "dnf",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -206,7 +206,7 @@
       "package_manager": "dnf",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -215,7 +215,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -224,7 +224,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "ddnsto/ddnsto-install.sh",
-      "path": "ddnsto/0.1.5/ddnsto-install.sh",
+      "path": "ddnsto/0.1.6/ddnsto-install.sh",
       "background": false
     },
     {
@@ -233,7 +233,7 @@
       "package_manager": "opkg",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -242,7 +242,7 @@
       "package_manager": "opkg",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -251,7 +251,7 @@
       "package_manager": "opkg",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -260,7 +260,7 @@
       "package_manager": "apt",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -269,7 +269,7 @@
       "package_manager": "apt",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -278,7 +278,7 @@
       "package_manager": "apt",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -287,7 +287,7 @@
       "package_manager": "apt",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -296,7 +296,7 @@
       "package_manager": "apt",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -305,7 +305,7 @@
       "package_manager": "apt",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -314,7 +314,7 @@
       "package_manager": "yum",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -323,7 +323,7 @@
       "package_manager": "yum",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -332,7 +332,7 @@
       "package_manager": "yum",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -341,7 +341,7 @@
       "package_manager": "dnf",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -350,7 +350,7 @@
       "package_manager": "dnf",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -359,7 +359,7 @@
       "package_manager": "dnf",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -368,7 +368,7 @@
       "package_manager": "yum",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -377,7 +377,7 @@
       "package_manager": "yum",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -386,7 +386,7 @@
       "package_manager": "yum",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -395,7 +395,7 @@
       "package_manager": "dnf",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -404,7 +404,7 @@
       "package_manager": "dnf",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -413,7 +413,7 @@
       "package_manager": "dnf",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -422,7 +422,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -431,7 +431,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
       "background": false
     },
     {
@@ -440,7 +440,16 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "linkease/linkease-install.sh",
-      "path": "linkease/0.1.5/linkease-install.sh",
+      "path": "linkease/0.1.6/linkease-install.sh",
+      "background": false
+    },
+    {
+      "application": "fastpve",
+      "os": "debian",
+      "package_manager": "apt",
+      "arch": "x86_64",
+      "script": "fastpve/fastpve-install.sh",
+      "path": "fastpve/0.1.6/fastpve-install.sh",
       "background": false
     }
   ]

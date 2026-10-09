@@ -1,6 +1,6 @@
 # 历史安装脚本
 
-这里保存原始源码，用于回顾 FastNet/DDNSTO 的安装经验、调用关系和迁移依据。文件是固定历史快照，不是指向当前 install.sh 的链接；不继续维护，也不加入安装索引或发布包。验收只对这些快照做 POSIX 语法和摘要检查，不执行历史安装逻辑。
+这里保存原始源码，用于回顾 FastNet/DDNSTO 的安装经验、调用关系和迁移依据。文件是固定历史快照，不是指向当前 install.sh 的链接；不继续维护，也不加入安装索引或发布包。验收只对这些快照按原 shebang 做 shell 语法和摘要检查（FastPVE 历史脚本为 Bash），不执行历史安装逻辑。
 
 来源仓库：`linkease/ddnsto_all_in_one_script`。来源提交：`13bfb7580416487fda17d3d93d72bf6d25eb9800`。归档日期：2026-10-08。五个文件均通过 git show 从该提交原样取得。
 
@@ -24,3 +24,10 @@
 |---|---|---|
 | install_linkease_linux.sh | Linux 三程序及 linkmount ZIP/服务安装 | 19e38713db5155b00f73470c918fff6f3430ca200daa92f45063e29f861e2b87 |
 | install_linkease_openwrt.sh | OpenWrt opkg 三架构及 iStore 依赖 | efdf86db8947790ce64af67d475916d68416aed9eeb627f976089b5b9b1c0d6c |
+
+
+## 用户补充的 FastPVE 参考
+
+2026-10-09 用户提供 `fastpve-install.sh`，原字节保留；上游 commit 未提供，不虚构归属。SHA256：`5a8babfcfe46c341cde7c35ebda47bafaa19b5b72d95653843e7d595f2445a97`。
+
+原脚本用 Bash/curl 或 wget/awk/sha256sum 或 shasum，读取 fw.kspeeder.com 的 VERSION/FASTPVE_SHA256，缓存 FastPVE-<VERSION>，调用 version 和默认菜单；没有本地辅助脚本，也没有安装/服务/PVE 操作实现。当前入口见 [fastpve/fastpve-install.sh](../fastpve/fastpve-install.sh)，由下载后的程序拥有业务操作。

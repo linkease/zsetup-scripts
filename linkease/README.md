@@ -1,6 +1,6 @@
 # LinkEase
 
-维护入口为 `linkease-install.sh`，由 `business.sh`、`main.sh` 与共享 `../lib/bootstrap.sh` 生成。直接执行与 zsetup install linkease 汇合到同一 linkease_install 函数；运行中的脚本不下载自身。依赖 zsetup >=0.2.4，发布脚本版本为 0.1.5。
+维护入口为 `linkease-install.sh`，由 `business.sh`、`main.sh` 与共享 `../lib/bootstrap.sh` 生成。直接执行与 zsetup install linkease 汇合到同一 linkease_install 函数；运行中的脚本不下载自身。依赖 zsetup >=0.2.4，发布脚本版本为 0.1.6。
 
 设备已有 zsetup：
 

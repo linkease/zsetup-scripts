@@ -36,3 +36,8 @@
 2026-10-08 命名规范更新：当前业务入口为 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh；构建和安装索引统一采用 APP/APP-install.sh。脚本发布版本为 0.1.4（scripts-0.1.4），native 仍为 0.2.4。原 /binary/APP/install.sh 及 DDNSTO 历史 URL 发布同字节兼容副本；原不可变目录与 legacy 历史快照保留。
 
 2026-10-09 LinkEase 接入盘点：用户提供了未跟踪的 legacy/install_linkease_linux.sh、install_linkease_openwrt.sh（对话中的 install_llinkease_linux.sh 不存在，实际第二份为 OpenWrt）。两个原文件原样保留。Linux 原固定版本 1.7.5，三程序 + 带库 linkmount ZIP，tar/unzip、root 或 sudo、systemctl/service/init 与 --serviceControl；OpenWrt 原 opkg 三架构，三主包及 x86_64/aarch64 的 iStore linkmount/remux，无 APK/MIPS。现模块 linkease/ 复用共享 bootstrap、native metadata/context/download 与统一索引，发布脚本 0.1.5/native 0.2.4。验收增加双入口、架构/版本、全部下载前不改服务、缓存/进度、失败回滚/恢复备份、后台 result、fallback 与中断回收；产品和元数据仍由服务器提前提供。
+
+
+2026-10-09 FastPVE 接入盘点：目标仓库 HEAD 6802d71 已提交 LinkEase，只有用户新增 legacy/fastpve-install.sh 未跟踪；原字节 SHA256 为 5a8babfcfe46c341cde7c35ebda47bafaa19b5b72d95653843e7d595f2445a97。脚本独立，没有调用仓库其他入口或辅助文件；Bash/curl/wget/awk/sha256sum/shasum 用于取得版本、校验缓存并启动程序，具体 PVE 业务由程序拥有。原 fw.kspeeder.com 的 0.1.8 产物只读检查：9240868 字节、ELF x86_64、SHA256 0e92cf8ab6ca78cdb2b0125974cbe9d2948181735026f36e6adada0a0fc82486 与 version.txt 一致，未执行。
+
+任务树：测试先行 → fastpve/{business,main,fastpve-install,README,tests} → Debian/apt/x86_64 索引 → 发布版本 0.1.6/native 0.2.4 → 全量检查/发布包/证据。验收覆盖双入口不重复自身、无 awk/sed/hash 工具的真实 HTTPS 下载、root/PVE/CPU/包管理器拒绝、参数逐项透传、缓存/版本/进度、非法元数据与损坏下载不启动、旧缓存保留、信号回收、fallback、前台/后台结果、50 条配置的路径/size/SHA256 与包一致。私有 marker/size 缓存沿用现有规范，不每次全文件重新哈希；具体安全边界见 fastpve/README.md。未推断 PVE 大版本矩阵、无人值守参数或安装实现，不改变主机服务，不发布公网。新增历史 Bash 只按 bash -n 检查，现行脚本全部 POSIX sh -n。

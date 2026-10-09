@@ -4,7 +4,7 @@
 - Read `docs/inventory.md`, `docs/release.md`, `docs/ai-contract.md`, and the owning zsetup product principles/config/lifecycle/release documents before changing behavior.
 - `lib/bootstrap.sh` is the shared shell bootstrap source extracted from tested FastNet. `scripts/build-entrypoints.py` embeds it; generated `APP/APP-install.sh` is the only public entry. Edit maintained sources, regenerate, then use `--check`.
 - Historical source snapshots live in legacy/ with source commit and SHA256 documented in legacy/README.md. Keep old script names out of the root; never build, index or publish the snapshots as current installers. The source DDNSTO repository and existing live URLs must remain until explicit migration verification.
-- Scripts 0.1.5 require zsetup >=0.2.4 for native metadata/memory, preserving the 0.2.3 Race/DNS fixes, three HTTPS primaries and the final fallback. Only shell bootstrap may prompt for HTTP after exhausting HTTPS. Do not add unattended downgrade or external SHA dependencies to normal installation.
+- Scripts 0.1.6 require zsetup >=0.2.4 for native metadata/memory, preserving the 0.2.3 Race/DNS fixes, three HTTPS primaries and the final fallback. Only shell bootstrap may prompt for HTTP after exhausting HTTPS. Do not add unattended downgrade or external SHA dependencies to normal installation.
 - Test with local HTTPS fixtures, fake package managers and isolated work/install paths. Never execute a real OpenWrt package or change a host service as a test.
 - Add behavior tests before production edits; keep test-only and implementation commits separate. Run `sh scripts/check.sh ZSETUP_ROOT` after meaningful changes.
 - Do not rewrite a running shell script in place. Generated entries and package pointers must be installed atomically.
@@ -13,3 +13,5 @@
 - Each root business folder owns its scripts, tests and business release rules. Public files live under binary/APP/; never publish internal main/business sources, Python tools or tests. Root catalog and packaging remain the complete shared index/release.
 
 - LinkEase owns its Linux multi-file/service transaction and OpenWrt opkg workflow in linkease/business.sh. Reference bytes in legacy/install_linkease_{linux,openwrt}.sh remain unchanged. APK is unproven; do not claim it in the index. Linux recovery copies are retained if rollback fails; tests never touch host services.
+
+- FastPVE owns only its PVE preflight and verified binary launcher; PVE actions/menus belong to FastPVE. Do not infer PVE major-version support or noninteractive flags from the legacy launcher. Keep the user-supplied Bash snapshot unchanged and syntax-check it with bash -n.
