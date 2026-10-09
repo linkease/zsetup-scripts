@@ -12,6 +12,9 @@ import sys
 import tarfile
 import tempfile
 import threading
+import time
+import signal
+import shutil
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,9 +28,14 @@ case "$1" in
  showVersion) echo 'LinkEase fixture {kind}'; exit "${{VERSION_FAIL:-0}}" ;;
  --serviceControl)
    printf '{kind} service %s\\n' "$2" >> "$TEST_LOG"
+   case "$2" in
+     uninstall) rm -f "$SERVICE_REGISTRY" ;;
+     install) [ ! -e "$SERVICE_REGISTRY" ] || exit 41; : > "$SERVICE_REGISTRY" ;;
+   esac
    if [ '{kind}' = new ]; then
      case "$2" in install) exit "${{INSTALL_FAIL:-0}}" ;; start) exit "${{START_FAIL:-0}}" ;; esac
-   fi ;;
+   fi
+   if [ '{kind}' = old ] && [ "$2" = start ]; then exit "${{OLD_START_FAIL:-0}}"; fi ;;
 esac
 '''.encode()
 
@@ -107,7 +115,18 @@ def main():
             fakebin = root / 'bin'; fakebin.mkdir()
             for name in ('awk', 'sed', 'curl', 'wget'):
                 executable(fakebin/name, '#!/bin/sh\nexit 97\n')
-            executable(fakebin/'opkg', '#!/bin/sh\nprintf "opkg %s\\n" "$*" >> "$TEST_LOG"\nexit "${PKG_FAIL:-0}"\n')
+            stable = root/'stable'; stable.write_text('0.2.4\n')
+            # First bootstrap may use curl; business requests must use the real zsetup.
+            executable(fakebin/'curl', r"""#!/bin/sh
+out=; url=
+while [ "$#" -gt 0 ]; do
+    [ "$1" != -o ] || { shift; out=$1; shift; continue; }
+    case "$1" in https://*) url=$1 ;; esac
+    shift
+done
+case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;; esac
+""")
+            executable(fakebin/'opkg' , '#!/bin/sh\nprintf "opkg %s\\n" "$*" >> "$TEST_LOG"\nexit "${PKG_FAIL:-0}"\n')
             executable(fakebin/'linkease', '#!/bin/sh\necho "OpenWrt fixture"\n')
             executable(fakebin/'systemctl', '#!/bin/sh\nprintf "systemctl %s\\n" "$*" >> "$TEST_LOG"\nexit "${STOP_FAIL:-0}"\n')
             config = {'schema_version':1, 'config_version':'linkease-fixture',
@@ -119,7 +138,7 @@ def main():
                               'ZSETUP_SOURCE_BASES':base,'ZSETUP_SOURCE_FALLBACK':'','ZSETUP_BOOTSTRAP_BASES':base,
                               'ZSETUP_ROOT':str(root/'bootstrap'),'ZSETUP_WORK_DIR':str(root/'work'),
                               'ZSETUP_OS':'ubuntu','ZSETUP_PACKAGE_MANAGER':'apt','ZSETUP_ARCH':'x86_64',
-                              'LINKEASE_APP_DIR':str(root/'installed'),'TEST_LOG':str(root/'log')}
+                              'LINKEASE_APP_DIR':str(root/'installed'),'SERVICE_REGISTRY':str(root/'service-registration'),'TEST_STABLE':str(stable),'TEST_LOG':str(root/'log')}
             (root/'installed').mkdir()
             def run(args=(), overrides=None, indexed=False):
                 cmd = [str(ZSETUP),'install','linkease','--foreground','--',*args] if indexed else ['sh',str(SCRIPT),*args]
@@ -142,6 +161,9 @@ def main():
             for arch in ('aarch64','armv7'):
                 selected=run(['--version','2.0.0'], {'ZSETUP_INSTALLER_MODE':'1','ZSETUP_ARCH':arch})
                 assert selected.returncode==0, selected
+            fallback=run(['--version','2.0.0'], {'ZSETUP_INSTALLER_MODE':'1','ZSETUP_SOURCE_BASES':base+'/missing','ZSETUP_SOURCE_FALLBACK':base,'ZSETUP_WORK_DIR':str(root/'fallback-work')})
+            assert fallback.returncode==0, fallback
+            assert Handler.counts.get('/binary/missing/LinkEase/LinuxStorage/2.0.0/SHA256SUMS')
             for args,overrides in ((['--version'],{}),(['--bogus'],{}),(['--version','../escape'],{}),([] ,{'ZSETUP_ARCH':'mipsel'}),([] ,{'ZSETUP_OS':'openwrt','ZSETUP_PACKAGE_MANAGER':'apk'})):
                 before=log()
                 bad=run(args, {'ZSETUP_INSTALLER_MODE':'1'}|overrides)
@@ -168,9 +190,18 @@ def main():
                 assert (root/'installed/linkease-media').read_bytes()==b'old media'
                 assert (root/'installed/linkmount/linkmount_bin').read_bytes()==b'old mount'
                 assert 'old service start' in log(), log()
+            failed_recovery=run(overrides={'ZSETUP_INSTALLER_MODE':'1','START_FAIL':'37','OLD_START_FAIL':'39'})
+            assert failed_recovery.returncode==37 and 'recovery files retained' in failed_recovery.stderr, failed_recovery
+            backups=list((root/'installed').glob('.linkease-backup.*'))
+            assert len(backups)==1 and (backups[0]/'linkease').read_bytes()==program('old')
+            # The test operator reaps the deliberately retained recovery copy after asserting it.
+            shutil.rmtree(backups[0])
             actions=log(); before=(root/'installed/linkease').read_bytes()
             bad=run(overrides={'ZSETUP_INSTALLER_MODE':'1','STOP_FAIL':'38'})
             assert bad.returncode==38 and (root/'installed/linkease').read_bytes()==before, bad
+            first_target=root/'first-failure'; first_target.mkdir()
+            bad=run(overrides={'ZSETUP_INSTALLER_MODE':'1','LINKEASE_APP_DIR':str(first_target),'SERVICE_REGISTRY':str(root/'first-registration'),'START_FAIL':'37'})
+            assert bad.returncode==37 and not list(first_target.iterdir()), bad
             # Validate zip member paths without allowing archive writes outside staging.
             stream=io.BytesIO()
             with zipfile.ZipFile(stream,'w') as zip: zip.writestr('amd64/bin/../../outside',b'escape')
@@ -193,10 +224,29 @@ def main():
             bad=run(overrides={'ZSETUP_INSTALLER_MODE':'1','ZSETUP_OS':'openwrt','ZSETUP_PACKAGE_MANAGER':'opkg','ZSETUP_WORK_DIR':str(root/'openwrt-fresh')})
             assert bad.returncode!=0 and log()==actions, bad
             Handler.broken.clear()
+            pkg_failure=run(overrides={'ZSETUP_INSTALLER_MODE':'1','ZSETUP_OS':'openwrt','ZSETUP_PACKAGE_MANAGER':'opkg','PKG_FAIL':'23'})
+            assert pkg_failure.returncode==23, pkg_failure
+            # Existing detached execution protocol supplies the final installation exit status.
+            background=subprocess.run([str(ZSETUP),'install','linkease','--background','--','--version','2.0.0'],env=env,text=True,capture_output=True,timeout=10)
+            assert background.returncode==0, background
+            fields=dict(item.split('=',1) for item in background.stdout.strip().split())
+            result_file=Path(fields['result']); deadline=time.monotonic()+10
+            while not result_file.exists() and time.monotonic()<deadline: time.sleep(0.01)
+            assert result_file.read_text().strip()=='0'
+            assert '[4/4]' in Path(fields['log']).read_text()
+            # A waiting business download is interrupted without retaining its transaction.
+            blocked=root/'blocked-zsetup'; ready=root/'download-ready'
+            executable(blocked,'#!/bin/sh\nif [ "$1" = download ]; then : > "$DOWNLOAD_READY"; sleep 1; exit 13; fi\nexit 97\n')
+            process=subprocess.Popen(['sh',str(SCRIPT)],env=env|{'ZSETUP_INSTALLER_MODE':'1','ZSETUP_BIN':str(blocked),'DOWNLOAD_READY':str(ready)},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            deadline=time.monotonic()+5
+            while not ready.exists() and time.monotonic()<deadline: time.sleep(0.01)
+            assert ready.exists()
+            process.send_signal(signal.SIGTERM); _out,_err=process.communicate(timeout=5)
+            assert process.returncode==143, (process.returncode,_err)
             # Every failed and successful transaction is reaped, backups only remain on rollback failure.
             assert not list(root.rglob('.transaction.*'))
             assert not list((root/'installed').glob('.linkease-*'))
-            print('LinkEase: HTTPS direct/index, architecture, parameters, cache, progress, pre-install failures, full Linux rollback and opkg passed')
+            print('LinkEase: HTTPS direct/index, architecture, parameters, cache, progress, pre-install failures, full Linux rollback, opkg, fallback, background result and signal cleanup passed')
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=2)
 
