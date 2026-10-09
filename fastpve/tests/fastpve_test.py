@@ -16,6 +16,9 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / 'fastpve/fastpve-install.sh'
 ZSETUP = Path(sys.argv[1]).resolve()
+NATIVE_VERSION = subprocess.check_output([str(ZSETUP), "--version"], text=True).strip().removeprefix("zsetup ")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests"))
+from tls_fixture import generate_certificate
 PRODUCT = b'''#!/bin/sh
 if [ "${1:-}" = version ]; then echo 'FastPVE fixture'; exit "${VERSION_FAIL:-0}"; fi
 printf '<%s>' "$@" > "$TEST_OUTPUT"
@@ -46,8 +49,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 def main():
     assert SCRIPT.is_file(), 'FastPVE canonical installer missing'
     with tempfile.TemporaryDirectory(prefix='fastpve-test-') as temp:
-        root = Path(temp); cert = root/'cert'; key = root/'key'
-        subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1','-keyout',str(key),'-out',str(cert)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        root = Path(temp); cert = root/'server.crt'; key = root/'server.key'
+        generate_certificate(root)
         server = http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
         tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); tls.load_cert_chain(cert,key)
         server.socket=tls.wrap_socket(server.socket,server_side=True)
@@ -65,7 +68,7 @@ def main():
                 executable(fakebin/name,'#!/bin/sh\nexit 97\n')
             executable(fakebin/'pveversion','#!/bin/sh\necho "pve-manager/8.4.1/fixture"\nexit "${PVE_FAIL:-0}"\n')
             executable(fakebin/'id','#!/bin/sh\necho "${TEST_UID:-0}"\n')
-            stable=root/'stable'; stable.write_text('0.2.4\n')
+            stable=root/'stable'; stable.write_text(NATIVE_VERSION + "\n")
             executable(fakebin/'curl',r'''#!/bin/sh
 out=; url=
 while [ "$#" -gt 0 ]; do
@@ -78,11 +81,11 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             # Wildcard selectors only in this fixture: host Ubuntu runs a mocked PVE.
             # Production selectors are separately checked as Debian/apt/x86_64 only.
             config={'schema_version':1,'config_version':'fastpve-fixture','source_groups':[{'id':'fixture','primary_bases':[base]}],
-                    'stable_zsetup':{'version':'0.2.4','source_group':'fixture','artifacts':[{'arch':'x86_64','path':'zsetup/unused','sha256':'00'*32,'size':1}]},
-                    'installers':[{'application':'fastpve','os':'*','package_manager':'*','arch':'x86_64','source_group':'fixture','path':'fastpve/0.1.6/fastpve-install.sh','sha256':hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),'size':SCRIPT.stat().st_size,'background':False,'min_version':'0.2.4'}]}
+                    'stable_zsetup':{'version':NATIVE_VERSION,'source_group':'fixture','artifacts':[{'arch':'x86_64','path':'zsetup/unused','sha256':'00'*32,'size':1}]},
+                    'installers':[{'application':'fastpve','os':'*','package_manager':'*','arch':'x86_64','source_group':'fixture','path':'fastpve/0.1.6/fastpve-install.sh','sha256':hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),'size':SCRIPT.stat().st_size,'background':False,'min_version':NATIVE_VERSION}]}
             cfg=root/'config'; cfg.write_text(json.dumps(config))
             work=root/'work'; output=root/'args'
-            env=os.environ | {'PATH':f'{fakebin}:/usr/bin:/bin','ZSETUP_BIN':str(ZSETUP),'ZSETUP_CA_FILE':str(cert),'ZSETUP_CONFIG':str(cfg),
+            env=os.environ | {'PATH':f'{fakebin}:/usr/bin:/bin','ZSETUP_BIN':str(ZSETUP),'ZSETUP_CA_FILE':str(root/'ca.crt'),'ZSETUP_CONFIG':str(cfg),
                 'ZSETUP_CONFIG_CACHE':str(root/'config-cache'),'ZSETUP_MANAGED_ROOT':str(root/'managed'),'ZSETUP_ROOT':str(root/'bootstrap'),
                 'ZSETUP_WORK_DIR':str(work),'ZSETUP_ARCH':'x86_64','ZSETUP_PACKAGE_MANAGER':'apt','ZSETUP_OS':'debian',
                 'ZSETUP_SOURCE_BASES':base,'ZSETUP_SOURCE_FALLBACK':'','ZSETUP_BOOTSTRAP_BASES':base,'TEST_STABLE':str(stable),'TEST_OUTPUT':str(output)}

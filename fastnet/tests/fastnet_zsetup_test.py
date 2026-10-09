@@ -16,6 +16,9 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "fastnet-install.sh"
 ZSETUP = Path(sys.argv[1])
+NATIVE_VERSION = subprocess.check_output([str(ZSETUP), "--version"], text=True).strip().removeprefix("zsetup ")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests"))
+from tls_fixture import generate_certificate
 TUNNEL_ROOT = Path(sys.argv[2])
 BINARY = b"""#!/bin/sh
 if [ "${1:-}" = version ]; then echo 'FastNet fixture'; exit 0; fi
@@ -59,10 +62,7 @@ def main() -> None:
     # Use numeric loopback and a matching TLS certificate; no public DNS in this fixture.
     cert_tmp = tempfile.TemporaryDirectory(prefix="installer-loopback-tls-")
     cert_dir = Path(cert_tmp.name)
-    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
-                    "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
-                    "-keyout", str(cert_dir / "server.key"), "-out", str(cert_dir / "server.crt")],
-                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    generate_certificate(cert_dir)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     tls.load_cert_chain(cert_dir / "server.crt", cert_dir / "server.key")
@@ -79,14 +79,14 @@ def main() -> None:
                 "config_version": "fastnet-fixture-1",
                 "source_groups": [{"id": "fixture", "primary_bases": [base]}],
                 "stable_zsetup": {
-                    "version": "0.2.4", "source_group": "fixture",
+                    "version": NATIVE_VERSION, "source_group": "fixture",
                     "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00" * 32, "size": 1}],
                 },
                 "installers": [{
                     "application": "fastnet", "os": "*", "package_manager": "*", "arch": "*",
                     "source_group": "fixture", "path": "fastnet/fastnet-install.sh",
                     "sha256": hashlib.sha256(BUSINESS).hexdigest(), "size": len(BUSINESS),
-                    "background": False, "min_version": "0.2.4",
+                    "background": False, "min_version": NATIVE_VERSION,
                 }],
             }
             config_path = tmp / "config.json"
@@ -101,7 +101,7 @@ def main() -> None:
             env = os.environ | {
                 "ZSETUP_BIN": str(ZSETUP),
                 "ZSETUP_ARCH": "x86_64",
-                "ZSETUP_CA_FILE": str(cert_dir / "server.crt"),
+                "ZSETUP_CA_FILE": str(cert_dir / "ca.crt"),
                 "ZSETUP_WORK_DIR": str(tmp / "work"),
                 "FASTNET_TEST_OUTPUT": str(output),
                 "ZSETUP_CONFIG": str(config_path),

@@ -19,6 +19,9 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 ZSETUP = Path(sys.argv[1]).resolve()
+NATIVE_VERSION = subprocess.check_output([str(ZSETUP), "--version"], text=True).strip().removeprefix("zsetup ")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests"))
+from tls_fixture import generate_certificate
 SCRIPT = ROOT / 'linkease/linkease-install.sh'
 
 
@@ -86,7 +89,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='linkease-test-') as temporary:
         root = Path(temporary)
         cert, key = root / 'server.crt', root / 'server.key'
-        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', str(key), '-out', str(cert)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        generate_certificate(root)
         server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); tls.load_cert_chain(cert, key)
         server.socket = tls.wrap_socket(server.socket, server_side=True)
@@ -95,7 +98,7 @@ def main():
             base = f'https://127.0.0.1:{server.server_address[1]}/binary'
             bodies = Handler.bodies
             bodies['/binary/linkease/0.1.5/linkease-install.sh'] = SCRIPT.read_bytes()
-            bodies['/binary/zsetup/stable'] = b'0.2.4\n'
+            bodies['/binary/zsetup/stable'] = (NATIVE_VERSION + "\n").encode()
             for version in ('1.7.5', '2.0.0'):
                 folder = f'/binary/LinkEase/LinuxStorage/{version}'
                 files = {f'linkease-binary-{version}.tar.gz': archive(version)}
@@ -115,7 +118,7 @@ def main():
             fakebin = root / 'bin'; fakebin.mkdir()
             for name in ('awk', 'sed', 'curl', 'wget'):
                 executable(fakebin/name, '#!/bin/sh\nexit 97\n')
-            stable = root/'stable'; stable.write_text('0.2.4\n')
+            stable = root/'stable'; stable.write_text(NATIVE_VERSION + "\n")
             # First bootstrap may use curl; business requests must use the real zsetup.
             executable(fakebin/'curl', r"""#!/bin/sh
 out=; url=
@@ -131,10 +134,10 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             executable(fakebin/'systemctl', '#!/bin/sh\nprintf "systemctl %s\\n" "$*" >> "$TEST_LOG"\nexit "${STOP_FAIL:-0}"\n')
             config = {'schema_version':1, 'config_version':'linkease-fixture',
                       'source_groups':[{'id':'fixture','primary_bases':[base]}],
-                      'stable_zsetup':{'version':'0.2.4','source_group':'fixture','artifacts':[{'arch':'x86_64','path':'zsetup/unused','sha256':'00'*32,'size':1}]},
-                      'installers':[{'application':'linkease','os':'*','package_manager':'*','arch':'*','source_group':'fixture','path':'linkease/0.1.5/linkease-install.sh','sha256':hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),'size':SCRIPT.stat().st_size,'background':False,'min_version':'0.2.4'}]}
+                      'stable_zsetup':{'version':NATIVE_VERSION,'source_group':'fixture','artifacts':[{'arch':'x86_64','path':'zsetup/unused','sha256':'00'*32,'size':1}]},
+                      'installers':[{'application':'linkease','os':'*','package_manager':'*','arch':'*','source_group':'fixture','path':'linkease/0.1.5/linkease-install.sh','sha256':hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),'size':SCRIPT.stat().st_size,'background':False,'min_version':NATIVE_VERSION}]}
             cfg=root/'config.json'; cfg.write_text(json.dumps(config))
-            env=os.environ | {'PATH':f'{fakebin}:/usr/bin:/bin','ZSETUP_BIN':str(ZSETUP),'ZSETUP_CA_FILE':str(cert), 'ZSETUP_CONFIG':str(cfg), 'ZSETUP_CONFIG_CACHE':str(root/'config-cache'), 'ZSETUP_MANAGED_ROOT':str(root/'managed'),
+            env=os.environ | {'PATH':f'{fakebin}:/usr/bin:/bin','ZSETUP_BIN':str(ZSETUP),'ZSETUP_CA_FILE':str(root/'ca.crt'), 'ZSETUP_CONFIG':str(cfg), 'ZSETUP_CONFIG_CACHE':str(root/'config-cache'), 'ZSETUP_MANAGED_ROOT':str(root/'managed'),
                               'ZSETUP_SOURCE_BASES':base,'ZSETUP_SOURCE_FALLBACK':'','ZSETUP_BOOTSTRAP_BASES':base,
                               'ZSETUP_ROOT':str(root/'bootstrap'),'ZSETUP_WORK_DIR':str(root/'work'),
                               'ZSETUP_OS':'ubuntu','ZSETUP_PACKAGE_MANAGER':'apt','ZSETUP_ARCH':'x86_64',

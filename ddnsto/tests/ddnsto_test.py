@@ -17,6 +17,9 @@ import threading
 
 ROOT = Path(__file__).resolve().parents[2]
 ZSETUP = Path(sys.argv[1]).resolve()
+NATIVE_VERSION = subprocess.check_output([str(ZSETUP), "--version"], text=True).strip().removeprefix("zsetup ")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests"))
+from tls_fixture import generate_certificate
 TUNNEL = Path(sys.argv[2]).resolve()
 SCRIPT = ROOT / "ddnsto/ddnsto-install.sh"
 BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\nif [ "${1:-}" = stop ]; then exit "${STOP_FAIL:-0}"; fi\n'
@@ -51,10 +54,7 @@ def main():
     # Use numeric loopback and a matching TLS certificate; no public DNS in this fixture.
     cert_tmp = tempfile.TemporaryDirectory(prefix="installer-loopback-tls-")
     cert_dir = Path(cert_tmp.name)
-    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
-                    "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
-                    "-keyout", str(cert_dir / "server.key"), "-out", str(cert_dir / "server.crt")],
-                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    generate_certificate(cert_dir)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     tls.load_cert_chain(cert_dir / "server.crt", cert_dir / "server.key")
@@ -67,10 +67,10 @@ def main():
             base = f"https://127.0.0.1:{server.server_address[1]}/binary"
             bodies = Handler.bodies
             bodies["/binary/ddnsto/ddnsto-install.sh"] = SCRIPT.read_bytes()
-            bodies["/binary/zsetup/stable"] = b"0.2.4\n"
+            bodies["/binary/zsetup/stable"] = (NATIVE_VERSION + "\n").encode()
             payload = ZSETUP.read_bytes()
-            bodies["/binary/zsetup/0.2.4/zsetup-linux-x86_64"] = payload
-            bodies["/binary/zsetup/0.2.4/SHA256SUMS"] = f"{hashlib.sha256(payload).hexdigest()}  zsetup-linux-x86_64\n".encode()
+            bodies[f"/binary/zsetup/{NATIVE_VERSION}/zsetup-linux-x86_64"] = payload
+            bodies[f"/binary/zsetup/{NATIVE_VERSION}/SHA256SUMS"] = f"{hashlib.sha256(payload).hexdigest()}  zsetup-linux-x86_64\n".encode()
             archive = io.BytesIO()
             with tarfile.open(fileobj=archive, mode="w:gz") as tar:
                 member = tarfile.TarInfo("ddnsto-standard-4.2.3/ddnsto.x86_64")
@@ -121,14 +121,14 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             config = {
                 "schema_version": 1, "config_version": "ddnsto-fixture-1",
                 "source_groups": [{"id": "fixture", "primary_bases": [base]}],
-                "stable_zsetup": {"version": "0.2.4", "source_group": "fixture", "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00"*32, "size": 1}]},
-                "installers": [{"application": "ddnsto", "os": "*", "package_manager": "*", "arch": "*", "source_group": "fixture", "path": "ddnsto/ddnsto-install.sh", "sha256": hashlib.sha256(SCRIPT.read_bytes()).hexdigest(), "size": SCRIPT.stat().st_size, "background": False, "min_version": "0.2.4"}],
+                "stable_zsetup": {"version": NATIVE_VERSION, "source_group": "fixture", "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00"*32, "size": 1}]},
+                "installers": [{"application": "ddnsto", "os": "*", "package_manager": "*", "arch": "*", "source_group": "fixture", "path": "ddnsto/ddnsto-install.sh", "sha256": hashlib.sha256(SCRIPT.read_bytes()).hexdigest(), "size": SCRIPT.stat().st_size, "background": False, "min_version": NATIVE_VERSION}],
             }
             config_path = root / "config.json"
             config_path.write_text(json.dumps(config))
             env = os.environ | {
                 "PATH": f"{bindir}:/usr/bin:/bin", "ZSETUP_BIN": str(ZSETUP),
-                "ZSETUP_CA_FILE": str(cert_dir / "server.crt"),
+                "ZSETUP_CA_FILE": str(cert_dir / "ca.crt"),
                 "ZSETUP_SOURCE_BASES": base, "ZSETUP_SOURCE_FALLBACK": "",
                 "ZSETUP_BOOTSTRAP_BASES": base, "ZSETUP_ROOT": str(root / "rescue"),
                 "ZSETUP_WORK_DIR": str(root / "work"), "DDNSTO_BIN_PATH": str(root / "installed/ddnsto"),
