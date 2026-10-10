@@ -16,4 +16,6 @@ python -B kspeeder/tests/windows_bootstrap_test.py D:\tests\zsetup.exe --report 
 
 测试只运行 zsetup --version、隔离 TLS/HTTP 和临时文件；不执行 KSpeeder 安装、服务或修改机器 PATH。测试必须在 Windows 运行，交叉编译不算通过。Windows10 x64 WOW64/PS5.1 已通过8组，原生 Windows11 仍缺环境。
 
-业务接入前置：实际 Windows amd64 产品须由业务服务器提供不可变版本路径、真实 SHA256/size；当前官方 ks-cli-version.txt 缺 Windows 摘要。参考 ks-cli 默认菜单的安装动作即使管理员启动仍会 UAC，需用户决定保留菜单并等待业务方修正，或新入口默认 installer install --elevated。此库不构建/打包 Go 业务产物、不撤销旧入口、不切公网配置指针。
+业务接入前置：实际 Windows amd64 产品须由业务服务器提供不可变版本路径、真实 SHA256/size；当前官方 ks-cli-version.txt 缺 Windows 摘要。用户已选择保留默认菜单并等待业务方修正。参考 ks-cli 默认菜单的安装动作即使管理员启动仍会 UAC，业务发布者须修正当前进程有效管理员识别、验证菜单不再跨权限启动，并提供修正提交及包身份。新入口不默认改为 installer install --elevated。此库不构建/打包 Go 业务产物、不撤销旧入口、不切公网配置指针。
+
+M6完整业务验收等待上述修正版及资源，当前共享bootstrap通过不等于KSpeeder业务已经接入。到位后重新核对源码/版本/SHA/size，先补测试，再接入唯一Windows入口及管理员预检，验证直接入口/install、字面参数、失败保留、缓存以及原生进程树。普通用户业务修改前退出2，基础zsetup CLI不新增管理员要求。非管理员及Windows11环境缺失分别记录，不用交叉编译或管理员fixture替代。
