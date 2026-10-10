@@ -25,6 +25,8 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 | `fastnet` | Linux/OpenWrt；启动后由 FastNet 管理菜单 | x86_64、aarch64、armv7 | 参数逐项原样传给 FastNet；菜单交互由业务程序决定 |
 | `ddnsto` | OpenWrt opkg/apk | x86_64、aarch64、armv7、mipsel | `--token TOKEN` 可选；`--force-version lite\|standard` 可选；低于 900 MB 自动选 Lite；`--verify-status` 检查服务 |
 | `ddnsto` | Ubuntu/Debian apt、CentOS/RHEL yum/dnf、其他已识别 Linux | x86_64、aarch64 | 默认 Standard 4.2.3；`DDNSTO_VERSION` 可覆盖已发布版本；无终端必须传 `--token` |
+| `ddnsto` | Windows 10 x64 WOW64 / PowerShell 5.1 | x86_64 CLI | `ddnsto/install.ps1`；固定校验的 CLI 4.2.1；使用计划任务随系统启动；必须提供 `-Token` |
+| `ddnsto` | macOS | x86_64、arm64 | `ddnsto/install-macos.sh`；固定校验的 CLI 4.2.1；使用用户级 launchd；必须提供 `--token` |
 | `fastpve` | 待确认 | 待确认 | 未实现、未加入索引；所需输入见 [新增业务](docs/extension.md) |
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
@@ -34,7 +36,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 ```text
 zsetup-scripts/
   fastnet/          # business.sh、main.sh、install.sh、README、tests/
-  ddnsto/           # 同上，另有兼容 URL 发布规则 release.py
+  ddnsto/           # Linux/OpenWrt install.sh；Windows install.ps1；macOS install-macos.sh
   legacy/           # 原仓库旧脚本快照与来源说明，仅供历史参考
   lib/              # 共享 shell bootstrap
   scripts/          # 统一生成、打包与验收
@@ -56,3 +58,5 @@ python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zse
 ```
 
 第三条在干净提交后生成安装脚本、zsetup 和配置候选，不访问产品服务器、不需要本地产品文件。dist/release 是本仓库的发布输出，dist/evidence 是验证日志；不再生成 ddnsto-artifacts。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。
+
+跨平台 DDNSTO 入口的当前边界见 [ddnsto/README.md](ddnsto/README.md)。Windows/macOS 入口使用客户端业务发布目录中的 CLI 归档，不把客户端二进制复制进本仓库；归档版本和 SHA256 必须随业务发布物同步更新。

@@ -22,6 +22,8 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert not any(p.suffix in {".ipk", ".apk", ".gz"} for p in binary.rglob("*"))
     for relative in ("openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh", "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh"):
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/install.sh").read_bytes()
+    for relative in ("install.ps1", "install-macos.sh"):
+        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
     config = json.loads((binary / "zsetup/config.json").read_text())
     assert config["stable_zsetup"]["version"] == "0.2.4"
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto"}

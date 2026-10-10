@@ -29,12 +29,13 @@ manifest 的 business_artifacts 标记业务服务器发布所有权及 included
 | binary/zsetup/0.2.4/ | 权威 native release 的六个不可变文件，包括 SHA256SUMS/manifest |
 | binary/{fastnet,ddnsto}/0.1.3/install.sh | 不可变业务入口；索引记录真实 SHA256/size |
 | binary/{fastnet,ddnsto}/install.sh | 可变用户入口，与当前索引脚本同字节 |
+| binary/ddnsto/install.ps1、install-macos.sh | Windows/macOS 原生业务入口；使用已发布客户端归档，不在本仓库内复制客户端二进制 |
 | binary/zsetup/config.json | 完整配置，不进行字段合并 |
 | binary/zsetup/stable | 精确 native 版本，最后激活 |
 | binary/ddnsto/openwrt/install_ddnsto.sh、install_ddnsto_business.sh、setup_ddnsto.sh | 相同 DDNSTO 入口字节的兼容副本 |
 | binary/ddnsto/linux-binary/install_ddnsto_linux.sh | 相同 DDNSTO 入口字节的兼容副本 |
 
-APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/install.sh 生成实际文件，不依赖历史快照或符号链接。脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
+APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/install.sh 生成实际文件，不依赖历史快照或符号链接。Windows/macOS 原生入口由打包器显式复制；脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
 
 ## 服务器提前提供的产品
 

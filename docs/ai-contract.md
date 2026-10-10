@@ -6,6 +6,8 @@
 |---|---|---|
 | fastnet | `zsetup install fastnet --foreground -- ARGS...` | 原样传 ARGS，安装器最终 exec FastNet，退出码继承业务程序；它可能打开菜单，自动化须使用业务已支持的非交互参数，本文不虚构 FastNet 参数 |
 | ddnsto | `zsetup install ddnsto --foreground -- --token TOKEN [--force-version lite\|standard] [--verify-status]` | OpenWrt token 可选；Linux 无终端 token 必需。Linux 不支持 lite/verify-status。前台退出码为业务结果 |
+| ddnsto/macOS | `sh ddnsto/install-macos.sh --token TOKEN [--version 4.2.1]` | 仅支持 x86_64/arm64；使用用户级 launchd；当前固定客户端归档为 4.2.1，入口会校验归档 SHA256 |
+| ddnsto/Windows | `powershell -ExecutionPolicy Bypass -File ddnsto/install.ps1 -Token TOKEN [-Version 4.2.1]` | Windows 10 x64 WOW64 / PowerShell 5.1 验证范围；使用 x86_64 CLI 和 SYSTEM 计划任务；入口会校验归档及二进制 SHA256 |
 | fastpve | 不调用 | 尚无源实现、参数或测试，不在索引中 |
 
 业务入口约定：0 成功；2 参数/平台不支持或缺少必需交互输入；11 业务 metadata 不完整/非法；包管理器、启动程序、zsetup download 的其他错误码原样传播；信号退出 129/130/143。zsetup 自身配置/索引/版本收敛失败通常返回 17；download 的错误类别由其既有命令协议定义，不把一切非零都解释成“业务安装失败”。不要解析人类进度文案作为成功协议。
