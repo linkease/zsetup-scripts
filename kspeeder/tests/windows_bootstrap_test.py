@@ -47,7 +47,7 @@ def main():
             thread = threading.Thread(target=server.serve_forever)
             thread.start(); servers.append((server,thread))
         https = f"https://127.0.0.1:{servers[0][0].server_port}"
-        http = f"https://127.0.0.1:{servers[1][0].server_port}" # bootstrap must first try HTTPS
+        plaintext_base = f"https://127.0.0.1:{servers[1][0].server_port}" # bootstrap must first try HTTPS
         def serve(prefix, v=version, payload=data, digest=sha, sums=True):
             routes[prefix+"/zsetup/stable-windows"] = (v+"\n").encode()
             if sums: routes[prefix+f"/zsetup/{v}/SHA256SUMS"] = (digest+"  "+artifact+"\n").encode()
@@ -108,11 +108,11 @@ def main():
         def http_confirmation():
             serve("/plain")
             before=sum(hits.values())
-            r,_=run("plain-no",[http+"/plain"],confirm="n");assert r.returncode==1,(r.stdout,r.stderr)
+            r,_=run("plain-no",[plaintext_base+"/plain"],confirm="n");assert r.returncode==1,(r.stdout,r.stderr)
             assert sum(hits.values())==before,"HTTP used without consent"
-            r,_=run("plain-noninteractive",[http+"/plain"]);assert r.returncode==1,(r.stdout,r.stderr)
+            r,_=run("plain-noninteractive",[plaintext_base+"/plain"]);assert r.returncode==1,(r.stdout,r.stderr)
             assert sum(hits.values())==before
-            r,w=run("plain-yes",[http+"/plain"],confirm="yes");assert r.returncode==0,(r.stdout,r.stderr)
+            r,w=run("plain-yes",[plaintext_base+"/plain"],confirm="yes");assert r.returncode==0,(r.stdout,r.stderr)
             assert (w/"rescue"/version/"zsetup.exe").read_bytes()==data
             assert b"accepted" in r.stderr.lower(),r.stderr
         try:
