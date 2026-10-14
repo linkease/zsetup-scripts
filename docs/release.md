@@ -5,7 +5,7 @@
 --zsetup-release /path/to/RUST-RELEASE-PACKAGE` 和对应 `scripts/check.sh` 两参数。
 该包通过 Rust 的完整 payload SHA/size 检查，再由 Rust 唯一配置生成器计算业务脚本
 字节，保留历史原生/脚本不可变文件与兼容入口，不打包业务产品。
-当前 Rust 0.4.0 无公网激活，Mac 仍候选；本仓库0.1.7也未公开发布。
+当前 Rust 0.4.0 已激活 Linux/Windows，Mac 仍候选；本仓库0.1.7未公开发布。
 后文0.1.6/Zig命令为历史发布说明，最新核心状态见 owning zsetup-rust 统一发布记录。
 
 业务发布流程提前把 FastNet/DDNSTO/LinkEase/FastPVE 产品、版本信息和真实 SHA256 元数据放到服务器。设备上的业务脚本按平台和架构选择产品，调用 zsetup 下载、校验、复用缓存，然后完成业务安装。本仓库维护安装脚本和统一安装索引，不采集、缓存或重新打包产品。

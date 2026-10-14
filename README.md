@@ -79,6 +79,6 @@ python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zse
 由 zsetup-rust 唯一实现。POSIX bootstrap 按 Linux/Darwin 选择 OS 文件/stable，
 Windows 使用 canonical PowerShell win32 bootstrap。Mac bootstrap 支持不代表
 已有 Mac 业务；catalog 仍只声明实际已验证的 Linux 业务，Windows/Mac 不虚构映射。
-0.4.0 本体包不发布本仓库的新业务脚本，保留原线上业务 hash/path；本仓库0.1.7
+0.4.0 本体已激活 Linux/Windows、Mac仍候选；本体包不发布本仓库的新业务脚本，保留原线上业务 hash/path；本仓库0.1.7
 后续独立发布/业务设备 canary仍需完成。core原生证据/发布阻塞见
 [统一Rust记录](../../linkease-vpn/linkease-tunnel/zsetup-rust/docs/2026-10-14-unified-rust-release.md)。
