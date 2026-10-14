@@ -63,7 +63,7 @@ printf '%s\\n' "$*" > "$FASTNET_TEST_LOG"
 
         fake_bin = root / "bin"
         fake_bin.mkdir()
-        executable(fake_bin / "uname", "#!/bin/sh\necho x86_64\n")
+        executable(fake_bin / "uname", "#!/bin/sh\ncase \"${1:-}\" in -s) echo Linux ;; *) echo x86_64 ;; esac\n")
         executable(fake_bin / "wget", "#!/bin/sh\nexit 1\n")
         executable(fake_bin / "curl", """#!/bin/sh
 out=
