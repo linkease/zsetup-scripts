@@ -31,9 +31,11 @@ expected = {
 }
 for filename, digest in expected.items():
     assert hashlib.sha256((ROOT / "legacy" / filename).read_bytes()).hexdigest() == digest
-for record in json.loads((ROOT / "catalog.json").read_text())["installers"]:
+catalog = json.loads((ROOT / "catalog.json").read_text())
+script_version = catalog["config_version"].removeprefix("scripts-")
+for record in catalog["installers"]:
     app = record["application"]
     assert record["script"] == f"{app}/{app}-install.sh"
-    assert record["path"] == f"{app}/0.1.6/{app}-install.sh"
+    assert record["path"] == f"{app}/{script_version}/{app}-install.sh"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")
