@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        assert record["path"] == f"{app}/{CATALOG["config_version"]}/{app}-install.sh"
+        assert record["path"] == f"{app}/{CATALOG["config_version"].removeprefix("scripts-")}/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()
         # Historical public URL remains an identical compatibility copy.
