@@ -61,6 +61,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main():
+    global SCRIPT
     assert SCRIPT.is_file(), "DDNSTO unified entry is missing"
     version_output = subprocess.check_output([str(ZSETUP), "--version"], text=True)
     native_version = re.search(r"\b\d+\.\d+\.\d+\b", version_output).group(0)
@@ -93,7 +94,6 @@ def main():
             root = Path(tmp)
             base = f"https://127.0.0.1:{server.server_address[1]}/binary"
             bodies = Handler.bodies
-            bodies["/binary/ddnsto/install.sh"] = SCRIPT.read_bytes()
             bodies["/binary/zsetup/stable"] = (native_version + "\n").encode()
             payload = ZSETUP.read_bytes()
             bodies[f"/binary/zsetup/{native_version}/zsetup-linux-x86_64"] = payload
@@ -105,17 +105,27 @@ def main():
                 member.mode = 0o755
                 tar.addfile(member, io.BytesIO(BINARY))
             bodies["/binary/ddnsto/linux-binary/ddnsto-standard-4.2.3.tar.gz"] = archive.getvalue()
-            bodies["/binary/ddnsto/linux-binary/SHA256SUMS"] = f"{hashlib.sha256(archive.getvalue()).hexdigest()}  ddnsto-standard-4.2.3.tar.gz\n".encode()
             for variant in ("lite", "standard"):
-                bodies[f"/binary/ddnsto/openwrt/{'VERSION_LITE' if variant == 'lite' else 'VERSION'}"] = b"4.2.3\n"
+                version = '4.2.2' if variant == 'lite' else '4.2.6'
                 for ext in ("ipk", "apk"):
                     folder = variant + ("-apk" if ext == "apk" else "")
-                    prefix = f"/binary/ddnsto/openwrt/{folder}/4.2.3/"
+                    prefix = f"/binary/ddnsto/openwrt/{folder}/{version}/"
                     names = [f"ddnsto_{arch}.{ext}" for arch in ("x86_64", "aarch64", "arm", "mipsel")]
-                    names += [f"luci-app-ddnsto.{ext}", f"luci-i18n-ddnsto-zh-cn.{ext}"]
                     for name in names:
                         bodies[prefix + name] = b"package-fixture"
-                    bodies[prefix + "SHA256SUMS"] = "".join(f"{hashlib.sha256(bodies[prefix+name]).hexdigest()}  {name}\n" for name in names).encode()
+                    for name in [f'luci-app-ddnsto.{ext}', f'luci-i18n-ddnsto-zh-cn.{ext}']:
+                        bodies['/binary/ddnsto/openwrt/' + name] = b'package-fixture'
+            # Patch only pinned product bytes in a private fixture copy. No
+            # runtime checksum bypass or test-only switch exists in production.
+            source = SCRIPT.read_text()
+            history = json.loads((ROOT / 'docs/ddnsto-artifacts-2026-10-08.json').read_text())
+            for item in history['files']:
+                path = '/binary/ddnsto/' + item['source_path']
+                if path in bodies:
+                    source = source.replace(item['sha256'], hashlib.sha256(bodies[path]).hexdigest())
+            SCRIPT = root / 'install.sh'
+            SCRIPT.write_text(source)
+            bodies['/binary/ddnsto/install.sh'] = source.encode()
             bindir = root / "bin"
             bindir.mkdir()
             for dependency in ("awk", "sed"):
@@ -242,6 +252,8 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             blocked = root / "blocking-zsetup"
             executable(blocked, '#!/bin/sh\nif [ "${1:-}" = download ]; then : > "$BLOCK_READY"; sleep 1; exit 13; fi\nexit 97\n')
             ready = root / "ready"
+            # Force a cold business download rather than the verified cache.
+            env['ZSETUP_WORK_DIR'] = str(root / 'signal-work')
             proc = subprocess.Popen(["sh", str(SCRIPT), "--token", token], env=env | {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "ubuntu", "ZSETUP_PACKAGE_MANAGER": "apt", "ZSETUP_ARCH": "x86_64", "ZSETUP_BIN": str(blocked), "BLOCK_READY": str(ready)}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             deadline = time.monotonic() + 5
             while not ready.exists() and time.monotonic() < deadline:
@@ -250,21 +262,22 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             proc.send_signal(signal.SIGTERM)
             _out, _err = proc.communicate(timeout=5)
             assert proc.returncode == 143, (proc.returncode, _err)
-            assert not list((root / "work").glob(".transaction.*"))
-            # Metadata checksum mismatch fails before any package manager mutation.
-            prefix = "/binary/ddnsto/openwrt/standard/4.2.3/"
-            old_sums = bodies[prefix + "SHA256SUMS"]
-            bodies[prefix + "SHA256SUMS"] = old_sums.replace(hashlib.sha256(b"package-fixture").hexdigest().encode(), b"0"*64)
+            assert not list((root / "signal-work").glob(".transaction.*"))
+            # Changed mutable LuCI bytes fail before any package manager mutation.
+            path = '/binary/ddnsto/openwrt/luci-app-ddnsto.ipk'
+            old_package = bodies[path]
+            bodies[path] = b'changed-package'
             old_log = (root / "log").read_text()
             corrupt = run(["--force-version", "standard"], {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "openwrt", "ZSETUP_PACKAGE_MANAGER": "opkg", "ZSETUP_ARCH": "x86_64"})
             assert corrupt.returncode != 0, corrupt
             assert (root / "log").read_text() == old_log
-            bodies[prefix + "SHA256SUMS"] = old_sums
+            bodies[path] = old_package
             failed = run(["--force-version", "standard"], {"ZSETUP_INSTALLER_MODE": "1", "ZSETUP_OS": "openwrt", "ZSETUP_PACKAGE_MANAGER": "opkg", "ZSETUP_ARCH": "x86_64", "PKG_FAIL": "23"})
             assert failed.returncode == 23, failed
             assert not list((root / "work").glob(".transaction.*"))
             assert not list((root / "installed").glob(".*candidate*"))
             assert not list((root / "rescue").rglob(".zsetup-download.*"))
+            assert not any('/ddnsto/' in path and path.endswith(('VERSION', 'VERSION_LITE', 'SHA256SUMS')) for path in Handler.counts), Handler.counts
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)
         cert_tmp.cleanup()
