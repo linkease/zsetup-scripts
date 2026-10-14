@@ -10,22 +10,27 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 ZROOT = Path(sys.argv[1]).resolve()
+RELEASE = Path(sys.argv[2]).resolve() if len(sys.argv)>2 else ZROOT / "dist/release"
+IS_RUST = (ZROOT / "Cargo.toml").is_file()
+RELEASE_MANIFEST = json.loads((RELEASE / "release-manifest.json").read_text())
+EXPECTED_VERSION = RELEASE_MANIFEST["version"]
+CATALOG = json.loads((ROOT / "catalog.json").read_text())
 with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     output = Path(tmp) / "release"
-    argv = ["python3", "-B", str(ROOT / "scripts/package-release.py"), "--zsetup-root", str(ZROOT), "--output", str(output)]
+    argv = ["python3", "-B", str(ROOT / "scripts/package-release.py"), "--zsetup-root", str(ZROOT), "--output", str(output), "--zsetup-release", str(RELEASE)]
     subprocess.run(argv, check=True)
     binary = output / "binary"
     manifest = json.loads((output / "scripts-release-manifest.json").read_text())
     assert manifest["readiness"] == "server-artifacts-and-canary-unverified"
     assert manifest["business_artifacts"] == {"owner": "business-server-release", "included": False}
     assert not (output.parent / "ddnsto-artifacts").exists()
-    assert not any(p.suffix in {".ipk", ".apk", ".gz"} for p in binary.rglob("*"))
+    assert not any(p.suffix in {".ipk", ".apk"} or p.suffix == ".gz" and p.relative_to(binary).parts[0] != "zsetup" for p in binary.rglob("*"))
     for relative in ("openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh", "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh"):
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/ddnsto-install.sh").read_bytes()
     for relative in ("install.ps1", "install-macos.sh"):
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
     config = json.loads((binary / "zsetup/config.json").read_text())
-    assert config["stable_zsetup"]["version"] == "0.2.4"
+    assert config["stable_zsetup"]["version"] == EXPECTED_VERSION
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease", "fastpve"}
     assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "fastpve", "zsetup"}
     assert not (binary / "legacy").exists()
@@ -41,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        assert record["path"] == f"{app}/0.1.6/{app}-install.sh"
+        assert record["path"] == f"{app}/{CATALOG["config_version"]}/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()
         # Historical public URL remains an identical compatibility copy.
@@ -67,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert not any(r["application"] == "fastnet" and r["arch"] in ("mipsel", "*") for r in config["installers"])
     subprocess.run(["sha256sum", "-c", "PACKAGE-SHA256SUMS"], cwd=output, check=True, stdout=subprocess.DEVNULL)
     env = __import__("os").environ | {"ZSETUP_CONFIG": str(binary / "zsetup/config.json")}
-    listed = subprocess.run([str(ZROOT / "dist/release/zsetup-linux-x86_64"), "install", "--list"], env=env, text=True, capture_output=True, check=True)
+    listed = subprocess.run([str(RELEASE / "immutable/zsetup" / EXPECTED_VERSION / "zsetup-linux-x86_64" if IS_RUST else RELEASE / "zsetup-linux-x86_64"), "install", "--list"], env=env, text=True, capture_output=True, check=True)
     assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease", "fastpve"}
     archive = next(output.glob("*.tar.gz"))
     first = archive.read_bytes()
