@@ -23,9 +23,9 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     for relative in ("openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh", "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh"):
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/install.sh").read_bytes()
     for relative in ("install.ps1", "install-macos.sh"):
-        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
+        assert not (binary / "ddnsto" / relative).exists(), "unverified desktop must not get a public alias"
     config = json.loads((binary / "zsetup/config.json").read_text())
-    assert config["stable_zsetup"]["version"] == "0.2.4"
+    assert config["stable_zsetup"]["version"] == json.loads((ZROOT / "dist/release/release-manifest.json").read_text())["version"]
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto"}
     assert not any(r["application"] == "fastpve" for r in config["installers"])
     assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "zsetup"}
@@ -81,6 +81,13 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     with tarfile.open(next(output.glob("*.tar.gz"))) as archive:
         assert not any(name.endswith((".ipk", ".apk", ".tar.gz")) for name in archive.getnames())
         assert not any("legacy" in Path(name).parts for name in archive.getnames())
+    subprocess.run(argv + ["--include-desktop-candidates"], check=True, stdout=subprocess.DEVNULL)
+    for name in ("install.ps1", "install-macos.sh"):
+        candidate = binary / "ddnsto/desktop-candidate-0.1.7" / name
+        assert candidate.read_bytes() == (ROOT / "ddnsto" / name).read_bytes()
+        assert not (binary / "ddnsto" / name).exists()
+    subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)
+    assert candidate.is_file(), "immutable desktop history must survive later packaging"
     # A changed immutable path is rejected before any config or stable pointer update.
     immutable = binary / config["installers"][0]["path"]
     immutable.write_text("corrupt immutable version")

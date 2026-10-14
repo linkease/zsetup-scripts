@@ -5,6 +5,7 @@ import http.server
 import io
 import json
 import os
+import re
 import signal
 import time
 from pathlib import Path
@@ -18,8 +19,21 @@ import threading
 ROOT = Path(__file__).resolve().parents[2]
 ZSETUP = Path(sys.argv[1]).resolve()
 TUNNEL = Path(sys.argv[2]).resolve()
+DIRECT_ONLY = "--direct-only" in sys.argv[3:]
 SCRIPT = ROOT / "ddnsto/install.sh"
-BINARY = b'#!/bin/sh\nif [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi\nprintf "%s\\n" "$@" >> "$TEST_LOG"\nif [ "${1:-}" = -u ]; then exit "${START_FAIL:-0}"; fi\nif [ "${1:-}" = stop ]; then exit "${STOP_FAIL:-0}"; fi\n'
+BINARY = b'''#!/bin/sh
+if [ "${1:-}" = -v ]; then echo "DDNSTO fixture"; exit 0; fi
+printf "%s\\n" "$@" >> "$TEST_LOG"
+if [ "${1:-}" = stop ]; then exit "${STOP_FAIL:-0}"; fi
+if [ "${1:-}" = uninstall ]; then exit 0; fi
+if [ "${1:-}" = -u ]; then
+    [ "${START_FAIL:-0}" = 0 ] || exit "$START_FAIL"
+    mkdir -p "$DDNSTO_LINUX_CONFIG_DIR"
+    printf fixture-config > "$DDNSTO_LINUX_CONFIG_DIR/ddnsto-config.json"
+fi
+touch "$SERVICE_ACTIVE"
+printf '{"addr":"127.0.0.1:18334","pid":111,"startedAt":"fixture"}' > "$DDNSTO_LINUX_CONFIG_DIR/.ddnsto_http_addr.json"
+'''
 
 
 def executable(path, content):
@@ -48,12 +62,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def main():
     assert SCRIPT.is_file(), "DDNSTO unified entry is missing"
-    # Use numeric loopback and a matching TLS certificate; no public DNS in this fixture.
+    version_output = subprocess.check_output([str(ZSETUP), "--version"], text=True)
+    native_version = re.search(r"\b\d+\.\d+\.\d+\b", version_output).group(0)
+    # Use a CA-signed end-entity certificate. Rust TLS correctly rejects a CA
+    # certificate used as a server leaf, which the old native tolerated.
     cert_tmp = tempfile.TemporaryDirectory(prefix="installer-loopback-tls-")
     cert_dir = Path(cert_tmp.name)
     subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                    "-subj", "/CN=DDNSTO fixture CA", "-addext", "basicConstraints=critical,CA:TRUE",
+                    "-keyout", str(cert_dir / "ca.key"), "-out", str(cert_dir / "ca.crt")],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes",
                     "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
-                    "-keyout", str(cert_dir / "server.key"), "-out", str(cert_dir / "server.crt")],
+                    "-addext", "basicConstraints=critical,CA:FALSE",
+                    "-keyout", str(cert_dir / "server.key"), "-out", str(cert_dir / "server.csr")],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["openssl", "x509", "-req", "-in", str(cert_dir / "server.csr"),
+                    "-CA", str(cert_dir / "ca.crt"), "-CAkey", str(cert_dir / "ca.key"),
+                    "-set_serial", "2", "-days", "1", "-copy_extensions", "copy",
+                    "-out", str(cert_dir / "server.crt")],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -67,10 +94,10 @@ def main():
             base = f"https://127.0.0.1:{server.server_address[1]}/binary"
             bodies = Handler.bodies
             bodies["/binary/ddnsto/install.sh"] = SCRIPT.read_bytes()
-            bodies["/binary/zsetup/stable"] = b"0.2.4\n"
+            bodies["/binary/zsetup/stable"] = (native_version + "\n").encode()
             payload = ZSETUP.read_bytes()
-            bodies["/binary/zsetup/0.2.4/zsetup-linux-x86_64"] = payload
-            bodies["/binary/zsetup/0.2.4/SHA256SUMS"] = f"{hashlib.sha256(payload).hexdigest()}  zsetup-linux-x86_64\n".encode()
+            bodies[f"/binary/zsetup/{native_version}/zsetup-linux-x86_64"] = payload
+            bodies[f"/binary/zsetup/{native_version}/SHA256SUMS"] = f"{hashlib.sha256(payload).hexdigest()}  zsetup-linux-x86_64\n".encode()
             archive = io.BytesIO()
             with tarfile.open(fileobj=archive, mode="w:gz") as tar:
                 member = tarfile.TarInfo("ddnsto-standard-4.2.3/ddnsto.x86_64")
@@ -96,10 +123,20 @@ def main():
             executable(bindir / "opkg", '#!/bin/sh\nprintf "opkg %s\\n" "$*" >> "$TEST_LOG"\n[ "${1:-}" != install ] || [ "${PKG_FAIL:-0}" = 0 ] || exit 23\n')
             executable(bindir / "apk", '#!/bin/sh\nprintf "apk %s\\n" "$*" >> "$TEST_LOG"\n[ "${1:-}" != add ] || [ "${PKG_FAIL:-0}" = 0 ] || exit 23\n')
             executable(bindir / "ddnsto", '#!/bin/sh\necho "DDNSTO fixture"\n')
-            executable(bindir / "uci", '#!/bin/sh\nprintf "uci %s\\n" "$*" >> "$TEST_LOG"\n')
+            executable(bindir / "uci", '#!/bin/sh\nif [ "$1" = -q ] && [ "$2" = get ]; then printf "fixture token"; exit 0; fi\nprintf "uci %s\\n" "$*" >> "$TEST_LOG"\n')
             executable(bindir / "service", '#!/bin/sh\nprintf "service %s\\n" "$*" >> "$TEST_LOG"\n')
             executable(bindir / "pgrep", '#!/bin/sh\nexit 0\n')
             executable(bindir / "wget", '#!/bin/sh\nexit 97\n')
+            executable(bindir / "id", '#!/bin/sh\necho 0\n')
+            executable(bindir / "readlink", '#!/bin/sh\ncase "$1" in /proc/111/exe) printf "%s" "$DDNSTO_BIN_PATH" ;; *) /usr/bin/readlink "$@" ;; esac\n')
+            executable(bindir / "systemctl", '''#!/bin/sh
+case "$1" in
+show-environment) exit 0 ;;
+is-active) test -f "$SERVICE_ACTIVE" ;;
+stop) [ "${STOP_FAIL:-0}" = 0 ] || exit "$STOP_FAIL"; rm -f "$SERVICE_ACTIVE" "$DDNSTO_LINUX_CONFIG_DIR/.ddnsto_http_addr.json" ;;
+*) exit 1 ;;
+esac
+''')
             # Only shell bootstrap may fetch metadata/binary. Subsequent requests use real zsetup.
             bootstrap_web = root / "bootstrap-web"
             for path, data in bodies.items():
@@ -111,7 +148,7 @@ def main():
 out=; url=
 while [ "$#" -gt 0 ]; do
     [ "$1" != -o ] || { shift; out=$1; shift; continue; }
-    case "$1" in https://*) url=$1 ;; esac
+    case "$1" in http://127.0.0.1:18334/healthz) printf ok; exit 0 ;; https://*) url=$1 ;; esac
     shift
 done
 printf '%s\n' "$url" >> "$FETCH_LOG"
@@ -121,14 +158,14 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             config = {
                 "schema_version": 1, "config_version": "ddnsto-fixture-1",
                 "source_groups": [{"id": "fixture", "primary_bases": [base]}],
-                "stable_zsetup": {"version": "0.2.4", "source_group": "fixture", "artifacts": [{"arch": "x86_64", "path": "zsetup/unused", "sha256": "00"*32, "size": 1}]},
+                "stable_zsetup": {"version": native_version, "source_group": "fixture", "artifacts": [{"arch": "x86_64", "path": f"zsetup/{native_version}/zsetup-linux-x86_64", "sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload)}]},
                 "installers": [{"application": "ddnsto", "os": "*", "package_manager": "*", "arch": "*", "source_group": "fixture", "path": "ddnsto/install.sh", "sha256": hashlib.sha256(SCRIPT.read_bytes()).hexdigest(), "size": SCRIPT.stat().st_size, "background": False, "min_version": "0.2.4"}],
             }
             config_path = root / "config.json"
             config_path.write_text(json.dumps(config))
             env = os.environ | {
                 "PATH": f"{bindir}:/usr/bin:/bin", "ZSETUP_BIN": str(ZSETUP),
-                "ZSETUP_CA_FILE": str(cert_dir / "server.crt"),
+                "ZSETUP_CA_FILE": str(cert_dir / "ca.crt"),
                 "ZSETUP_SOURCE_BASES": base, "ZSETUP_SOURCE_FALLBACK": "",
                 "ZSETUP_BOOTSTRAP_BASES": base, "ZSETUP_ROOT": str(root / "rescue"),
                 "ZSETUP_WORK_DIR": str(root / "work"), "DDNSTO_BIN_PATH": str(root / "installed/ddnsto"),
@@ -136,12 +173,13 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
                 "DDNSTO_CONFIG_PATH": str(root / "legacy-config"),
                 "TEST_LOG": str(root / "log"), "FETCH_LOG": str(root / "fetch"),
                 "BOOTSTRAP_WEB": str(bootstrap_web), "ZSETUP_CONFIG": str(config_path),
+                "DDNSTO_LINUX_CONFIG_DIR": str(root / "service-config"), "SERVICE_ACTIVE": str(root / "service-active"),
                 "ZSETUP_CONFIG_CACHE": str(root / "config-cache"), "ZSETUP_MANAGED_ROOT": str(root / "managed"),
             }
             (root / "installed").mkdir()
             def run(args, overrides=None, indexed=False):
                 custom = env | (overrides or {})
-                argv = [str(ZSETUP), "install", "ddnsto", "--foreground", "--"] if indexed else ["sh", str(SCRIPT)]
+                argv = [str(ZSETUP), "install", "ddnsto", "--foreground", "--"] if indexed and not DIRECT_ONLY else ["sh", str(SCRIPT)]
                 result = subprocess.run(argv + args, env=custom, text=True, capture_output=True, timeout=60)
                 return result
             token = "fixture token"
@@ -150,10 +188,19 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             assert all(step in direct.stderr for step in ("[1/4]", "[2/4]", "[3/4]", "[4/4]")), direct.stderr
             assert "-u\nfixture token\n-daemon" in (root / "log").read_text()
             assert Handler.counts.get("/binary/ddnsto/install.sh", 0) == 0
+            # A target with no installed native binary must bootstrap it itself.
+            cold = run(["--token", token], {"ZSETUP_BIN": "", "ZSETUP_OS": "ubuntu", "ZSETUP_PACKAGE_MANAGER": "apt"})
+            assert cold.returncode == 0, cold
+            native_fetches = (root / 'fetch').read_text()
+            assert f'/zsetup/{native_version}/zsetup-linux-x86_64' in native_fetches, native_fetches
             archive_path = "/binary/ddnsto/linux-binary/ddnsto-standard-4.2.3.tar.gz"
             count = Handler.counts[archive_path]
+            listed = subprocess.run([str(ZSETUP), "install", "--list"], env=env, text=True, capture_output=True)
+            assert listed.returncode == 0 and "ddnsto" in listed.stdout, listed
             indexed = run(["--token", token], indexed=True)
-            assert indexed.returncode == 0, indexed
+            assert indexed.returncode == 0, (indexed, Handler.counts,
+                {str(p.relative_to(root)): p.read_text(errors="replace")[-4000:]
+                 for p in (root / "managed").rglob("*") if p.is_file() and p.suffix in {".log", ".json"}})
             assert Handler.counts[archive_path] == count, "verified cache must be reused"
             assert "cached" in indexed.stderr, indexed.stderr
             installed = root / "installed/ddnsto"
@@ -221,7 +268,8 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)
         cert_tmp.cleanup()
-    print("DDNSTO: direct/index, opkg/apk x 4 arch, Linux, token, Lite/Standard, cache, progress and failures passed")
+    entries = "direct only (indexed path NOT tested)" if DIRECT_ONLY else "direct/index"
+    print(f"DDNSTO: {entries}, opkg/apk x 4 arch, Linux, token, Lite/Standard, cache, progress and failures passed")
 
 
 if __name__ == "__main__":
