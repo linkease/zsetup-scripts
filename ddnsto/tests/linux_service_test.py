@@ -22,6 +22,7 @@ printf '{"addr":"127.0.0.1:18334","pid":111,"startedAt":"fixture"}' > "$DDNSTO_L
 '''
 HARNESS = r'''
 . "$BUSINESS"
+[ ! -f "$PRODUCT_PINS" ] || . "$PRODUCT_PINS"
 [ ! -f "$LINUX_SERVICE" ] || . "$LINUX_SERVICE"
 status() { printf '%s\n' "$*" >&2; }
 id() { printf 0; }
@@ -72,6 +73,7 @@ class LinuxService(unittest.TestCase):
             tar.addfile(member, io.BytesIO(payload))
         self.env = os.environ | {
             'BUSINESS': str(ROOT / 'business.sh'), 'LINUX_SERVICE': str(ROOT / 'linux-service.sh'),
+            'PRODUCT_PINS': str(ROOT / 'product-pins.sh'),
             'ZSETUP_BIN': '/unused-native', 'ZSETUP_OS': 'linux', 'ZSETUP_ARCH': 'x86_64',
             'ZSETUP_PACKAGE_MANAGER': 'unknown', 'ZSETUP_SOURCE_BASES': 'https://fixture.invalid',
             'ZSETUP_WORK_DIR': str(self.root / 'work'), 'DDNSTO_BIN_PATH': str(self.binary),
@@ -86,6 +88,12 @@ class LinuxService(unittest.TestCase):
     def test_missing_manager_rejected_before_download_or_replace(self):
         result = self.run_install(NO_MANAGER='1')
         self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(self.binary.read_text(), self.old)
+        self.assertNotIn('download', (self.root / 'log').read_text())
+
+    def test_unpinned_linux_version_rejected_before_download_or_replace(self):
+        result = self.run_install(DDNSTO_VERSION='9.9.9')
+        self.assertEqual(result.returncode, 11, result.stderr)
         self.assertEqual(self.binary.read_text(), self.old)
         self.assertNotIn('download', (self.root / 'log').read_text())
 
