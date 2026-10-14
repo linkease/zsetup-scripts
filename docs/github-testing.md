@@ -4,23 +4,23 @@
 
 ## 使用方式
 
-以下 `<COMMIT>` 为占位符，执行前替换为已发布并核验的40位commit，不可原样执行。
+本轮固定安装器commit：`5a7a0437d11b1df7cfc44be5d6f95453de3baf34`。以下命令已使用该commit，不会跟随测试分支之后的变动。
 
 Linux/OpenWrt/macOS终端（需要curl）：
 
 ```sh
-sh -c 'entry=$(curl -fsSL --proto "=https" --proto-redir "=https" https://raw.githubusercontent.com/linkease/zsetup-scripts/<COMMIT>/ddnsto/install.sh) && test -n "$entry" && sh -c "$entry" install.sh'
+sh -c 'entry=$(curl -fsSL --retry 2 --connect-timeout 10 --max-time 60 --proto "=https" --proto-redir "=https" https://raw.githubusercontent.com/linkease/zsetup-scripts/5a7a0437d11b1df7cfc44be5d6f95453de3baf34/ddnsto/install.sh) && test -n "$entry" && sh -c "$entry" install.sh'
 ```
 
 Windows管理员PowerShell：
 
 ```powershell
-$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-WebRequest -UseBasicParsing -MaximumRedirection 0 'https://raw.githubusercontent.com/linkease/zsetup-scripts/<COMMIT>/ddnsto/install.ps1').Content))
+$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; & ([ScriptBlock]::Create((Invoke-WebRequest -UseBasicParsing -MaximumRedirection 0 'https://raw.githubusercontent.com/linkease/zsetup-scripts/5a7a0437d11b1df7cfc44be5d6f95453de3baf34/ddnsto/install.ps1').Content))
 ```
 
 首次按提示粘贴控制台Token（不回显）；无终端自动化使用受限权限Token文件参数，不能把真实Token放进GitHub、日志或公开命令。Linux仍需重复提供Token；桌面重复安装保留配置。macOS为用户登录后启动，Windows为SYSTEM计划任务，Linux需可用systemd/OpenRC。最终到控制台确认设备在线；脚本的本地成功不等于云端绑定成功。
 
-GitHub Raw必须在测试机上可达；网络失败应停止，不使用不可信代理或HTTP替代。不要用 `curl | sh` 占用Token交互输入。NAS/厂商系统不能只因底层是Linux便视为已适配。
+GitHub Raw必须在测试机上可达；网络失败应停止，不使用不可信代理或HTTP替代。Shell命令有有限重试和超时，仍不保证所有国内网络可达。不要用 `curl | sh` 占用Token交互输入。NAS/厂商系统不能只因底层是Linux便视为已适配。
 
 ## 固定版本与只读下载站
 
@@ -48,4 +48,31 @@ Linux/OpenWrt的21个唯一路径及SHA256维护于 `ddnsto/product-pins.sh`，�
 
 ## 发布与实测记录
 
-待固定commit上传后记录GitHub字节回读及隔离Linux真实安装结果。禁止把“推送成功”当作“全平台安装通过”。
+已推送测试分支，未改main。两个固定commit Raw入口均匿名回读成功，与本地生成字节一致；Shell `--help` 成功。摘要：
+
+```text
+88f28305cb4ba98b879970f38e4cfac9efb4b44938fb1a29d1b596cb3ac33740  install.sh
+403288ba109ad9170289d9816fc2e7cb0f06714c1202c3bae806a4864cf3111a  install.ps1
+```
+
+### 测试环境及一次失败的定位
+
+沿用已授权测试服务器，在临时Alpine3.20/OpenRC0.54容器内运行 `ddnsto/tests/github_linux_canary.sh`；不在宿主安装客户端。初次Docker Hub拉取超时，改为传输已有Alpine镜像；官方Alpine软件源过慢，容器依赖改从可达镜像安装，APK签名验证保留。上述仅影响测试环境，不改变产品下载地址。
+
+第一次实际安装通过GitHub入口回读、zsetup0.4.0自动引导、客户端4.2.3下载与校验，但因容器仅有softlevel、缺少OpenRC starting/started等运行目录而服务启动失败。安装器返回13，没有误报成功；失败恢复提示保留备份。最小隔离容器中相同客户端也失败，补齐运行目录后服务started、健康接口ok，证明是测试初始化问题。已修正测试脚本，不修改已发布安装器字节。同时修正测试中服务名称为实际的 `com.linkease.ddnstoshell`。
+
+容器出站仅允许DNS与解析出的GitHub/产品下载站443，禁用IPv6；实际确认生产控制端口不可达。使用合成非账号Token，不做生产或测试后端设备绑定。诊断容器及其internal网络已清理，未改变宿主服务。不能把本地服务运行当作云端在线。
+
+后续一次复跑在GitHub Raw回读时60秒超时（exit28，尚未进入安装）。同链接此前在该服务器成功回读，说明网络存在波动。测试入口获取增加有限重试，未关闭TLS、未使用第三方代理、未改写GitHub地址。
+
+### 开发机隔离容器：完整GitHub链路通过
+
+使用同一测试脚本、同一固定commit、同一Alpine3.20/OpenRC0.54及出站白名单，在开发机Docker容器进行对照，退出0：
+
+1. 无预装zsetup、无客户端，先从GitHub回读入口，SHA256与上表一致。
+2. 执行GitHub一键命令：自动获取zsetup0.4.0，选择既有fw20下载源，取得15.5MiB客户端4.2.3并通过SHA256校验。
+3. 安装及启动真实服务 `com.linkease.ddnstoshell`；输出 `local_service=healthy cloud_status=unverified`，OpenRC为started、健康接口返回ok，`COLD_INSTALL_OK`。
+4. 再次执行同一命令，复用已校验缓存、停止旧服务再启动；健康接口ok，设备ID保持一致，`REPEAT_INSTALL_OK`。
+5. 停止测试服务，临时容器自动删除；其中合成Token、服务配置及安装随之回收，未安装到宿主。无需恢复用户数据，可重跑脚本重建。
+
+这是Linux x86_64/OpenRC、真实下载与真实客户端的验收，不是模拟包或模拟服务；云端绑定被主动隔离，未验收账号闭环，也不代表Windows/macOS/OpenWrt真机、systemd/ARM64、跨版本更新或系统重启验收通过。服务器网络波动不能因另一环境通过而忽略。
