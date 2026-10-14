@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build reviewable static release trees using the canonical zsetup generator/checker."""
 import argparse
+import importlib.util
 import gzip
 import json
 from pathlib import Path
@@ -28,6 +29,7 @@ def tree_dirty(root):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--zsetup-root", type=Path, required=True)
+    parser.add_argument("--zsetup-release", type=Path, help="canonical Rust package; default ZSETUP_ROOT/dist/release")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/release")
     parser.add_argument("--require-clean", action="store_true", help="require committed scripts and zsetup sources; server verification remains a separate release step")
     args = parser.parse_args()
@@ -38,9 +40,19 @@ def main():
     if output.exists() and (not output.is_dir() or (any(output.iterdir()) and not (output / "scripts-release-manifest.json").is_file())):
         raise ValueError("refusing to replace a directory without this tool's release manifest")
     subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
-    release = zroot / "dist/release"
-    subprocess.run([str(zroot / "scripts/check-release-artifacts.sh"), "--directory", str(release)], check=True)
-    manifest = json.loads((release / "release-manifest.json").read_text())
+    package = args.zsetup_release.resolve() if args.zsetup_release else zroot / "dist/release"
+    manifest = json.loads((package / "release-manifest.json").read_text())
+    is_rust = manifest.get("implementation") == "rust"
+    if is_rust:
+        spec = importlib.util.spec_from_file_location("native_release", zroot / "scripts/release-preflight.py")
+        native = importlib.util.module_from_spec(spec); spec.loader.exec_module(native)
+        native.validate_payload(package)  # Integrity only; never claims native/public acceptance.
+        release = package / "immutable/zsetup" / manifest["version"]
+        if not (release / "platform-release-manifest.json").is_file():
+            raise ValueError("complete canonical Rust platform package required")
+    else:
+        release = package
+        subprocess.run([str(zroot / "scripts/check-release-artifacts.sh"), "--directory", str(release)], check=True)
     version = manifest["version"]
     components = [int(v) for v in version.split(".")]
     if components < [0, 2, 4]:
@@ -79,13 +91,19 @@ def main():
         for relative in ("install.ps1", "install-macos.sh"):
             copy_immutable(ROOT / "ddnsto" / relative, binary / "ddnsto" / relative)
         DDNSTO["copy_compat_installers"](ROOT / "ddnsto/ddnsto-install.sh", binary / "ddnsto")
-        subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(release), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
+        subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(package), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
+        if is_rust:
+            for pointer in (package / "pointers/zsetup").iterdir():
+                if pointer.name not in {"config.json", "stable"}:
+                    shutil.copy2(pointer, binary / "zsetup" / pointer.name)
         (binary / "zsetup/stable").write_text(version + "\n")
         evidence = {
             "schema_version": 1, "config_version": catalog["config_version"],
             "scripts_commit": git_commit(ROOT), "zsetup_commit": git_commit(zroot),
             "scripts_tree_dirty": scripts_dirty, "zsetup_tree_dirty": zsetup_dirty,
-            "zsetup_release_source_commit": manifest["source_commit"],
+            "zsetup_release_source_commit": manifest.get("source_commit", manifest.get("product_commit")),
+            "zsetup_implementation": "rust" if is_rust else "legacy-zig",
+            "native_release_package_sha256": digest(package / "release-manifest.json"),
             "zsetup_version": version,
             "business_artifacts": {"owner": "business-server-release", "included": False},
             "readiness": "server-artifacts-and-canary-unverified",
