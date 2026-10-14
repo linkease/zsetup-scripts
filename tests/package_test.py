@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert not any("legacy" in Path(name).parts for name in archive.getnames())
     subprocess.run(argv + ["--include-desktop-candidates"], check=True, stdout=subprocess.DEVNULL)
     for name in ("install.ps1", "install-macos.sh"):
-        candidate = binary / "ddnsto/desktop-candidate-0.1.7" / name
+        candidate = binary / "ddnsto/desktop-candidate-0.1.8" / name
         assert candidate.read_bytes() == (ROOT / "ddnsto" / name).read_bytes()
         assert not (binary / "ddnsto" / name).exists()
     subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)

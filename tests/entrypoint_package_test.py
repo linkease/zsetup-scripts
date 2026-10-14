@@ -26,7 +26,7 @@ class EntrypointPackage(unittest.TestCase):
             files = {r['path']: r for r in manifest['files']}
             for name in ('install.sh', 'install.ps1'):
                 alias = 'binary/ddnsto/' + name
-                immutable = 'binary/ddnsto/0.1.7/' + name
+                immutable = 'binary/ddnsto/0.1.8/' + name
                 self.assertEqual((output / alias).read_bytes(), (ROOT / 'ddnsto' / name).read_bytes())
                 self.assertEqual((output / immutable).read_bytes(), (output / alias).read_bytes())
                 self.assertEqual(files[alias]['sha256'], hashlib.sha256((output / alias).read_bytes()).hexdigest())

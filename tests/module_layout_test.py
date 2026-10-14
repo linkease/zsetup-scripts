@@ -30,7 +30,7 @@ for filename, digest in expected.items():
 for record in json.loads((ROOT / "catalog.json").read_text())["installers"]:
     app = record["application"]
     assert record["script"] == f"{app}/install.sh"
-    version = "0.1.7" if app == "ddnsto" else "0.1.3"
+    version = "0.1.8" if app == "ddnsto" else "0.1.3"
     assert record["path"] == f"{app}/{version}/install.sh"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")
