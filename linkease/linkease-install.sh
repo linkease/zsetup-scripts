@@ -37,7 +37,15 @@ bootstrap_arch() {
             ZSETUP_ARCH=mipsel ;;
         *) echo "zsetup: unsupported architecture" >&2; return 2 ;;
     esac
-    ZSETUP_ARTIFACT="zsetup-linux-$ZSETUP_ARCH"
+    case "$(uname -s 2>/dev/null || true)" in
+        Darwin)
+            ZSETUP_ARTIFACT="zsetup-macos-$ZSETUP_ARCH"
+            ZSETUP_STABLE_PATH=zsetup/stable-macos ;;
+        Linux)
+            ZSETUP_ARTIFACT="zsetup-linux-$ZSETUP_ARCH"
+            ZSETUP_STABLE_PATH=zsetup/stable ;;
+        *) echo "zsetup: unsupported operating system" >&2; return 2 ;;
+    esac
 }
 
 bootstrap_url() {
@@ -187,7 +195,7 @@ fetch_bootstrap_metadata() {
     stable_file=$2
     sums_file=$3
     for base in $BOOTSTRAP_BASES; do
-        bootstrap_fetch_from_base "$scheme" "$base" zsetup/stable "$stable_file" || continue
+        bootstrap_fetch_from_base "$scheme" "$base" "$ZSETUP_STABLE_PATH" "$stable_file" || continue
         read_stable_version "$stable_file" || continue
         EXPECTED_SHA256=
         if have_hash_tool && bootstrap_fetch_from_base "$scheme" "$base" "zsetup/$RESCUE_VERSION/SHA256SUMS" "$sums_file"; then
