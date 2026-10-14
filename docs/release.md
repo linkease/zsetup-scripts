@@ -1,5 +1,13 @@
 # 构建、配置与发布
 
+2026-10-14 更新：后续原生 zsetup 统一 Rust；本仓库脚本候选为 scripts-0.1.7。
+使用 `scripts/package-release.py --zsetup-root /path/to/zsetup-rust
+--zsetup-release /path/to/RUST-RELEASE-PACKAGE` 和对应 `scripts/check.sh` 两参数。
+该包通过 Rust 的完整 payload SHA/size 检查，再由 Rust 唯一配置生成器计算业务脚本
+字节，保留历史原生/脚本不可变文件与兼容入口，不打包业务产品。
+当前 Rust 0.4.0 无公网激活，Mac 仍候选；本仓库0.1.7也未公开发布。
+后文0.1.6/Zig命令为历史发布说明，最新核心状态见 owning zsetup-rust 统一发布记录。
+
 业务发布流程提前把 FastNet/DDNSTO/LinkEase/FastPVE 产品、版本信息和真实 SHA256 元数据放到服务器。设备上的业务脚本按平台和架构选择产品，调用 zsetup 下载、校验、复用缓存，然后完成业务安装。本仓库维护安装脚本和统一安装索引，不采集、缓存或重新打包产品。
 
 依赖权威 zsetup 源码和现有构建能力，最低版本 0.2.4。复用原生版本/SHA256 元数据读取、总内存探测和 download/context/run/install；保留 0.2.3 Race 预算及 DoH/UDP 解析修复。统一入口命名为 APP/APP-install.sh，发布脚本版本为 0.1.6，config_version 为 scripts-0.1.6；native 保持 0.2.4。此前脚本及 native 不可变目录保留原字节。

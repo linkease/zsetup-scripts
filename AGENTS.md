@@ -23,3 +23,18 @@
 - Zig host compilers, verified archives, global caches and target-specific runtime dependencies are separated there. Business scripts must not download compilers or copy runtime into this repository.
 - The owning native repository is `/projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup`; use its `scripts/prepare-toolchain.py`, `release/toolchains.json`, and `docs/plans/2026-10-09-desktop-portability.md`. The root toolchain README is another discovery entrypoint for future AI.
 - Desktop API compile success is not full zsetup/platform release support. Check the native build evidence and release status before publishing a platform installer.
+
+## Unified Rust release path (2026-10-14)
+
+- Future zsetup source owner is linkease-tunnel/zsetup-rust, backed by canonical
+  runtime-rust. Zig zsetup is a frozen protocol/history reference. Do not
+  implement a second downloader or keep two product feature implementations.
+- Run scripts/check.sh ZSETUP_RUST_ROOT RUST_RELEASE_PACKAGE. Package with
+  --zsetup-root ZSETUP_RUST_ROOT --zsetup-release RUST_RELEASE_PACKAGE; both
+  use canonical Rust integrity/configuration tools. Historical Zig arguments
+  are compatibility paths only, not the default future release workflow.
+- scripts-0.1.7 is a local candidate. Linux/Darwin bootstrap dispatch does not
+  establish a Mac business mapping. Preserve unverified legacy entries.
+- Native release readiness and actual business installation remain separate
+  from script/package fixtures. Read the owning unified 0.4.0 evidence before
+  public activation; current shared-runtime blocker must not be dropped silently.

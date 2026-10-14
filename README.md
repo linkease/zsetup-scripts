@@ -1,6 +1,6 @@
 # zsetup-scripts
 
-FastNet、DDNSTO、LinkEase、FastPVE 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup/README.md)，最低版本 **0.2.4**。
+FastNet、DDNSTO、LinkEase、FastPVE 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)，最低版本 **0.2.4**。
 
 设备已有 zsetup：
 
@@ -60,8 +60,9 @@ zsetup-scripts/
 
 ```sh
 python3 -B scripts/build-entrypoints.py
-sh scripts/check.sh /path/to/linkease-tunnel/zsetup
-python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --require-clean
+sh scripts/check.sh /path/to/linkease-tunnel/zsetup-rust /path/to/RUST-RELEASE-PACKAGE
+python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup-rust \
+  --zsetup-release /path/to/RUST-RELEASE-PACKAGE --require-clean
 ```
 
 第三条在干净提交后生成安装脚本、zsetup 和配置候选，不访问产品服务器、不需要本地产品文件。dist/release 是本仓库的发布输出，dist/evidence 是验证日志；不再生成 ddnsto-artifacts。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。
@@ -72,3 +73,12 @@ python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zse
 由原生 zsetup 仓库锁定版本、准备和复用，设置 `LINKEASE_TOOLCHAIN_ROOT` 即可指定。
 目录用途和平台状态见原生仓库 `zsetup/docs/plans/2026-10-09-desktop-portability.md`，
 工具链根目录也提供 README；业务安装脚本不需要这些编译依赖。
+
+2026-10-14：后续 zsetup 统一 Rust，脚本候选为 scripts-0.1.7。`--zsetup-release`
+接收 Rust 的完整 platform package，复用其不可变原生产物和字节校验；配置生成
+由 zsetup-rust 唯一实现。POSIX bootstrap 按 Linux/Darwin 选择 OS 文件/stable，
+Windows 使用 canonical PowerShell win32 bootstrap。Mac bootstrap 支持不代表
+已有 Mac 业务；catalog 仍只声明实际已验证的 Linux 业务，Windows/Mac 不虚构映射。
+0.4.0 本体包不发布本仓库的新业务脚本，保留原线上业务 hash/path；本仓库0.1.7
+后续独立发布/业务设备 canary仍需完成。core原生证据/发布阻塞见
+[统一Rust记录](../../linkease-vpn/linkease-tunnel/zsetup-rust/docs/2026-10-14-unified-rust-release.md)。
