@@ -20,8 +20,17 @@ def main():
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", app):
             raise ValueError("invalid application id")
         folder = ROOT / app
-        content = common + "\n# Business logic: maintained in " + app + "/business.sh\n"
+        content = ""
+        if app == "ddnsto":
+            # Embed maintained macOS implementation; no sibling files or repo
+            # checkout are needed on the target device.
+            content = '#!/bin/sh\nif [ "$(uname -s)" = Darwin ]; then\n(\n'
+            content += (folder / "install-macos.sh").read_text().rstrip() + '\n)\nexit "$?"\nfi\n\n'
+        content += common + "\n# Business logic: maintained in " + app + "/business.sh\n"
         content += (folder / "business.sh").read_text().rstrip() + "\n\n"
+        if app == "ddnsto":
+            content += (folder / "product-pins.sh").read_text().rstrip() + "\n\n"
+            content += (folder / "linux-service.sh").read_text().rstrip() + "\n\n"
         content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n    bootstrap_zsetup\n"
         content += "    status \"      zsetup $RESCUE_VERSION is ready\"\n    ZSETUP_BIN=$ACTIVE_ZSETUP\n"
         content += "    ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}\n"

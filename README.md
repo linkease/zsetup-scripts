@@ -1,6 +1,10 @@
 # zsetup-scripts
 
+DDNSTO 0.1.8当前使用[GitHub固定commit测试入口](docs/github-testing.md)，内置已核验产品摘要，不修改下载站。下述完整索引发布与远端业务元数据模型不是这条测试路径的前置条件。
+
 FastNet、DDNSTO 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup/README.md)，最低版本 **0.2.4**。
+
+以下为历史索引/CDN调用示例，当前GitHub测试请使用上方指南（正式DDNSTO入口尚未部署）：
 
 设备已有 zsetup：
 
@@ -24,9 +28,9 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/install.sh)" -- --to
 |---|---|---|---|
 | `fastnet` | Linux/OpenWrt；启动后由 FastNet 管理菜单 | x86_64、aarch64、armv7 | 参数逐项原样传给 FastNet；菜单交互由业务程序决定 |
 | `ddnsto` | OpenWrt opkg/apk | x86_64、aarch64、armv7、mipsel | `--token TOKEN` 可选；`--force-version lite\|standard` 可选；低于 900 MB 自动选 Lite；`--verify-status` 检查服务 |
-| `ddnsto` | Ubuntu/Debian apt、CentOS/RHEL yum/dnf、其他已识别 Linux | x86_64、aarch64 | 默认 Standard 4.2.3；`DDNSTO_VERSION` 可覆盖已发布版本；无终端必须传 `--token` |
-| `ddnsto` | Windows 10 x64 WOW64 / PowerShell 5.1 | x86_64 CLI | `ddnsto/install.ps1`；固定校验的 CLI 4.2.1；使用计划任务随系统启动；必须提供 `-Token` |
-| `ddnsto` | macOS | x86_64、arm64 | `ddnsto/install-macos.sh`；固定校验的 CLI 4.2.1；使用用户级 launchd；必须提供 `--token` |
+| `ddnsto` | Ubuntu/Debian apt、CentOS/RHEL yum/dnf、其他已识别 Linux | x86_64、aarch64 | 固定 Standard 4.2.3；拒绝未内置摘要的版本；无终端使用 `--token-file` |
+| `ddnsto` | Windows x64 工程候选，原生未验收 | x86_64 CLI | `ddnsto/install.ps1` 自动引导 zsetup；SYSTEM 计划任务；首次提示 Token，重装沿用配置 |
+| `ddnsto` | macOS 工程候选，原生未验收 | x86_64、arm64 | `ddnsto/install.sh` 自动分流并引导 zsetup；用户登录后 launchd 启动；首次提示 Token |
 | `fastpve` | 待确认 | 待确认 | 未实现、未加入索引；所需输入见 [新增业务](docs/extension.md) |
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
@@ -60,3 +64,5 @@ python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zse
 第三条在干净提交后生成安装脚本、zsetup 和配置候选，不访问产品服务器、不需要本地产品文件。dist/release 是本仓库的发布输出，dist/evidence 是验证日志；不再生成 ddnsto-artifacts。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。
 
 跨平台 DDNSTO 入口的当前边界见 [ddnsto/README.md](ddnsto/README.md)。Windows/macOS 入口使用客户端业务发布目录中的 CLI 归档，不把客户端二进制复制进本仓库；归档版本和 SHA256 必须随业务发布物同步更新。
+
+2026-10-14：DDNSTO 用户路径为“一条命令自动取得 zsetup 并安装”，不要求手动下载工具或仓库，也不依赖索引安装。使用方法见 [DDNSTO](ddnsto/README.md)。`python3 -B scripts/package-entrypoints.py --output dist/ddnsto-entrypoints-0.1.8` 可独立生成入口候选，不依赖 zsetup 源码；完整索引打包仍沿用原工具。公网发布、产品元数据与原生验收尚未完成，见 [验证记录](docs/verification-2026-10-14.md)。

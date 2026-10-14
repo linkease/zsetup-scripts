@@ -1,10 +1,35 @@
 # 构建、配置与发布
 
+## 当前：0.1.8 GitHub 固定入口测试
+
+当前config_version为scripts-0.1.8，DDNSTO入口0.1.8，FastNet仍0.1.3。下载站只读，本轮只推送GitHub专用测试分支。以[GitHub测试指南](github-testing.md)为准：Linux/OpenWrt内置已核验版本/路径/SHA256，LuCI沿用根目录，不要求新增业务元数据。打包使用 `python3 -B scripts/package-entrypoints.py --output dist/ddnsto-entrypoints-0.1.8`。
+
+`check-publication.py` 保留的是下方**服务器元数据模型**的审计语义，不能用于判断GitHub入口是否可用。GitHub模式回读固定commit入口比对摘要，再检查产品和真机。下文保留0.1.7及完整索引发布作为历史/可选流程，不是当前前置条件。
+
+## 0.1.7及以前：服务器元数据发布模型
+
 业务发布流程提前把 FastNet/DDNSTO 产品、版本信息和真实 SHA256 元数据放到服务器。设备上的业务脚本按平台和架构选择产品，调用 zsetup 下载、校验、复用缓存，然后完成业务安装。本仓库维护安装脚本和统一安装索引，不采集、缓存或重新打包产品。
 
-依赖权威 zsetup 源码和现有构建能力，最低版本 0.2.4。复用原生版本/SHA256 元数据读取、总内存探测和 download/context/run/install；保留 0.2.3 Race 预算及 DoH/UDP 解析修复。本次没有修改下载内核或业务脚本字节，脚本版本仍为 0.1.3，config_version 为 scripts-0.1.3。
+完整 native/索引构建沿用 zsetup 自身工具，最低版本0.2.4；直接运行 DDNSTO 入口不需要其源码。当前 config_version 为 scripts-0.1.7，DDNSTO 入口0.1.7、FastNet入口0.1.3。Linux/OpenWrt 复用既有官方 stable（已验证0.4.0）；Windows固定0.4.0，macOS保留0.3.0；未修改下载内核。
+
+当前任务采用[复用现有下载站的直接入口发布流程](publish-existing-download-site.md)：仅发布 DDNSTO 业务文件，不重新部署 zsetup、不覆盖其全局 stable/config、不新建下载服务器。下方“完整 native/索引发布”是历史独立流程，不能直接套用到这次业务入口发布。
+
+0.1.6 已部署至测试站独立 `20261014-016` 命名空间，未覆盖0.1.5或正式 CDN。Linux 本地服务成功判定与测试边界见[修复验证](verification-2026-10-14-service-fix.md)，整体职责见[架构流程](one-command-architecture.md)。客户端错误传播源码修复尚未发布新的正式客户端包。
 
 ## 本地构建
+
+### 2026-10-14：DDNSTO 直接入口候选（无需 zsetup 源码）
+
+用户的一条命令直接执行安装脚本，脚本自动获取发布好的 zsetup。因此这条交付路径不以 native 源码或 `zsetup install` 索引打通为前提：
+
+```sh
+python3 -B scripts/build-entrypoints.py
+python3 -B scripts/package-entrypoints.py --output dist/ddnsto-entrypoints-0.1.7
+```
+
+生成 `binary/ddnsto/install.sh`（Linux/OpenWrt/macOS）与 `install.ps1`（Windows），以及 `0.1.7/` 下同字节不可变副本、摘要和候选 manifest。不是部署命令，不会修改站点、旧版本或索引。必须验证产品元数据、入口实际下载执行和原生 canary 后才可发布；不得把候选直接当作所有平台已支持。入口版本0.1.7，FastNet 仍0.1.3。Windows/macOS 分别固定官方 zsetup 0.4.0/0.3.0 及其摘要。
+
+### 完整 native / 多业务索引发布（原流程）
 
 业务变动不要求重编同版本 zsetup，复用已验证的不可变 release；若需要新 native 版本，在 zsetup 仓库执行既有 release-targets.sh、check-release-artifacts.sh、run-target-smoke.sh。无需下载任何 DDNSTO 产品来构建安装脚本发布包。
 
@@ -27,15 +52,17 @@ manifest 的 business_artifacts 标记业务服务器发布所有权及 included
 | 文件 | 规则 |
 |---|---|
 | binary/zsetup/0.2.4/ | 权威 native release 的六个不可变文件，包括 SHA256SUMS/manifest |
-| binary/{fastnet,ddnsto}/0.1.3/install.sh | 不可变业务入口；索引记录真实 SHA256/size |
+| binary/fastnet/0.1.3/install.sh、binary/ddnsto/0.1.7/install.sh | 不可变业务入口；索引记录真实 SHA256/size |
 | binary/{fastnet,ddnsto}/install.sh | 可变用户入口，与当前索引脚本同字节 |
-| binary/ddnsto/install.ps1、install-macos.sh | Windows/macOS 原生业务入口；使用已发布客户端归档，不在本仓库内复制客户端二进制 |
+| binary/ddnsto/desktop-candidate-0.1.7/{install.ps1,install-macos.sh} | 完整索引打包器仅在 `--include-desktop-candidates` 下生成的隔离候选；与独立入口候选打包模式区分 |
 | binary/zsetup/config.json | 完整配置，不进行字段合并 |
 | binary/zsetup/stable | 精确 native 版本，最后激活 |
 | binary/ddnsto/openwrt/install_ddnsto.sh、install_ddnsto_business.sh、setup_ddnsto.sh | 相同 DDNSTO 入口字节的兼容副本 |
 | binary/ddnsto/linux-binary/install_ddnsto_linux.sh | 相同 DDNSTO 入口字节的兼容副本 |
 
-APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/install.sh 生成实际文件，不依赖历史快照或符号链接。Windows/macOS 原生入口由打包器显式复制；脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
+APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/install.sh 生成实际文件，不依赖历史快照或符号链接。桌面脚本只可显式加入隔离候选目录，默认打包不激活；保留历史不可变候选。脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
+
+直接入口部署前后运行 `python3 -B scripts/check-publication.py --mode direct --base https://fw.koolcenter.com/binary`，回读两种入口、不可变副本和产品元数据；索引模式使用 `--mode indexed`（默认）。失败退出1；不下载业务产品、不验证全部 zsetup 配置语义、不检查设备或跨镜像一致性。成功不能替代原生 canary。当前边界见 [2026-10-14 验证](verification-2026-10-14.md)。
 
 ## 服务器提前提供的产品
 

@@ -1,4 +1,210 @@
 #!/bin/sh
+if [ "$(uname -s)" = Darwin ]; then
+(
+#!/bin/sh
+# Engineering candidate: bootstraps zsetup automatically; native canary pending.
+set -eu
+umask 077
+VERSION=${DDNSTO_VERSION:-4.2.1}
+INSTALL_DIR=${DDNSTO_INSTALL_DIR:-$HOME/.local/bin}
+CONFIG_DIR=${DDNSTO_CONFIG_DIR:-$HOME/Library/Application Support/DDNSTO}
+AGENTS_DIR=${DDNSTO_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}
+LABEL=com.ddnsto.client
+TOKEN=
+TOKEN_FILE=
+fail() { printf 'DDNSTO: %s\n' "$1" >&2; exit "${2:-2}"; }
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --token|--token-file|--version)
+            [ "$#" -ge 2 ] || fail 'argument requires a value'
+            case "$1" in --token) TOKEN=$2 ;; --token-file) TOKEN_FILE=$2 ;; *) VERSION=$2 ;; esac
+            shift 2 ;;
+        --token=*) TOKEN=${1#--token=}; shift ;;
+        --help|-h) printf '%s\n' 'Usage: install-macos.sh [--token TOKEN | --token-file FILE] [--version 4.2.1]' 'Updates preserve existing configuration when token is omitted.'; exit 0 ;;
+        *) fail 'unknown argument' ;;
+    esac
+done
+[ "$(uname -s)" = Darwin ] || fail 'this installer requires macOS'
+case "$(uname -m)" in x86_64|amd64) member=ddnsto_cli.amd64 ;; arm64|aarch64) member=ddnsto_cli.arm64 ;; *) fail 'unsupported macOS architecture' ;; esac
+[ "$VERSION" = 4.2.1 ] || fail 'no pinned artifact for requested version'
+archive_sha=46aad0f28da7ad67175cfed1bc973b1eea68bed4242c8779d8cbd1ba57ed31d7
+ZSETUP_BIN=${ZSETUP_BIN:-}
+for tool in launchctl tar sed grep; do command -v "$tool" >/dev/null || fail "missing dependency: $tool"; done
+for directory in "$INSTALL_DIR" "$CONFIG_DIR" "$AGENTS_DIR"; do
+    case "$directory" in /*) ;; *) fail 'installation paths must be absolute' ;; esac
+    [ ! -L "$directory" ] || fail 'installation directories must not be symlinks'
+done
+config="$CONFIG_DIR/ddnsto.yaml"
+binary="$INSTALL_DIR/ddnsto"
+plist="$AGENTS_DIR/$LABEL.plist"
+marker="$CONFIG_DIR/.installer-macos-v1"
+for file in "$config" "$binary" "$plist" "$marker"; do [ ! -L "$file" ] || fail 'managed files must not be symlinks'; done
+if [ -e "$binary" ] || [ -e "$config" ] || [ -e "$plist" ]; then
+    [ -f "$marker" ] && [ -f "$binary" ] && [ -f "$config" ] && [ -f "$plist" ] || fail 'existing unmanaged or incomplete installation; migrate it before retrying'
+fi
+if [ -n "$TOKEN_FILE" ]; then
+    [ -z "$TOKEN" ] || fail 'choose either token or token-file'
+    [ -f "$TOKEN_FILE" ] && [ ! -L "$TOKEN_FILE" ] || fail 'token file must be regular'
+    TOKEN=$(cat "$TOKEN_FILE"; printf '.')
+    TOKEN=${TOKEN%.}
+    TOKEN=${TOKEN%"
+"}
+fi
+read_token() (
+    [ -t 0 ] || exit 2
+    exec 3<>/dev/tty
+    terminal_state=$(stty -g <&3)
+    trap 'stty "$terminal_state" <&3; printf "\n" >&3' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    trap 'exit 129' HUP
+    stty -echo <&3
+    printf 'DDNSTO token: ' >&3
+    IFS= read -r entered_token <&3
+    printf '%s' "$entered_token"
+)
+if [ -z "$TOKEN" ] && [ ! -f "$config" ] && [ -z "$TOKEN_FILE" ]; then
+    TOKEN=$(read_token) || fail 'token required: use an interactive terminal or --token-file FILE'
+fi
+case "$TOKEN" in *"
+"*|*"$(printf '\r')"*) fail 'token must be one line' ;; esac
+yaml_token=$(printf '%s' "$TOKEN" | sed "s/'/''/g")
+token_line="userToken: '$yaml_token'"
+if [ -f "$config" ]; then
+    [ -z "$TOKEN" ] || grep -F -x -q -- "$token_line" "$config" || fail 'existing token differs; edit configuration explicitly before reinstalling'
+else
+    [ -n "$TOKEN" ] || fail 'token is required on first installation'
+fi
+uid=$(id -u)
+domain="gui/$uid"
+work=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto.XXXXXX")
+changed=0
+had_old=0
+was_running=0
+candidate=
+locked=0
+cleanup() {
+    code=$?
+    trap - EXIT HUP INT TERM
+    recovery_failed=0
+    if [ "$changed" = 1 ]; then
+        launchctl bootout "$domain/$LABEL" >/dev/null 2>&1 || true
+        if [ "$had_old" = 1 ]; then
+            cp -p "$work/old-binary" "$binary" || recovery_failed=1
+            cp -p "$work/old-config" "$config" || recovery_failed=1
+            cp -p "$work/old-plist" "$plist" || recovery_failed=1
+            if [ "$was_running" = 1 ]; then launchctl bootstrap "$domain" "$plist" >&2 || recovery_failed=1; fi
+        else
+            rm -f "$binary" "$config" "$plist" "$marker" || recovery_failed=1
+        fi
+        printf '%s\n' 'DDNSTO: installation failed; recovery attempted' >&2
+    fi
+    [ -z "$candidate" ] || rm -f "$candidate"
+    [ "$locked" = 0 ] || rmdir "$CONFIG_DIR/.install-lock"
+    if [ "$recovery_failed" = 1 ]; then
+        printf 'DDNSTO: recovery incomplete; backup retained at %s\n' "$work" >&2
+        exit 1
+    fi
+    rm -rf "$work"
+    exit "$code"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+ensure_zsetup() {
+    if [ -n "$ZSETUP_BIN" ]; then
+        [ -x "$ZSETUP_BIN" ] && [ "$("$ZSETUP_BIN" --version)" = 'zsetup 0.3.0' ] || fail 'explicit zsetup must be executable version 0.3.0'
+        return
+    fi
+    command -v curl >/dev/null || fail 'curl is required for initial bootstrap'
+    command -v shasum >/dev/null || fail 'shasum is required for initial bootstrap verification'
+    case "$member" in
+        ddnsto_cli.amd64) native=zsetup-macos-x86_64; native_sha=608323145bcd8f083c0845b4bd0481eabccf0d74b99aa2aa6a88e59b34ce5b31 ;;
+        *) native=zsetup-macos-aarch64; native_sha=06ec453f851bd0395cf9ea8539de168f80a9628d1a25597dd598c85f9dc633b0 ;;
+    esac
+    printf '%s\n' 'DDNSTO: downloading and verifying zsetup 0.3.0...' >&2
+    for base in https://dl.istoreos.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary https://fw.koolcenter.com/binary; do
+        if curl -fLsS --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
+            -o "$work/zsetup.part" "$base/zsetup/0.3.0/$native"; then
+            actual=$(shasum -a 256 "$work/zsetup.part")
+            if [ "${actual%% *}" = "$native_sha" ]; then
+                mv "$work/zsetup.part" "$work/zsetup"
+                chmod 700 "$work/zsetup"
+                ZSETUP_BIN="$work/zsetup"
+                [ "$("$ZSETUP_BIN" --version)" = 'zsetup 0.3.0' ] || fail 'unexpected zsetup version'
+                return
+            fi
+        fi
+    done
+    fail 'zsetup bootstrap download/checksum failed; no client changes made' 11
+}
+ensure_zsetup
+"$ZSETUP_BIN" download -o "$work/client.tar.gz" --sha256 "$archive_sha" \
+    "https://fw.koolcenter.com/binary/ddnsto/macOS/ddnsto_darwin_cli_${VERSION}.tar.gz"
+tar -xzf "$work/client.tar.gz" -C "$work" "$member"
+[ -f "$work/$member" ] && [ ! -L "$work/$member" ] || fail 'missing regular client binary' 11
+mkdir -p "$CONFIG_DIR" "$INSTALL_DIR" "$AGENTS_DIR"
+chmod 700 "$CONFIG_DIR"
+mkdir "$CONFIG_DIR/.install-lock" 2>/dev/null || fail 'another installation is active'
+locked=1
+# Revalidate ownership after locking; another installer may have just finished.
+for file in "$config" "$binary" "$plist" "$marker"; do [ ! -L "$file" ] || fail 'managed files must not be symlinks'; done
+if [ -e "$binary" ] || [ -e "$config" ] || [ -e "$plist" ] || [ -e "$marker" ]; then
+    [ -f "$marker" ] && [ -f "$binary" ] && [ -f "$config" ] && [ -f "$plist" ] || fail 'existing unmanaged or incomplete installation'
+    [ -z "$TOKEN" ] || grep -F -x -q -- "$token_line" "$config" || fail 'existing token differs'
+elif launchctl print "$domain/$LABEL" >/dev/null 2>&1; then
+    fail 'existing unmanaged launchd job; migrate it before retrying'
+else
+    [ -n "$TOKEN" ] || fail 'token is required on first installation'
+fi
+if [ -f "$binary" ]; then
+    cp -p "$binary" "$work/old-binary"
+    cp -p "$config" "$work/old-config"
+    cp -p "$plist" "$work/old-plist"
+    had_old=1
+    if launchctl print "$domain/$LABEL" >/dev/null 2>&1; then was_running=1; fi
+fi
+xml() { printf '%s' "$1" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
+if [ "$had_old" = 0 ]; then
+    printf '%s\n' "$token_line" > "$work/config"
+    printf "logPath: '%s'\n" "$(printf '%s' "$CONFIG_DIR/logs" | sed "s/'/''/g")" >> "$work/config"
+fi
+cat > "$work/plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>Label</key><string>$LABEL</string>
+<key>ProgramArguments</key><array><string>$(xml "$binary")</string><string>--config</string><string>$(xml "$config")</string></array>
+<key>WorkingDirectory</key><string>$(xml "$CONFIG_DIR")</string>
+<key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+<key>StandardOutPath</key><string>$(xml "$CONFIG_DIR/stdout.log")</string>
+<key>StandardErrorPath</key><string>$(xml "$CONFIG_DIR/stderr.log")</string>
+</dict></plist>
+EOF
+candidate=$(mktemp "$INSTALL_DIR/.ddnsto.XXXXXX")
+cp "$work/$member" "$candidate"
+chmod 755 "$candidate"
+changed=1
+if [ "$was_running" = 1 ]; then launchctl bootout "$domain/$LABEL"; fi
+mv -f "$candidate" "$binary"
+candidate=
+if [ "$had_old" = 0 ]; then cp "$work/config" "$config"; fi
+chmod 600 "$config"
+cp "$work/plist" "$plist"
+launchctl bootstrap "$domain" "$plist"
+launchctl kickstart -k "$domain/$LABEL"
+sleep 1
+launchctl print "$domain/$LABEL" > "$work/service-status"
+grep -E -q 'pid = [1-9][0-9]*' "$work/service-status" || fail 'launchd job has no running process' 1
+printf '%s\n' 'ddnsto-macos-v1' > "$marker"
+changed=0
+printf '%s\n' "DDNSTO $VERSION: local_service=running cloud_status=unverified" \
+    'Runs after user login. Confirm device online in the DDNSTO console: https://www.ddnsto.com/'
+)
+exit "$?"
+fi
+
+#!/bin/sh
 set -eu
 
 WORK_ROOT=${ZSETUP_ROOT:-/tmp/zsetup}
@@ -253,28 +459,69 @@ bootstrap_zsetup() {
 ddnsto_error() { printf 'DDNSTO: %s\n' "$*" >&2; }
 
 ddnsto_usage() {
-    printf '%s\n' 'Usage: install.sh [--token TOKEN] [--force-version lite|standard] [--verify-status]' \
+    printf '%s\n' 'Usage: install.sh [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         'OpenWrt: token optional; automatic Lite selection below 900 MB.' \
         'Linux x86_64/aarch64: --token required without an interactive terminal.'
 }
 
 ddnsto_parse_args() {
     TOKEN=
+    TOKEN_FILE=
     FORCE_VERSION=
     VERIFY_STATUS=0
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            --token|--force-version)
+            --token|--token-file|--force-version)
                 [ "$#" -ge 2 ] && [ -n "$2" ] || { ddnsto_error "$1 requires a value"; return 2; }
-                case "$1" in --token) TOKEN=$2 ;; *) FORCE_VERSION=$2 ;; esac
+                case "$1" in --token) TOKEN=$2 ;; --token-file) TOKEN_FILE=$2 ;; *) FORCE_VERSION=$2 ;; esac
                 shift 2 ;;
             --token=*) TOKEN=${1#--token=}; [ -n "$TOKEN" ] || return 2; shift ;;
             --force-version=*) FORCE_VERSION=${1#--force-version=}; shift ;;
             --verify-status) VERIFY_STATUS=1; shift ;;
-            *) ddnsto_error "unknown argument: $1"; return 2 ;;
+            *) ddnsto_error 'unknown argument (use --help)'; return 2 ;;
         esac
     done
     case "$FORCE_VERSION" in ''|lite|standard) ;; *) ddnsto_error 'version must be lite or standard'; return 2 ;; esac
+    if [ -n "$TOKEN_FILE" ]; then
+        [ -z "$TOKEN" ] || { ddnsto_error 'choose token or token-file'; return 2; }
+        [ -f "$TOKEN_FILE" ] && [ ! -L "$TOKEN_FILE" ] && [ -r "$TOKEN_FILE" ] || { ddnsto_error 'token file must be readable and regular'; return 2; }
+        TOKEN=$(cat "$TOKEN_FILE"; printf '.')
+        TOKEN=${TOKEN%.}
+        TOKEN=${TOKEN%"
+"}
+        [ -n "$TOKEN" ] || { ddnsto_error 'empty token file'; return 2; }
+    fi
+    case "$TOKEN" in *"
+"*|*"$(printf '\r')"*) ddnsto_error 'token must be one line'; return 2 ;; esac
+}
+
+ddnsto_prompt_token() (
+    exec 3<>/dev/tty
+    terminal_state=$(stty -g <&3)
+    trap 'stty "$terminal_state" <&3; printf "\n" >&3' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    stty -echo <&3
+    printf 'DDNSTO token: ' >&3
+    IFS= read -r entered_token <&3
+    printf '%s' "$entered_token"
+)
+
+ddnsto_prepare_token() {
+    [ -z "$TOKEN" ] || return 0
+    if [ "$business_platform" = openwrt ]; then
+        TOKEN=$(uci -q get 'ddnsto.@ddnsto[0].token' 2>/dev/null) || TOKEN=
+        [ -z "$TOKEN" ] || return 0
+    fi
+    if [ -t 0 ]; then
+        TOKEN=$(ddnsto_prompt_token) || { ddnsto_error 'could not read token'; return 2; }
+        [ -n "$TOKEN" ] || { ddnsto_error 'empty token'; return 2; }
+    elif [ "$business_platform" = linux ]; then
+        ddnsto_error 'Linux needs --token or --token-file without an interactive terminal'
+        return 2
+    fi
+    # Preserve the existing unattended OpenWrt package-only contract.
 }
 
 ddnsto_download() {
@@ -312,31 +559,19 @@ ddnsto_verified_download() {
     mv -f "$transaction_dir/verified" "$verified_marker"
 }
 
-ddnsto_checksum() {
-    "$ZSETUP_BIN" metadata sha256 "$1" "$2" || {
-        ddnsto_error "invalid, missing or duplicate SHA256 for $2"; return 11;
-    }
-}
-
 ddnsto_rollback() {
     [ "${replacement_started:-0}" = 1 ] || return 0
-    if [ "$had_old" = 1 ]; then
-        ddnsto_privileged mv -f "$backup" "$bin_path" || {
-            ddnsto_error "rollback failed; backup retained at $backup"; return 1;
-        }
-        replacement_started=0
-        ddnsto_privileged "$bin_path" -u "$TOKEN" -daemon || status 'DDNSTO: previous service could not be restarted; manual recovery needed'
-    else
-        ddnsto_privileged rm -f "$bin_path"
-        replacement_started=0
-    fi
+    ddnsto_linux_restore || {
+        ddnsto_error "manual recovery needed; binary/config backup retained at $backup"
+        return 1
+    }
 }
 
 ddnsto_cleanup() {
     ddnsto_rollback || true
     [ -z "${install_candidate:-}" ] || ddnsto_privileged rm -f "$install_candidate"
     if [ "${replacement_started:-0}" = 0 ] && [ -n "${backup:-}" ]; then
-        ddnsto_privileged rm -f "$backup"
+        ddnsto_privileged rm -rf "$backup"
     fi
     if [ "${deprecated_config:-0}" = 1 ] && [ -f "${transaction_dir:-}/deprecated-config" ]; then
         cp -p "$transaction_dir/deprecated-config" "$config_path"
@@ -362,15 +597,10 @@ ddnsto_openwrt() {
         if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 900 ]; then SELECTED_VERSION=lite; else SELECTED_VERSION=standard; fi
     fi
     status "[2/4] Checking DDNSTO $SELECTED_VERSION version ($package_manager/$arch)..."
-    version_pointer=VERSION
-    [ "$SELECTED_VERSION" != lite ] || version_pointer=VERSION_LITE
-    ddnsto_download "openwrt/$version_pointer" "$transaction_dir/version" '' 1
-    version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version")
-    case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid version metadata'; return 11 ;; esac
+    version_num=$(ddnsto_pinned_version "$SELECTED_VERSION")
     version_folder=$SELECTED_VERSION
     [ "$pkg_ext" != apk ] || version_folder="$version_folder-apk"
     relative_folder="openwrt/$version_folder/$version_num"
-    ddnsto_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1
     status "      DDNSTO $version_num ($SELECTED_VERSION; Lite below 900 MB)"
     status '[3/4] Downloading and verifying DDNSTO packages...'
     package_cache="$work_dir/cache/$version_folder/$version_num/$arch"
@@ -379,8 +609,12 @@ ddnsto_openwrt() {
     ui_package="luci-app-ddnsto.$pkg_ext"
     language_package="luci-i18n-ddnsto-zh-cn.$pkg_ext"
     for package in "$main_package" "$ui_package" "$language_package"; do
-        digest=$(ddnsto_checksum "$transaction_dir/sums" "$package")
-        ddnsto_verified_download "$relative_folder/$package" "$package_cache/$package" "$digest"
+        case "$package" in
+            ddnsto_*) product_path="$relative_folder/$package" ;;
+            *) product_path="openwrt/$package" ;;
+        esac
+        digest=$(ddnsto_pinned_sha "$product_path")
+        ddnsto_verified_download "$product_path" "$package_cache/$package" "$digest"
     done
     status '[4/4] Installing DDNSTO packages...'
     # All packages are verified before touching dependencies or installed packages.
@@ -424,28 +658,21 @@ ddnsto_openwrt() {
         pgrep -x ddnstod >/dev/null || { ddnsto_error 'DDNSTO process not found'; return 1; }
         ddnsto -w
     fi
-    status 'DDNSTO installation completed; refresh LuCI if its menu is missing'
+    status 'DDNSTO packages installed; cloud_status=unverified'
+    status 'Confirm this device is online in the DDNSTO console: https://www.ddnsto.com/; refresh LuCI if its menu is missing'
 }
 
 ddnsto_linux() {
     case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
     [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
-    if [ -z "$TOKEN" ]; then
-        if [ -t 0 ]; then
-            printf 'DDNSTO token: ' >&2
-            IFS= read -r TOKEN
-        else
-            ddnsto_error 'Linux needs --token TOKEN for noninteractive installation'; return 2
-        fi
-    fi
     [ -n "$TOKEN" ] || { ddnsto_error 'empty token'; return 2; }
+    ddnsto_linux_preflight
     version_num=${DDNSTO_VERSION:-4.2.3}
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid DDNSTO_VERSION'; return 2 ;; esac
     status "[2/4] Checking DDNSTO standard $version_num ($arch)..."
     archive_name="ddnsto-standard-$version_num.tar.gz"
-    ddnsto_download linux-binary/SHA256SUMS "$transaction_dir/sums" '' 1
-    digest=$(ddnsto_checksum "$transaction_dir/sums" "$archive_name")
+    digest=$(ddnsto_pinned_sha "linux-binary/$archive_name")
     mkdir -p "$work_dir/cache/linux-binary"
     archive_path="$work_dir/cache/linux-binary/$archive_name"
     status '[3/4] Downloading DDNSTO (verified cached artifacts are reused)...'
@@ -458,35 +685,43 @@ ddnsto_linux() {
     "$extracted" -v
     bin_path=${DDNSTO_BIN_PATH:-/usr/local/bin/ddnsto}
     bin_dir=$(dirname "$bin_path")
-    SUDO=
-    if [ ! -w "$bin_dir" ] && [ "$(id -u)" != 0 ]; then
-        command -v sudo >/dev/null 2>&1 || { ddnsto_error 'root or sudo is required'; return 2; }
-        SUDO=sudo
-    fi
+    [ ! -L "$bin_path" ] || { ddnsto_error 'installed binary must not be a symlink'; return 2; }
     status '[4/4] Installing and starting DDNSTO...'
     ddnsto_privileged mkdir -p "$bin_dir"
     install_candidate="$bin_dir/.ddnsto-candidate.$$"
-    backup="$bin_dir/.ddnsto-backup.$$"
+    backup=$(ddnsto_privileged mktemp -d "$bin_dir/.ddnsto-backup.XXXXXX")
     ddnsto_privileged cp "$extracted" "$install_candidate"
     ddnsto_privileged chmod 0755 "$install_candidate"
     had_old=0
+    had_config=0
+    if ddnsto_privileged test -f "$linux_config_file"; then
+        ddnsto_privileged cp -p "$linux_config_file" "$backup/config"
+        had_config=1
+    fi
     if [ -f "$bin_path" ]; then
-        ddnsto_privileged cp -p "$bin_path" "$backup"
+        ddnsto_privileged cp -p "$bin_path" "$backup/binary"
         had_old=1
-        ddnsto_privileged "$bin_path" stop
+        ddnsto_linux_stop
+        if ddnsto_linux_running >/dev/null 2>&1; then
+            ddnsto_error 'old service is still running; refusing binary replacement'
+            return 13
+        fi
     fi
     replacement_started=1
     ddnsto_privileged mv -f "$install_candidate" "$bin_path"
     install_candidate=
     if ddnsto_privileged "$bin_path" -u "$TOKEN" -daemon; then
+        ddnsto_linux_wait_healthy
+        ddnsto_privileged chmod 0600 "$linux_config_file"
         replacement_started=0
-        ddnsto_privileged rm -f "$backup"
+        ddnsto_privileged rm -rf "$backup"
     else
         start_code=$?
         ddnsto_error 'start failed; restoring previous binary'
         return "$start_code"
     fi
-    status 'DDNSTO installation completed'
+    status 'DDNSTO installed; local_service=healthy cloud_status=unverified'
+    status 'Confirm this device is online in the DDNSTO console: https://www.ddnsto.com/'
 }
 
 ddnsto_install() {
@@ -500,6 +735,7 @@ ddnsto_install() {
         ubuntu:apt|debian:apt|centos:yum|centos:dnf|rhel:yum|rhel:dnf|linux:*) business_platform=linux ;;
         *) ddnsto_error "unsupported platform: $os/$package_manager"; return 2 ;;
     esac
+    ddnsto_prepare_token
     work_dir=${ZSETUP_WORK_DIR:-${WORK_ROOT}/ddnsto}
     mkdir -p "$work_dir"
     chmod 0700 "$work_dir"
@@ -516,6 +752,144 @@ ddnsto_install() {
     ddnsto_cleanup
     transaction_dir=
     trap - EXIT HUP INT TERM
+}
+
+# Maintained product metadata; embedded in install.sh, never fetched at runtime.
+# All 21 existing HTTPS artifacts re-downloaded and verified 2026-10-14.
+# See docs/github-testing.md. Bump installer version when updating any pin.
+ddnsto_pinned_version() {
+    case "$1" in
+        standard) printf '%s\n' 4.2.6 ;;
+        lite) printf '%s\n' 4.2.2 ;;
+        *) printf '%s\n' 'DDNSTO: unknown pinned variant' >&2; return 11 ;;
+    esac
+}
+
+ddnsto_pinned_sha() {
+    case "$1" in
+        linux-binary/ddnsto-standard-4.2.3.tar.gz) printf '%s\n' b982ebd38e8c145d955049eb5b73960c01941bc05f084c3a2115dfca2b6eea6e ;;
+        openwrt/lite-apk/4.2.2/ddnsto_aarch64.apk) printf '%s\n' fa8715e298357b1f194fd303b7bc53fe97fc2d62847099c8942fb1d833c44bba ;;
+        openwrt/lite-apk/4.2.2/ddnsto_arm.apk) printf '%s\n' a0d748be8936b8515a4a83e624529ee9873728c434b44e330e03159e2f7fd4b4 ;;
+        openwrt/lite-apk/4.2.2/ddnsto_mipsel.apk) printf '%s\n' 34cf69a86b7c22993e974d54b973ad65eda9a81b59b79a77eff68140bf3f421d ;;
+        openwrt/lite-apk/4.2.2/ddnsto_x86_64.apk) printf '%s\n' 291a24cb1e8e821f127ad08249bcfbc1517501189b895fbad261c950e2aa0abf ;;
+        openwrt/lite/4.2.2/ddnsto_aarch64.ipk) printf '%s\n' 4f1542dc9e8f14a2da69800190e2d2b5f20288c96c2067eb1ada62e9d9999d0c ;;
+        openwrt/lite/4.2.2/ddnsto_arm.ipk) printf '%s\n' 3ccdc5100c4e43e7a75a6fd1cbfd5718e8ba7fce40ac4626da83487db2f3ea96 ;;
+        openwrt/lite/4.2.2/ddnsto_mipsel.ipk) printf '%s\n' 22df2e1f8c9238e861954778d9b48f149660ee7b0fd8639b1e73731454209fbe ;;
+        openwrt/lite/4.2.2/ddnsto_x86_64.ipk) printf '%s\n' 1434d56a8122d4fdb470a744a512373741307631fabde0a31e37733984461ca4 ;;
+        openwrt/standard-apk/4.2.6/ddnsto_aarch64.apk) printf '%s\n' 55e0d89060bbd8d6df3ca473ca114f257dd1312587ea703963ce812877e7a509 ;;
+        openwrt/standard-apk/4.2.6/ddnsto_arm.apk) printf '%s\n' a90951eb323a19f79964b597af9cdefbb728e675b8077c0fd115fa061011f62a ;;
+        openwrt/standard-apk/4.2.6/ddnsto_mipsel.apk) printf '%s\n' ebd0f3eeed46ec8f45a585b0e49403725fbd18a48de42d9ed0380609ed0d76ed ;;
+        openwrt/standard-apk/4.2.6/ddnsto_x86_64.apk) printf '%s\n' 470e4ea428f897cc8e38f7528b9387b0dd7373d5c727ef334e1d79c8dead7da2 ;;
+        openwrt/standard/4.2.6/ddnsto_aarch64.ipk) printf '%s\n' 413aef536307542e08fde749af9c9b5db239280fb2cdee5f48ced5cb61ef545a ;;
+        openwrt/standard/4.2.6/ddnsto_arm.ipk) printf '%s\n' 167ff8ba20965f72471bf8be9a1010eb776ca54b336033d807bb83c19e1f3917 ;;
+        openwrt/standard/4.2.6/ddnsto_mipsel.ipk) printf '%s\n' 9a0c740708cb1ede7e680112bcec5c9dad9f00739ef8587b334f305898d2763c ;;
+        openwrt/standard/4.2.6/ddnsto_x86_64.ipk) printf '%s\n' a7d868da03dea6e6e9b4cb02bc6f2ccfa31d2eeba62f0ac088338bc83e31e9eb ;;
+        openwrt/luci-app-ddnsto.apk) printf '%s\n' 74c1905d95ec90077cd3f4b4d907782c093ad977f0c7c4c93137190106e1e566 ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.apk) printf '%s\n' 96fcf176a2d2be9d3ad85d0687d5f0adaa37282be4cb0c95cee609c6dde60fb4 ;;
+        openwrt/luci-app-ddnsto.ipk) printf '%s\n' f3c87b000e7ec6ed640783232354b7462a274323d5edd5d2cc857c03192bda13 ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.ipk) printf '%s\n' 6c5f3e287b70704181769f23b1775c064bf1d4bf2c6ee1fb0a226377478c1a04 ;;
+        *) printf '%s\n' "DDNSTO: no pinned artifact for $1; use a reviewed newer installer" >&2; return 11 ;;
+    esac
+}
+
+# Included in install.sh. Do not trust older clients' service exit codes.
+ddnsto_linux_preflight() {
+    SUDO=
+    if [ "$(id -u)" != 0 ]; then
+        command -v sudo >/dev/null 2>&1 || { ddnsto_error 'Linux service installation requires root or sudo'; return 2; }
+        SUDO=sudo
+        sudo -v || return 2
+    fi
+    linux_service_name=com.linkease.ddnstoshell
+    linux_config_dir=${DDNSTO_LINUX_CONFIG_DIR:-/etc/ddnsto}
+    linux_config_file="$linux_config_dir/ddnsto-config.json"
+    [ ! -L "$linux_config_dir" ] && [ ! -L "$linux_config_file" ] || {
+        ddnsto_error 'service configuration must not be a symlink'; return 2;
+    }
+    if command -v systemctl >/dev/null 2>&1 && ddnsto_privileged systemctl show-environment >/dev/null 2>&1; then
+        linux_service_manager=systemd
+    elif command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1 &&
+         command -v openrc-run >/dev/null 2>&1 && [ -f /run/openrc/softlevel ]; then
+        linux_service_manager=openrc
+    else
+        ddnsto_error 'a running systemd or initialized OpenRC environment is required; no service changes made'
+        return 2
+    fi
+    command -v readlink >/dev/null 2>&1 || return 2
+    command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || {
+        ddnsto_error 'curl or wget is required for the local health check'; return 2;
+    }
+}
+
+ddnsto_linux_running() {
+    case "$linux_service_manager" in
+        systemd) ddnsto_privileged systemctl is-active --quiet "$linux_service_name" ;;
+        openrc) ddnsto_privileged rc-service "$linux_service_name" status ;;
+    esac
+}
+
+ddnsto_linux_stop() {
+    case "$linux_service_manager" in
+        systemd) ddnsto_privileged systemctl stop "$linux_service_name" ;;
+        openrc) ddnsto_privileged rc-service "$linux_service_name" stop ;;
+    esac
+}
+
+ddnsto_linux_health() (
+    # Read only the client's own compact addrInfo schema; reject unfamiliar data
+    # rather than eval JSON or probe an unrelated service at a hard-coded port.
+    info=$(ddnsto_privileged cat "$linux_config_dir/.ddnsto_http_addr.json" 2>/dev/null) || exit 1
+    case "$info" in '{"addr":"127.0.0.1:'*'","pid":'*',"startedAt":"'*'"}') ;; *) exit 1 ;; esac
+    port=${info#*127.0.0.1:}; port=${port%%\"*}
+    pid=${info#*\"pid\":}; pid=${pid%%,*}
+    case "$port:$pid" in *[!0-9:]*|:*|*:) exit 1 ;; esac
+    [ "${#port}" -le 5 ] && [ "$port" -gt 0 ] && [ "$port" -le 65535 ] || exit 1
+    [ "${#pid}" -le 10 ] && [ "$pid" -gt 0 ] || exit 1
+    executable=$(ddnsto_privileged readlink "/proc/$pid/exe") || exit 1
+    [ "$executable" = "$(readlink -f "$bin_path")" ] || exit 1
+    # Never send local checks through an environment-configured proxy.
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
+    if command -v curl >/dev/null 2>&1; then
+        response=$(curl --noproxy '*' -fsS --connect-timeout 1 --max-time 2 "http://127.0.0.1:$port/healthz" 2>/dev/null) || exit 1
+    else
+        response=$(wget -q -T 2 -O - "http://127.0.0.1:$port/healthz" 2>/dev/null) || exit 1
+    fi
+    [ "$response" = ok ]
+)
+
+ddnsto_linux_wait_healthy() {
+    health_attempt=0
+    while [ "$health_attempt" -lt 10 ]; do
+        if ddnsto_linux_running >/dev/null 2>&1 && ddnsto_linux_health; then return 0; fi
+        health_attempt=$((health_attempt + 1))
+        sleep 1
+    done
+    ddnsto_error 'local service health check failed (cloud connectivity is not required)'
+    return 13
+}
+
+ddnsto_linux_restore() {
+    # Every step is checked explicitly: this runs from a conditional EXIT trap,
+    # where POSIX shells suppress errexit inside functions.
+    ddnsto_linux_stop >/dev/null 2>&1 || return 1
+    if [ "$had_old" = 1 ]; then
+        ddnsto_privileged cp -p "$backup/binary" "$bin_path" || return 1
+    else
+        ddnsto_privileged "$bin_path" uninstall || return 1
+        ddnsto_privileged rm -f "$bin_path" || return 1
+    fi
+    if [ "$had_config" = 1 ]; then
+        ddnsto_privileged cp -p "$backup/config" "$linux_config_file" || return 1
+    else
+        ddnsto_privileged rm -f "$linux_config_file" || return 1
+    fi
+    if [ "$had_old" = 1 ]; then
+        # Reuse restored service config, never overwrite it with the failed
+        # candidate's Token while attempting recovery.
+        ddnsto_privileged "$bin_path" -daemon || return 1
+        ddnsto_linux_wait_healthy || return 1
+    fi
+    replacement_started=0
 }
 
 

@@ -4,6 +4,11 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 zroot=${1:?usage: check.sh ZSETUP_ROOT}
 tunnel_root=$(CDPATH= cd -- "$zroot/.." && pwd)
 python3 -B "$root/tests/module_layout_test.py"
+python3 -B "$root/ddnsto/tests/cross_platform_installer_test.py"
+python3 -B "$root/ddnsto/tests/pinned_products_test.py"
+python3 -B "$root/tests/publication_test.py"
+python3 -B "$root/tests/desktop_package_test.py"
+python3 -B "$root/tests/entrypoint_package_test.py"
 for script in "$root"/legacy/*.sh "$root"/fastnet/*.sh "$root"/ddnsto/*.sh "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh; do
     sh -n "$script"
 done

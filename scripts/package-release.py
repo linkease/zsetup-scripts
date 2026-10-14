@@ -25,11 +25,19 @@ def tree_dirty(root):
     return bool(subprocess.check_output(["git", "-C", str(root), "status", "--porcelain", "--", "."], text=True).strip())
 
 
+def copy_desktop_candidates(binary, include):
+    """No stable aliases: desktop support has not passed native acceptance."""
+    if include:
+        for relative in ("install.ps1", "install-macos.sh"):
+            copy_immutable(ROOT / "ddnsto" / relative, binary / "ddnsto" / "desktop-candidate-0.1.8" / relative)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--zsetup-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "dist/release")
     parser.add_argument("--require-clean", action="store_true", help="require committed scripts and zsetup sources; server verification remains a separate release step")
+    parser.add_argument("--include-desktop-candidates", action="store_true", help="include unactivated desktop scripts in an isolated candidate namespace")
     args = parser.parse_args()
     zroot = args.zsetup_root.resolve()
     output = args.output.resolve()
@@ -63,7 +71,8 @@ def main():
             parts = file.relative_to(previous_binary).parts
             if len(parts) != 3 or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", parts[1]) or parts[1] in {".", "..", "stable", "latest"}:
                 continue
-            if (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] == "install.sh"):
+            desktop_history = parts[0] == "ddnsto" and parts[1].startswith("desktop-candidate-") and parts[2] in {"install.ps1", "install-macos.sh"}
+            if desktop_history or (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] == "install.sh"):
                 copy_immutable(file, binary.joinpath(*parts))
         # Refuse replacing any previously staged immutable executable or installer.
         for file in sorted(release.iterdir()):
@@ -72,10 +81,8 @@ def main():
             copy_immutable(ROOT / record["script"], binary / record["path"])
         for app in sorted(applications):
             shutil.copy2(ROOT / app / "install.sh", binary / app / "install.sh")
-        # Native desktop entrypoints are public business installers, but are
-        # not zsetup POSIX catalog entries and therefore are copied explicitly.
-        for relative in ("install.ps1", "install-macos.sh"):
-            copy_immutable(ROOT / "ddnsto" / relative, binary / "ddnsto" / relative)
+        # Desktop candidates have no stable aliases or catalog activation.
+        copy_desktop_candidates(binary, args.include_desktop_candidates)
         DDNSTO["copy_compat_installers"](ROOT / "ddnsto/install.sh", binary / "ddnsto")
         subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(release), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
         (binary / "zsetup/stable").write_text(version + "\n")
@@ -87,6 +94,7 @@ def main():
             "zsetup_version": version,
             "business_artifacts": {"owner": "business-server-release", "included": False},
             "readiness": "server-artifacts-and-canary-unverified",
+            "desktop_candidates_included": args.include_desktop_candidates,
             "files": [{"path": str(file.relative_to(staging)), "size": file.stat().st_size, "sha256": digest(file)} for file in sorted(binary.rglob("*")) if file.is_file()],
         }
         (staging / "scripts-release-manifest.json").write_text(json.dumps(evidence, indent=2) + "\n")
