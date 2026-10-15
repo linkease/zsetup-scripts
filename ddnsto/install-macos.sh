@@ -55,7 +55,7 @@ read_token() (
     trap 'exit 130' INT
     trap 'exit 143' TERM
     trap 'exit 129' HUP
-    stty -echo <&3
+    stty echo <&3
     printf 'DDNSTO token: ' >&3
     IFS= read -r entered_token <&3
     printf '%s' "$entered_token"
@@ -78,6 +78,8 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto.XXXXXX")
 changed=0
 had_old=0
 was_running=0
+was_disabled=0
+restore_disabled=0
 candidate=
 locked=0
 cleanup() {
@@ -95,6 +97,10 @@ cleanup() {
             rm -f "$binary" "$config" "$plist" "$marker" || recovery_failed=1
         fi
         printf '%s\n' 'DDNSTO: installation failed; recovery attempted' >&2
+    fi
+    # Also restore the override if enable itself failed before any file/job change.
+    if [ "$code" != 0 ] && [ "$restore_disabled" = 1 ]; then
+        launchctl disable "$domain/$LABEL" >&2 || recovery_failed=1
     fi
     [ -z "$candidate" ] || rm -f "$candidate"
     [ "$locked" = 0 ] || rmdir "$CONFIG_DIR/.install-lock"
@@ -136,6 +142,7 @@ ensure_zsetup() {
     done
     fail 'zsetup bootstrap download/checksum failed; no client changes made' 11
 }
+printf 'DDNSTO: selected client version %s (pinned by this installer; latest release not checked).\n' "$VERSION" >&2
 ensure_zsetup
 "$ZSETUP_BIN" download -o "$work/client.tar.gz" --sha256 "$archive_sha" \
     "https://fw.koolcenter.com/binary/ddnsto/macOS/ddnsto_darwin_cli_${VERSION}.tar.gz"
@@ -162,6 +169,12 @@ if [ -f "$binary" ]; then
     had_old=1
     if launchctl print "$domain/$LABEL" >/dev/null 2>&1; then was_running=1; fi
 fi
+# Disabled overrides survive bootout and removal of the plist. Read them before
+# changing files/services; macOS reports either "disabled" or "true".
+launchctl print-disabled "$domain" > "$work/disabled-status" || fail 'cannot inspect launchd disabled state; no client changes made'
+if grep -E -q '^[[:space:]]*"com\.ddnsto\.client"[[:space:]]*=>[[:space:]]*(disabled|true)[[:space:]]*[;,]?[[:space:]]*$' "$work/disabled-status"; then
+    was_disabled=1
+fi
 xml() { printf '%s' "$1" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
 if [ "$had_old" = 0 ]; then
     printf '%s\n' "$token_line" > "$work/config"
@@ -181,6 +194,11 @@ EOF
 candidate=$(mktemp "$INSTALL_DIR/.ddnsto.XXXXXX")
 cp "$work/$member" "$candidate"
 chmod 755 "$candidate"
+if [ "$was_disabled" = 1 ]; then
+    printf '%s\n' 'DDNSTO: re-enabling the disabled user service for installation.' >&2
+    restore_disabled=1
+    launchctl enable "$domain/$LABEL"
+fi
 changed=1
 if [ "$was_running" = 1 ]; then launchctl bootout "$domain/$LABEL"; fi
 mv -f "$candidate" "$binary"
