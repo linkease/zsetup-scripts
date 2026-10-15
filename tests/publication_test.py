@@ -25,7 +25,7 @@ class Publication(unittest.TestCase):
         result = mod.audit('https://fixture.invalid/binary', fetch=fetch, mode='direct')
         self.assertNotIn('zsetup/config.json', requested)
         self.assertIn('ddnsto/install.ps1', requested)
-        self.assertIn('ddnsto/0.1.8/install.ps1', requested)
+        self.assertIn('ddnsto/0.1.10/install.ps1', requested)
         self.assertTrue(all(c['ok'] for c in result['checks'] if c['path'].endswith(('.sh', '.ps1'))))
         self.assertFalse(result['publication_inputs_ready'], 'products still need checksum metadata')
 
