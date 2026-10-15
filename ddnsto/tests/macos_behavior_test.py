@@ -28,6 +28,7 @@ class MacInstaller(unittest.TestCase):
             'DDNSTO_INSTALL_DIR': str(self.install), 'DDNSTO_CONFIG_DIR': str(self.config),
             'DDNSTO_LAUNCH_AGENTS_DIR': str(self.agents), 'TEST_ROOT': str(self.root),
             'ZSETUP_BIN': str(self.bin / 'zsetup'),
+            'TMPDIR': str(self.root),
         }
         self.tool('uname', 'echo "${TEST_OS:-Darwin}"\n')
         # uname -m needs its architecture; all other native platform probes are isolated.
@@ -47,9 +48,26 @@ tar -czf "$dest" -C "$TEST_ROOT/payload" ddnsto_cli.arm64 ddnsto_cli.amd64
         self.tool('launchctl', '''
 printf '%s\n' "$1" >> "$TEST_ROOT/service.log"
 case "$1" in
+print-disabled)
+ [ "${FAIL_DISABLED_QUERY:-0}" = 0 ] || exit 7
+ echo 'disabled services = {'
+ echo ' "com.ddnsto.client.other" => disabled'
+ if [ -f "$TEST_ROOT/disabled" ]; then
+  printf ' "com.ddnsto.client" => %s\n' "${DISABLED_WORD:-disabled}"
+ else
+  echo ' "com.ddnsto.client" => enabled'
+ fi
+ echo '}' ;;
+enable)
+ [ "${FAIL_ENABLE:-0}" = 0 ] || exit 8
+ rm -f "$TEST_ROOT/disabled" ;;
+disable) touch "$TEST_ROOT/disabled" ;;
 print) [ -f "$TEST_ROOT/running" ] && echo 'pid = 123' ;;
 bootout) rm -f "$TEST_ROOT/running" ;;
 bootstrap)
+ if [ -f "$TEST_ROOT/disabled" ]; then
+  echo 'Bootstrap failed: 5: Input/output error' >&2; exit 5
+ fi
  if [ "${FAIL_START:-0}" = 1 ] && [ ! -f "$TEST_ROOT/failed-once" ]; then
   touch "$TEST_ROOT/failed-once"; exit 9
  fi
@@ -102,6 +120,105 @@ esac
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.install / 'ddnsto').exists())
         self.assertFalse((self.root / 'service.log').exists())
+
+    def test_disabled_reinstall_enables_before_start_and_preserves_identity(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        cfg = self.config / 'ddnsto.yaml'
+        old = cfg.read_bytes()
+        identity = self.config / '.ddnsto_boot.cfg'
+        identity.write_text('existing-device-identity')
+        for word in ('disabled', 'true'):
+            with self.subTest(output=word):
+                (self.root / 'running').unlink(missing_ok=True)
+                (self.root / 'disabled').touch()
+                result = self.run_script((), DISABLED_WORD=word)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse((self.root / 'disabled').exists())
+                self.assertTrue((self.root / 'running').exists())
+                self.assertEqual(cfg.read_bytes(), old)
+                self.assertEqual(identity.read_text(), 'existing-device-identity')
+
+    def test_disabled_cold_install_via_public_entry(self):
+        (self.root / 'disabled').touch()
+        result = subprocess.run(['sh', str(SCRIPT.with_name('install.sh')), '--token', 'test-token'],
+                                env=self.env, capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.root / 'disabled').exists())
+        self.assertTrue((self.root / 'running').exists())
+
+    def test_disabled_reinstall_failure_restores_disabled_state_and_files(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        (self.root / 'running').unlink()
+        (self.root / 'disabled').touch()
+        binary = self.install / 'ddnsto'
+        binary.write_text('old binary')
+        cfg = self.config / 'ddnsto.yaml'
+        old = cfg.read_bytes()
+        result = self.run_script((), FAIL_START='1')
+        self.assertNotEqual(result.returncode, 0)
+        # Ensure the new start was reached, not rejected early as still disabled.
+        self.assertTrue((self.root / 'failed-once').exists())
+        self.assertTrue((self.root / 'disabled').exists())
+        self.assertFalse((self.root / 'running').exists())
+        self.assertEqual(binary.read_text(), 'old binary')
+        self.assertEqual(cfg.read_bytes(), old)
+
+    def test_disabled_cold_start_failure_restores_disabled_state(self):
+        (self.root / 'disabled').touch()
+        result = self.run_script(FAIL_START='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / 'failed-once').exists())
+        self.assertTrue((self.root / 'disabled').exists())
+        self.assertFalse((self.root / 'running').exists())
+        self.assertFalse((self.install / 'ddnsto').exists())
+
+    def test_disabled_state_query_failure_does_not_replace_or_stop_old_service(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        binary = self.install / 'ddnsto'
+        binary.write_text('old binary')
+        (self.root / 'service.log').write_text('')
+        result = self.run_script((), FAIL_DISABLED_QUERY='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(binary.read_text(), 'old binary')
+        self.assertTrue((self.root / 'running').exists())
+        self.assertNotIn('bootout', (self.root / 'service.log').read_text())
+
+    def test_enabled_service_does_not_change_disable_override(self):
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = (self.root / 'service.log').read_text().splitlines()
+        self.assertNotIn('enable', calls)
+        self.assertNotIn('disable', calls)
+
+    def test_enable_failure_preserves_disabled_state(self):
+        (self.root / 'disabled').touch()
+        result = self.run_script(FAIL_ENABLE='1')
+        self.assertEqual(result.returncode, 8, result.stderr)
+        self.assertTrue((self.root / 'disabled').exists())
+        self.assertFalse((self.root / 'running').exists())
+        self.assertFalse((self.install / 'ddnsto').exists())
+
+    def test_enable_failure_does_not_stop_a_loaded_disabled_service(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        (self.root / 'disabled').touch()  # disable alone does not unload a job
+        binary = self.install / 'ddnsto'
+        binary.write_text('old binary')
+        (self.root / 'service.log').write_text('')
+        result = self.run_script((), FAIL_ENABLE='1')
+        self.assertEqual(result.returncode, 8, result.stderr)
+        self.assertTrue((self.root / 'disabled').exists())
+        self.assertTrue((self.root / 'running').exists())
+        self.assertEqual(binary.read_text(), 'old binary')
+        self.assertNotIn('bootout', (self.root / 'service.log').read_text())
+
+    def test_start_failure_restores_a_loaded_disabled_service(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        (self.root / 'disabled').touch()
+        result = self.run_script((), FAIL_START='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / 'failed-once').exists())
+        self.assertTrue((self.root / 'disabled').exists())
+        self.assertTrue((self.root / 'running').exists())
 
     def test_wrong_os_rejected_before_download(self):
         result = self.run_script(TEST_OS='Linux')
@@ -159,7 +276,7 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
         self.assertIn('/0.3.0/zsetup-macos-x86_64', (self.root / 'bootstrap.log').read_text())
         self.assertTrue((self.install / 'ddnsto').exists())
 
-    def test_first_install_prompts_without_echoing_token(self):
+    def test_first_install_echoes_token_once_without_logging_it_again(self):
         pid, terminal = pty.fork()
         if pid == 0:
             os.execve('/bin/sh', ['sh', str(SCRIPT)], self.env)
@@ -179,7 +296,7 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
                     break
                 output += part
                 if b'DDNSTO token:' in output and not sent:
-                    os.write(terminal, b'hidden-fixture-token\n')
+                    os.write(terminal, b'visible-fixture-token\n')
                     sent = True
             else:
                 os.kill(pid, 15)
@@ -189,8 +306,14 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
             _, status = os.waitpid(pid, 0)
         self.assertEqual(os.waitstatus_to_exitcode(status), 0, output.decode())
         self.assertTrue(sent)
-        self.assertNotIn(b'hidden-fixture-token', output)
-        self.assertIn('hidden-fixture-token', (self.config / 'ddnsto.yaml').read_text())
+        self.assertEqual(output.count(b'visible-fixture-token'), 1, output.decode())
+        self.assertIn('visible-fixture-token', (self.config / 'ddnsto.yaml').read_text())
+
+    def test_selected_version_is_explained_as_pinned_not_latest(self):
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('selected client version 4.2.1', result.stderr)
+        self.assertIn('pinned by this installer; latest release not checked', result.stderr)
 
     def test_first_start_failure_removes_only_owned_files(self):
         self.config.mkdir()
