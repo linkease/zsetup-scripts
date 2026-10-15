@@ -1,5 +1,9 @@
 # DDNSTO
 
+0.1.10 测试修复版：macOS 安装前读取 launchd 禁用状态，兼容 `disabled` / `true`；安装会重新启用被禁用的 DDNSTO 用户服务，失败时恢复原有禁用状态及旧安装。保留 Token 和设备身份。测试站地址与验收边界见 [0.1.10 修复记录](../docs/macos-disabled-fix-2026-10-15.md)。旧固定 GitHub / 0.1.9 链接不会自动更新。
+
+0.1.9历史变更：按macOS实际使用反馈将Token终端输入改为可见（不额外打印或写入日志），并明确提示客户端为固定4.2.1、未查询最新版。Linux/OpenWrt/Windows交互不变。
+
 ## 当前测试：0.1.8 GitHub固定入口
 
 下载站保持只读。GitHub分发独立入口，zsetup和客户端包仍从既有站点取得。Linux固定4.2.3，OpenWrt Standard固定4.2.6/Lite固定4.2.2；21个产品路径和实际SHA256由 `product-pins.sh` 嵌入入口，不读取业务VERSION/SHA256SUMS。OpenWrt主包仍在版本目录，LuCI/语言包使用根目录并固定摘要。文件变化会拒绝安装，不跳过校验。

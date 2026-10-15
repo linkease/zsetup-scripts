@@ -1,5 +1,17 @@
 # 构建、配置与发布
 
+## 0.1.10 macOS 禁用状态修复（2026-10-15）
+
+当前候选 `config_version=scripts-0.1.10`，DDNSTO 入口 0.1.10，FastNet 仍 0.1.3。修复 `launchctl disable` 后重装时报 `Bootstrap failed: 5`；重新启用失败时不停止原服务，后续安装失败则恢复原禁用状态。已增量发布新测试目录并更新本地官网地址，未覆盖历史入口、部署官网或提交推送 Git。详见 [修复与验收记录](macos-disabled-fix-2026-10-15.md)。以下 0.1.9 / 0.1.8 为历史记录。
+
+## 0.1.9 测试域名候选（2026-10-15）
+
+已发布至 `web.toany.net/ddnsto-install/0.1.9/20261015-366a4330f424/` 独立不可变目录；两个入口回读、404/方法限制、服务器隔离 Linux 冷安装及重复安装通过。未发布正式下载站、未推送 Git、未部署新官网。部署隔离、摘要、回退及验收边界见[测试站记录](test-site-2026-10-15.md)。
+
+### 2026-10-14 本地候选记录
+
+macOS Token输入改为可见，增加固定客户端版本/未检查最新版的提示。客户端仍4.2.1，下载器仍0.3.0；不新增远端版本查询或自动升级。catalog/config_version递增到0.1.9以避免覆盖旧不可变入口，FastNet仍0.1.3。打包输出使用 `dist/ddnsto-entrypoints-0.1.9`。下文0.1.8为已推送测试基线。
+
 ## 当前：0.1.8 GitHub 固定入口测试
 
 当前config_version为scripts-0.1.8，DDNSTO入口0.1.8，FastNet仍0.1.3。下载站只读，本轮只推送GitHub专用测试分支。以[GitHub测试指南](github-testing.md)为准：Linux/OpenWrt内置已核验版本/路径/SHA256，LuCI沿用根目录，不要求新增业务元数据。打包使用 `python3 -B scripts/package-entrypoints.py --output dist/ddnsto-entrypoints-0.1.8`。
