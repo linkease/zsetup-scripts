@@ -5,7 +5,7 @@ ddnsto_usage() {
     printf '%s\n' 'Usage: ddnsto-install.sh [--token TOKEN] [--force-version lite|standard] [--verify-status]' \
         'OpenWrt: token optional; automatic Lite selection below 900 MB.' \
         'Linux x86_64/aarch64: --token required without an interactive terminal.'
-    printf '%s\n' 'Linux systemd: root/sudo -H, system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
+    printf '%s\n' 'Linux systemd: user preparation + sudo -n commit (or explicit root), system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
 }
 
 ddnsto_parse_args() {
@@ -111,7 +111,13 @@ ddnsto_openwrt() {
         if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
             installer_package_command update update && installer_package_command install install luci-compat || status 'DDNSTO: luci-compat installation failed'
         fi
-        if ! installer_package_command query list-installed | grep -q '^luci-lua-runtime '; then
+        ddnsto_has_runtime=0
+        if installer_package_command query "$transaction_dir/pm-query" list-installed luci-lua-runtime; then
+            while IFS= read -r ddnsto_query_line; do
+                case "$ddnsto_query_line" in 'luci-lua-runtime '*) ddnsto_has_runtime=1 ;; esac
+            done < "$transaction_dir/pm-query"
+        fi
+        if [ "$ddnsto_has_runtime" = 0 ]; then
             installer_package_command update update && installer_package_command install install luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
         fi
         installer_package_command remove remove app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
@@ -120,7 +126,7 @@ ddnsto_openwrt() {
         if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
             installer_package_command update update && installer_package_command add add luci-compat || status 'DDNSTO: luci-compat installation failed'
         fi
-        if ! installer_package_command query info -e luci-lua-runtime >/dev/null 2>&1; then
+        if ! installer_package_command query "$transaction_dir/pm-query" info -e luci-lua-runtime >/dev/null 2>&1; then
             installer_package_command update update && installer_package_command add add luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
         fi
         installer_package_command del del app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true

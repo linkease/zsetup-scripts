@@ -129,6 +129,18 @@ installer_privilege_read() {
 
 installer_privilege_result() {
     installer_privilege_read 4 || return $?
+    ip_transport_only=0
+    case "$(cat "$transaction_dir/bridge-read")" in
+        T*)
+            # A sudo transport exit after ready without a root result is a
+            # protocol failure, but it must still be reaped before cleanup.
+            ip_transport_code=$(cat "$transaction_dir/bridge-read")
+            ip_transport_code=${ip_transport_code#T}
+            installer_privilege_read 1 || return $?
+            printf '%s\n' "$ip_transport_code" > "$transaction_dir/bridge-read"
+            ip_transport_only=1
+            ;;
+    esac
     IFS= read -r ip_result < "$transaction_dir/bridge-read" || return 12
     case "$ip_result" in [012][0123456789][0123456789]) ;; *) return 12 ;; esac
     # decimal conversion without shell-dependent octal interpretation
@@ -136,6 +148,27 @@ installer_privilege_result() {
     INSTALLER_ROOT_RESULT=$((ip_h * 100 + ip_t * 10 + ip_o))
     [ "$INSTALLER_ROOT_RESULT" -le 255 ] || return 12
     INSTALLER_ROOT_ACK=1
+    [ "$ip_transport_only" = 0 ] || return 12
+}
+
+installer_privilege_transport() {
+    # A distinct ordinary-user owner reaps sudo even when its command policy
+    # refuses startup before the root protocol exists. Caught signals interrupt
+    # wait; repeat wait until the owned child actually exits.
+    ip_transport_signal=0
+    trap 'ip_transport_signal=1' HUP INT TERM
+    exec 6<&0
+    /usr/bin/sudo -n "$@" <&6 6<&- &
+    ip_transport_pid=$!
+    exec 6<&-
+    while :; do
+        ip_transport_exit=0
+        wait "$ip_transport_pid" || ip_transport_exit=$?
+        if [ "$ip_transport_signal" = 1 ]; then ip_transport_signal=0; continue; fi
+        break
+    done
+    printf 'T%03d\n' "$ip_transport_exit" || true
+    return "$ip_transport_exit"
 }
 
 installer_privilege_cleanup() {
@@ -205,11 +238,16 @@ installer_privilege_install() {
     INSTALLER_BRIDGE_OPEN=1; INSTALLER_ROOT_ACK=0; INSTALLER_SUDO_PID=
     INSTALLER_CLEANUP_HOOK=installer_privilege_cleanup
     INSTALLER_SPAWNING=1
-    /usr/bin/sudo -n /bin/sh -eu -c "$(installer_privilege_root_code)" zsetup-root \
+    (
+    # Close permanently in this subshell. Redirecting a shell function's FD3
+    # alone saves a hidden restoration descriptor and keeps the control writer
+    # alive, preventing root from observing cancellation EOF.
+    exec 3>&- 4>&-
+    installer_privilege_transport /bin/sh -eu -c "$(installer_privilege_root_code)" zsetup-root \
         "$ip_uid" "$ZSETUP_BIN" "$ip_native_sha" "$transaction_dir/root-program" "$ip_program_sha" \
         "${ZSETUP_CA_FILE:-}" "$ip_ca_sha" "$transaction_dir" "$os" "$package_manager" "$arch" \
         "$ZSETUP_SOURCE_BASES" "${ZSETUP_SOURCE_FALLBACK:-}" "$INSTALLER_PREFIX" "${DDNSTO_VERSION:-}" "$@" \
-        < "$transaction_dir/control" > "$transaction_dir/status" 3>&- 4>&- &
+    ) < "$transaction_dir/control" > "$transaction_dir/status" &
     INSTALLER_SUDO_PID=$!
     INSTALLER_SPAWNING=0
     [ "$INSTALLER_SIGNAL" = 0 ] || exit "$INSTALLER_SIGNAL"
@@ -218,6 +256,7 @@ installer_privilege_install() {
     case "$ip_ready" in
         R) printf 'G\n' >&3 ;;
         E) installer_privilege_result || return $?; return "$INSTALLER_ROOT_RESULT" ;;
+        T) installer_privilege_result || return $?; return 2 ;;
         *) return 12 ;;
     esac
     installer_privilege_result || return $?

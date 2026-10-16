@@ -55,8 +55,8 @@ def main():
         subprocess.run([str(zroot / "scripts/check-release-artifacts.sh"), "--directory", str(release)], check=True)
     version = manifest["version"]
     components = [int(v) for v in version.split(".")]
-    if components < [0, 2, 4]:
-        raise ValueError("zsetup >= 0.2.4 required (native metadata and memory facts)")
+    if components < [0, 5, 0]:
+        raise ValueError("zsetup >= 0.5.0 required (storage, bounded download/capture and joined process lifecycle)")
     scripts_dirty, zsetup_dirty = tree_dirty(ROOT), tree_dirty(zroot)
     if args.require_clean and (scripts_dirty or zsetup_dirty):
         raise ValueError("production candidate requires clean scripts and zsetup source trees")

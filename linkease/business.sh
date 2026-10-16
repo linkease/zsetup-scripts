@@ -5,7 +5,7 @@ linkease_usage() {
     printf '%s\n' 'Usage: linkease-install.sh [--version VERSION]' \
         'Linux: default version 1.7.5; installs LinkEase, media, HEIF converter and linkmount.' \
         'OpenWrt opkg: defaults to server VERSION; x86_64/aarch64/armv7 supported.'
-    printf '%s\n' 'Linux systemd: root/sudo -H, system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
+    printf '%s\n' 'Linux systemd: user preparation + sudo -n commit (or explicit root), system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
 }
 
 linkease_parse_args() {

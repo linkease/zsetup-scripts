@@ -1,125 +1,73 @@
-# Linux 安装存储：开发中规范
+# Linux 安装目录、存储和权限协议
 
-2026-10-16 用户批准实施 M0–M7，Zig 产品归档，仅 Rust zsetup 新增能力。
-权威计划与状态在 owning zsetup-rust/docs/2026-10-16-linux-install-storage.md。
+当前开发候选：scripts-0.1.8，要求 Rust zsetup >=0.5.0。M0–M6 已完成，
+M7 集成证据见 owning zsetup-rust/docs/2026-10-16-linux-install-storage.md。
+这不是发布或生产切换批准。Zig zsetup 保持归档。
 
-当前源码候选已接入FastNet/FastPVE；DDNSTO/LinkEase的systemd适配通过单项自检，
-M5整体仍待SysV覆盖范围决定。未公开发布，不改变线上安装行为。
-测试：python3 -B tests/install_storage_test.py（隔离挂载事实、PTY及无终端选择）。
+## 目录和入口
 
-* 用户命令推荐 $HOME/.local/bin/ddnsto。版本程序与命令入口分离，系统独立安装
-  使用 /opt/linkease/APP。业务必须单独证明用户运行/服务路径兼容，不从可写性推断。
-* runtime-rust 负责文件系统事实，Rust zsetup storage 提供稳定查询；业务脚本负责
-  目录策略、安装方式、包管理、提权、清理和回滚。不复制下载器或维护 Zig 第二实现。
-* installer_layout 是无副作用布局；installer_space_budget 接受下载、展开、额外提交
-  副本及额外备份四类已知峰值字节，输出 INSTALLER_REQUIRED_BYTES。旧版本已占用
-  空间不能再重复计入，只有额外复制才计入。余量为10%+8MiB，signed32 有界算术。
-* installer_preflight 在目标及独立工作目录执行相同峰值预算检查，输出人类计划，
-  不创建目录。默认 work root 为 PREFIX/.staging；没有合适位置，前台允许重选，
-  非交互错误12退出。临时/最终文件仍须在提交前重检并实施运行时限制。
-* 已知内存文件系统、unknown backing、只读、noexec、低空间/无inode按需拒绝。
-  不以目录名字代替实际探测，不自动扫描并使用外接盘，不静默回退 /tmp。
-* 该存储 helper 不执行sudo/包管理器/服务；独立install-transaction.sh拥有lease、
-  原生子进程及清理，install-bounds.sh拥有有实测依据的兼容上限。
+FastNet 默认用户程序位于 `$HOME/.local/lib/linkease/fastnet/versions/V/bin/fastnet`，
+用户命令为 `$HOME/.local/bin/fastnet`。FastPVE 保留 root/PVE 限制，不推定其内部业务操作支持用户模式。
+DDNSTO/LinkEase 为系统服务：root 保护程序位于 `/opt/linkease/APP/versions/V/bin/APP`，
+current/previous 保留两版；普通调用者的 `$HOME/.local/bin/APP` 是用户所有的受管理链接。
+root 不跟随用户 HOME 的链接写系统文件，不覆盖未知旧安装或外来 unit。
+原生包安装文件的位置服从包管理器所有权，不能通过 prefix 重定向其 maintainer scripts。
 
-用户已选兼容B，9个产物测量见2026-10-16-storage-measurements.json，产品下载仅临时
-测量后删除，未执行/重打包。上限：FastNet/FastPVE raw32MiB；DDNSTO下载32/展开64MiB；
-LinkEase下载128/展开256MiB/128文件。保留8MiB运行时空间，超限退出11，空间错误12。
-缺大小元数据时明确提示，不声称预检充分；业务摘要规则不降级，观察SHA不替代服务器元数据。
+共用前置参数：`--installer-scope user|system`、`--installer-prefix /PATH`、
+`--installer-work-dir /PATH`。`--` 结束共用参数，余下逐字交业务；共用参数应在业务参数之前。
+环境兼容入口：ZSETUP_INSTALL_SCOPE、ZSETUP_INSTALL_PREFIX、ZSETUP_WORK_DIR。
+目录必须为规范绝对路径，支持中文、空格和普通特殊字符。DDNSTO/LinkEase 不支持 user 服务。
+DDNSTO_BIN_PATH/LINKEASE_APP_DIR 旧 raw 覆盖变量被拒绝，旧安装需明确迁移，不静默覆盖。
 
-FastNet/FastPVE公共前置选项：--installer-scope user|system、--installer-prefix PATH、
---installer-work-dir PATH。--后均传业务原参数；zsetup install的外层--保持不变，例如：
+显式 root 的暂存默认 PREFIX/.staging。普通用户准备默认
+`$HOME/.local/state/linkease/APP/.staging`，work-dir 参数只选择普通用户准备位置；
+root 提交仍用受保护 PREFIX/.staging。两入口：直接业务脚本和 `zsetup install APP --foreground -- ...`
+执行相同业务函数，已运行脚本不重复下载自身；`sh -c "$(curl ...)"` 也使用同源内嵌 root 片段。
 
-    zsetup install fastnet -- --installer-prefix /data/apps/fastnet -- "业务参数"
+## 存储与预算
 
-程序在PREFIX/versions/VERSION/bin/APP，current指向当前可执行文件，用户入口在
-HOME/.local/bin/APP。FastNet默认user，FastPVE仅system且要求root/PVE。保留当前/上一版，
-拒绝同版本不同SHA。原cache marker/size复用仅限私有目录，不检测同大小外部篡改。
-工程变量ZSETUP_INSTALL_PREFIX/ZSETUP_INSTALL_SCOPE用于隔离fixture；公共选择用上述参数。
+事实来自 canonical runtime-rust 的只读 `zsetup storage PATH --json / get FIELD`。
+默认拒绝 tmpfs/ramfs、无法证明持久 backing、只读、所需执行被禁、权限不足、空间不足或零 inode。
+overlay 只在当前 namespace 可解析 upperdir 且能证明其挂载介质时给出事实；隐藏路径、循环及异常选项为 unknown。
+选择顺序为显式路径、作用域默认目录，不扫描外接盘自动放置。前台终端可重选；无终端退出12，不等待。
+原生包目标 `/` 独立检查，换暂存盘不能假称包目标已迁移。
 
-先检查空间/挂载，再创建私有事务。已有共享目录不擅自chmod，SIGTERM先等待原生操作
-close/join后清理；崩溃遗留lease需人工确认恢复，阻止再次累积，不猜测PID并清理在用文件。
-恢复hook失败保留暂存及lease。exec业务菜单前已释放事务；程序自身业务安装目录未迁移。
+业务服务器 size 不完整，采用获批兼容 B：实测安全上限，而非精确磁盘估计。
+FastNet/FastPVE raw32MiB；DDNSTO下载32/展开64MiB/16文件；LinkEase下载128/展开256MiB/128文件。
+预算覆盖下载、展开、额外提交/备份复制，增加10%+8MiB；普通用户提权计入两份归档。
+算术有 signed32 上限。下载/capture 按32KiB流式限制并持续保留8MiB空间，不整体读安装包。
+超限11，空间/文件错误12，参数/不支持/冲突/无提权能力2；业务失败保留原退出码。
 
-M0–M4已完成。用户已选A：DDNSTO/LinkEase保留系统服务，程序在root保护的
-PREFIX/versions/VERSION/bin（默认/opt/linkease/APP），current/previous保留两版，
-命令入口HOME/.local/bin/APP。Linux systemd支持上述公共参数；user scope明确拒绝。
-DDNSTO_BIN_PATH/LINKEASE_APP_DIR工程旧覆盖项退休，不能用它们绕过受管理目录。
-尚未迁移的OpenWrt分支暂不接受Linux布局参数，M6仍待实施。
+只有 zsetup 本体及小型提权引导可用 /tmp；业务包、解压、PM cache/tmp/lists 均使用持久暂存。
+成功、失败、取消均由协调器等待 native 子进程清理后释放自身事务；root 服务快照/旧版本按需保留。
+SIGKILL/掉电或回滚失败留下锁和恢复目录，后续保守拒绝；人工核对 owner/快照/进程后恢复，不猜PID自动删。
 
-系统程序、暂存及祖先必须root所有且组/其他用户不可写，不经过符号链接。
-已有旧方案文件/服务、来源不明prefix或命令入口拒绝覆盖；跨暂存目录也共用目标锁。
-缓存有受保护文件清单，每个程序/辅助库均重查权限，元数据读取有界。
-下载/解压/跨盘提交仍走canonical Rust，有累计上限和8MiB余量。
+## 提权、取消和缓存
 
-当前需要显式root执行，例如下载脚本并审阅后运行sudo -H sh SCRIPT；不自动请求密码。
-sudo调用者由getent确认，通过runuser降权创建其命令入口，root不写入可由该用户改动的目录。
-完整的“普通用户准备、仅提交时跨sudo边界”尚未完成，属于M6；当前方式不算该项通过。
-真实sudo/第二UID、旧业务完整回归、真实服务及辅助程序路径为M6/M7后续验收。
+Linux systemd 普通用户仅下载校验归档，不执行业务程序。`sudo -n` 只使用已有凭据；
+不足时退出2，提示先 `sudo -v` 或显式 root 调用，不自动请求密码。
+可选提权桥需要 sudo、dd、mkfifo、sha256sum 或 openssl；普通 root 安装保持 native SHA，不新增外部摘要依赖。
+root 将有界 native/脚本/可选 CA 复制到私有引导目录校验，ready/go 后运行私有副本；
+重新取得元数据，导入归档经 native SHA 复验再执行。普通用户数据和参数不作为表达式求值。
+每个协调器只等待自己的子进程。控制 EOF 触发 root TERM、join 和回滚；其结束后才释放普通用户准备。
+Rust install 的 POSIX 取消先给业务协调器最多30秒 TERM 回滚，再强制回收剩余进程树；
+无响应/强杀留下的锁仍需恢复。generic run/capture 保持原取消协议。
 
-业务原生注册退出0仍需核对unit、reload/enable/start及两次is-active。
-失败/TERM恢复旧current、unit、启用/运行状态及DDNSTO真实配置
-/etc/ddnsto/ddnsto-config.json。恢复失败保留lease与恢复文件，不报成功。
-真实DDNSTO从新位置重复注册返回OK但保留旧unit；新适配器只替换已证明归属的旧unit。
-unit经真实systemd-analyze验证；root保护的固定.service-run只字面exec已校验路径，
-不执行配置表达式。中文、空格、百分号、美元及单双引号路径与真实wrapper执行均已测。
-语法依据：[systemd.service](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml)、
-[解析实现](https://github.com/systemd/systemd/blob/main/src/core/load-fragment.c)。
+root 所有且不可写的非秘密版本回执允许普通用户读取，故普通用户重复安装也可复用已有版本。
+原生 download 给定摘要的缓存可离线复用；业务安装仍刷新版本/SHA 元数据，不宣称完整离线业务安装。
+缓存文件必须通过 SHA 或 root 保护的已验证版本回执，不能仅按文件名激活。同版本摘要改变拒绝11。
 
-服务fixture在私有root/mount/PID namespace中，网络仅本地HTTPS fixture，systemctl及程序为stub。
-真实业务程序的独立probe使用隔离网络，未操作宿主服务；这些不等同真实systemd业务健康。
-详细证据见2026-10-16-service-storage-evidence.json及各service probe JSON。
-M5新待决：SysV真实生成的脚本无.service后缀、空格拆词有误，foreground owner还会回收
-其直接派生的daemon。首期仅交付systemd并保留SysV legacy，或本轮同时迁移SysV监督协议，
-待用户决定；在此之前新适配器对非systemd拒绝，旧入口及legacy参考保留。M6/M7未开始。
+## 支持映射与验证边界
 
-补充真实DDNSTO SysV对照：补齐隔离PATH中的/usr/sbin和私有/var/run、/var/log后，
-直接注册返回OK且在namespace退出前PID存在；经canonical Rust foreground run注册同样
-返回OK，但owner返回前已回收该PID。见2026-10-16-sysv-{direct,owned}-process-probe.json。
-原首轮service找不到属于隔离设施，不当作产品缺陷；新的两次对照均实际调用了隔离SysV脚本。
-这仅证明PID可见性/回收差异，不证明认证、连通、重启恢复或LinkEase实际SysV启动。
+新的 Linux raw 适配首期仅 systemd。SysV 保留 legacy，未移植；不是删除 OpenWrt procd 支持。
+DDNSTO OpenWrt opkg/apk 支持 x86_64/aarch64/armv7/mipsel；Lite 在已知内存小于900MB时优先，未知为Standard。
+LinkEase OpenWrt 仅 opkg x86_64/aarch64/armv7，APK/MIPS未接入。没有经验证的 deb/rpm 映射，不虚构 apt/yum 包。
+OpenWrt 明确 root 调用；Linux systemd 的 sudo 准备桥不推定适用于 OpenWrt。
+原生包先验证所有输入，使用持久 .packages 保留当前/前次尝试，独立 .package-lock 防止跨暂存目录并发。
+已有命令必须由 opkg search / apk info 识别本包所有权；不覆盖其他安装方案。
+PM 失败不切 raw 二进制；package-result 记录阶段/退出码，maintainer scripts 不承诺整体回滚。
 
-这不是新版本发布或生产安装证据；线上0.4.0缺新增storage/capture及下载限制参数，
-新脚本必须随未来具备这些能力的原生版本/最低版本配置一起发布，不能提前替换线上脚本。
-
-
-## M6 completed; M7 integration in progress
-
-Approved scope A: new raw Linux adapters target systemd. Keep SysV legacy
-unported; native OpenWrt opkg/apk semantics remain separate.
-
-Ordinary users prepare archives under ~/.local/state/linkease/APP/.staging
-(or --installer-work-dir / ZSETUP_WORK_DIR). The service prefix defaults to
-/opt/linkease/APP. Preparation executes no business payload. sudo -n requires
-existing credentials; authenticate with sudo -v in a terminal or explicitly
-invoke the reviewed installer as root. No unattended password prompt. The
-optional privilege bootstrap requires OS sha256sum or openssl, dd, mkfifo and
-sudo; ordinary root installation keeps native hashing without that dependency.
-The same generated business source is emitted locally for the root phase,
-including sh -c one-key entries with no readable script file. No self-download.
-
-The root coordinator copies bounded native/program/optional CA inputs into a
-private bootstrap directory, checks their hashes, signals ready, waits for go,
-and runs only those private copies. Its control EOF requests TERM followed by
-join and rollback; only then may the ordinary owner release preparation.
-Root re-fetches metadata and natively verifies imported archive copies before
-extraction/execution. Root staging is protected PREFIX/.staging; an ordinary
-user's work-dir does not become root executable staging. Peak budget includes
-both user and root archive copies. Root-owned nonsecret installed receipts are
-readable so repeated ordinary installs also avoid artifact requests.
-
-OpenWrt packages use persistent protected PREFIX/.packages, retain current and
-previous attempts, and place PM cache/tmp/lists under the private transaction.
-Installed paths remain package-owned; opkg search / apk info must identify an
-existing command. No deb/rpm mappings or raw fallback are invented. Each target
-has an independent .package-lock. A bounded package-result records phase and
-original exit code; package maintainer scripts cannot be promised transactional
-rollback. A missing or unsuitable / target cannot be fixed by moving staging.
-Unknown overlay backing is refused until proven persistent. Root package
-installation remains explicit; the sudo preparation bridge is for Linux systemd
-raw-service flows. OpenWrt usually runs as root; do not infer sudo support there.
-
-Real UID1000→0 sudo gate passed on the authorized test server in a disposable
-Ubuntu24.04 container, including denied credentials, Chinese/special token,
-root payload protection, UID1000 alias, cache and TERM rollback/complete cleanup.
-No host package manager or production service was modified.
+本地隔离 suites 覆盖真实 HTTPS/native fs/process 和业务/PM stub；真实服务器容器另验证
+systemd255 管理器和 UID1000→0 sudo。OpenWrt 宿主仅做只读 storage 探测，不安装真实包、不修改宿主服务。
+真实业务公网连接、procd/maintainer scripts、0.5.0 Windows/macOS 原生验收属于后续发布 canary，不能以交叉编译代替。
+旧回归覆盖迁移见 2026-10-16-regression-coverage.md；旧 legacy 和未验证入口保持不变。

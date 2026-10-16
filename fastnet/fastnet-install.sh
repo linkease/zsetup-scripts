@@ -125,8 +125,7 @@ read_stable_version() {
     compatibility_patch=${compatibility_rest#*.}
     case "$compatibility_major:$compatibility_minor:$compatibility_patch" in *[!0123456789:]*|::*|*::*) return 1 ;; esac
     if [ "$compatibility_major" -eq 0 ]; then
-        [ "$compatibility_minor" -ge 2 ] || return 1
-        if [ "$compatibility_minor" -eq 2 ]; then [ "$compatibility_patch" -ge 4 ] || return 1; fi
+        [ "$compatibility_minor" -ge 5 ] || return 1
     fi
 }
 

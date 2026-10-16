@@ -114,11 +114,18 @@ installer_package_command() {
     installer_storage_check / "$INSTALLER_RESERVE" 1 1 || return $?
     installer_storage_check "$INSTALLER_WORK_ROOT" "$INSTALLER_RESERVE" 0 1 || return $?
     PACKAGE_PHASE=$1; shift
+    ip_query_output=
+    if [ "$PACKAGE_PHASE" = query ]; then ip_query_output=$1; shift; fi
     case "$package_manager" in
-        opkg) installer_exec_native "$ZSETUP_BIN" run -- opkg --cache "$transaction_dir/pm-cache" --tmp-dir "$transaction_dir/pm-tmp" --lists-dir "$transaction_dir/pm-lists" "$@" ;;
-        apk) installer_exec_native "$ZSETUP_BIN" run -- apk --cache-dir "$transaction_dir/pm-cache" "$@" ;;
+        opkg) set -- opkg --cache "$transaction_dir/pm-cache" --tmp-dir "$transaction_dir/pm-tmp" --lists-dir "$transaction_dir/pm-lists" "$@" ;;
+        apk) set -- apk --cache-dir "$transaction_dir/pm-cache" "$@" ;;
         *) return 2 ;;
     esac
+    if [ -n "$ip_query_output" ]; then
+        installer_exec_native "$ZSETUP_BIN" capture -o "$ip_query_output" --max-bytes 4096 --min-free-bytes "$INSTALLER_RESERVE" --timeout 5s -- "$@"
+    else
+        installer_exec_native "$ZSETUP_BIN" run -- "$@"
+    fi
 }
 
 installer_package_immutable() {

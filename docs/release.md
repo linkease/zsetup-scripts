@@ -88,3 +88,15 @@ FastPVE：fastpve/version.txt 提供 VERSION 与 FASTPVE_SHA256；同目录提�
 当前工具只生成本地候选，不上传公网、不更改服务。原 zsetup upload-fw-koolcenter.sh 只接受旧 S6 FastNet 布局，不能直接上传本多业务包。实际部署需要具体服务器、网站路径、上传方式、站点回源关系及 canary 设备。
 
 维护者构建依赖仍为 Python 3.11+、Git、POSIX shell 和权威 native release 检查器所要求的现有 binutils/UPX 等工具，不增加设备安装依赖。
+
+
+## Storage candidate0.1.8
+
+Requires native Rust0.5.0; use new immutable script paths, matching SHA256/size
+and min_version0.5.0. Canonical platform measurements feed package-release.py
+--platform-id windows-i686, then package-platform-release.py, then this repo's
+package-release.py. Do not combine an independently rebuilt Win32 file with the
+canonical platform manifest: identical size/version does not imply identical SHA.
+M0–M7 local source/candidate checks are not M8 production authorization. Windows/macOS
+native new-candidate gates, business server metadata and device canaries remain
+explicit blockers recorded in the package. No business payloads are bundled.

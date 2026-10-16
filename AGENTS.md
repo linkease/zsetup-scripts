@@ -38,3 +38,18 @@
 - Native release readiness and actual business installation remain separate
   from script/package fixtures. Read the owning unified 0.4.0 evidence before
   public activation; current shared-runtime blocker must not be dropped silently.
+
+
+## Storage source candidate (2026-10-16)
+
+- scripts0.1.8 requires canonical Rust zsetup >=0.5.0 (storage, bounded
+  download/capture and coordinator-aware cancellation). Old0.4.0 cannot run
+  these scripts. Preserve old immutable paths; do not publish until separately
+  authorized and native/server/device gates are satisfied.
+- New Linux raw services target systemd; SysV legacy is frozen/unported.
+  Linux user preparation/sudo -n commit and explicit root flows share generated
+  sources. Never redownload a running installer or weaken root path protection.
+- Core/site facts, policy and receipts: docs/linux-install-storage.md.
+  Regression migration: docs/2026-10-16-regression-coverage.md.
+- Real sudo and systemd tests require the isolated lab container; fixture
+  success is not native business package/procd or production connectivity proof.

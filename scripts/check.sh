@@ -13,6 +13,8 @@ fi
 tunnel_root=$(CDPATH= cd -- "$zroot/.." && pwd)
 python3 -B "$root/tests/module_layout_test.py"
 python3 -B "$root/tests/bootstrap_platform_test.py"
+python3 -B "$root/tests/minimum_native_test.py"
+python3 -B "$root/tests/install_storage_test.py"
 for script in "$root"/fastnet/*.sh "$root"/ddnsto/*.sh "$root"/linkease/*.sh "$root"/fastpve/*.sh "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh; do
     sh -n "$script"
 done
@@ -21,6 +23,9 @@ for script in "$root"/legacy/*.sh; do
         '#!/bin/bash'*) bash -n "$script" ;;
         *) sh -n "$script" ;;
     esac
+done
+for suite in install_bounds_test install_transaction_test launcher_storage_test privilege_bridge_test; do
+    python3 -B "$root/tests/$suite.py" "$native_dir/zsetup-linux-x86_64"
 done
 python3 -B "$root/fastpve/tests/fastpve_test.py" "$native_dir/zsetup-linux-x86_64"
 python3 -B "$root/fastnet/tests/fastnet_bootstrap_test.py" "$native_dir/zsetup-linux-x86_64"

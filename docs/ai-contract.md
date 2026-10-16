@@ -28,3 +28,18 @@ zsetup 默认完整本地配置 `/etc/zsetup/config.json` 优先于云端；无�
 LinkEase 只支持 opkg 的 OpenWrt 及已声明 Linux 的 x86_64/aarch64/armv7，不声明 APK/MIPS。--version 原样通过现有 install 参数协议传入；LINKEASE_VERSION 作为默认，命令行优先。Linux 安装/启动失败会恢复旧文件/服务，恢复失败保留备份并报告；opkg 部分安装结果须由包管理器恢复，不解释成完整事务回滚。详见 [LinkEase 协议](../linkease/README.md)。
 
 FastPVE 使用原 version.txt 的 VERSION/FASTPVE_SHA256 与 FastPVE-<VERSION> 协议；默认前台菜单，AI 不能将启动成功解释成 PVE 业务操作完成。PVE 大版本兼容性仍需设备验证。私有缓存 marker/size 不检测同大小的外部篡改，不允许共享可写工作目录。详见 [FastPVE 协议](../fastpve/README.md)。
+
+
+## Linux storage candidate protocol (scripts-0.1.8 / Rust zsetup0.5.0)
+
+Use `zsetup install APP --foreground -- --installer-prefix /PATH --installer-work-dir /PERSISTENT -- BUSINESS_ARGS`.
+Common options precede business arguments. Default user command is ~/.local/bin/APP;
+DDNSTO/LinkEase root service payloads use protected /opt/linkease/APP. Existing
+foreign commands/units require explicit migration. Do not force-copy into /usr/bin.
+Unattended sudo never prompts: missing credentials or command policy returns2;
+a human can run sudo -v first. Use supplied token/version flags for noninteractive
+business input. Facts and unknowns come from storage JSON; do not infer persistent
+storage from overlay name or from available bytes alone. Low/unknown memory-backed
+storage returns12 without terminal; no automatic disk scan. See linux-install-storage.md
+for measured caps, SHA cache/metadata distinction, cancellation, recovery and native package mapping.
+This source candidate must not be deployed against live0.4.0 or old immutable script paths.

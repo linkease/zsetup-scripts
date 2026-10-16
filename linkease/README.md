@@ -78,3 +78,16 @@ sh scripts/check.sh /path/to/linkease-tunnel/zsetup
 ```
 
 安装入口/配置发布见 [release.md](../docs/release.md)；所有产品提前部署，legacy、business/main、测试不进入发布包。
+
+
+Linux storage candidate scripts0.1.8 requires Rust zsetup0.5.0. Default command
+is ~/.local/bin/linkease; the system-service payload is root-protected under
+/opt/linkease/linkease. Systemd is the new raw service adapter; SysV legacy remains
+unported. Ordinary users prepare on persistent storage then use sudo -n for
+verified root commit (sudo -v beforehand when credentials are missing).
+Explicit root invocation also works. Common --installer-prefix/work-dir/scope
+options precede business arguments; -- ends common parsing. Unknown existing
+installations are migration conflicts. OpenWrt keeps only its proven native
+package mappings and explicit root invocation. See ../docs/linux-install-storage.md
+for disk bounds, two-version cache, metadata/network behavior and recovery.
+This is an unpublished candidate, not a new production pointer.

@@ -43,3 +43,16 @@ python3 -B ddnsto/tests/cross_platform_installer_test.py
 ```
 
 业务发布者从其实际发布字节生成 SHA256SUMS，并先部署 OpenWrt 每个版本目录中的主包、LuCI/语言包和摘要，以及 Linux tar 和摘要，最后更新 VERSION/VERSION_LITE。安装脚本只从服务器读取版本和摘要，再调用 zsetup download 校验产品。完整安装配置仍与 FastNet、native zsetup 一起生成；发布顺序见 [发布文档](../docs/release.md)。
+
+
+Linux storage candidate scripts0.1.8 requires Rust zsetup0.5.0. Default command
+is ~/.local/bin/ddnsto; the system-service payload is root-protected under
+/opt/linkease/ddnsto. Systemd is the new raw service adapter; SysV legacy remains
+unported. Ordinary users prepare on persistent storage then use sudo -n for
+verified root commit (sudo -v beforehand when credentials are missing).
+Explicit root invocation also works. Common --installer-prefix/work-dir/scope
+options precede business arguments; -- ends common parsing. Unknown existing
+installations are migration conflicts. OpenWrt keeps only its proven native
+package mappings and explicit root invocation. See ../docs/linux-install-storage.md
+for disk bounds, two-version cache, metadata/network behavior and recovery.
+This is an unpublished candidate, not a new production pointer.
