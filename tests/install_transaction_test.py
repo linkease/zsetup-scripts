@@ -12,7 +12,9 @@ native = str(Path(sys.argv[1]).resolve())
 with tempfile.TemporaryDirectory(prefix="installer-txn-") as name:
     root = Path(name)
     work = root / "work"
-    code = '. "$1"; shift; INSTALLER_WORK_ROOT=$1; installer_transaction_begin; printf ready; installer_owned_native "$ZSETUP_BIN" capture -o "$transaction_dir/out" --max-bytes 100 -- sh -c "sleep 20 & echo \\$! > \\"\$1\\"; wait" child "$2"'
+    child = root / "slow.sh"
+    child.write_text('#!/bin/sh\nsleep 20 &\necho $! > "$1"\nwait\n')
+    code = '. "$1"; shift; INSTALLER_WORK_ROOT=$1; installer_transaction_begin; printf ready; installer_owned_native "$ZSETUP_BIN" capture -o "$transaction_dir/out" --max-bytes 100 -- sh "$3" "$2"'
     env = {**os.environ, "ZSETUP_BIN": native}
     # Success and failure clean exactly their own files.
     for result in [0, 37]:
@@ -22,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="installer-txn-") as name:
         assert not list(work.iterdir()), list(work.iterdir())
     # Signal cancellation waits for native capture to close/join its full group.
     pidfile = root / "child.pid"
-    process = subprocess.Popen(["sh", "-eu", "-c", code, "test", str(ROOT / "lib/install-transaction.sh"), str(work), str(pidfile)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(["sh", "-eu", "-c", code, "test", str(ROOT / "lib/install-transaction.sh"), str(work), str(pidfile), str(child)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         assert process.stdout.read(5) == b"ready"
         deadline = time.monotonic() + 5
