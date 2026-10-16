@@ -60,6 +60,9 @@ installer_transaction_cleanup() {
     fi
     # Business rollback runs only after all native operations have joined.
     if [ -n "${INSTALLER_CLEANUP_HOOK:-}" ]; then
+        # The original signal exit is retained by transaction_exit. Recovery
+        # itself must be allowed to run joined native operations after cancel.
+        INSTALLER_SIGNAL=0
         "$INSTALLER_CLEANUP_HOOK" || {
             printf 'Installer: recovery incomplete; staging and lease retained at %s\n' "$INSTALLER_WORK_ROOT" >&2
             return 12

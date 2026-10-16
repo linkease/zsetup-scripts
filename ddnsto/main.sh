@@ -10,7 +10,7 @@ main() {
     status 'DDNSTO installer'
     if [ "${ZSETUP_INSTALLER_MODE:-0}" = 1 ]; then
         status '[1/4] zsetup is ready'
-        ddnsto_install "$@"
+        installer_dispatch ddnsto "$@"
     else
         bootstrap_and_run "$@"
     fi

@@ -5,6 +5,7 @@ linkease_usage() {
     printf '%s\n' 'Usage: linkease-install.sh [--version VERSION]' \
         'Linux: default version 1.7.5; installs LinkEase, media, HEIF converter and linkmount.' \
         'OpenWrt opkg: defaults to server VERSION; x86_64/aarch64/armv7 supported.'
+    printf '%s\n' 'Linux systemd: root/sudo -H, system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
 }
 
 linkease_parse_args() {
@@ -23,18 +24,7 @@ linkease_parse_args() {
 }
 
 # All transport, HTTPS/Race/fallback policy and digest verification remain in zsetup.
-linkease_download() {
-    le_relative=$1; le_destination=$2; le_sha=${3:-}; le_fresh=${4:-0}
-    set -- "$ZSETUP_BIN" download -o "$le_destination"
-    [ -z "$le_sha" ] || set -- "$@" --sha256 "$le_sha"
-    [ "$le_fresh" = 0 ] || set -- "$@" --no-cache
-    [ -z "${ZSETUP_CA_FILE:-}" ] || set -- "$@" --ca-file "$ZSETUP_CA_FILE"
-    for le_base in $ZSETUP_SOURCE_BASES; do
-        set -- "$@" "${le_base%/}/LinkEase/$le_relative"
-    done
-    [ -z "${ZSETUP_SOURCE_FALLBACK:-}" ] || set -- "$@" --fallback-url "${ZSETUP_SOURCE_FALLBACK%/}/LinkEase/$le_relative"
-    "$@"
-}
+linkease_download() { installer_download "$@"; }
 
 linkease_verified_download() {
     le_name=$1
@@ -43,13 +33,6 @@ linkease_verified_download() {
     }
     le_file="$cache_dir/$le_name"
     le_marker="$le_file.verified"
-    if [ -s "$le_file" ] && [ -f "$le_marker" ]; then
-        le_size=$(wc -c < "$le_file" | tr -d '[:space:]')
-        if [ "$(cat "$le_marker")" = "$le_digest:$le_size" ]; then
-            status "      Using verified cached $le_name"
-            return 0
-        fi
-    fi
     linkease_download "$relative_folder/$le_name" "$le_file" "$le_digest"
     le_size=$(wc -c < "$le_file" | tr -d '[:space:]')
     printf '%s:%s\n' "$le_digest" "$le_size" > "$transaction_dir/verified"
@@ -107,15 +90,19 @@ linkease_cleanup() {
 linkease_unpack_linux() {
     mkdir -p "$transaction_dir/products/linkmount"
     for le_binary in linkease heif-converter linkease-media; do
-        tar -xOzf "$cache_dir/$archive_name" "linkease-binary-$version_num/$le_binary.$binary_arch" > "$transaction_dir/products/$le_binary"
+        installer_extract_member "$transaction_dir/products/$le_binary" tar -xOzf "$cache_dir/$archive_name" "linkease-binary-$version_num/$le_binary.$binary_arch" || return $?
         [ -s "$transaction_dir/products/$le_binary" ] || { linkease_error "empty or missing $le_binary"; return 11; }
         chmod 0755 "$transaction_dir/products/$le_binary"
     done
     # Info-ZIP -Z1 is required on Linux. Read filenames with shell builtins, without awk/sed.
-    unzip -Z1 "$cache_dir/$mount_name" > "$transaction_dir/zip-members" || {
+    installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/zip-members" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- unzip -Z1 "$cache_dir/$mount_name" || {
         linkease_error 'unzip must support -Z1 member listing'; return 2;
     }
+    : > "$transaction_dir/mount-files"
+    le_member_count=0
     while IFS= read -r le_member || [ -n "$le_member" ]; do
+        le_member_count=$((le_member_count + 1))
+        [ "$le_member_count" -le "$INSTALLER_MAX_FILES" ] || return 11
         case "$le_member" in
             ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+/-]*|/*|../*|*/../*|*/..|./*|*/./*|*/.|*//* )
                 linkease_error 'invalid linkmount archive member'; return 11 ;;
@@ -131,13 +118,21 @@ linkease_unpack_linux() {
                 le_target="$transaction_dir/products/linkmount/$le_output"
                 [ ! -e "$le_target" ] || { linkease_error 'duplicate linkmount archive member'; return 11; }
                 mkdir -p "$(dirname "$le_target")"
-                unzip -p "$cache_dir/$mount_name" "$le_member" > "$le_target"
+                installer_extract_member "$le_target" unzip -p "$cache_dir/$mount_name" "$le_member" || return $?
+                printf '%s\n' "$le_output" >> "$transaction_dir/mount-files"
                 [ -s "$le_target" ] || { linkease_error 'empty linkmount archive file'; return 11; } ;;
         esac
     done < "$transaction_dir/zip-members"
     [ -s "$transaction_dir/products/linkmount/linkmount_bin" ] || { linkease_error 'linkmount_bin missing'; return 11; }
     chmod -R 0755 "$transaction_dir/products/linkmount"
-    "$transaction_dir/products/linkease" showVersion
+    installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/products/linkease" showVersion
+}
+
+linkease_register() {
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+        installer_exec_native "$ZSETUP_BIN" run -- "$INSTALLER_PREFIX/$SERVICE_OLD/bin/linkease" --serviceControl uninstall || return $?
+    fi
+    installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" --serviceControl install
 }
 
 linkease_linux() {
@@ -146,59 +141,28 @@ linkease_linux() {
     done
     case "$arch" in x86_64) binary_arch=x86_64; mount_arch=amd64 ;; aarch64) binary_arch=aarch64; mount_arch=arm64 ;; armv7) binary_arch=arm; mount_arch=arm ;; esac
     version_num=${version_override:-1.7.5}
-    app_dir=${LINKEASE_APP_DIR:-/usr/sbin}
-    case "$app_dir" in /*) ;; *) linkease_error 'installation directory must be absolute'; return 2 ;; esac
-    [ "$app_dir" != / ] || { linkease_error 'installation directory must not be /'; return 2; }
-    if [ ! -w "$app_dir" ] && [ "$(id -u)" != 0 ]; then
-        command -v sudo >/dev/null 2>&1 || { linkease_error 'root or sudo is required'; return 2; }
-        SUDO=sudo
-    fi
-    status "[2/4] Checking LinkEase $version_num ($arch)..."
     relative_folder="LinuxStorage/$version_num"
-    linkease_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1
-    cache_dir="$work_dir/cache/linux/$version_num/$arch"
-    mkdir -p "$cache_dir"
-    archive_name="linkease-binary-$version_num.tar.gz"
-    mount_name="$mount_arch.zip"
-    status '[3/4] Downloading and verifying LinkEase and linkmount...'
-    linkease_verified_download "$archive_name"
-    linkease_verified_download "$mount_name"
-    linkease_unpack_linux
-    status '[4/4] Installing and starting LinkEase...'
-    linkease_privileged mkdir -p "$app_dir"
-    # Serialize replacement in the destination, including callers using different cache directories.
-    le_lock="$app_dir/.linkease-install-lock"
-    linkease_privileged mkdir "$le_lock" || { linkease_error 'another install or unrecovered install lock exists'; return 2; }
-    install_lock=$le_lock
-    candidate_dir="$app_dir/.linkease-candidate.$$"
-    backup_dir="$app_dir/.linkease-backup.$$"
-    linkease_privileged mkdir "$candidate_dir" "$backup_dir"
-    linkease_privileged cp -Rp "$transaction_dir/products/." "$candidate_dir/"
-    for le_existing in linkease heif-converter linkease-media linkmount; do
-        [ ! -L "$app_dir/$le_existing" ] || { linkease_error "refusing to replace symbolic link $le_existing"; return 2; }
-        if [ -e "$app_dir/$le_existing" ]; then
-            linkease_privileged cp -Rp "$app_dir/$le_existing" "$backup_dir/$le_existing"
-        fi
-    done
-    if [ -f "$backup_dir/linkease" ]; then linkease_stop_service; fi
-    replacement_started=1
-    for le_install in linkease heif-converter linkease-media linkmount; do
-        linkease_privileged rm -rf "$app_dir/$le_install"
-        linkease_privileged mv "$candidate_dir/$le_install" "$app_dir/$le_install"
-    done
-    # Match the proven installer: replace the service definition as well as its files.
-    linkease_privileged "$app_dir/linkease" --serviceControl uninstall || true
-    if linkease_privileged "$app_dir/linkease" --serviceControl install; then :; else
-        le_code=$?; linkease_error 'service installation failed'; return "$le_code"
+    status "[2/4] Checking LinkEase $version_num ($arch)..."
+    linkease_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1 || return $?
+    archive_name="linkease-binary-$version_num.tar.gz"; mount_name="$mount_arch.zip"
+    le_archive_sha=$("$ZSETUP_BIN" metadata sha256 "$transaction_dir/sums" "$archive_name") || return 11
+    le_mount_sha=$("$ZSETUP_BIN" metadata sha256 "$transaction_dir/sums" "$mount_name") || return 11
+    installer_service_cached "$version_num" "$le_archive_sha:$le_mount_sha" || return $?
+    if [ "$SERVICE_CACHED" = 0 ]; then
+        status '[3/4] Downloading and verifying LinkEase and linkmount...'
+        cache_dir=$transaction_dir
+        linkease_download "$relative_folder/$archive_name" "$cache_dir/$archive_name" "$le_archive_sha" || return $?
+        linkease_download "$relative_folder/$mount_name" "$cache_dir/$mount_name" "$le_mount_sha" || return $?
+        linkease_unpack_linux || return $?
+        installer_service_stage || return $?
+        for le_binary in linkease heif-converter linkease-media; do installer_service_copy "$le_binary" || return $?; done
+        while IFS= read -r le_output; do installer_service_copy "linkmount/$le_output" || return $?; done < "$transaction_dir/mount-files"
+        installer_service_commit_version || return $?
+    else
+        installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" showVersion || return $?
     fi
-    if linkease_privileged "$app_dir/linkease" --serviceControl start; then :; else
-        le_code=$?
-        le_init=${LINKEASE_SERVICE_PATH:-/etc/init.d/com.linkease.linkeasedaemon.service}
-        if [ -x "$le_init" ] && linkease_privileged "$le_init" start; then :; else
-            linkease_error 'service start failed'; return "$le_code"
-        fi
-    fi
-    replacement_started=0
+    status '[4/4] Installing and checking the LinkEase system service...'
+    installer_service_activate || return $?
     status 'LinkEase installation completed'
 }
 
@@ -238,6 +202,16 @@ linkease_install() {
         ubuntu:apt|debian:apt|centos:yum|centos:dnf|rhel:yum|rhel:dnf|linux:*) business_platform=linux ;;
         *) linkease_error "unsupported platform: $os/$package_manager"; return 2 ;;
     esac
+    INSTALLER_REMOTE_APP=LinkEase
+    if [ "$business_platform" = linux ]; then
+        [ -z "${LINKEASE_APP_DIR:-}" ] || { linkease_error 'LINKEASE_APP_DIR is retired; use --installer-prefix for the protected installation root'; return 2; }
+        installer_service_prepare linkease || return $?
+        linkease_linux || return $?
+        installer_transaction_finish
+        return $?
+    fi
+    [ -z "${installer_prefix:-}${installer_work_dir:-}" ] && [ "${installer_scope:-system}" = system ] || { linkease_error 'OpenWrt storage adapter is pending; do not apply Linux layout options to native packages'; return 2; }
+    installer_policy linkease || return $?
     work_dir=${ZSETUP_WORK_DIR:-$WORK_ROOT/linkease}
     mkdir -p "$work_dir"
     chmod 0700 "$work_dir"

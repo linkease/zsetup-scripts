@@ -20,9 +20,6 @@ installer_dispatch() {
             *) break ;;
         esac
     done
-    case "$il_app" in fastnet|fastpve) ;;
-        *) [ "$il_seen_scope:$il_seen_prefix:$il_seen_work" = 0:0:0 ] || { printf 'Installer storage migration pending for %s\n' "$il_app" >&2; return 2; } ;;
-    esac
     "${il_app}_install" "$@"
 }
 

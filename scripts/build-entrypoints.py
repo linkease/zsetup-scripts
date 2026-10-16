@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     common = (ROOT / "lib/bootstrap.sh").read_text().rstrip() + "\n\n"
-    for helper in ["install-storage.sh", "install-bounds.sh", "install-transaction.sh", "install-launcher.sh"]:
+    for helper in ["install-storage.sh", "install-bounds.sh", "install-transaction.sh", "install-launcher.sh", "install-service.sh"]:
         common += (ROOT / "lib" / helper).read_text().rstrip() + "\n\n"
     catalog = json.loads((ROOT / "catalog.json").read_text())
     for app in sorted({entry["application"] for entry in catalog["installers"]}):

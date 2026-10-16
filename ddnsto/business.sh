@@ -5,6 +5,7 @@ ddnsto_usage() {
     printf '%s\n' 'Usage: ddnsto-install.sh [--token TOKEN] [--force-version lite|standard] [--verify-status]' \
         'OpenWrt: token optional; automatic Lite selection below 900 MB.' \
         'Linux x86_64/aarch64: --token required without an interactive terminal.'
+    printf '%s\n' 'Linux systemd: root/sudo -H, system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
 }
 
 ddnsto_parse_args() {
@@ -26,21 +27,7 @@ ddnsto_parse_args() {
     case "$FORCE_VERSION" in ''|lite|standard) ;; *) ddnsto_error 'version must be lite or standard'; return 2 ;; esac
 }
 
-ddnsto_download() {
-    download_relative=$1
-    download_output=$2
-    download_sha=${3:-}
-    download_fresh=${4:-0}
-    set -- "$ZSETUP_BIN" download -o "$download_output"
-    [ -z "$download_sha" ] || set -- "$@" --sha256 "$download_sha"
-    [ "$download_fresh" = 0 ] || set -- "$@" --no-cache
-    [ -z "${ZSETUP_CA_FILE:-}" ] || set -- "$@" --ca-file "$ZSETUP_CA_FILE"
-    for download_base in $ZSETUP_SOURCE_BASES; do
-        set -- "$@" "${download_base%/}/ddnsto/$download_relative"
-    done
-    [ -z "${ZSETUP_SOURCE_FALLBACK:-}" ] || set -- "$@" --fallback-url "${ZSETUP_SOURCE_FALLBACK%/}/ddnsto/$download_relative"
-    "$@"
-}
+ddnsto_download() { installer_download "$@"; }
 
 # Markers are written only after zsetup has verified and committed an artifact.
 ddnsto_verified_download() {
@@ -48,13 +35,6 @@ ddnsto_verified_download() {
     verified_output=$2
     verified_sha=$3
     verified_marker="$verified_output.verified"
-    if [ -s "$verified_output" ] && [ -f "$verified_marker" ]; then
-        verified_size=$(wc -c < "$verified_output" | tr -d '[:space:]')
-        if [ "$(cat "$verified_marker")" = "$verified_sha:$verified_size" ]; then
-            status "      Using verified cached ${verified_output##*/}"
-            return 0
-        fi
-    fi
     ddnsto_download "$verified_relative" "$verified_output" "$verified_sha"
     verified_size=$(wc -c < "$verified_output" | tr -d '[:space:]')
     printf '%s:%s\n' "$verified_sha" "$verified_size" > "$transaction_dir/verified"
@@ -95,6 +75,18 @@ ddnsto_cleanup() {
 
 ddnsto_privileged() {
     if [ -n "${SUDO:-}" ]; then "$SUDO" "$@"; else "$@"; fi
+}
+
+ddnsto_register() {
+    # DDNSTO reports OK but keeps an existing unit's executable path. Only
+    # remove the already-proven managed definition, with rollback owned by
+    # installer_service_cleanup; never uninstall a foreign service.
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+        installer_service_manager disable || return $?
+        rm -f "$SERVICE_UNIT" || return 12
+        installer_service_manager reload || return $?
+    fi
+    installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -u "$TOKEN" -daemon
 }
 
 ddnsto_openwrt() {
@@ -195,46 +187,23 @@ ddnsto_linux() {
     archive_name="ddnsto-standard-$version_num.tar.gz"
     ddnsto_download linux-binary/SHA256SUMS "$transaction_dir/sums" '' 1
     digest=$(ddnsto_checksum "$transaction_dir/sums" "$archive_name")
-    mkdir -p "$work_dir/cache/linux-binary"
-    archive_path="$work_dir/cache/linux-binary/$archive_name"
-    status '[3/4] Downloading DDNSTO (verified cached artifacts are reused)...'
-    ddnsto_verified_download "linux-binary/$archive_name" "$archive_path" "$digest"
-    member="ddnsto-standard-$version_num/ddnsto.$arch"
-    tar -xzf "$archive_path" -C "$transaction_dir" "$member"
-    extracted="$transaction_dir/$member"
-    [ -f "$extracted" ] && [ ! -L "$extracted" ] || { ddnsto_error 'archive binary is missing or is a symlink'; return 11; }
-    chmod 0755 "$extracted"
-    "$extracted" -v
-    bin_path=${DDNSTO_BIN_PATH:-/usr/local/bin/ddnsto}
-    bin_dir=$(dirname "$bin_path")
-    SUDO=
-    if [ ! -w "$bin_dir" ] && [ "$(id -u)" != 0 ]; then
-        command -v sudo >/dev/null 2>&1 || { ddnsto_error 'root or sudo is required'; return 2; }
-        SUDO=sudo
-    fi
-    status '[4/4] Installing and starting DDNSTO...'
-    ddnsto_privileged mkdir -p "$bin_dir"
-    install_candidate="$bin_dir/.ddnsto-candidate.$$"
-    backup="$bin_dir/.ddnsto-backup.$$"
-    ddnsto_privileged cp "$extracted" "$install_candidate"
-    ddnsto_privileged chmod 0755 "$install_candidate"
-    had_old=0
-    if [ -f "$bin_path" ]; then
-        ddnsto_privileged cp -p "$bin_path" "$backup"
-        had_old=1
-        ddnsto_privileged "$bin_path" stop
-    fi
-    replacement_started=1
-    ddnsto_privileged mv -f "$install_candidate" "$bin_path"
-    install_candidate=
-    if ddnsto_privileged "$bin_path" -u "$TOKEN" -daemon; then
-        replacement_started=0
-        ddnsto_privileged rm -f "$backup"
+    installer_service_cached "$version_num" "$digest" || return $?
+    if [ "$SERVICE_CACHED" = 0 ]; then
+        archive_path="$transaction_dir/product.tar.gz"
+        status '[3/4] Downloading DDNSTO with bounded staging...'
+        ddnsto_download "linux-binary/$archive_name" "$archive_path" "$digest" || return $?
+        mkdir -p "$transaction_dir/products"
+        installer_extract_member "$transaction_dir/products/ddnsto" tar -xOzf "$archive_path" "ddnsto-standard-$version_num/ddnsto.$arch" || return $?
+        chmod 0755 "$transaction_dir/products/ddnsto"
+        installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/products/ddnsto" -v || return $?
+        installer_service_stage || return $?
+        installer_service_copy ddnsto || return $?
+        installer_service_commit_version || return $?
     else
-        start_code=$?
-        ddnsto_error 'start failed; restoring previous binary'
-        return "$start_code"
+        installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -v || return $?
     fi
+    status '[4/4] Installing and checking the DDNSTO system service...'
+    installer_service_activate || return $?
     status 'DDNSTO installation completed'
 }
 
@@ -249,6 +218,16 @@ ddnsto_install() {
         ubuntu:apt|debian:apt|centos:yum|centos:dnf|rhel:yum|rhel:dnf|linux:*) business_platform=linux ;;
         *) ddnsto_error "unsupported platform: $os/$package_manager"; return 2 ;;
     esac
+    INSTALLER_REMOTE_APP=ddnsto
+    if [ "$business_platform" = linux ]; then
+        [ -z "${DDNSTO_BIN_PATH:-}" ] || { ddnsto_error 'DDNSTO_BIN_PATH is retired; use --installer-prefix for the protected installation root'; return 2; }
+        installer_service_prepare ddnsto || return $?
+        ddnsto_linux || return $?
+        installer_transaction_finish
+        return $?
+    fi
+    [ -z "${installer_prefix:-}${installer_work_dir:-}" ] && [ "${installer_scope:-system}" = system ] || { ddnsto_error 'OpenWrt storage adapter is pending; do not apply Linux layout options to native packages'; return 2; }
+    installer_policy ddnsto || return $?
     work_dir=${ZSETUP_WORK_DIR:-${WORK_ROOT}/ddnsto}
     mkdir -p "$work_dir"
     chmod 0700 "$work_dir"

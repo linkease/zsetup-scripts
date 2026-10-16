@@ -20,6 +20,9 @@ def main():
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--application", choices=["ddnsto", "linkease"])
     parser.add_argument("--scope", choices=["system", "user"], default="system")
+    parser.add_argument("--init-system", choices=["systemd", "sysv"], default="systemd")
+    parser.add_argument("--repeat-register", action="store_true")
+    parser.add_argument("--replace-before-repeat", action="store_true")
     args = parser.parse_args()
     native = str(args.zsetup.resolve())
     previous = json.loads(args.report.read_text())["probes"] if args.report.exists() else []
@@ -44,9 +47,26 @@ def main():
                 (jail / folder).mkdir(parents=True, exist_ok=True)
             (jail / "etc/os-release").write_text('ID=ubuntu\nVERSION_ID="22.04"\n')
             (jail / "etc/passwd").write_text("root:x:0:0::/root:/bin/sh\nuser:x:1000:1000::/home/user:/bin/sh\n")
+            if args.init_system == "sysv":
+                (jail / "run/systemd/system").rmdir()
             (jail / "sandbox-bin/systemctl").write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> /actions\ncase "$1" in --version) echo "systemd 249" ;; status) exit 3 ;; is-enabled) exit 1 ;; esac\nexit 0\n')
             (jail / "sandbox-bin/systemctl").chmod(0o755)
             (jail / "probe.sh").write_text('#!/bin/sh\nid -u > /effective-uid\n"$@"\nprobe_code=$?\nprintf "%s\\n" "$probe_code" > /program-exit\nexit 0\n')
+            if args.repeat_register:
+                (jail / "probe.sh").write_text('''#!/bin/sh
+id -u > /effective-uid
+original=$1; shift
+"$original" "$@"
+cp "$original" "$original.next"
+"$original.next" "$@"
+probe_code=$?
+printf '%s\\n' "$probe_code" > /program-exit
+exit 0
+''')
+                if args.replace_before_repeat:
+                    probe = jail / "probe.sh"
+                    text = probe.read_text().replace('cp "$original" "$original.next"', f'rm -f /etc/systemd/system/com.linkease.{"ddnstoshell" if app == "ddnsto" else "linkeasedaemon"}.service\ncp "$original" "$original.next"')
+                    probe.write_text(text)
             # Linux refuses CLONE_NEWUSER after chroot. Map UID1000 before
             # chroot, using the new namespace's capabilities before exec drops
             # them. Privileged paths are separately read-only in this probe.
@@ -98,14 +118,23 @@ probe_code=$?
 exit "$probe_code"
 ''')
             output = work / f"{app}.output"
-            cmd = [native, "capture", "-o", str(output), "--max-bytes", "16384", "--timeout", "5s", "--", "unshare", "-Urnmpf", "sh", str(setup), str(jail), args.scope, "/" + str(program.relative_to(jail)), *invocation]
+            cmd = [native, "capture", "-o", str(output), "--max-bytes", "16384", "--timeout", "10s" if args.repeat_register else "5s", "--", "unshare", "-Urnmpf", "sh", str(setup), str(jail), args.scope, "/" + str(program.relative_to(jail)), *invocation]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             units = {}
             for folder in [jail / "etc/systemd/system", jail / "etc/init.d"]:
                 for unit in folder.iterdir():
                     if unit.is_file() and unit.stat().st_size <= 16384:
                         units[str(unit.relative_to(jail))] = unit.read_text(errors="replace")
+            configuration = {}
+            for folder in [jail / "etc", jail / "root"]:
+                for entry in folder.rglob("*"):
+                    if entry.is_file() and not entry.is_symlink() and entry.stat().st_size <= 16384:
+                        configuration[str(entry.relative_to(jail))] = entry.read_text(errors="replace")
             rows.append({"application": app, "version": version, "scope": args.scope, "effective_uid": int((jail / "effective-uid").read_text()) if (jail / "effective-uid").exists() else None, "probe_exit": result.returncode, "program_exit": int((jail / "program-exit").read_text()) if (jail / "program-exit").exists() else None, "stdout": output.read_text(errors="replace") if output.exists() else "", "stderr": result.stderr[:16384], "generated_units": units, "service_actions": (jail / "actions").read_text() if (jail / "actions").exists() else "", "real_systemctl": False, "network": "isolated", "host_services_modified": False})
+            rows[-1]["configuration_files"] = configuration
+            rows[-1]["init_system"] = args.init_system
+            rows[-1]["repeat_register"] = args.repeat_register
+            rows[-1]["replace_before_repeat"] = args.replace_before_repeat
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(json.dumps({"schema_version":1,"probes":rows}, ensure_ascii=False, indent=2) + "\n")
     print(args.report)

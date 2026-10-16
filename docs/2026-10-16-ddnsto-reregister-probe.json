@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "probes": [
+    {
+      "application": "ddnsto",
+      "version": "4.2.3",
+      "scope": "system",
+      "effective_uid": 0,
+      "probe_exit": 0,
+      "program_exit": 0,
+      "stdout": "",
+      "stderr": "2026/10/16 06:48:04 routerId: 020000000010 RouterIdx: 0 host: tunnel.kooldns.cn:4445 supplier: \n2026/10/16 06:48:06 Run in daemon result: OK\n2026/10/16 06:48:06 routerId: 020000000010 RouterIdx: 0 host: tunnel.kooldns.cn:4445 supplier: \n2026/10/16 06:48:08 Run in daemon result: OK\n",
+      "generated_units": {
+        "etc/systemd/system/com.linkease.ddnstoshell.service": "[Unit]\nDescription=DdnstoShell Service\nConditionFileIsExecutable=/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto\n\n\n[Service]\nStartLimitInterval=5\nStartLimitBurst=10\nExecStart=/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto \"run\"\n\n\n\n\n\n\nLimitNOFILE=1048576\nRestart=always\n\nRestartSec=120\nEnvironmentFile=-/etc/sysconfig/com.linkease.ddnstoshell\n\n[Install]\nWantedBy=multi-user.target\n"
+      },
+      "service_actions": "is-active com.linkease.ddnstoshell.service\n--version\nenable com.linkease.ddnstoshell.service\ndaemon-reload\nstart com.linkease.ddnstoshell.service\nis-active com.linkease.ddnstoshell.service\nstart com.linkease.ddnstoshell.service\n",
+      "real_systemctl": false,
+      "network": "isolated",
+      "host_services_modified": false,
+      "configuration_files": {
+        "etc/passwd": "root:x:0:0::/root:/bin/sh\nuser:x:1000:1000::/home/user:/bin/sh\n",
+        "etc/os-release": "ID=ubuntu\nVERSION_ID=\"22.04\"\n",
+        "etc/ddnsto/ddnsto-config.json": "{\"token\":\"storage-probe-invalid-token\",\"routeridx\":0,\"supplierCode\":\"\"}",
+        "etc/systemd/system/com.linkease.ddnstoshell.service": "[Unit]\nDescription=DdnstoShell Service\nConditionFileIsExecutable=/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto\n\n\n[Service]\nStartLimitInterval=5\nStartLimitBurst=10\nExecStart=/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto \"run\"\n\n\n\n\n\n\nLimitNOFILE=1048576\nRestart=always\n\nRestartSec=120\nEnvironmentFile=-/etc/sysconfig/com.linkease.ddnstoshell\n\n[Install]\nWantedBy=multi-user.target\n"
+      },
+      "init_system": "systemd",
+      "repeat_register": true
+    }
+  ]
+}

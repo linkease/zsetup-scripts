@@ -503,6 +503,9 @@ installer_transaction_cleanup() {
     fi
     # Business rollback runs only after all native operations have joined.
     if [ -n "${INSTALLER_CLEANUP_HOOK:-}" ]; then
+        # The original signal exit is retained by transaction_exit. Recovery
+        # itself must be allowed to run joined native operations after cancel.
+        INSTALLER_SIGNAL=0
         "$INSTALLER_CLEANUP_HOOK" || {
             printf 'Installer: recovery incomplete; staging and lease retained at %s\n' "$INSTALLER_WORK_ROOT" >&2
             return 12
@@ -562,9 +565,6 @@ installer_dispatch() {
             *) break ;;
         esac
     done
-    case "$il_app" in fastnet|fastpve) ;;
-        *) [ "$il_seen_scope:$il_seen_prefix:$il_seen_work" = 0:0:0 ] || { printf 'Installer storage migration pending for %s\n' "$il_app" >&2; return 2; } ;;
-    esac
     "${il_app}_install" "$@"
 }
 
@@ -706,6 +706,399 @@ installer_launcher_activate() {
     il_new_version=0
 }
 
+# Linux system-service adapter. Business programs own registration/configuration;
+# this coordinator owns protected payloads, activation, health and rollback.
+# No automatic sudo child is spawned: privileged invocations must already have
+# a root owner, so cancellation can join every install operation as the same UID.
+installer_require_root() {
+    if [ "$("$ZSETUP_BIN" storage / get effective_uid)" != 0 ]; then
+        printf '%s\n' 'Installer: this operation installs a system service and requires root.' \
+            'Run the downloaded installer explicitly with sudo (or from a root shell); unattended installation never requests a password.' >&2
+        return 2
+    fi
+}
+
+installer_service_prepare() {
+    SERVICE_APP=$1
+    installer_layout "$1" system || return $?
+    [ "$INSTALLER_SCOPE" = system ] || { printf 'Installer: %s requires system scope; user services are not supported.\n' "$1" >&2; return 2; }
+    installer_require_root || return $?
+    installer_policy "$1" || return $?
+    installer_preflight "$1" system "$INSTALLER_REQUIRED_BYTES" 1 || return $?
+    for service_protected_path in "$INSTALLER_PREFIX" "$INSTALLER_WORK_ROOT"; do
+        [ "$("$ZSETUP_BIN" storage "$service_protected_path" get system_protected)" = true ] || {
+            printf 'Installer: system payload/staging ancestors must be root-owned, without symlinks or group/other write access: %s\n' "$service_protected_path" >&2; return 12;
+        }
+    done
+    case "$1" in
+        ddnsto) SERVICE_NAME=com.linkease.ddnstoshell.service; SERVICE_CONFIG=/etc/ddnsto/ddnsto-config.json ;;
+        linkease) SERVICE_NAME=com.linkease.linkeasedaemon.service; SERVICE_CONFIG= ;;
+        *) return 2 ;;
+    esac
+    SERVICE_UNIT="/etc/systemd/system/$SERVICE_NAME"
+    SERVICE_BACKEND=systemd
+    if [ ! -d /run/systemd/system ] || ! command -v systemctl >/dev/null 2>&1; then
+        printf '%s\n' 'Installer: migration of non-systemd service supervision is pending; retain the legacy installer for this system.' >&2
+        return 2
+    fi
+    [ "$("$ZSETUP_BIN" storage "$SERVICE_UNIT" get system_protected)" = true ] || return 12
+    if [ -n "$SERVICE_CONFIG" ]; then
+        [ "$("$ZSETUP_BIN" storage "$SERVICE_CONFIG" get system_protected)" = true ] || return 12
+    fi
+    SERVICE_OLD=
+    SERVICE_CHANGED=0; SERVICE_NEW_VERSION=0; SERVICE_CANDIDATE=; SERVICE_GOOD=0
+    SERVICE_HAD_UNIT=0; SERVICE_WAS_ACTIVE=0; SERVICE_WAS_ENABLED=0; SERVICE_HAD_CONFIG=0; SERVICE_CONFIG_TOUCHED=0
+    SERVICE_DEST_LOCK_HELD=0
+    SERVICE_COMMAND="${HOME:?HOME is required}/.local/bin/$SERVICE_APP"
+    SERVICE_ALIAS_USER=
+    case "${SUDO_UID:-0}" in ''|*[!0-9]*) return 2 ;; esac
+    if [ "${SUDO_UID:-0}" != 0 ]; then
+        command -v getent >/dev/null 2>&1 && command -v runuser >/dev/null 2>&1 || {
+            printf '%s\n' 'Installer: getent and runuser are required to create the sudo caller command without root writes into its HOME.' >&2; return 2;
+        }
+        SERVICE_ALIAS_USER=pending
+    elif [ "$("$ZSETUP_BIN" storage "${SERVICE_COMMAND%/*}" get system_protected)" != true ]; then
+        printf '%s\n' 'Installer: invoke sudo with its root HOME; do not preserve a user-writable HOME for root writes.' >&2; return 2;
+    fi
+    # Unknown old files or service definitions are migration conflicts, never
+    # an invitation to stop another installer or replace package-owned files.
+    if [ -e "$INSTALLER_PREFIX/.managed" ] || [ -L "$INSTALLER_PREFIX/.managed" ]; then
+        [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX/.managed" get system_protected)" = true ] || return 12
+        installer_file_size "$INSTALLER_PREFIX/.managed" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 65 ] || return 2
+        IFS= read -r service_owner < "$INSTALLER_PREFIX/.managed" || return 2
+        [ "$service_owner" = "$SERVICE_APP" ] || return 2
+        [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX" get system_protected)" = true ] || return 12
+    else
+        for service_entry in "$INSTALLER_PREFIX"/* "$INSTALLER_PREFIX"/.[!.]* "$INSTALLER_PREFIX"/..?*; do
+            [ ! -e "$service_entry" ] && [ ! -L "$service_entry" ] || { printf 'Installer: unowned installation at %s\n' "$INSTALLER_PREFIX" >&2; return 2; }
+        done
+        for service_legacy in "/usr/bin/$1" "/usr/local/bin/$1" "/usr/sbin/$1" "$SERVICE_UNIT" "/etc/init.d/$SERVICE_NAME" "/etc/init.d/${SERVICE_NAME%.service}"; do
+            [ ! -e "$service_legacy" ] && [ ! -L "$service_legacy" ] || { printf 'Installer: existing installation requires explicit migration: %s\n' "$service_legacy" >&2; return 2; }
+        done
+    fi
+    for service_path in "$INSTALLER_PREFIX/versions" "$INSTALLER_PREFIX/.managed"; do [ ! -L "$service_path" ] || return 2; done
+    installer_service_read_current || return $?
+    umask 022
+    mkdir -p "$INSTALLER_PREFIX" "$INSTALLER_PREFIX/versions" || return 12
+    [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX/versions" get system_protected)" = true ] || return 12
+    if [ ! -e "$INSTALLER_PREFIX/.managed" ]; then
+        (set -C; printf '%s\n' "$SERVICE_APP" > "$INSTALLER_PREFIX/.managed") || return 2
+    fi
+    installer_transaction_begin || return $?
+    INSTALLER_CLEANUP_HOOK=installer_service_cleanup
+    if ! mkdir "$INSTALLER_PREFIX/.service-lock" 2>/dev/null; then
+        printf 'Installer: active or interrupted destination transaction at %s/.service-lock\n' "$INSTALLER_PREFIX" >&2; return 2
+    fi
+    SERVICE_DEST_LOCK_HELD=1
+    printf '%s\n' "$$" > "$INSTALLER_PREFIX/.service-lock/owner"
+    # The preliminary check is read-only. Another coordinator may have
+    # committed between it and our lock acquisition; snapshot only now.
+    installer_service_read_current || return $?
+    if [ "$SERVICE_ALIAS_USER" = pending ]; then
+        installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/passwd" --max-bytes 4096 --timeout 5s -- getent passwd "$SUDO_UID" || return 2
+        IFS=: read -r service_user service_pass service_uid service_gid service_gecos service_home service_shell < "$transaction_dir/passwd" || return 2
+        [ "$service_uid" = "$SUDO_UID" ] && [ "$service_uid" != 0 ] && [ -n "$service_user" ] || return 2
+        installer_valid_directory "$service_home" || return 2
+        SERVICE_ALIAS_USER=$service_user
+        SERVICE_COMMAND="$service_home/.local/bin/$SERVICE_APP"
+    fi
+    installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/fragment" --max-bytes 4096 --timeout 5s -- systemctl show --property=FragmentPath --value "$SERVICE_NAME" || return $?
+    service_fragment=
+    IFS= read -r service_fragment < "$transaction_dir/fragment" || service_fragment=
+    [ -z "$service_fragment" ] || { [ "$service_fragment" = "$SERVICE_UNIT" ] && [ "$SERVICE_HAD_UNIT" = 1 ]; } || {
+        printf 'Installer: existing service belongs to another installation: %s\n' "$service_fragment" >&2; return 2;
+    }
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+        cp -p "$SERVICE_UNIT" "$transaction_dir/old-unit" || return 12
+        if installer_service_manager is-active; then SERVICE_WAS_ACTIVE=1; fi
+        if installer_service_manager is-enabled; then SERVICE_WAS_ENABLED=1; fi
+    fi
+    if [ -n "$SERVICE_CONFIG" ] && [ -e "$SERVICE_CONFIG" ]; then
+        [ "$("$ZSETUP_BIN" storage "$SERVICE_CONFIG" get system_protected)" = true ] || return 12
+        installer_file_size "$SERVICE_CONFIG" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+        cp -p "$SERVICE_CONFIG" "$transaction_dir/old-config" || return 12
+        SERVICE_HAD_CONFIG=1
+    fi
+    # This alias belongs to the invoking account. Privilege boundaries never
+    # follow arbitrary HOME links to write a root-owned system file.
+    if [ -z "$SERVICE_ALIAS_USER" ] && { [ -e "$SERVICE_COMMAND" ] || [ -L "$SERVICE_COMMAND" ]; }; then
+        [ -L "$SERVICE_COMMAND" ] && [ "$(readlink "$SERVICE_COMMAND")" = "$INSTALLER_PREFIX/current/bin/$SERVICE_APP" ] || return 2
+    fi
+}
+
+installer_service_read_current() {
+    SERVICE_OLD=; SERVICE_HAD_UNIT=0
+    if [ -L "$INSTALLER_PREFIX/current" ]; then
+        SERVICE_OLD=$(readlink "$INSTALLER_PREFIX/current") || return 2
+        case "$SERVICE_OLD" in versions/*) ;; *) return 2 ;; esac
+        service_old_version=${SERVICE_OLD#versions/}
+        installer_service_version "$service_old_version" || return 2
+        [ -x "$INSTALLER_PREFIX/$SERVICE_OLD/bin/$SERVICE_APP" ] || return 2
+        [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX/$SERVICE_OLD/bin/$SERVICE_APP" get system_protected)" = true ] || return 12
+    elif [ -e "$INSTALLER_PREFIX/current" ]; then return 2
+    fi
+    if [ -e "$SERVICE_UNIT" ] || [ -L "$SERVICE_UNIT" ]; then
+        [ -n "$SERVICE_OLD" ] || return 2
+        installer_service_definition "$INSTALLER_PREFIX/$SERVICE_OLD/bin/$SERVICE_APP" || return 2
+        SERVICE_HAD_UNIT=1
+    fi
+}
+
+installer_service_alias() {
+    # All user-controlled path traversal happens after dropping privilege.
+    # Values are argv data, never interpolated into the fixed shell program.
+    set -- /bin/sh -c 'set -eu
+umask 077
+directory=$1; application=$2; target=$3
+command_path="$directory/$application"
+if [ -e "$command_path" ] || [ -L "$command_path" ]; then
+    [ -L "$command_path" ] && [ "$(readlink "$command_path")" = "$target" ] || exit 2
+fi
+mkdir -p "$directory"
+candidate="$directory/.$application.$$"
+trap '\''rm -f "$candidate"'\'' EXIT
+ln -s "$target" "$candidate"
+mv -f "$candidate" "$command_path"
+' installer-alias "${SERVICE_COMMAND%/*}" "$SERVICE_APP" "$INSTALLER_PREFIX/current/bin/$SERVICE_APP"
+    if [ -n "$SERVICE_ALIAS_USER" ]; then
+        installer_exec_native "$ZSETUP_BIN" run -- runuser -u "$SERVICE_ALIAS_USER" -- "$@"
+    else
+        installer_exec_native "$ZSETUP_BIN" run -- "$@"
+    fi
+}
+
+installer_service_version() {
+    case "$1" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*|.*|-*|+*|_*) return 2 ;; esac
+    [ "${#1}" -le 64 ]
+}
+
+installer_service_manager() {
+    service_action=$1
+    if [ "$SERVICE_BACKEND" = systemd ]; then
+        case "$service_action" in
+            is-active|is-enabled) installer_exec_native "$ZSETUP_BIN" run -- systemctl "$service_action" --quiet "$SERVICE_NAME" ;;
+            reload) installer_exec_native "$ZSETUP_BIN" run -- systemctl daemon-reload ;;
+            *) installer_exec_native "$ZSETUP_BIN" run -- systemctl "$service_action" "$SERVICE_NAME" ;;
+        esac
+    else
+        case "$service_action" in
+            reload|enable|disable) return 0 ;;
+            is-active) service_action=status ;;
+        esac
+        installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_UNIT" "$service_action"
+    fi
+}
+
+# Bounded files produced by the trusted native product only. Never source/eval
+# a unit or execute configuration contents in the installer.
+installer_service_definition() {
+    installer_file_size "$SERVICE_UNIT" || return 2
+    [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+    [ "$("$ZSETUP_BIN" storage "$SERVICE_UNIT" get system_protected)" = true ] || return 12
+    service_expected=$1
+    installer_service_escape_exec "$service_expected"
+    service_expected_escaped=$service_escaped
+    installer_service_escape_exec "${service_expected%/*}/.service-run"
+    service_expected_wrapper=$service_escaped
+    service_found=0
+    while IFS= read -r service_line || [ -n "$service_line" ]; do
+        case "$SERVICE_BACKEND:$service_line" in
+            "systemd:ExecStart=$service_expected \"run\""|"systemd:ExecStart=\"$service_expected_escaped\" \"run\"") service_found=$((service_found + 1)) ;;
+            "systemd:ExecStart=/bin/sh \"$service_expected_wrapper\"") service_found=$((service_found + 1)) ;;
+            sysv:*"$service_expected"*) service_found=$((service_found + 1)) ;;
+        esac
+    done < "$SERVICE_UNIT"
+    [ "$service_found" = 1 ]
+}
+
+# POSIX literal replacement, bounded by the normalized path limit. systemd
+# command parsing is not shell parsing: escape quotes/backslashes/specifiers
+# and literal dollar signs independently (systemd.service Command Lines).
+installer_service_replace() {
+    service_replaced=
+    service_rest=$1; service_needle=$2; service_replacement=$3
+    while :; do
+        case "$service_rest" in
+            *"$service_needle"*) service_replaced="$service_replaced${service_rest%%"$service_needle"*}$service_replacement"; service_rest=${service_rest#*"$service_needle"} ;;
+            *) service_replaced="$service_replaced$service_rest"; break ;;
+        esac
+    done
+}
+
+installer_service_escape_exec() {
+    service_escaped=$1
+    installer_service_replace "$service_escaped" '\' '\\'; service_escaped=$service_replaced
+    installer_service_replace "$service_escaped" '"' '\"'; service_escaped=$service_replaced
+    installer_service_replace "$service_escaped" '%' '%%'; service_escaped=$service_replaced
+    installer_service_replace "$service_escaped" '$' '$$'; service_escaped=$service_replaced
+}
+
+installer_service_quote_unit() {
+    [ "$SERVICE_BACKEND" = systemd ] || return 0
+    installer_service_escape_exec "${SERVICE_EXEC%/*}/.service-run"
+    service_escaped_exec=$service_escaped
+    # Conditions consume a raw path with unit specifier expansion, rather than
+    # command-line unquoting; only '%' needs doubling here.
+    installer_service_replace "$SERVICE_EXEC" '%' '%%'
+    service_condition=$service_replaced
+    service_exec_count=0
+    while IFS= read -r service_line || [ -n "$service_line" ]; do
+        case "$service_line" in
+            ExecStart=*) printf 'ExecStart=/bin/sh "%s"\n' "$service_escaped_exec"; service_exec_count=$((service_exec_count + 1)) ;;
+            ConditionFileIsExecutable=*) printf 'ConditionFileIsExecutable=%s\n' "$service_condition" ;;
+            *) printf '%s\n' "$service_line" ;;
+        esac
+    done < "$SERVICE_UNIT" > "$transaction_dir/new-unit"
+    [ "$service_exec_count" = 1 ] || return 11
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_UNIT" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/new-unit"
+}
+
+installer_service_cached() {
+    SERVICE_VERSION=$1; SERVICE_DIGEST=$2
+    installer_service_version "$SERVICE_VERSION" || return 2
+    SERVICE_VERSION_DIR="$INSTALLER_PREFIX/versions/$SERVICE_VERSION"
+    SERVICE_EXEC="$SERVICE_VERSION_DIR/bin/$SERVICE_APP"
+    SERVICE_CACHED=0
+    [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
+    if [ -e "$SERVICE_VERSION_DIR" ]; then
+        installer_file_size "$SERVICE_VERSION_DIR/.artifact-sha256" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 160 ] || return 2
+        IFS= read -r service_digest < "$SERVICE_VERSION_DIR/.artifact-sha256" || return 2
+        [ "$service_digest" = "$SERVICE_DIGEST" ] || { printf 'Installer: immutable version has a different digest.\n' >&2; return 11; }
+        [ -x "$SERVICE_EXEC" ] && [ ! -L "$SERVICE_EXEC" ] || return 11
+        [ -x "$SERVICE_VERSION_DIR/bin/.service-run" ] && [ ! -L "$SERVICE_VERSION_DIR/bin/.service-run" ] || return 11
+        for service_cached_file in "$SERVICE_EXEC" "$SERVICE_VERSION_DIR/.artifact-sha256"; do
+            [ "$("$ZSETUP_BIN" storage "$service_cached_file" get system_protected)" = true ] || return 12
+        done
+        installer_file_size "$SERVICE_VERSION_DIR/.files" || return 11
+        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+        [ "$("$ZSETUP_BIN" storage "$SERVICE_VERSION_DIR/.files" get system_protected)" = true ] || return 12
+        service_cached_count=0; service_cached_bytes=0
+        while IFS= read -r service_cached_relative; do
+            case "$service_cached_relative" in ''|/*|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+/-]*|../*|*/../*|*/..|./*|*/./*|*/.|*//* ) return 11 ;; esac
+            service_cached_file="$SERVICE_VERSION_DIR/bin/$service_cached_relative"
+            installer_file_size "$service_cached_file" || return 11
+            service_cached_bytes=$((service_cached_bytes + INSTALLER_FILE_SIZE))
+            service_cached_count=$((service_cached_count + 1))
+            [ "$service_cached_count" -le "$INSTALLER_MAX_FILES" ] && [ "$service_cached_bytes" -le "$INSTALLER_MAX_EXPANDED" ] || return 11
+            [ "$("$ZSETUP_BIN" storage "$service_cached_file" get system_protected)" = true ] || return 12
+        done < "$SERVICE_VERSION_DIR/.files"
+        [ "$service_cached_count" -gt 0 ] || return 11
+        SERVICE_CACHED=1
+        status '      Using verified cached installed version'
+    fi
+}
+
+installer_service_copy() {
+    service_relative=$1
+    service_destination="$SERVICE_CANDIDATE/bin/$service_relative"
+    mkdir -p "${service_destination%/*}" || return 12
+    chmod 0755 "${service_destination%/*}"
+    installer_exec_native "$ZSETUP_BIN" capture -o "$service_destination" --max-bytes "$INSTALLER_MAX_EXPANDED" --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/products/$service_relative" || return $?
+    chmod 0755 "$service_destination" || return 12
+    printf '%s\n' "$service_relative" >> "$SERVICE_CANDIDATE/.files"
+}
+
+installer_service_stage() {
+    SERVICE_CANDIDATE="$INSTALLER_PREFIX/versions/.candidate.$$"
+    mkdir "$SERVICE_CANDIDATE" || return 12
+    mkdir "$SERVICE_CANDIDATE/bin" || return 12
+    chmod 0755 "$SERVICE_CANDIDATE" "$SERVICE_CANDIDATE/bin"
+    : > "$SERVICE_CANDIDATE/.files"
+    # systemd rejects quotes/backslashes in its executable word even when the
+    # unit is correctly escaped. Its fixed executable is /bin/sh; this private,
+    # root-owned wrapper performs a literal exec without evaluation of paths.
+    installer_service_replace "$SERVICE_EXEC" "'" "'\\''"
+    printf '#!/bin/sh\nexec '\''%s'\'' run\n' "$service_replaced" > "$SERVICE_CANDIDATE/bin/.service-run"
+    chmod 0755 "$SERVICE_CANDIDATE/bin/.service-run"
+    printf '%s\n' .service-run >> "$SERVICE_CANDIDATE/.files"
+}
+
+installer_service_commit_version() {
+    printf '%s\n' "$SERVICE_DIGEST" > "$SERVICE_CANDIDATE/.artifact-sha256"
+    [ ! -e "$SERVICE_VERSION_DIR" ] && [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
+    mv "$SERVICE_CANDIDATE" "$SERVICE_VERSION_DIR" || return 12
+    SERVICE_CANDIDATE=; SERVICE_NEW_VERSION=1
+}
+
+installer_service_activate() {
+    installer_storage_check "$INSTALLER_PREFIX" "$INSTALLER_RESERVE" 1 1 || return $?
+    [ "$("$ZSETUP_BIN" storage "$SERVICE_VERSION_DIR/bin" get system_protected)" = true ] || return 12
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then installer_service_manager stop || return $?; fi
+    SERVICE_CHANGED=1
+    ln -s "versions/$SERVICE_VERSION" "$INSTALLER_PREFIX/.current.$$" || return 12
+    mv -fT "$INSTALLER_PREFIX/.current.$$" "$INSTALLER_PREFIX/current" || return 12
+    SERVICE_CONFIG_TOUCHED=1
+    "${SERVICE_APP}_register" || return $?
+    installer_service_definition "$SERVICE_EXEC" || { printf 'Installer: product returned success without the expected service definition.\n' >&2; return 11; }
+    installer_service_quote_unit || return $?
+    installer_service_manager reload || return $?
+    installer_service_manager enable || return $?
+    installer_service_manager start || return $?
+    installer_service_manager is-active || return $?
+    # Check once more after the immediate start return; an exiting daemon is
+    # not accepted merely because its registration command returned zero.
+    sleep 1
+    installer_service_manager is-active || return $?
+    installer_service_alias || return $?
+    if [ -n "$SERVICE_OLD" ] && [ "$SERVICE_OLD" != "versions/$SERVICE_VERSION" ]; then
+        ln -s "$SERVICE_OLD" "$INSTALLER_PREFIX/.previous.$$" || return 12
+        mv -fT "$INSTALLER_PREFIX/.previous.$$" "$INSTALLER_PREFIX/previous" || return 12
+    fi
+    # Reach the commit point before pruning; current and previous are retained.
+    SERVICE_GOOD=1; SERVICE_CHANGED=0; SERVICE_NEW_VERSION=0
+    service_previous=$(readlink "$INSTALLER_PREFIX/previous" 2>/dev/null || true)
+    for service_version_dir in "$INSTALLER_PREFIX"/versions/*; do
+        [ -d "$service_version_dir" ] && [ ! -L "$service_version_dir" ] || continue
+        service_target="versions/${service_version_dir##*/}"
+        [ "$service_target" != "versions/$SERVICE_VERSION" ] && [ "$service_target" != "$service_previous" ] || continue
+        [ -f "$service_version_dir/.artifact-sha256" ] && [ ! -L "$service_version_dir/.artifact-sha256" ] || continue
+        rm -rf "$service_version_dir" || return 12
+    done
+    status "Installed $SERVICE_APP: $SERVICE_COMMAND (system service; $SERVICE_EXEC)"
+}
+
+installer_service_cleanup() {
+    if [ "$SERVICE_CHANGED" = 1 ]; then
+        printf 'Installer: restoring the previous installation and service.\n' >&2
+        installer_service_manager stop || true
+        if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+            cp -p "$transaction_dir/old-unit" "$SERVICE_UNIT" || return 1
+        else
+            installer_service_manager disable || return 1
+            rm -f "$SERVICE_UNIT" || return 1
+        fi
+        if [ "$SERVICE_CONFIG_TOUCHED" = 1 ] && [ -n "$SERVICE_CONFIG" ]; then
+            if [ "$SERVICE_HAD_CONFIG" = 1 ]; then cp -p "$transaction_dir/old-config" "$SERVICE_CONFIG" || return 1
+            else rm -f "$SERVICE_CONFIG" || return 1; fi
+        fi
+        if [ -n "$SERVICE_OLD" ]; then
+            ln -s "$SERVICE_OLD" "$INSTALLER_PREFIX/.restore.$$" || return 1
+            mv -fT "$INSTALLER_PREFIX/.restore.$$" "$INSTALLER_PREFIX/current" || return 1
+        else rm -f "$INSTALLER_PREFIX/current" || return 1; fi
+        installer_service_manager reload || return 1
+        if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+            if [ "$SERVICE_WAS_ENABLED" = 1 ]; then installer_service_manager enable || return 1
+            else installer_service_manager disable || return 1; fi
+        fi
+        if [ "$SERVICE_WAS_ACTIVE" = 1 ]; then
+            installer_service_manager start || return 1
+            installer_service_manager is-active || return 1
+        fi
+        SERVICE_CHANGED=0
+    fi
+    [ -z "$SERVICE_CANDIDATE" ] || rm -rf "$SERVICE_CANDIDATE" || return 1
+    if [ "$SERVICE_NEW_VERSION" = 1 ]; then rm -rf "$SERVICE_VERSION_DIR" || return 1; fi
+    rm -f "$INSTALLER_PREFIX/.current.$$" "$INSTALLER_PREFIX/.previous.$$" "$INSTALLER_PREFIX/.restore.$$"
+    if [ "$SERVICE_DEST_LOCK_HELD" = 1 ]; then
+        rm -f "$INSTALLER_PREFIX/.service-lock/owner" || return 1
+        rmdir "$INSTALLER_PREFIX/.service-lock" || return 1
+        SERVICE_DEST_LOCK_HELD=0
+    fi
+}
+
 
 # Business logic: maintained in linkease/business.sh
 # Included at build time; only linkease-install.sh is maintained as the public entry.
@@ -715,6 +1108,7 @@ linkease_usage() {
     printf '%s\n' 'Usage: linkease-install.sh [--version VERSION]' \
         'Linux: default version 1.7.5; installs LinkEase, media, HEIF converter and linkmount.' \
         'OpenWrt opkg: defaults to server VERSION; x86_64/aarch64/armv7 supported.'
+    printf '%s\n' 'Linux systemd: root/sudo -H, system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
 }
 
 linkease_parse_args() {
@@ -733,18 +1127,7 @@ linkease_parse_args() {
 }
 
 # All transport, HTTPS/Race/fallback policy and digest verification remain in zsetup.
-linkease_download() {
-    le_relative=$1; le_destination=$2; le_sha=${3:-}; le_fresh=${4:-0}
-    set -- "$ZSETUP_BIN" download -o "$le_destination"
-    [ -z "$le_sha" ] || set -- "$@" --sha256 "$le_sha"
-    [ "$le_fresh" = 0 ] || set -- "$@" --no-cache
-    [ -z "${ZSETUP_CA_FILE:-}" ] || set -- "$@" --ca-file "$ZSETUP_CA_FILE"
-    for le_base in $ZSETUP_SOURCE_BASES; do
-        set -- "$@" "${le_base%/}/LinkEase/$le_relative"
-    done
-    [ -z "${ZSETUP_SOURCE_FALLBACK:-}" ] || set -- "$@" --fallback-url "${ZSETUP_SOURCE_FALLBACK%/}/LinkEase/$le_relative"
-    "$@"
-}
+linkease_download() { installer_download "$@"; }
 
 linkease_verified_download() {
     le_name=$1
@@ -753,13 +1136,6 @@ linkease_verified_download() {
     }
     le_file="$cache_dir/$le_name"
     le_marker="$le_file.verified"
-    if [ -s "$le_file" ] && [ -f "$le_marker" ]; then
-        le_size=$(wc -c < "$le_file" | tr -d '[:space:]')
-        if [ "$(cat "$le_marker")" = "$le_digest:$le_size" ]; then
-            status "      Using verified cached $le_name"
-            return 0
-        fi
-    fi
     linkease_download "$relative_folder/$le_name" "$le_file" "$le_digest"
     le_size=$(wc -c < "$le_file" | tr -d '[:space:]')
     printf '%s:%s\n' "$le_digest" "$le_size" > "$transaction_dir/verified"
@@ -817,15 +1193,19 @@ linkease_cleanup() {
 linkease_unpack_linux() {
     mkdir -p "$transaction_dir/products/linkmount"
     for le_binary in linkease heif-converter linkease-media; do
-        tar -xOzf "$cache_dir/$archive_name" "linkease-binary-$version_num/$le_binary.$binary_arch" > "$transaction_dir/products/$le_binary"
+        installer_extract_member "$transaction_dir/products/$le_binary" tar -xOzf "$cache_dir/$archive_name" "linkease-binary-$version_num/$le_binary.$binary_arch" || return $?
         [ -s "$transaction_dir/products/$le_binary" ] || { linkease_error "empty or missing $le_binary"; return 11; }
         chmod 0755 "$transaction_dir/products/$le_binary"
     done
     # Info-ZIP -Z1 is required on Linux. Read filenames with shell builtins, without awk/sed.
-    unzip -Z1 "$cache_dir/$mount_name" > "$transaction_dir/zip-members" || {
+    installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/zip-members" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- unzip -Z1 "$cache_dir/$mount_name" || {
         linkease_error 'unzip must support -Z1 member listing'; return 2;
     }
+    : > "$transaction_dir/mount-files"
+    le_member_count=0
     while IFS= read -r le_member || [ -n "$le_member" ]; do
+        le_member_count=$((le_member_count + 1))
+        [ "$le_member_count" -le "$INSTALLER_MAX_FILES" ] || return 11
         case "$le_member" in
             ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+/-]*|/*|../*|*/../*|*/..|./*|*/./*|*/.|*//* )
                 linkease_error 'invalid linkmount archive member'; return 11 ;;
@@ -841,13 +1221,21 @@ linkease_unpack_linux() {
                 le_target="$transaction_dir/products/linkmount/$le_output"
                 [ ! -e "$le_target" ] || { linkease_error 'duplicate linkmount archive member'; return 11; }
                 mkdir -p "$(dirname "$le_target")"
-                unzip -p "$cache_dir/$mount_name" "$le_member" > "$le_target"
+                installer_extract_member "$le_target" unzip -p "$cache_dir/$mount_name" "$le_member" || return $?
+                printf '%s\n' "$le_output" >> "$transaction_dir/mount-files"
                 [ -s "$le_target" ] || { linkease_error 'empty linkmount archive file'; return 11; } ;;
         esac
     done < "$transaction_dir/zip-members"
     [ -s "$transaction_dir/products/linkmount/linkmount_bin" ] || { linkease_error 'linkmount_bin missing'; return 11; }
     chmod -R 0755 "$transaction_dir/products/linkmount"
-    "$transaction_dir/products/linkease" showVersion
+    installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/products/linkease" showVersion
+}
+
+linkease_register() {
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+        installer_exec_native "$ZSETUP_BIN" run -- "$INSTALLER_PREFIX/$SERVICE_OLD/bin/linkease" --serviceControl uninstall || return $?
+    fi
+    installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" --serviceControl install
 }
 
 linkease_linux() {
@@ -856,59 +1244,28 @@ linkease_linux() {
     done
     case "$arch" in x86_64) binary_arch=x86_64; mount_arch=amd64 ;; aarch64) binary_arch=aarch64; mount_arch=arm64 ;; armv7) binary_arch=arm; mount_arch=arm ;; esac
     version_num=${version_override:-1.7.5}
-    app_dir=${LINKEASE_APP_DIR:-/usr/sbin}
-    case "$app_dir" in /*) ;; *) linkease_error 'installation directory must be absolute'; return 2 ;; esac
-    [ "$app_dir" != / ] || { linkease_error 'installation directory must not be /'; return 2; }
-    if [ ! -w "$app_dir" ] && [ "$(id -u)" != 0 ]; then
-        command -v sudo >/dev/null 2>&1 || { linkease_error 'root or sudo is required'; return 2; }
-        SUDO=sudo
-    fi
-    status "[2/4] Checking LinkEase $version_num ($arch)..."
     relative_folder="LinuxStorage/$version_num"
-    linkease_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1
-    cache_dir="$work_dir/cache/linux/$version_num/$arch"
-    mkdir -p "$cache_dir"
-    archive_name="linkease-binary-$version_num.tar.gz"
-    mount_name="$mount_arch.zip"
-    status '[3/4] Downloading and verifying LinkEase and linkmount...'
-    linkease_verified_download "$archive_name"
-    linkease_verified_download "$mount_name"
-    linkease_unpack_linux
-    status '[4/4] Installing and starting LinkEase...'
-    linkease_privileged mkdir -p "$app_dir"
-    # Serialize replacement in the destination, including callers using different cache directories.
-    le_lock="$app_dir/.linkease-install-lock"
-    linkease_privileged mkdir "$le_lock" || { linkease_error 'another install or unrecovered install lock exists'; return 2; }
-    install_lock=$le_lock
-    candidate_dir="$app_dir/.linkease-candidate.$$"
-    backup_dir="$app_dir/.linkease-backup.$$"
-    linkease_privileged mkdir "$candidate_dir" "$backup_dir"
-    linkease_privileged cp -Rp "$transaction_dir/products/." "$candidate_dir/"
-    for le_existing in linkease heif-converter linkease-media linkmount; do
-        [ ! -L "$app_dir/$le_existing" ] || { linkease_error "refusing to replace symbolic link $le_existing"; return 2; }
-        if [ -e "$app_dir/$le_existing" ]; then
-            linkease_privileged cp -Rp "$app_dir/$le_existing" "$backup_dir/$le_existing"
-        fi
-    done
-    if [ -f "$backup_dir/linkease" ]; then linkease_stop_service; fi
-    replacement_started=1
-    for le_install in linkease heif-converter linkease-media linkmount; do
-        linkease_privileged rm -rf "$app_dir/$le_install"
-        linkease_privileged mv "$candidate_dir/$le_install" "$app_dir/$le_install"
-    done
-    # Match the proven installer: replace the service definition as well as its files.
-    linkease_privileged "$app_dir/linkease" --serviceControl uninstall || true
-    if linkease_privileged "$app_dir/linkease" --serviceControl install; then :; else
-        le_code=$?; linkease_error 'service installation failed'; return "$le_code"
+    status "[2/4] Checking LinkEase $version_num ($arch)..."
+    linkease_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1 || return $?
+    archive_name="linkease-binary-$version_num.tar.gz"; mount_name="$mount_arch.zip"
+    le_archive_sha=$("$ZSETUP_BIN" metadata sha256 "$transaction_dir/sums" "$archive_name") || return 11
+    le_mount_sha=$("$ZSETUP_BIN" metadata sha256 "$transaction_dir/sums" "$mount_name") || return 11
+    installer_service_cached "$version_num" "$le_archive_sha:$le_mount_sha" || return $?
+    if [ "$SERVICE_CACHED" = 0 ]; then
+        status '[3/4] Downloading and verifying LinkEase and linkmount...'
+        cache_dir=$transaction_dir
+        linkease_download "$relative_folder/$archive_name" "$cache_dir/$archive_name" "$le_archive_sha" || return $?
+        linkease_download "$relative_folder/$mount_name" "$cache_dir/$mount_name" "$le_mount_sha" || return $?
+        linkease_unpack_linux || return $?
+        installer_service_stage || return $?
+        for le_binary in linkease heif-converter linkease-media; do installer_service_copy "$le_binary" || return $?; done
+        while IFS= read -r le_output; do installer_service_copy "linkmount/$le_output" || return $?; done < "$transaction_dir/mount-files"
+        installer_service_commit_version || return $?
+    else
+        installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" showVersion || return $?
     fi
-    if linkease_privileged "$app_dir/linkease" --serviceControl start; then :; else
-        le_code=$?
-        le_init=${LINKEASE_SERVICE_PATH:-/etc/init.d/com.linkease.linkeasedaemon.service}
-        if [ -x "$le_init" ] && linkease_privileged "$le_init" start; then :; else
-            linkease_error 'service start failed'; return "$le_code"
-        fi
-    fi
-    replacement_started=0
+    status '[4/4] Installing and checking the LinkEase system service...'
+    installer_service_activate || return $?
     status 'LinkEase installation completed'
 }
 
@@ -948,6 +1305,16 @@ linkease_install() {
         ubuntu:apt|debian:apt|centos:yum|centos:dnf|rhel:yum|rhel:dnf|linux:*) business_platform=linux ;;
         *) linkease_error "unsupported platform: $os/$package_manager"; return 2 ;;
     esac
+    INSTALLER_REMOTE_APP=LinkEase
+    if [ "$business_platform" = linux ]; then
+        [ -z "${LINKEASE_APP_DIR:-}" ] || { linkease_error 'LINKEASE_APP_DIR is retired; use --installer-prefix for the protected installation root'; return 2; }
+        installer_service_prepare linkease || return $?
+        linkease_linux || return $?
+        installer_transaction_finish
+        return $?
+    fi
+    [ -z "${installer_prefix:-}${installer_work_dir:-}" ] && [ "${installer_scope:-system}" = system ] || { linkease_error 'OpenWrt storage adapter is pending; do not apply Linux layout options to native packages'; return 2; }
+    installer_policy linkease || return $?
     work_dir=${ZSETUP_WORK_DIR:-$WORK_ROOT/linkease}
     mkdir -p "$work_dir"
     chmod 0700 "$work_dir"
@@ -980,7 +1347,7 @@ main() {
     status 'LinkEase installer'
     if [ "${ZSETUP_INSTALLER_MODE:-0}" = 1 ]; then
         status '[1/4] zsetup is ready'
-        linkease_install "$@"
+        installer_dispatch linkease "$@"
     else
         bootstrap_and_run "$@"
     fi
