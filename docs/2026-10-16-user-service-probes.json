@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "probes": [
+    {
+      "application": "ddnsto",
+      "version": "4.2.3",
+      "scope": "user",
+      "effective_uid": 1000,
+      "probe_exit": 0,
+      "program_exit": 0,
+      "stdout": "",
+      "stderr": "2026/10/16 03:43:23 routerId: 020000000010 RouterIdx: 0 host: tunnel.kooldns.cn:4445 supplier: \n2026/10/16 03:43:23 Run in daemon result: OK\n",
+      "generated_units": {},
+      "service_actions": "",
+      "real_systemctl": false,
+      "network": "isolated",
+      "host_services_modified": false
+    },
+    {
+      "application": "linkease",
+      "version": "1.7.5",
+      "scope": "user",
+      "effective_uid": 1000,
+      "probe_exit": 0,
+      "program_exit": 0,
+      "stdout": "",
+      "stderr": "E: 03:43:48 Failed to install LinkEaseDaemon Service: open /etc/systemd/system/com.linkease.linkeasedaemon.service: read-only file system\n2026/10/16 03:43:48 run cli failed, err= Failed to install LinkEaseDaemon Service: open /etc/systemd/system/com.linkease.linkeasedaemon.service: read-only file system\n",
+      "generated_units": {},
+      "service_actions": "",
+      "real_systemctl": false,
+      "network": "isolated",
+      "host_services_modified": false
+    }
+  ]
+}

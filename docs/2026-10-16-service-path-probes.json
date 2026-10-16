@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "probes": [
+    {
+      "application": "linkease",
+      "version": "1.7.5",
+      "probe_exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "generated_units": {
+        "etc/systemd/system/com.linkease.linkeasedaemon.service": "[Unit]\nDescription=LinkEaseDaemon Service\nConditionFileIsExecutable=/opt/linkease/linkease/versions/1.7.5/bin/linkease\n\n\n[Service]\nStartLimitInterval=5\nStartLimitBurst=10\nExecStart=/opt/linkease/linkease/versions/1.7.5/bin/linkease \"run\"\n\n\n\n\n\n\nLimitNOFILE=1048576\nRestart=always\n\nRestartSec=120\nEnvironmentFile=-/etc/sysconfig/com.linkease.linkeasedaemon\n\n[Install]\nWantedBy=multi-user.target\n"
+      },
+      "service_actions": "--version\nenable com.linkease.linkeasedaemon.service\ndaemon-reload\n",
+      "real_systemctl": false,
+      "network": "isolated",
+      "host_services_modified": false
+    },
+    {
+      "application": "ddnsto",
+      "version": "4.2.3",
+      "probe_exit": 0,
+      "program_exit": 0,
+      "stdout": "",
+      "stderr": "2026/10/16 03:36:01 routerId: 020000000010 RouterIdx: 0 host: tunnel.kooldns.cn:4445 supplier: \n2026/10/16 03:36:03 Run in daemon result: OK\n",
+      "generated_units": {
+        "etc/systemd/system/com.linkease.ddnstoshell.service": "[Unit]\nDescription=DdnstoShell Service\nConditionFileIsExecutable=/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto\n\n\n[Service]\nStartLimitInterval=5\nStartLimitBurst=10\nExecStart=/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto \"run\"\n\n\n\n\n\n\nLimitNOFILE=1048576\nRestart=always\n\nRestartSec=120\nEnvironmentFile=-/etc/sysconfig/com.linkease.ddnstoshell\n\n[Install]\nWantedBy=multi-user.target\n"
+      },
+      "service_actions": "is-active com.linkease.ddnstoshell.service\n--version\nenable com.linkease.ddnstoshell.service\ndaemon-reload\nstart com.linkease.ddnstoshell.service\n",
+      "real_systemctl": false,
+      "network": "isolated",
+      "host_services_modified": false
+    }
+  ]
+}
