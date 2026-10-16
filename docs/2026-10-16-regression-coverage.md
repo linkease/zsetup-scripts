@@ -15,11 +15,11 @@ a disposable server container; tests/sudo_privilege_test.py uses real two UIDs.
 | DDNSTO Lite <900, 900/unknown Standard, force-version and verify | package fixture; unsupported Linux flags rejected |
 | DDNSTO four architectures × opkg/apk, LinkEase three × opkg, unsupported APK/MIPS | package fixture mappings; core selector regression |
 | LinkEase multi-file archive/library layout and malicious ZIP | service fixture, native bounded extraction tests |
-| Cached input/network avoidance | package input SHA cache, service protected installed receipts; metadata still refreshes |
+| Cached input/network avoidance | package input SHA cache, service protected installed receipts and architecture guard; metadata still refreshes |
 | Pre-version/digest failure before mutation | service version/ZIP refusals, package immutable digest11 before PM |
 | Stop failure, registration/start/health false success | service fixture; original exit preserved, current/config restored |
 | All old files restored, failed rollback retains backup | immutable version transaction/current restoration; deliberate manager-start failure retains old-unit/leases; fixture operator recovery |
-| First install failure | registration failure without old version covered by shared transaction/manager tests; no unknown flat directory overwritten |
+| First install failure | service fixture explicitly fails registration without old unit/version; removes new current/payload/unit and releases leases |
 | OpenWrt package failure23/no fallback | package fixture with bounded package-result receipt |
 | Background result/log | native background install in service fixture, core process tests |
 | Waiting download/process TERM and cleanup | transaction/bounds, service registration descendant, package-query descendant, sudo EOF/root rollback |

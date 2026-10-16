@@ -255,6 +255,14 @@ installer_service_cached() {
     SERVICE_CACHED=0
     [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
     if [ -e "$SERVICE_VERSION_DIR" ]; then
+        [ "$("$ZSETUP_BIN" storage "$SERVICE_VERSION_DIR/.arch" get system_protected)" = true ] || return 12
+        installer_file_size "$SERVICE_VERSION_DIR/.arch" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 32 ] || return 2
+        IFS= read -r service_cached_arch < "$SERVICE_VERSION_DIR/.arch" || return 2
+        [ "$service_cached_arch" = "$arch" ] || {
+            printf '%s\n' 'Installer: cached payload architecture differs; use a new protected prefix or explicit migration.' >&2
+            return 2
+        }
         installer_file_size "$SERVICE_VERSION_DIR/.artifact-sha256" || return 2
         [ "$INSTALLER_FILE_SIZE" -le 160 ] || return 2
         IFS= read -r service_digest < "$SERVICE_VERSION_DIR/.artifact-sha256" || return 2
@@ -310,7 +318,8 @@ installer_service_stage() {
 
 installer_service_commit_version() {
     printf '%s\n' "$SERVICE_DIGEST" > "$SERVICE_CANDIDATE/.artifact-sha256"
-    chmod 0644 "$SERVICE_CANDIDATE/.artifact-sha256" "$SERVICE_CANDIDATE/.files" || return 12
+    printf '%s\n' "$arch" > "$SERVICE_CANDIDATE/.arch"
+    chmod 0644 "$SERVICE_CANDIDATE/.artifact-sha256" "$SERVICE_CANDIDATE/.files" "$SERVICE_CANDIDATE/.arch" || return 12
     [ ! -e "$SERVICE_VERSION_DIR" ] && [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
     mv "$SERVICE_CANDIDATE" "$SERVICE_VERSION_DIR" || return 12
     SERVICE_CANDIDATE=; SERVICE_NEW_VERSION=1
