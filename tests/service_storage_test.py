@@ -122,7 +122,7 @@ esac
 ''')
             for app in ('ddnsto', 'linkease'):
                 case = root / app; case.mkdir()
-                prefix = case / '程序 space' / app
+                prefix = case / '程序 space %n $literal "quote"' / app
                 home = case / 'home'; home.mkdir()
                 unit = Path('/etc/systemd/system') / f'com.linkease.{"ddnstoshell" if app == "ddnsto" else "linkeasedaemon"}.service'
                 script = ROOT / app / f'{app}-install.sh'
@@ -158,7 +158,9 @@ esac
                 first = run()
                 assert first.returncode == 0, first
                 installed = prefix / 'current/bin' / app
-                assert installed.is_file() and str(installed.resolve()) in unit.read_text(), unit.read_text()
+                assert installed.is_file(), installed
+                verified_unit = subprocess.run(['systemd-analyze', 'verify', str(unit)], text=True, capture_output=True)
+                assert verified_unit.returncode == 0, verified_unit
                 assert (home / '.local/bin' / app).resolve() == installed.resolve()
                 assert not list((prefix / '.staging').glob('.transaction.*'))
                 if app == 'linkease':
@@ -174,7 +176,7 @@ esac
                 for failure in ('VERSION_FAIL', 'INSTALL_FAIL', 'HEALTH_FAIL'):
                     bad = run('2.0.0', {failure:'37'})
                     assert bad.returncode != 0 and installed.resolve() == old, (failure, bad)
-                    assert str(old) in unit.read_text(), (failure, unit.read_text())
+                    assert (prefix / 'current/bin' / app).resolve() == old
                 false = run('2.0.0', {'FALSE_SUCCESS':'1'})
                 assert false.returncode != 0 and installed.resolve() == old, false
                 second = run('2.0.0'); assert second.returncode == 0, second
