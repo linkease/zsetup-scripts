@@ -1,7 +1,7 @@
 # Linux system-service adapter. Business programs own registration/configuration;
 # this coordinator owns protected payloads, activation, health and rollback.
-# No automatic sudo child is spawned: privileged invocations must already have
-# a root owner, so cancellation can join every install operation as the same UID.
+# An optional unprivileged preparation hands off to a distinct root owner;
+# the control pipe requests cancellation and the root owner joins rollback.
 installer_require_root() {
     if [ "$("$ZSETUP_BIN" storage / get effective_uid)" != 0 ]; then
         printf '%s\n' 'Installer: this operation installs a system service and requires root.' \
@@ -310,6 +310,7 @@ installer_service_stage() {
 
 installer_service_commit_version() {
     printf '%s\n' "$SERVICE_DIGEST" > "$SERVICE_CANDIDATE/.artifact-sha256"
+    chmod 0644 "$SERVICE_CANDIDATE/.artifact-sha256" "$SERVICE_CANDIDATE/.files" || return 12
     [ ! -e "$SERVICE_VERSION_DIR" ] && [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
     mv "$SERVICE_CANDIDATE" "$SERVICE_VERSION_DIR" || return 12
     SERVICE_CANDIDATE=; SERVICE_NEW_VERSION=1

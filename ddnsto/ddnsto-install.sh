@@ -412,6 +412,15 @@ installer_download() {
         version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
         *) ib_metadata=0; ib_limit=$((INSTALLER_MAX_DOWNLOAD - INSTALLER_DOWNLOAD_BYTES)); [ "$ib_limit" -gt 0 ] || return 11 ;;
     esac
+    # Cross-UID inputs are copied into the root-owned destination with native
+    # bounds, then the ordinary native download path revalidates their digest.
+    # Untrusted metadata is never imported as the root phase's authority.
+    if [ "$ib_metadata" = 0 ] && [ -n "${ZSETUP_PRIVILEGED_STAGE:-}" ] && [ -n "$ib_sha" ]; then
+        ib_prepared="$ZSETUP_PRIVILEGED_STAGE/${ib_relative##*/}"
+        if [ -f "$ib_prepared" ] && [ ! -L "$ib_prepared" ]; then
+            installer_exec_native "$ZSETUP_BIN" capture -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE" --timeout 30s -- cat "$ib_prepared" || return $?
+        fi
+    fi
     set -- "$ZSETUP_BIN" download -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE"
     [ -z "$ib_sha" ] || set -- "$@" --sha256 "$ib_sha"
     [ "$ib_fresh" = 0 ] || set -- "$@" --no-cache
@@ -485,7 +494,11 @@ installer_owned_native() {
     [ "$1" = "$ZSETUP_BIN" ] || return 2
     [ "$INSTALLER_SIGNAL" = 0 ] || return "$INSTALLER_SIGNAL"
     INSTALLER_SPAWNING=1
-    "$@" <&0 &
+    if [ "${INSTALLER_BRIDGE_OPEN:-0}" = 1 ]; then
+        "$@" <&0 3>&- 4>&- &
+    else
+        "$@" <&0 &
+    fi
     INSTALLER_CHILD=$!
     INSTALLER_SPAWNING=0
     [ "$INSTALLER_SIGNAL" = 0 ] || exit "$INSTALLER_SIGNAL"
@@ -532,6 +545,7 @@ installer_transaction_cleanup() {
 
 installer_transaction_exit() {
     it_exit=$1
+    INSTALLER_EXIT_CODE=$it_exit
     trap - EXIT
     trap '' HUP INT TERM
     installer_transaction_cleanup || { [ "$it_exit" != 0 ] || it_exit=12; }
@@ -539,6 +553,7 @@ installer_transaction_exit() {
 }
 
 installer_transaction_finish() {
+    INSTALLER_EXIT_CODE=0
     installer_transaction_cleanup || return $?
     trap - EXIT HUP INT TERM
 }
@@ -568,148 +583,10 @@ installer_dispatch() {
     "${il_app}_install" "$@"
 }
 
-installer_launcher_prepare() {
-    il_application=$1
-    case "$1" in fastnet) il_display=FastNet ;; fastpve) il_display=FastPVE ;; *) il_display=$1 ;; esac
-    il_work_hint=${installer_work_dir:-${ZSETUP_WORK_DIR:-}}
-    [ -z "$il_work_hint" ] || [ ! -L "$il_work_hint" ] || return 2
-    installer_policy "$1" || return $?
-    installer_preflight "$1" "$2" "$INSTALLER_REQUIRED_BYTES" 1 || return $?
-    [ "$INSTALLER_SCOPE" != system ] || INSTALLER_COMMAND="$INSTALLER_PREFIX/current"
-    [ ! -L "$INSTALLER_PREFIX" ] || return 2
-    umask 077
-    mkdir -p "$INSTALLER_PREFIX"
-    [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX" get private_directory)" = true ] || return 12
-    [ ! -L "$INSTALLER_PREFIX/.managed" ] && [ ! -L "$INSTALLER_PREFIX/versions" ] || return 2
-    il_owner=
-    if [ -f "$INSTALLER_PREFIX/.managed" ] && [ ! -L "$INSTALLER_PREFIX/.managed" ]; then
-        installer_file_size "$INSTALLER_PREFIX/.managed" || return 2
-        [ "$INSTALLER_FILE_SIZE" -le 65 ] || return 2
-        IFS= read -r il_owner < "$INSTALLER_PREFIX/.managed" || return 2
-        [ "$il_owner" = "$1" ] || return 2
-    else
-        [ ! -e "$INSTALLER_PREFIX/versions" ] && [ ! -L "$INSTALLER_PREFIX/current" ] && [ ! -e "$INSTALLER_PREFIX/current" ] || return 2
-        (set -C; printf '%s\n' "$1" > "$INSTALLER_PREFIX/.managed") || return 2
-    fi
-    if [ "$INSTALLER_SCOPE" = user ]; then
-        if [ -e "$INSTALLER_COMMAND" ] || [ -L "$INSTALLER_COMMAND" ]; then
-            [ -L "$INSTALLER_COMMAND" ] && [ "$(readlink "$INSTALLER_COMMAND")" = "$INSTALLER_PREFIX/current" ] || {
-                printf 'Installer: existing command belongs to another installation: %s\n' "$INSTALLER_COMMAND" >&2; return 2;
-            }
-        fi
-    fi
-    installer_transaction_begin || return $?
-    INSTALLER_CLEANUP_HOOK=installer_launcher_cleanup
-    il_candidate=
-    il_new_version=0
-    il_activated=0
-    il_previous=
-    mkdir -p "$INSTALLER_PREFIX/versions"
-}
-
-installer_launcher_cleanup() {
-    if [ "$il_activated" = 1 ]; then
-        if [ -n "$il_previous" ]; then
-            ln -s "$il_previous" "$INSTALLER_PREFIX/.restore.$$" || return 1
-            mv -f "$INSTALLER_PREFIX/.restore.$$" "$INSTALLER_PREFIX/current" || return 1
-        else
-            rm -f "$INSTALLER_PREFIX/current" || return 1
-        fi
-        il_activated=0
-    fi
-    [ -z "$il_candidate" ] || rm -f "$il_candidate" || return 1
-    if [ "$il_new_version" = 1 ]; then rm -rf "$il_version_dir" || return 1; fi
-    rm -f "$INSTALLER_PREFIX/.current.$$" "$INSTALLER_PREFIX/.previous.$$"
-}
-
-installer_launcher_activate() {
-    il_version=$1; il_remote_name=$2; il_sha=$3
-    il_version_dir="$INSTALLER_PREFIX/versions/$il_version"
-    INSTALLER_EXECUTABLE="$il_version_dir/bin/$il_application"
-    il_marker="$INSTALLER_EXECUTABLE.verified"
-    [ ! -L "$il_version_dir" ] && [ ! -L "$il_version_dir/bin" ] || return 2
-    for il_path in "$INSTALLER_EXECUTABLE" "$il_marker"; do
-        [ ! -L "$il_path" ] && { [ ! -e "$il_path" ] || [ -f "$il_path" ]; } || return 2
-    done
-    il_cached=0
-    if [ -x "$INSTALLER_EXECUTABLE" ] && [ -f "$il_marker" ]; then
-        installer_file_size "$INSTALLER_EXECUTABLE" || return $?
-        il_payload_size=$INSTALLER_FILE_SIZE
-        [ "$il_payload_size" -le "$INSTALLER_MAX_DOWNLOAD" ] || return 11
-        installer_file_size "$il_marker" || return 2
-        [ "$INSTALLER_FILE_SIZE" -le 128 ] || return 2
-        il_record=
-        IFS= read -r il_record < "$il_marker" || il_record=
-        il_old_sha=${il_record%%:*}
-        case "$il_old_sha" in *[!0123456789abcdef]*|'') ;;
-            *) if [ "${#il_old_sha}" = 64 ] && [ "$il_old_sha" != "$il_sha" ]; then
-                printf 'Installer: installed version %s has a different digest; immutable versions cannot be replaced.\n' "$il_version" >&2
-                return 11
-            fi ;;
-        esac
-        if [ "$il_record" = "$il_sha:$il_payload_size" ]; then il_cached=1; fi
-    fi
-    if [ "$il_cached" = 1 ]; then
-        status "[3/4] $il_display is already downloaded (verified cached version)"
-        installer_exec_native "$ZSETUP_BIN" run -- "$INSTALLER_EXECUTABLE" version || return $?
-    else
-        status "[3/4] Downloading $il_display..."
-        installer_download "$il_remote_name" "$transaction_dir/product" "$il_sha" || return $?
-        chmod 0755 "$transaction_dir/product"
-        installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/product" version || return $?
-        if [ ! -d "$il_version_dir" ]; then
-            mkdir "$il_version_dir" || return 12
-            il_new_version=1
-        fi
-        mkdir -p "$il_version_dir/bin"
-        il_candidate="$il_version_dir/bin/.candidate.$$"
-        installer_exec_native "$ZSETUP_BIN" capture -o "$il_candidate" --max-bytes "$INSTALLER_MAX_DOWNLOAD" --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/product" || return $?
-        chmod 0755 "$il_candidate"
-        installer_file_size "$il_candidate" || return $?
-        printf '%s:%s\n' "$il_sha" "$INSTALLER_FILE_SIZE" > "$transaction_dir/verified"
-        mv -f "$il_candidate" "$INSTALLER_EXECUTABLE" || return 12
-        il_candidate=
-        mv -f "$transaction_dir/verified" "$il_marker" || return 12
-    fi
-    installer_storage_check "$INSTALLER_PREFIX" "$INSTALLER_RESERVE" 1 1 || return $?
-    if [ -e "$INSTALLER_PREFIX/current" ] || [ -L "$INSTALLER_PREFIX/current" ]; then
-        [ -L "$INSTALLER_PREFIX/current" ] && [ -f "$INSTALLER_PREFIX/current" ] || return 2
-        il_previous=$(readlink "$INSTALLER_PREFIX/current") || return 2
-        case "$il_previous" in versions/*/bin/"$il_application") ;; *) return 2 ;; esac
-        il_old_version=${il_previous#versions/}; il_old_version=${il_old_version%/bin/"$il_application"}
-        case "$il_old_version" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*|.*) return 2 ;; esac
-    fi
-    ln -s "versions/$il_version/bin/$il_application" "$INSTALLER_PREFIX/.current.$$" || return 12
-    il_activated=1
-    mv -f "$INSTALLER_PREFIX/.current.$$" "$INSTALLER_PREFIX/current" || return 12
-    if [ "$INSTALLER_SCOPE" = user ]; then
-        mkdir -p "${INSTALLER_COMMAND%/*}"
-        il_candidate="${INSTALLER_COMMAND%/*}/.$il_application.$$"
-        ln -s "$INSTALLER_PREFIX/current" "$il_candidate" || return 12
-        mv -f "$il_candidate" "$INSTALLER_COMMAND" || return 12
-        il_candidate=
-    fi
-    if [ -n "$il_previous" ] && [ "$il_previous" != "versions/$il_version/bin/$il_application" ]; then
-        ln -s "$il_previous" "$INSTALLER_PREFIX/.previous.$$" || return 12
-        mv -f "$INSTALLER_PREFIX/.previous.$$" "$INSTALLER_PREFIX/previous" || return 12
-    fi
-    il_keep=$(readlink "$INSTALLER_PREFIX/current")
-    il_keep_old=$(readlink "$INSTALLER_PREFIX/previous" 2>/dev/null || true)
-    for il_dir in "$INSTALLER_PREFIX"/versions/*; do
-        [ -d "$il_dir" ] && [ ! -L "$il_dir" ] || continue
-        il_target="versions/${il_dir##*/}/bin/$il_application"
-        [ "$il_target" != "$il_keep" ] && [ "$il_target" != "$il_keep_old" ] || continue
-        [ -f "$il_dir/bin/$il_application.verified" ] && [ ! -L "$il_dir/bin/$il_application.verified" ] || continue
-        rm -rf "$il_dir" || return 12
-    done
-    il_activated=0
-    il_new_version=0
-}
-
 # Linux system-service adapter. Business programs own registration/configuration;
 # this coordinator owns protected payloads, activation, health and rollback.
-# No automatic sudo child is spawned: privileged invocations must already have
-# a root owner, so cancellation can join every install operation as the same UID.
+# An optional unprivileged preparation hands off to a distinct root owner;
+# the control pipe requests cancellation and the root owner joins rollback.
 installer_require_root() {
     if [ "$("$ZSETUP_BIN" storage / get effective_uid)" != 0 ]; then
         printf '%s\n' 'Installer: this operation installs a system service and requires root.' \
@@ -1018,6 +895,7 @@ installer_service_stage() {
 
 installer_service_commit_version() {
     printf '%s\n' "$SERVICE_DIGEST" > "$SERVICE_CANDIDATE/.artifact-sha256"
+    chmod 0644 "$SERVICE_CANDIDATE/.artifact-sha256" "$SERVICE_CANDIDATE/.files" || return 12
     [ ! -e "$SERVICE_VERSION_DIR" ] && [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
     mv "$SERVICE_CANDIDATE" "$SERVICE_VERSION_DIR" || return 12
     SERVICE_CANDIDATE=; SERVICE_NEW_VERSION=1
@@ -1099,6 +977,381 @@ installer_service_cleanup() {
     fi
 }
 
+# Native packages own their installed paths and services. Only their verified
+# inputs, PM scratch/cache/list data and bounded receipts are managed here.
+installer_package_prepare() {
+    PACKAGE_APP=$1; PACKAGE_PHASE=preflight
+    PACKAGE_CACHE=; INSTALLER_PACKAGE_CLEANUP=
+    PACKAGE_DEST_LOCK_HELD=0
+    installer_require_root || return $?
+    installer_layout "$1" system || return $?
+    [ "$INSTALLER_SCOPE" = system ] || return 2
+    installer_policy "$1" || return $?
+    # A package target cannot be relocated by changing the download directory.
+    installer_storage_check / "$INSTALLER_REQUIRED_BYTES" 1 1 || {
+        printf '%s\n' 'Installer: native package target / is unsuitable; moving its download cache does not relocate package-owned files. Keep the legacy entry until the system target is verified.' >&2
+        return 12
+    }
+    installer_preflight "$1" system "$INSTALLER_REQUIRED_BYTES" 1 || return $?
+    for ip_path in "$INSTALLER_PREFIX" "$INSTALLER_WORK_ROOT"; do
+        [ "$("$ZSETUP_BIN" storage "$ip_path" get system_protected)" = true ] || return 12
+    done
+    [ ! -L "$INSTALLER_PREFIX/.managed" ] && [ ! -L "$INSTALLER_PREFIX/.package-manager" ] || return 2
+    if [ -f "$INSTALLER_PREFIX/.managed" ]; then
+        for ip_marker in "$INSTALLER_PREFIX/.managed" "$INSTALLER_PREFIX/.package-manager"; do
+            [ "$("$ZSETUP_BIN" storage "$ip_marker" get system_protected)" = true ] || return 12
+        done
+        installer_file_size "$INSTALLER_PREFIX/.managed" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 65 ] || return 2
+        IFS= read -r ip_owner < "$INSTALLER_PREFIX/.managed" || return 2
+        [ "$ip_owner" = "$PACKAGE_APP" ] || return 2
+        installer_file_size "$INSTALLER_PREFIX/.package-manager" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 8 ] || return 2
+        IFS= read -r ip_manager < "$INSTALLER_PREFIX/.package-manager" || return 2
+        [ "$ip_manager" = "$package_manager" ] || return 2
+    else
+        for ip_entry in "$INSTALLER_PREFIX"/* "$INSTALLER_PREFIX"/.[!.]* "$INSTALLER_PREFIX"/..?*; do
+            [ ! -e "$ip_entry" ] && [ ! -L "$ip_entry" ] || return 2
+        done
+        umask 022
+        mkdir -p "$INSTALLER_PREFIX" || return 12
+        (set -C; printf '%s\n' "$PACKAGE_APP" > "$INSTALLER_PREFIX/.managed") || return 2
+        (set -C; printf '%s\n' "$package_manager" > "$INSTALLER_PREFIX/.package-manager") || return 2
+    fi
+    [ ! -L "$INSTALLER_PREFIX/package-result" ] && [ ! -L "$INSTALLER_PREFIX/.packages" ] || return 2
+    installer_transaction_begin || return $?
+    INSTALLER_CLEANUP_HOOK=installer_package_cleanup
+    if ! mkdir "$INSTALLER_PREFIX/.package-lock" 2>/dev/null; then
+        printf 'Installer: active or interrupted destination transaction at %s/.package-lock\n' "$INSTALLER_PREFIX" >&2
+        return 2
+    fi
+    PACKAGE_DEST_LOCK_HELD=1
+    printf '%s\n' "$$" > "$INSTALLER_PREFIX/.package-lock/owner"
+    mkdir -p "$transaction_dir/pm-tmp" "$transaction_dir/pm-cache" "$transaction_dir/pm-lists"
+    # PMs and their maintainer scripts use disk scratch, rather than default /tmp.
+    TMPDIR="$transaction_dir/pm-tmp"; export TMPDIR
+    for ip_existing in "/usr/bin/$PACKAGE_APP" "/usr/sbin/$PACKAGE_APP" "/usr/local/bin/$PACKAGE_APP"; do
+        [ -e "$ip_existing" ] || [ -L "$ip_existing" ] || continue
+        if [ "$package_manager" = opkg ]; then
+            installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/owner" --max-bytes 4096 --timeout 5s -- opkg search "$ip_existing" || return 2
+            ip_count=0
+            while IFS= read -r ip_line; do
+                case "$ip_line" in "$PACKAGE_APP - "*) ip_count=$((ip_count + 1)) ;; *) return 2 ;; esac
+            done < "$transaction_dir/owner"
+            [ "$ip_count" = 1 ] || return 2
+        else
+            installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/owner" --max-bytes 4096 --timeout 5s -- apk info --who-owns "$ip_existing" || return 2
+            IFS= read -r ip_line < "$transaction_dir/owner" || return 2
+            case "$ip_line" in "$ip_existing is owned by $PACKAGE_APP-"*) ;; *) return 2 ;; esac
+        fi
+    done
+    PACKAGE_PHASE=download
+}
+
+installer_package_cache() {
+    installer_service_version "$1" || return 2
+    case "$2" in x86_64|aarch64|armv7|arm|mipsel) ;; *) return 2 ;; esac
+    ip_cache_root="$INSTALLER_PREFIX/.packages"
+    ip_key="$package_manager-$1-$2"
+    ip_previous=
+    [ ! -L "$ip_cache_root/recent" ] || return 2
+    if [ -f "$ip_cache_root/recent" ]; then
+        installer_file_size "$ip_cache_root/recent" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 128 ] || return 2
+        IFS= read -r ip_previous < "$ip_cache_root/recent" || return 2
+        case "$ip_previous" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*|.*) return 2 ;; esac
+    fi
+    PACKAGE_CACHE="$ip_cache_root/$ip_key"
+    [ ! -L "$PACKAGE_CACHE" ] || return 2
+    mkdir -p "$PACKAGE_CACHE" || return 12
+    [ "$("$ZSETUP_BIN" storage "$PACKAGE_CACHE" get system_protected)" = true ] || return 12
+    [ ! -L "$PACKAGE_CACHE/.owned" ] || return 2
+    if [ -e "$PACKAGE_CACHE/.owned" ]; then
+        [ "$("$ZSETUP_BIN" storage "$PACKAGE_CACHE/.owned" get system_protected)" = true ] || return 12
+        installer_file_size "$PACKAGE_CACHE/.owned" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 65 ] || return 2
+        IFS= read -r ip_owner < "$PACKAGE_CACHE/.owned" || return 2
+        [ "$ip_owner" = "$PACKAGE_APP" ] || return 2
+    else
+        (set -C; printf '%s\n' "$PACKAGE_APP" > "$PACKAGE_CACHE/.owned") || return 12
+    fi
+    # Keep the current and preceding attempt, including verified recovery inputs
+    # after a partial PM failure. Never pretend this rolls back package scripts.
+    for ip_old in "$ip_cache_root"/*; do
+        [ -d "$ip_old" ] && [ ! -L "$ip_old" ] || continue
+        [ "${ip_old##*/}" != "$ip_key" ] && [ "${ip_old##*/}" != "$ip_previous" ] || continue
+        installer_file_size "$ip_old/.owned" || continue
+        [ "$INSTALLER_FILE_SIZE" -le 65 ] || continue
+        IFS= read -r ip_owner < "$ip_old/.owned" || continue
+        [ "$ip_owner" != "$PACKAGE_APP" ] || rm -rf "$ip_old" || return 12
+    done
+    printf '%s\n' "$ip_key" > "$transaction_dir/recent"
+    mv -f "$transaction_dir/recent" "$ip_cache_root/recent" || return 12
+}
+
+installer_package_command() {
+    installer_storage_check / "$INSTALLER_RESERVE" 1 1 || return $?
+    installer_storage_check "$INSTALLER_WORK_ROOT" "$INSTALLER_RESERVE" 0 1 || return $?
+    PACKAGE_PHASE=$1; shift
+    case "$package_manager" in
+        opkg) installer_exec_native "$ZSETUP_BIN" run -- opkg --cache "$transaction_dir/pm-cache" --tmp-dir "$transaction_dir/pm-tmp" --lists-dir "$transaction_dir/pm-lists" "$@" ;;
+        apk) installer_exec_native "$ZSETUP_BIN" run -- apk --cache-dir "$transaction_dir/pm-cache" "$@" ;;
+        *) return 2 ;;
+    esac
+}
+
+installer_package_immutable() {
+    ip_marker=$1; ip_expected=$2
+    [ ! -L "$ip_marker" ] || return 2
+    if [ -f "$ip_marker" ]; then
+        installer_file_size "$ip_marker" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 128 ] || return 2
+        IFS= read -r ip_record < "$ip_marker" || return 2
+        ip_digest=${ip_record%%:*}
+        case "$ip_digest" in ''|*[!0123456789abcdef]*) return 11 ;; esac
+        [ "${#ip_digest}" = 64 ] && [ "$ip_digest" = "$ip_expected" ] || return 11
+    fi
+}
+
+installer_package_cleanup() {
+    [ "$PACKAGE_DEST_LOCK_HELD" = 1 ] || return 0
+    [ -z "$INSTALLER_PACKAGE_CLEANUP" ] || "$INSTALLER_PACKAGE_CLEANUP" || return 1
+    printf 'application=%s\nmanager=%s\nphase=%s\nexit=%s\npackage_rollback=not_guaranteed\n' \
+        "$PACKAGE_APP" "$package_manager" "$PACKAGE_PHASE" "${INSTALLER_EXIT_CODE:-0}" > "$INSTALLER_PREFIX/.package-result.$$" || return 1
+    mv -f "$INSTALLER_PREFIX/.package-result.$$" "$INSTALLER_PREFIX/package-result" || return 1
+    rm -f "$INSTALLER_PREFIX/.package-lock/owner" || return 1
+    rmdir "$INSTALLER_PREFIX/.package-lock" || return 1
+    PACKAGE_DEST_LOCK_HELD=0
+}
+
+# Only the optional sudo bootstrap uses OS copy/hash tools. Ordinary root
+# installs and all business downloads/hashes continue to use canonical zsetup.
+# The root coordinator owns its monitor and installer; EOF requests cancellation
+# and it joins the installer (including rollback) before releasing bootstrap files.
+installer_privilege_root_code() {
+    cat <<'ZSETUP_ROOT_COORDINATOR'
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+umask 077
+exec 5>&1
+exec 1>&2
+root_directory=; root_child=; root_monitor=; root_ready=0; root_cancel=0; root_spawning=0
+root_signal() { root_cancel=$1; trap '' HUP INT TERM; [ "$root_spawning" = 1 ] || exit "$root_cancel"; }
+root_finish() {
+    root_result=$1
+    trap - EXIT
+    trap '' HUP INT TERM
+    if [ -n "$root_child" ]; then kill -TERM "$root_child" 2>/dev/null || true; wait "$root_child" 2>/dev/null || true; root_child=; fi
+    if [ -n "$root_monitor" ]; then kill -TERM "$root_monitor" 2>/dev/null || true; wait "$root_monitor" 2>/dev/null || true; root_monitor=; fi
+    if [ -n "$root_directory" ]; then
+        case "$root_directory" in /tmp/zsetup-privileged.*) rm -rf "$root_directory" || root_result=12 ;; *) root_result=12 ;; esac
+    fi
+    [ "$root_ready" = 1 ] || printf E >&5
+    printf '%03d\n' "$root_result" >&5 || true
+    exec 5>&-
+    exit "$root_result"
+}
+trap 'root_finish $?' EXIT
+trap 'root_signal 129' HUP
+trap 'root_signal 130' INT
+trap 'root_signal 143' TERM
+[ "$(id -u)" = 0 ] && [ "$1" = "${SUDO_UID:-0}" ] || exit 2
+root_caller=$1; root_native=$2; root_native_sha=$3; root_program=$4; root_program_sha=$5
+root_ca=$6; root_ca_sha=$7; root_prepared=$8; root_os=$9
+shift 9
+root_pm=$1; root_arch=$2; root_bases=$3; root_fallback=$4; root_prefix=$5; root_version=$6
+shift 6
+root_directory=$(mktemp -d /tmp/zsetup-privileged.XXXXXX) || exit 12
+root_parent=$$
+IFS= read -r root_stat < "/proc/$root_parent/stat" || exit 12
+set -f; set -- "$@" # do not expand proc text as filenames in the monitor
+# Save business argv before inspecting /proc positional fields in a function.
+root_cookie() { IFS= read -r rc_line < "/proc/$root_parent/stat" || return 1; set -- $rc_line; [ "$#" -ge 22 ] || return 1; shift 21; printf '%s\n' "$1"; }
+root_birth=$(root_cookie) || exit 12
+exec 6<&0
+root_spawning=1
+(
+    trap 'exit 0' HUP INT TERM
+    while IFS= read -r root_control; do
+        [ "$root_control" = G ] && (set -C; : > "$root_directory/go") || break
+    done
+    # The root PID is held until normal monitor join. The birth guard also
+    # avoids signalling an unrelated process after an exceptional root SIGKILL.
+    if [ "$(root_cookie 2>/dev/null || true)" = "$root_birth" ]; then kill -TERM "$root_parent" 2>/dev/null || true; fi
+) <&6 6<&- 5>&- &
+root_monitor=$!
+exec 6<&-
+root_spawning=0
+[ "$root_cancel" = 0 ] || exit "$root_cancel"
+root_run() {
+    root_spawning=1
+    "$@" </dev/null 5>&- &
+    root_child=$!
+    root_spawning=0
+    [ "$root_cancel" = 0 ] || exit "$root_cancel"
+    root_status=0
+    wait "$root_child" || root_status=$?
+    root_child=
+    return "$root_status"
+}
+root_copy_verified() {
+    rcv_source=$1; rcv_target=$2; rcv_sha=$3; rcv_blocks=$4
+    case "$rcv_sha" in ''|*[!0123456789abcdef]*) return 11 ;; esac
+    [ "${#rcv_sha}" = 64 ] || return 11
+    # Nonblocking open and a hard count also bound FIFO/device/race inputs.
+    root_run dd "if=$rcv_source" "of=$rcv_target" bs=32768 "count=$rcv_blocks" iflag=nonblock 2>/dev/null || return 12
+    if command -v sha256sum >/dev/null 2>&1; then
+        root_run /bin/sh -c 'exec sha256sum "$1" > "$2"' hash "$rcv_target" "$root_directory/hash" || return 12
+        IFS= read -r rcv_actual < "$root_directory/hash" || return 12
+        rcv_actual=${rcv_actual%% *}
+    elif command -v openssl >/dev/null 2>&1; then
+        root_run /bin/sh -c 'exec openssl dgst -sha256 "$1" > "$2"' hash "$rcv_target" "$root_directory/hash" || return 12
+        IFS= read -r rcv_actual < "$root_directory/hash" || return 12
+        rcv_actual=${rcv_actual##*= }
+    else printf '%s\n' 'Privilege bootstrap needs sha256sum or openssl; use the explicit root installer when unavailable.' >&2; return 2; fi
+    [ "$rcv_actual" = "$rcv_sha" ] || return 11
+}
+root_copy_verified "$root_native" "$root_directory/zsetup" "$root_native_sha" 2049 || exit $?
+root_copy_verified "$root_program" "$root_directory/install.sh" "$root_program_sha" 33 || exit $?
+chmod 0755 "$root_directory/zsetup"
+if [ -n "$root_ca" ]; then root_copy_verified "$root_ca" "$root_directory/ca.pem" "$root_ca_sha" 33 || exit $?; root_ca="$root_directory/ca.pem"; fi
+printf R >&5
+root_ready=1
+while [ ! -f "$root_directory/go" ]; do sleep .05; done
+# User data is argv/environment data. Neither a configuration expression nor
+# the original user-writable installer/native is executed with root privileges.
+root_run env -i PATH="$PATH" HOME=/root SUDO_UID="$root_caller" \
+    ZSETUP_BIN="$root_directory/zsetup" ZSETUP_INSTALLER_MODE=1 \
+    ZSETUP_OS="$root_os" ZSETUP_PACKAGE_MANAGER="$root_pm" ZSETUP_ARCH="$root_arch" \
+    ZSETUP_SOURCE_BASES="$root_bases" ZSETUP_SOURCE_FALLBACK="$root_fallback" ZSETUP_CA_FILE="$root_ca" \
+    ZSETUP_PRIVILEGED_STAGE="$root_prepared" DDNSTO_VERSION="$root_version" \
+    /bin/sh "$root_directory/install.sh" --installer-prefix "$root_prefix" -- "$@" || exit $?
+exit 0
+ZSETUP_ROOT_COORDINATOR
+}
+
+installer_privilege_hash() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        ip_hash=$(sha256sum "$1") || return 12
+        INSTALLER_HASH=${ip_hash%% *}
+    elif command -v openssl >/dev/null 2>&1; then
+        ip_hash=$(openssl dgst -sha256 "$1") || return 12
+        INSTALLER_HASH=${ip_hash##*= }
+    else
+        printf '%s\n' 'Automatic privilege bootstrap needs sha256sum or openssl; run the installer explicitly as root instead.' >&2
+        return 2
+    fi
+}
+
+# The ordinary-user coordinator owns preparation and its sudo transport. Root
+# owns privileged children; closing control requests root cancellation/join.
+installer_privilege_read() {
+    ip_read_count=$1
+    installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/bridge-read" --max-bytes "$ip_read_count" --timeout 60s -- \
+        dd "if=$transaction_dir/status" bs=1 "count=$ip_read_count" iflag=fullblock || return $?
+    installer_file_size "$transaction_dir/bridge-read" || return 12
+    [ "$INSTALLER_FILE_SIZE" = "$ip_read_count" ] || return 12
+}
+
+installer_privilege_result() {
+    installer_privilege_read 4 || return $?
+    IFS= read -r ip_result < "$transaction_dir/bridge-read" || return 12
+    case "$ip_result" in [012][0123456789][0123456789]) ;; *) return 12 ;; esac
+    # decimal conversion without shell-dependent octal interpretation
+    ip_h=${ip_result%??}; ip_t=${ip_result#?}; ip_t=${ip_t%?}; ip_o=${ip_result#??}
+    INSTALLER_ROOT_RESULT=$((ip_h * 100 + ip_t * 10 + ip_o))
+    [ "$INSTALLER_ROOT_RESULT" -le 255 ] || return 12
+    INSTALLER_ROOT_ACK=1
+}
+
+installer_privilege_cleanup() {
+    if [ "${INSTALLER_BRIDGE_OPEN:-0}" = 1 ]; then
+        exec 3>&-
+        # EOF is the only request across UIDs. Never kill the root coordinator
+        # before its rollback/native operations have joined.
+        if [ "$INSTALLER_ROOT_ACK" = 0 ]; then installer_privilege_result || return 1; fi
+        ip_sudo_status=0
+        wait "$INSTALLER_SUDO_PID" || ip_sudo_status=$?
+        INSTALLER_SUDO_PID=
+        exec 4>&-
+        INSTALLER_BRIDGE_OPEN=0
+        [ "$ip_sudo_status" = "$INSTALLER_ROOT_RESULT" ] || return 1
+    fi
+}
+
+installer_privilege_install() {
+    ip_app=$1; shift
+    [ -x /usr/bin/sudo ] && /usr/bin/sudo -n true || {
+        printf '%s\n' 'Installer: system service needs sudo credentials. Run sudo -v in a terminal and retry, or invoke the installer explicitly as root. No password prompt was started.' >&2
+        return 2
+    }
+    installer_layout "$ip_app" system || return $?
+    [ "$INSTALLER_SCOPE" = system ] || return 2
+    installer_policy "$ip_app" || return $?
+    installer_space_budget "$INSTALLER_MAX_DOWNLOAD" "$INSTALLER_MAX_EXPANDED" "$INSTALLER_MAX_EXPANDED" "$INSTALLER_MAX_DOWNLOAD" || return $?
+    installer_storage_select "$INSTALLER_PREFIX" "$INSTALLER_REQUIRED_BYTES" 1 0 || return $?
+    INSTALLER_PREFIX=$INSTALLER_STORAGE_PATH
+    [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX" get system_protected)" = true ] || return 12
+    INSTALLER_WORK_ROOT=${installer_work_dir:-${ZSETUP_WORK_DIR:-$HOME/.local/state/linkease/$ip_app/.staging}}
+    installer_valid_directory "$INSTALLER_WORK_ROOT" || return $?
+    installer_storage_select "$INSTALLER_WORK_ROOT" "$INSTALLER_REQUIRED_BYTES" 1 1 || return $?
+    INSTALLER_WORK_ROOT=$INSTALLER_STORAGE_PATH
+    printf 'Prepare as uid=%s: prefix=%s staging=%s; privileged commit uses protected prefix/.staging\n' "$ip_uid" "$INSTALLER_PREFIX" "$INSTALLER_WORK_ROOT" >&2
+    installer_transaction_begin || return $?
+    # Shared metadata/version selection, no extracted business program executes
+    # under the ordinary account during preparation.
+    SERVICE_APP=$ip_app
+    "${ip_app}_linux_metadata" || return $?
+    case "$ip_app" in
+        ddnsto)
+            installer_service_cached "$version_num" "$digest" || return $?
+            [ "$SERVICE_CACHED" = 1 ] || installer_download "linux-binary/$archive_name" "$transaction_dir/$archive_name" "$digest" || return $?
+            set -- --token "$TOKEN"
+            ;;
+        linkease)
+            installer_service_cached "$version_num" "$le_archive_sha:$le_mount_sha" || return $?
+            if [ "$SERVICE_CACHED" = 0 ]; then
+                installer_download "$relative_folder/$archive_name" "$transaction_dir/$archive_name" "$le_archive_sha" || return $?
+                installer_download "$relative_folder/$mount_name" "$transaction_dir/$mount_name" "$le_mount_sha" || return $?
+            fi
+            set -- --version "$version_num"
+            ;;
+        *) return 2 ;;
+    esac
+    installer_privileged_program > "$transaction_dir/root-program" || return 12
+    installer_privilege_hash "$ZSETUP_BIN" || return $?
+    ip_native_sha=$INSTALLER_HASH
+    installer_privilege_hash "$transaction_dir/root-program" || return $?
+    ip_program_sha=$INSTALLER_HASH
+    ip_ca_sha=
+    if [ -n "${ZSETUP_CA_FILE:-}" ]; then installer_privilege_hash "$ZSETUP_CA_FILE" || return $?; ip_ca_sha=$INSTALLER_HASH; fi
+    mkfifo "$transaction_dir/control" "$transaction_dir/status" || return 12
+    exec 3<> "$transaction_dir/control"
+    exec 4<> "$transaction_dir/status"
+    INSTALLER_BRIDGE_OPEN=1; INSTALLER_ROOT_ACK=0; INSTALLER_SUDO_PID=
+    INSTALLER_CLEANUP_HOOK=installer_privilege_cleanup
+    INSTALLER_SPAWNING=1
+    /usr/bin/sudo -n /bin/sh -eu -c "$(installer_privilege_root_code)" zsetup-root \
+        "$ip_uid" "$ZSETUP_BIN" "$ip_native_sha" "$transaction_dir/root-program" "$ip_program_sha" \
+        "${ZSETUP_CA_FILE:-}" "$ip_ca_sha" "$transaction_dir" "$os" "$package_manager" "$arch" \
+        "$ZSETUP_SOURCE_BASES" "${ZSETUP_SOURCE_FALLBACK:-}" "$INSTALLER_PREFIX" "${DDNSTO_VERSION:-}" "$@" \
+        < "$transaction_dir/control" > "$transaction_dir/status" 3>&- 4>&- &
+    INSTALLER_SUDO_PID=$!
+    INSTALLER_SPAWNING=0
+    [ "$INSTALLER_SIGNAL" = 0 ] || exit "$INSTALLER_SIGNAL"
+    installer_privilege_read 1 || return $?
+    ip_ready=$(cat "$transaction_dir/bridge-read")
+    case "$ip_ready" in
+        R) printf 'G\n' >&3 ;;
+        E) installer_privilege_result || return $?; return "$INSTALLER_ROOT_RESULT" ;;
+        *) return 12 ;;
+    esac
+    installer_privilege_result || return $?
+    ip_return=$INSTALLER_ROOT_RESULT
+    installer_transaction_finish || return $?
+    return "$ip_return"
+}
+
 
 # Business logic: maintained in ddnsto/business.sh
 # Included at build time; only ddnsto-install.sh is a public installer.
@@ -1138,7 +1391,8 @@ ddnsto_verified_download() {
     verified_output=$2
     verified_sha=$3
     verified_marker="$verified_output.verified"
-    ddnsto_download "$verified_relative" "$verified_output" "$verified_sha"
+    installer_package_immutable "$verified_marker" "$verified_sha" || return $?
+    ddnsto_download "$verified_relative" "$verified_output" "$verified_sha" || return $?
     verified_size=$(wc -c < "$verified_output" | tr -d '[:space:]')
     printf '%s:%s\n' "$verified_sha" "$verified_size" > "$transaction_dir/verified"
     mv -f "$transaction_dir/verified" "$verified_marker"
@@ -1150,34 +1404,8 @@ ddnsto_checksum() {
     }
 }
 
-ddnsto_rollback() {
-    [ "${replacement_started:-0}" = 1 ] || return 0
-    if [ "$had_old" = 1 ]; then
-        ddnsto_privileged mv -f "$backup" "$bin_path" || {
-            ddnsto_error "rollback failed; backup retained at $backup"; return 1;
-        }
-        replacement_started=0
-        ddnsto_privileged "$bin_path" -u "$TOKEN" -daemon || status 'DDNSTO: previous service could not be restarted; manual recovery needed'
-    else
-        ddnsto_privileged rm -f "$bin_path"
-        replacement_started=0
-    fi
-}
-
-ddnsto_cleanup() {
-    ddnsto_rollback || true
-    [ -z "${install_candidate:-}" ] || ddnsto_privileged rm -f "$install_candidate"
-    if [ "${replacement_started:-0}" = 0 ] && [ -n "${backup:-}" ]; then
-        ddnsto_privileged rm -f "$backup"
-    fi
-    if [ "${deprecated_config:-0}" = 1 ] && [ -f "${transaction_dir:-}/deprecated-config" ]; then
-        cp -p "$transaction_dir/deprecated-config" "$config_path"
-    fi
-    [ -z "${transaction_dir:-}" ] || rm -rf "$transaction_dir"
-}
-
-ddnsto_privileged() {
-    if [ -n "${SUDO:-}" ]; then "$SUDO" "$@"; else "$@"; fi
+ddnsto_package_restore() {
+    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1; fi
 }
 
 ddnsto_register() {
@@ -1208,23 +1436,23 @@ ddnsto_openwrt() {
     status "[2/4] Checking DDNSTO $SELECTED_VERSION version ($package_manager/$arch)..."
     version_pointer=VERSION
     [ "$SELECTED_VERSION" != lite ] || version_pointer=VERSION_LITE
-    ddnsto_download "openwrt/$version_pointer" "$transaction_dir/version" '' 1
-    version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version")
+    ddnsto_download "openwrt/$version_pointer" "$transaction_dir/version" '' 1 || return $?
+    version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version") || return $?
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid version metadata'; return 11 ;; esac
     version_folder=$SELECTED_VERSION
     [ "$pkg_ext" != apk ] || version_folder="$version_folder-apk"
     relative_folder="openwrt/$version_folder/$version_num"
-    ddnsto_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1
+    ddnsto_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1 || return $?
     status "      DDNSTO $version_num ($SELECTED_VERSION; Lite below 900 MB)"
     status '[3/4] Downloading and verifying DDNSTO packages...'
-    package_cache="$work_dir/cache/$version_folder/$version_num/$arch"
-    mkdir -p "$package_cache"
+    installer_package_cache "$version_num-$version_folder" "$arch" || return $?
+    package_cache=$PACKAGE_CACHE
     main_package="ddnsto_$package_arch.$pkg_ext"
     ui_package="luci-app-ddnsto.$pkg_ext"
     language_package="luci-i18n-ddnsto-zh-cn.$pkg_ext"
     for package in "$main_package" "$ui_package" "$language_package"; do
-        digest=$(ddnsto_checksum "$transaction_dir/sums" "$package")
-        ddnsto_verified_download "$relative_folder/$package" "$package_cache/$package" "$digest"
+        digest=$(ddnsto_checksum "$transaction_dir/sums" "$package") || return $?
+        ddnsto_verified_download "$relative_folder/$package" "$package_cache/$package" "$digest" || return $?
     done
     status '[4/4] Installing DDNSTO packages...'
     # All packages are verified before touching dependencies or installed packages.
@@ -1237,41 +1465,41 @@ ddnsto_openwrt() {
     fi
     if [ "$package_manager" = opkg ]; then
         if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
-            opkg update && opkg install luci-compat || status 'DDNSTO: luci-compat installation failed'
+            installer_package_command update update && installer_package_command install install luci-compat || status 'DDNSTO: luci-compat installation failed'
         fi
-        if ! opkg list-installed | grep -q '^luci-lua-runtime '; then
-            opkg update && opkg install luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
+        if ! installer_package_command query list-installed | grep -q '^luci-lua-runtime '; then
+            installer_package_command update update && installer_package_command install install luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
         fi
-        opkg remove app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
-        for package in "$main_package" "$ui_package" "$language_package"; do opkg install "$package_cache/$package"; done
+        installer_package_command remove remove app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
+        for package in "$main_package" "$ui_package" "$language_package"; do installer_package_command install install "$package_cache/$package" || return $?; done
     else
         if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
-            apk update && apk add luci-compat || status 'DDNSTO: luci-compat installation failed'
+            installer_package_command update update && installer_package_command add add luci-compat || status 'DDNSTO: luci-compat installation failed'
         fi
-        if ! apk info -e luci-lua-runtime >/dev/null 2>&1; then
-            apk update && apk add luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
+        if ! installer_package_command query info -e luci-lua-runtime >/dev/null 2>&1; then
+            installer_package_command update update && installer_package_command add add luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
         fi
-        apk del app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
-        for package in "$main_package" "$ui_package" "$language_package"; do apk add --allow-untrusted "$package_cache/$package"; done
+        installer_package_command del del app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
+        for package in "$main_package" "$ui_package" "$language_package"; do installer_package_command add add --allow-untrusted "$package_cache/$package" || return $?; done
     fi
-    ddnsto -v
+    installer_exec_native "$ZSETUP_BIN" run -- ddnsto -v || return $?
     deprecated_config=0
     if [ -n "$TOKEN" ]; then
-        uci set "ddnsto.@ddnsto[0].token=$TOKEN"
-        uci set 'ddnsto.@ddnsto[0].enabled=1'
-        uci commit ddnsto
-        "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" restart
+        installer_exec_native "$ZSETUP_BIN" run -- uci set "ddnsto.@ddnsto[0].token=$TOKEN" || return $?
+        installer_exec_native "$ZSETUP_BIN" run -- uci set 'ddnsto.@ddnsto[0].enabled=1' || return $?
+        installer_exec_native "$ZSETUP_BIN" run -- uci commit ddnsto || return $?
+        installer_exec_native "$ZSETUP_BIN" run -- "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" restart || return $?
     else
         status 'DDNSTO: get a token at https://www.ddnsto.com and configure it in LuCI'
     fi
     if [ "$VERIFY_STATUS" = 1 ]; then
-        pgrep -x ddnstod >/dev/null || { ddnsto_error 'DDNSTO process not found'; return 1; }
-        ddnsto -w
+        installer_exec_native "$ZSETUP_BIN" run -- pgrep -x ddnstod >/dev/null || { ddnsto_error 'DDNSTO process not found'; return 1; }
+        installer_exec_native "$ZSETUP_BIN" run -- ddnsto -w || return $?
     fi
     status 'DDNSTO installation completed; refresh LuCI if its menu is missing'
 }
 
-ddnsto_linux() {
+ddnsto_linux_metadata() {
     case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
     [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
@@ -1288,8 +1516,12 @@ ddnsto_linux() {
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid DDNSTO_VERSION'; return 2 ;; esac
     status "[2/4] Checking DDNSTO standard $version_num ($arch)..."
     archive_name="ddnsto-standard-$version_num.tar.gz"
-    ddnsto_download linux-binary/SHA256SUMS "$transaction_dir/sums" '' 1
-    digest=$(ddnsto_checksum "$transaction_dir/sums" "$archive_name")
+    ddnsto_download linux-binary/SHA256SUMS "$transaction_dir/sums" '' 1 || return $?
+    digest=$(ddnsto_checksum "$transaction_dir/sums" "$archive_name") || return $?
+}
+
+ddnsto_linux() {
+    ddnsto_linux_metadata || return $?
     installer_service_cached "$version_num" "$digest" || return $?
     if [ "$SERVICE_CACHED" = 0 ]; then
         archive_path="$transaction_dir/product.tar.gz"
@@ -1312,7 +1544,7 @@ ddnsto_linux() {
 
 ddnsto_install() {
     : "${ZSETUP_BIN:?zsetup is required}" "${ZSETUP_SOURCE_BASES:?source group is required}"
-    ddnsto_parse_args "$@"
+    ddnsto_parse_args "$@" || return $?
     os=${ZSETUP_OS:-$("$ZSETUP_BIN" context get os)}
     package_manager=${ZSETUP_PACKAGE_MANAGER:-$("$ZSETUP_BIN" context get package_manager)}
     arch=${ZSETUP_ARCH:-$("$ZSETUP_BIN" context get arch)}
@@ -1324,31 +1556,853 @@ ddnsto_install() {
     INSTALLER_REMOTE_APP=ddnsto
     if [ "$business_platform" = linux ]; then
         [ -z "${DDNSTO_BIN_PATH:-}" ] || { ddnsto_error 'DDNSTO_BIN_PATH is retired; use --installer-prefix for the protected installation root'; return 2; }
+        ip_uid=$("$ZSETUP_BIN" storage / get effective_uid) || return 12
+        if [ "$ip_uid" != 0 ]; then installer_privilege_install ddnsto "$@"; return $?; fi
         installer_service_prepare ddnsto || return $?
         ddnsto_linux || return $?
         installer_transaction_finish
         return $?
     fi
-    [ -z "${installer_prefix:-}${installer_work_dir:-}" ] && [ "${installer_scope:-system}" = system ] || { ddnsto_error 'OpenWrt storage adapter is pending; do not apply Linux layout options to native packages'; return 2; }
-    installer_policy ddnsto || return $?
-    work_dir=${ZSETUP_WORK_DIR:-${WORK_ROOT}/ddnsto}
-    mkdir -p "$work_dir"
-    chmod 0700 "$work_dir"
-    transaction_dir=$(mktemp -d "$work_dir/.transaction.XXXXXX")
-    install_candidate=
-    backup=
-    replacement_started=0
-    SUDO=
-    trap ddnsto_cleanup EXIT
-    trap 'exit 129' HUP
-    trap 'exit 130' INT
-    trap 'exit 143' TERM
-    if [ "$business_platform" = openwrt ]; then ddnsto_openwrt; else ddnsto_linux; fi
-    ddnsto_cleanup
-    transaction_dir=
-    trap - EXIT HUP INT TERM
+    installer_package_prepare ddnsto || return $?
+    INSTALLER_PACKAGE_CLEANUP=ddnsto_package_restore
+    ddnsto_openwrt || return $?
+    PACKAGE_PHASE=complete
+    installer_transaction_finish
 }
 
+installer_privileged_program() {
+cat <<'ZSETUP_PRIVATE_ROOT_PROGRAM'
+set -eu
+status() { printf '%s\n' "$*" >&2; }
+installer_storage_error() { printf 'Installer storage: %s\n' "$*" >&2; }
+installer_valid_directory() {
+    case "$1" in
+        /*) ;;
+        *) installer_storage_error 'directory must be absolute'; return 2 ;;
+    esac
+    case "$1" in
+        /|*/../*|*/..|*/./*|*/.|*//*|*'
+'*|*'	'*) installer_storage_error 'directory must be a normalized non-root path'; return 2 ;;
+    esac
+}
+installer_layout() {
+    is_app=$1
+    case "$is_app" in ''|*[!a-z0-9_-]*) return 2 ;; esac
+    INSTALLER_SCOPE=${installer_scope:-$2}
+    case "$INSTALLER_SCOPE" in user|system) ;; *) installer_storage_error 'scope must be user or system'; return 2 ;; esac
+    if [ "$INSTALLER_SCOPE" = user ]; then
+        : "${HOME:?HOME is required for user installation}"
+        installer_valid_directory "$HOME" || return $?
+        INSTALLER_PREFIX=${installer_prefix:-$HOME/.local/lib/linkease/$is_app}
+        INSTALLER_COMMAND="$HOME/.local/bin/$is_app"
+    else
+        INSTALLER_PREFIX=${installer_prefix:-/opt/linkease/$is_app}
+        INSTALLER_COMMAND="$INSTALLER_PREFIX/current/bin/$is_app"
+    fi
+    INSTALLER_PREFIX=${INSTALLER_PREFIX%/}
+    installer_valid_directory "$INSTALLER_PREFIX"
+}
+installer_space_budget() {
+    [ "$#" = 4 ] || return 2
+    is_sum=0
+    for is_size in "$@"; do
+        case "$is_size" in ''|*[!0-9]*) installer_storage_error 'artifact size budget is unknown or invalid'; return 2 ;; esac
+        [ "${#is_size}" -le 10 ] && [ "$is_size" -le 1900000000 ] || return 2
+        case "$is_size" in 0) ;; 0*) return 2 ;; esac
+        is_sum=$((is_sum + is_size))
+        [ "$is_sum" -le 1900000000 ] || return 2
+    done
+    INSTALLER_REQUIRED_BYTES=$((is_sum + (is_sum + 9) / 10 + 8388608))
+}
+installer_storage_check() {
+    is_path=$1; is_needed=$2; is_exec=$3; is_write=$4
+    case "$is_needed" in ''|*[!0-9]*) return 2 ;; esac
+    [ "${#is_needed}" -le 10 ] && [ "$is_needed" -le 2147483647 ] || return 2
+    case "$is_exec:$is_write" in 0:0|0:1|1:0|1:1) ;; *) return 2 ;; esac
+    is_memory=$("$ZSETUP_BIN" storage "$is_path" get memory_backed) || {
+        installer_storage_error 'storage probe unavailable; a Rust zsetup with storage support is required'; return 12;
+    }
+    case "$is_memory" in
+        false) ;;
+        true) installer_storage_error "memory filesystem at $is_path; choose a persistent directory"; return 12 ;;
+        *) installer_storage_error "cannot establish persistent backing at $is_path; choose a verified directory"; return 12 ;;
+    esac
+    is_readonly=$("$ZSETUP_BIN" storage "$is_path" get read_only) || return 12
+    [ "$is_readonly" = false ] || { installer_storage_error "read-only or unknown mount at $is_path"; return 12; }
+    if [ "$is_exec" = 1 ]; then
+        is_noexec=$("$ZSETUP_BIN" storage "$is_path" get noexec) || return 12
+        [ "$is_noexec" = false ] || { installer_storage_error "execution is unavailable at $is_path"; return 12; }
+    fi
+    if [ "$is_write" = 1 ]; then
+        is_writable=$("$ZSETUP_BIN" storage "$is_path" get writable) || return 12
+        [ "$is_writable" = true ] || { installer_storage_error "write permission is required at $is_path"; return 12; }
+    fi
+    is_available=$("$ZSETUP_BIN" storage "$is_path" get available_bytes) || return 12
+    case "$is_available" in ''|*[!0-9]*) return 12 ;; esac
+    [ "$is_available" -ge "$is_needed" ] || {
+        installer_storage_error "insufficient space at $is_path: need $is_needed bytes, available $is_available; choose another directory"; return 12;
+    }
+    is_inodes=$("$ZSETUP_BIN" storage "$is_path" get available_inodes) || return 12
+    case "$is_inodes" in
+        unknown) installer_storage_error "inode availability is unknown at $is_path" ;;
+        ''|*[!0-9]*) return 12 ;;
+        *) [ "$is_inodes" -gt 0 ] || { installer_storage_error "no free inodes at $is_path"; return 12; } ;;
+    esac
+}
+installer_storage_select() {
+    INSTALLER_STORAGE_PATH=$1
+    is_select_needed=$2; is_select_exec=$3; is_select_write=$4
+    while :; do
+        if installer_storage_check "$INSTALLER_STORAGE_PATH" "$is_select_needed" "$is_select_exec" "$is_select_write"; then
+            return 0
+        fi
+        [ -t 0 ] || return 12
+        printf 'Enter another persistent absolute directory (empty cancels): ' >&2
+        IFS= read -r INSTALLER_STORAGE_PATH || return 12
+        [ -n "$INSTALLER_STORAGE_PATH" ] || return 12
+        installer_valid_directory "$INSTALLER_STORAGE_PATH" || return 2
+    done
+}
+installer_preflight() {
+    installer_layout "$1" "$2" || return $?
+    installer_storage_select "$INSTALLER_PREFIX" "$3" 1 "$4" || return $?
+    INSTALLER_PREFIX=$INSTALLER_STORAGE_PATH
+    INSTALLER_WORK_ROOT=${installer_work_dir:-${ZSETUP_WORK_DIR:-$INSTALLER_PREFIX/.staging}}
+    installer_valid_directory "$INSTALLER_WORK_ROOT" || return $?
+    installer_storage_select "$INSTALLER_WORK_ROOT" "$3" 1 "$4" || return $?
+    INSTALLER_WORK_ROOT=$INSTALLER_STORAGE_PATH
+    printf 'Install plan: application=%s scope=%s prefix=%s staging=%s peak-extra-bytes=%s\n' \
+        "$1" "$INSTALLER_SCOPE" "$INSTALLER_PREFIX" "$INSTALLER_WORK_ROOT" "$3" >&2
+}
+installer_policy() {
+    INSTALLER_DOWNLOAD_BYTES=0; INSTALLER_EXPANDED_BYTES=0; INSTALLER_FILE_COUNT=0
+    INSTALLER_RESERVE=8388608
+    case "$1" in
+        fastnet|fastpve) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
+        ddnsto) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16 ;;
+        linkease) INSTALLER_MAX_DOWNLOAD=134217728; INSTALLER_MAX_EXPANDED=268435456; INSTALLER_MAX_FILES=128 ;;
+        *) return 2 ;;
+    esac
+    ib_commit_budget=$INSTALLER_MAX_EXPANDED
+    [ "$ib_commit_budget" != 0 ] || ib_commit_budget=$INSTALLER_MAX_DOWNLOAD
+    installer_space_budget "$INSTALLER_MAX_DOWNLOAD" "$INSTALLER_MAX_EXPANDED" "$ib_commit_budget" 0
+    printf '%s\n' 'Artifact size metadata is incomplete; using measured safety ceilings, not a guaranteed space estimate.' >&2
+}
+installer_file_size() {
+    [ -f "$1" ] && [ ! -L "$1" ] || return 11
+    set -- $(wc -c < "$1")
+    case "$1" in ''|*[!0-9]*) return 11 ;; esac
+    INSTALLER_FILE_SIZE=$1
+}
+installer_download() {
+    ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}
+    case "${ib_relative##*/}" in
+        version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
+        *) ib_metadata=0; ib_limit=$((INSTALLER_MAX_DOWNLOAD - INSTALLER_DOWNLOAD_BYTES)); [ "$ib_limit" -gt 0 ] || return 11 ;;
+    esac
+    if [ "$ib_metadata" = 0 ] && [ -n "${ZSETUP_PRIVILEGED_STAGE:-}" ] && [ -n "$ib_sha" ]; then
+        ib_prepared="$ZSETUP_PRIVILEGED_STAGE/${ib_relative##*/}"
+        if [ -f "$ib_prepared" ] && [ ! -L "$ib_prepared" ]; then
+            installer_exec_native "$ZSETUP_BIN" capture -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE" --timeout 30s -- cat "$ib_prepared" || return $?
+        fi
+    fi
+    set -- "$ZSETUP_BIN" download -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE"
+    [ -z "$ib_sha" ] || set -- "$@" --sha256 "$ib_sha"
+    [ "$ib_fresh" = 0 ] || set -- "$@" --no-cache
+    [ -z "${ZSETUP_CA_FILE:-}" ] || set -- "$@" --ca-file "$ZSETUP_CA_FILE"
+    for ib_base in $ZSETUP_SOURCE_BASES; do set -- "$@" "${ib_base%/}/$INSTALLER_REMOTE_APP/$ib_relative"; done
+    [ -z "${ZSETUP_SOURCE_FALLBACK:-}" ] || set -- "$@" --fallback-url "${ZSETUP_SOURCE_FALLBACK%/}/$INSTALLER_REMOTE_APP/$ib_relative"
+    installer_exec_native "$@" || return $?
+    if [ "$ib_metadata" = 0 ]; then
+        installer_file_size "$ib_output" || return $?
+        INSTALLER_DOWNLOAD_BYTES=$((INSTALLER_DOWNLOAD_BYTES + INSTALLER_FILE_SIZE))
+        [ "$INSTALLER_DOWNLOAD_BYTES" -le "$INSTALLER_MAX_DOWNLOAD" ] || return 11
+    fi
+}
+installer_extract_member() {
+    ib_output=$1; shift
+    ib_remaining=$((INSTALLER_MAX_EXPANDED - INSTALLER_EXPANDED_BYTES))
+    [ "$ib_remaining" -gt 0 ] && [ "$INSTALLER_FILE_COUNT" -lt "$INSTALLER_MAX_FILES" ] || return 11
+    installer_exec_native "$ZSETUP_BIN" capture -o "$ib_output" --max-bytes "$ib_remaining" --min-free-bytes "$INSTALLER_RESERVE" -- "$@" || return $?
+    installer_file_size "$ib_output" || return $?
+    [ "$INSTALLER_FILE_SIZE" -gt 0 ] || return 11
+    INSTALLER_EXPANDED_BYTES=$((INSTALLER_EXPANDED_BYTES + INSTALLER_FILE_SIZE))
+    INSTALLER_FILE_COUNT=$((INSTALLER_FILE_COUNT + 1))
+}
+installer_exec_native() {
+    if [ "${INSTALLER_TRANSACTION_ACTIVE:-0}" = 1 ]; then installer_owned_native "$@"; else "$@"; fi
+}
+installer_transaction_begin() {
+    umask 077
+    INSTALLER_CHILD=
+    INSTALLER_SPAWNING=0
+    INSTALLER_SIGNAL=0
+    INSTALLER_LOCK_HELD=0
+    INSTALLER_TRANSACTION_ACTIVE=0
+    transaction_dir=
+    [ ! -L "$INSTALLER_WORK_ROOT" ] || return 12
+    mkdir -p "$INSTALLER_WORK_ROOT" || return 12
+    [ "$("$ZSETUP_BIN" storage "$INSTALLER_WORK_ROOT" get private_directory)" = true ] || {
+        printf 'Installer: staging must be a private directory owned by the current user: %s\n' "$INSTALLER_WORK_ROOT" >&2
+        return 12
+    }
+    INSTALLER_LOCK="$INSTALLER_WORK_ROOT/.install-lock"
+    if ! mkdir "$INSTALLER_LOCK" 2>/dev/null; then
+        printf 'Installer: active or interrupted transaction at %s; inspect/recover it before retrying.\n' "$INSTALLER_LOCK" >&2
+        return 2
+    fi
+    INSTALLER_LOCK_HELD=1
+    trap 'installer_transaction_exit $?' EXIT
+    trap 'installer_transaction_signal 129' HUP
+    trap 'installer_transaction_signal 130' INT
+    trap 'installer_transaction_signal 143' TERM
+    printf '%s\n' "$$" > "$INSTALLER_LOCK/owner"
+    transaction_dir=$(mktemp -d "$INSTALLER_WORK_ROOT/.transaction.XXXXXX") || return 12
+    printf '%s\n' "$$" > "$transaction_dir/.owner"
+    INSTALLER_TRANSACTION_ACTIVE=1
+}
+installer_transaction_signal() {
+    INSTALLER_SIGNAL=$1
+    [ "$INSTALLER_SPAWNING" = 1 ] || exit "$INSTALLER_SIGNAL"
+}
+installer_owned_native() {
+    [ "$1" = "$ZSETUP_BIN" ] || return 2
+    [ "$INSTALLER_SIGNAL" = 0 ] || return "$INSTALLER_SIGNAL"
+    INSTALLER_SPAWNING=1
+    if [ "${INSTALLER_BRIDGE_OPEN:-0}" = 1 ]; then
+        "$@" <&0 3>&- 4>&- &
+    else
+        "$@" <&0 &
+    fi
+    INSTALLER_CHILD=$!
+    INSTALLER_SPAWNING=0
+    [ "$INSTALLER_SIGNAL" = 0 ] || exit "$INSTALLER_SIGNAL"
+    it_status=0
+    wait "$INSTALLER_CHILD" || it_status=$?
+    INSTALLER_CHILD=
+    return "$it_status"
+}
+installer_transaction_cleanup() {
+    if [ -n "$INSTALLER_CHILD" ]; then
+        kill -TERM "$INSTALLER_CHILD" 2>/dev/null || true
+        wait "$INSTALLER_CHILD" 2>/dev/null || true
+        INSTALLER_CHILD=
+    fi
+    if [ -n "${INSTALLER_CLEANUP_HOOK:-}" ]; then
+        INSTALLER_SIGNAL=0
+        "$INSTALLER_CLEANUP_HOOK" || {
+            printf 'Installer: recovery incomplete; staging and lease retained at %s\n' "$INSTALLER_WORK_ROOT" >&2
+            return 12
+        }
+    fi
+    if [ -n "$transaction_dir" ]; then
+        case "$transaction_dir" in "$INSTALLER_WORK_ROOT"/.transaction.*) ;; *) return 12 ;; esac
+        [ ! -L "$transaction_dir" ] && [ ! -L "$transaction_dir/.owner" ] && [ -f "$transaction_dir/.owner" ] || return 12
+        set -- $(wc -c < "$transaction_dir/.owner")
+        [ "$1" -le 16 ] || return 12
+        it_owner=
+        IFS= read -r it_owner < "$transaction_dir/.owner" || return 12
+        [ "$it_owner" = "$$" ] || return 12
+        rm -rf "$transaction_dir" || return 12
+        transaction_dir=
+    fi
+    if [ "$INSTALLER_LOCK_HELD" = 1 ]; then
+        rm -f "$INSTALLER_LOCK/owner" || return 12
+        rmdir "$INSTALLER_LOCK" || return 12
+        INSTALLER_LOCK_HELD=0
+    fi
+    INSTALLER_TRANSACTION_ACTIVE=0
+}
+installer_transaction_exit() {
+    it_exit=$1
+    INSTALLER_EXIT_CODE=$it_exit
+    trap - EXIT
+    trap '' HUP INT TERM
+    installer_transaction_cleanup || { [ "$it_exit" != 0 ] || it_exit=12; }
+    exit "$it_exit"
+}
+installer_transaction_finish() {
+    INSTALLER_EXIT_CODE=0
+    installer_transaction_cleanup || return $?
+    trap - EXIT HUP INT TERM
+}
+installer_dispatch() {
+    il_app=$1; shift
+    installer_scope=${ZSETUP_INSTALL_SCOPE:-}
+    installer_prefix=${ZSETUP_INSTALL_PREFIX:-}
+    installer_work_dir=
+    il_seen_scope=0; il_seen_prefix=0; il_seen_work=0
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --installer-scope|--installer-prefix|--installer-work-dir)
+                [ "$#" -ge 2 ] && [ -n "$2" ] || return 2
+                case "$1" in
+                    --installer-scope) [ "$il_seen_scope" = 0 ] || return 2; installer_scope=$2; il_seen_scope=1 ;;
+                    --installer-prefix) [ "$il_seen_prefix" = 0 ] || return 2; installer_prefix=$2; il_seen_prefix=1 ;;
+                    *) [ "$il_seen_work" = 0 ] || return 2; installer_work_dir=$2; il_seen_work=1 ;;
+                esac
+                shift 2 ;;
+            --) shift; break ;;
+            --installer-*) printf 'Unknown installer option: %s\n' "$1" >&2; return 2 ;;
+            *) break ;;
+        esac
+    done
+    "${il_app}_install" "$@"
+}
+installer_require_root() {
+    if [ "$("$ZSETUP_BIN" storage / get effective_uid)" != 0 ]; then
+        printf '%s\n' 'Installer: this operation installs a system service and requires root.' \
+            'Run the downloaded installer explicitly with sudo (or from a root shell); unattended installation never requests a password.' >&2
+        return 2
+    fi
+}
+installer_service_prepare() {
+    SERVICE_APP=$1
+    installer_layout "$1" system || return $?
+    [ "$INSTALLER_SCOPE" = system ] || { printf 'Installer: %s requires system scope; user services are not supported.\n' "$1" >&2; return 2; }
+    installer_require_root || return $?
+    installer_policy "$1" || return $?
+    installer_preflight "$1" system "$INSTALLER_REQUIRED_BYTES" 1 || return $?
+    for service_protected_path in "$INSTALLER_PREFIX" "$INSTALLER_WORK_ROOT"; do
+        [ "$("$ZSETUP_BIN" storage "$service_protected_path" get system_protected)" = true ] || {
+            printf 'Installer: system payload/staging ancestors must be root-owned, without symlinks or group/other write access: %s\n' "$service_protected_path" >&2; return 12;
+        }
+    done
+    case "$1" in
+        ddnsto) SERVICE_NAME=com.linkease.ddnstoshell.service; SERVICE_CONFIG=/etc/ddnsto/ddnsto-config.json ;;
+        linkease) SERVICE_NAME=com.linkease.linkeasedaemon.service; SERVICE_CONFIG= ;;
+        *) return 2 ;;
+    esac
+    SERVICE_UNIT="/etc/systemd/system/$SERVICE_NAME"
+    SERVICE_BACKEND=systemd
+    if [ ! -d /run/systemd/system ] || ! command -v systemctl >/dev/null 2>&1; then
+        printf '%s\n' 'Installer: migration of non-systemd service supervision is pending; retain the legacy installer for this system.' >&2
+        return 2
+    fi
+    [ "$("$ZSETUP_BIN" storage "$SERVICE_UNIT" get system_protected)" = true ] || return 12
+    if [ -n "$SERVICE_CONFIG" ]; then
+        [ "$("$ZSETUP_BIN" storage "$SERVICE_CONFIG" get system_protected)" = true ] || return 12
+    fi
+    SERVICE_OLD=
+    SERVICE_CHANGED=0; SERVICE_NEW_VERSION=0; SERVICE_CANDIDATE=; SERVICE_GOOD=0
+    SERVICE_HAD_UNIT=0; SERVICE_WAS_ACTIVE=0; SERVICE_WAS_ENABLED=0; SERVICE_HAD_CONFIG=0; SERVICE_CONFIG_TOUCHED=0
+    SERVICE_DEST_LOCK_HELD=0
+    SERVICE_COMMAND="${HOME:?HOME is required}/.local/bin/$SERVICE_APP"
+    SERVICE_ALIAS_USER=
+    case "${SUDO_UID:-0}" in ''|*[!0-9]*) return 2 ;; esac
+    if [ "${SUDO_UID:-0}" != 0 ]; then
+        command -v getent >/dev/null 2>&1 && command -v runuser >/dev/null 2>&1 || {
+            printf '%s\n' 'Installer: getent and runuser are required to create the sudo caller command without root writes into its HOME.' >&2; return 2;
+        }
+        SERVICE_ALIAS_USER=pending
+    elif [ "$("$ZSETUP_BIN" storage "${SERVICE_COMMAND%/*}" get system_protected)" != true ]; then
+        printf '%s\n' 'Installer: invoke sudo with its root HOME; do not preserve a user-writable HOME for root writes.' >&2; return 2;
+    fi
+    if [ -e "$INSTALLER_PREFIX/.managed" ] || [ -L "$INSTALLER_PREFIX/.managed" ]; then
+        [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX/.managed" get system_protected)" = true ] || return 12
+        installer_file_size "$INSTALLER_PREFIX/.managed" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 65 ] || return 2
+        IFS= read -r service_owner < "$INSTALLER_PREFIX/.managed" || return 2
+        [ "$service_owner" = "$SERVICE_APP" ] || return 2
+        [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX" get system_protected)" = true ] || return 12
+    else
+        for service_entry in "$INSTALLER_PREFIX"/* "$INSTALLER_PREFIX"/.[!.]* "$INSTALLER_PREFIX"/..?*; do
+            [ ! -e "$service_entry" ] && [ ! -L "$service_entry" ] || { printf 'Installer: unowned installation at %s\n' "$INSTALLER_PREFIX" >&2; return 2; }
+        done
+        for service_legacy in "/usr/bin/$1" "/usr/local/bin/$1" "/usr/sbin/$1" "$SERVICE_UNIT" "/etc/init.d/$SERVICE_NAME" "/etc/init.d/${SERVICE_NAME%.service}"; do
+            [ ! -e "$service_legacy" ] && [ ! -L "$service_legacy" ] || { printf 'Installer: existing installation requires explicit migration: %s\n' "$service_legacy" >&2; return 2; }
+        done
+    fi
+    for service_path in "$INSTALLER_PREFIX/versions" "$INSTALLER_PREFIX/.managed"; do [ ! -L "$service_path" ] || return 2; done
+    installer_service_read_current || return $?
+    umask 022
+    mkdir -p "$INSTALLER_PREFIX" "$INSTALLER_PREFIX/versions" || return 12
+    [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX/versions" get system_protected)" = true ] || return 12
+    if [ ! -e "$INSTALLER_PREFIX/.managed" ]; then
+        (set -C; printf '%s\n' "$SERVICE_APP" > "$INSTALLER_PREFIX/.managed") || return 2
+    fi
+    installer_transaction_begin || return $?
+    INSTALLER_CLEANUP_HOOK=installer_service_cleanup
+    if ! mkdir "$INSTALLER_PREFIX/.service-lock" 2>/dev/null; then
+        printf 'Installer: active or interrupted destination transaction at %s/.service-lock\n' "$INSTALLER_PREFIX" >&2; return 2
+    fi
+    SERVICE_DEST_LOCK_HELD=1
+    printf '%s\n' "$$" > "$INSTALLER_PREFIX/.service-lock/owner"
+    installer_service_read_current || return $?
+    if [ "$SERVICE_ALIAS_USER" = pending ]; then
+        installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/passwd" --max-bytes 4096 --timeout 5s -- getent passwd "$SUDO_UID" || return 2
+        IFS=: read -r service_user service_pass service_uid service_gid service_gecos service_home service_shell < "$transaction_dir/passwd" || return 2
+        [ "$service_uid" = "$SUDO_UID" ] && [ "$service_uid" != 0 ] && [ -n "$service_user" ] || return 2
+        installer_valid_directory "$service_home" || return 2
+        SERVICE_ALIAS_USER=$service_user
+        SERVICE_COMMAND="$service_home/.local/bin/$SERVICE_APP"
+    fi
+    installer_exec_native "$ZSETUP_BIN" capture -o "$transaction_dir/fragment" --max-bytes 4096 --timeout 5s -- systemctl show --property=FragmentPath --value "$SERVICE_NAME" || return $?
+    service_fragment=
+    IFS= read -r service_fragment < "$transaction_dir/fragment" || service_fragment=
+    [ -z "$service_fragment" ] || { [ "$service_fragment" = "$SERVICE_UNIT" ] && [ "$SERVICE_HAD_UNIT" = 1 ]; } || {
+        printf 'Installer: existing service belongs to another installation: %s\n' "$service_fragment" >&2; return 2;
+    }
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+        cp -p "$SERVICE_UNIT" "$transaction_dir/old-unit" || return 12
+        if installer_service_manager is-active; then SERVICE_WAS_ACTIVE=1; fi
+        if installer_service_manager is-enabled; then SERVICE_WAS_ENABLED=1; fi
+    fi
+    if [ -n "$SERVICE_CONFIG" ] && [ -e "$SERVICE_CONFIG" ]; then
+        [ "$("$ZSETUP_BIN" storage "$SERVICE_CONFIG" get system_protected)" = true ] || return 12
+        installer_file_size "$SERVICE_CONFIG" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+        cp -p "$SERVICE_CONFIG" "$transaction_dir/old-config" || return 12
+        SERVICE_HAD_CONFIG=1
+    fi
+    if [ -z "$SERVICE_ALIAS_USER" ] && { [ -e "$SERVICE_COMMAND" ] || [ -L "$SERVICE_COMMAND" ]; }; then
+        [ -L "$SERVICE_COMMAND" ] && [ "$(readlink "$SERVICE_COMMAND")" = "$INSTALLER_PREFIX/current/bin/$SERVICE_APP" ] || return 2
+    fi
+}
+installer_service_read_current() {
+    SERVICE_OLD=; SERVICE_HAD_UNIT=0
+    if [ -L "$INSTALLER_PREFIX/current" ]; then
+        SERVICE_OLD=$(readlink "$INSTALLER_PREFIX/current") || return 2
+        case "$SERVICE_OLD" in versions/*) ;; *) return 2 ;; esac
+        service_old_version=${SERVICE_OLD#versions/}
+        installer_service_version "$service_old_version" || return 2
+        [ -x "$INSTALLER_PREFIX/$SERVICE_OLD/bin/$SERVICE_APP" ] || return 2
+        [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX/$SERVICE_OLD/bin/$SERVICE_APP" get system_protected)" = true ] || return 12
+    elif [ -e "$INSTALLER_PREFIX/current" ]; then return 2
+    fi
+    if [ -e "$SERVICE_UNIT" ] || [ -L "$SERVICE_UNIT" ]; then
+        [ -n "$SERVICE_OLD" ] || return 2
+        installer_service_definition "$INSTALLER_PREFIX/$SERVICE_OLD/bin/$SERVICE_APP" || return 2
+        SERVICE_HAD_UNIT=1
+    fi
+}
+installer_service_alias() {
+    set -- /bin/sh -c 'set -eu
+umask 077
+directory=$1; application=$2; target=$3
+command_path="$directory/$application"
+if [ -e "$command_path" ] || [ -L "$command_path" ]; then
+    [ -L "$command_path" ] && [ "$(readlink "$command_path")" = "$target" ] || exit 2
+fi
+mkdir -p "$directory"
+candidate="$directory/.$application.$$"
+trap '\''rm -f "$candidate"'\'' EXIT
+ln -s "$target" "$candidate"
+mv -f "$candidate" "$command_path"
+' installer-alias "${SERVICE_COMMAND%/*}" "$SERVICE_APP" "$INSTALLER_PREFIX/current/bin/$SERVICE_APP"
+    if [ -n "$SERVICE_ALIAS_USER" ]; then
+        installer_exec_native "$ZSETUP_BIN" run -- runuser -u "$SERVICE_ALIAS_USER" -- "$@"
+    else
+        installer_exec_native "$ZSETUP_BIN" run -- "$@"
+    fi
+}
+installer_service_version() {
+    case "$1" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*|.*|-*|+*|_*) return 2 ;; esac
+    [ "${#1}" -le 64 ]
+}
+installer_service_manager() {
+    service_action=$1
+    if [ "$SERVICE_BACKEND" = systemd ]; then
+        case "$service_action" in
+            is-active|is-enabled) installer_exec_native "$ZSETUP_BIN" run -- systemctl "$service_action" --quiet "$SERVICE_NAME" ;;
+            reload) installer_exec_native "$ZSETUP_BIN" run -- systemctl daemon-reload ;;
+            *) installer_exec_native "$ZSETUP_BIN" run -- systemctl "$service_action" "$SERVICE_NAME" ;;
+        esac
+    else
+        case "$service_action" in
+            reload|enable|disable) return 0 ;;
+            is-active) service_action=status ;;
+        esac
+        installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_UNIT" "$service_action"
+    fi
+}
+installer_service_definition() {
+    installer_file_size "$SERVICE_UNIT" || return 2
+    [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+    [ "$("$ZSETUP_BIN" storage "$SERVICE_UNIT" get system_protected)" = true ] || return 12
+    service_expected=$1
+    installer_service_escape_exec "$service_expected"
+    service_expected_escaped=$service_escaped
+    installer_service_escape_exec "${service_expected%/*}/.service-run"
+    service_expected_wrapper=$service_escaped
+    service_found=0
+    while IFS= read -r service_line || [ -n "$service_line" ]; do
+        case "$SERVICE_BACKEND:$service_line" in
+            "systemd:ExecStart=$service_expected \"run\""|"systemd:ExecStart=\"$service_expected_escaped\" \"run\"") service_found=$((service_found + 1)) ;;
+            "systemd:ExecStart=/bin/sh \"$service_expected_wrapper\"") service_found=$((service_found + 1)) ;;
+            sysv:*"$service_expected"*) service_found=$((service_found + 1)) ;;
+        esac
+    done < "$SERVICE_UNIT"
+    [ "$service_found" = 1 ]
+}
+installer_service_replace() {
+    service_replaced=
+    service_rest=$1; service_needle=$2; service_replacement=$3
+    while :; do
+        case "$service_rest" in
+            *"$service_needle"*) service_replaced="$service_replaced${service_rest%%"$service_needle"*}$service_replacement"; service_rest=${service_rest#*"$service_needle"} ;;
+            *) service_replaced="$service_replaced$service_rest"; break ;;
+        esac
+    done
+}
+installer_service_escape_exec() {
+    service_escaped=$1
+    installer_service_replace "$service_escaped" '\' '\\'; service_escaped=$service_replaced
+    installer_service_replace "$service_escaped" '"' '\"'; service_escaped=$service_replaced
+    installer_service_replace "$service_escaped" '%' '%%'; service_escaped=$service_replaced
+    installer_service_replace "$service_escaped" '$' '$$'; service_escaped=$service_replaced
+}
+installer_service_quote_unit() {
+    [ "$SERVICE_BACKEND" = systemd ] || return 0
+    installer_service_escape_exec "${SERVICE_EXEC%/*}/.service-run"
+    service_escaped_exec=$service_escaped
+    installer_service_replace "$SERVICE_EXEC" '%' '%%'
+    service_condition=$service_replaced
+    service_exec_count=0
+    while IFS= read -r service_line || [ -n "$service_line" ]; do
+        case "$service_line" in
+            ExecStart=*) printf 'ExecStart=/bin/sh "%s"\n' "$service_escaped_exec"; service_exec_count=$((service_exec_count + 1)) ;;
+            ConditionFileIsExecutable=*) printf 'ConditionFileIsExecutable=%s\n' "$service_condition" ;;
+            *) printf '%s\n' "$service_line" ;;
+        esac
+    done < "$SERVICE_UNIT" > "$transaction_dir/new-unit"
+    [ "$service_exec_count" = 1 ] || return 11
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_UNIT" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/new-unit"
+}
+installer_service_cached() {
+    SERVICE_VERSION=$1; SERVICE_DIGEST=$2
+    installer_service_version "$SERVICE_VERSION" || return 2
+    SERVICE_VERSION_DIR="$INSTALLER_PREFIX/versions/$SERVICE_VERSION"
+    SERVICE_EXEC="$SERVICE_VERSION_DIR/bin/$SERVICE_APP"
+    SERVICE_CACHED=0
+    [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
+    if [ -e "$SERVICE_VERSION_DIR" ]; then
+        installer_file_size "$SERVICE_VERSION_DIR/.artifact-sha256" || return 2
+        [ "$INSTALLER_FILE_SIZE" -le 160 ] || return 2
+        IFS= read -r service_digest < "$SERVICE_VERSION_DIR/.artifact-sha256" || return 2
+        [ "$service_digest" = "$SERVICE_DIGEST" ] || { printf 'Installer: immutable version has a different digest.\n' >&2; return 11; }
+        [ -x "$SERVICE_EXEC" ] && [ ! -L "$SERVICE_EXEC" ] || return 11
+        [ -x "$SERVICE_VERSION_DIR/bin/.service-run" ] && [ ! -L "$SERVICE_VERSION_DIR/bin/.service-run" ] || return 11
+        for service_cached_file in "$SERVICE_EXEC" "$SERVICE_VERSION_DIR/.artifact-sha256"; do
+            [ "$("$ZSETUP_BIN" storage "$service_cached_file" get system_protected)" = true ] || return 12
+        done
+        installer_file_size "$SERVICE_VERSION_DIR/.files" || return 11
+        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+        [ "$("$ZSETUP_BIN" storage "$SERVICE_VERSION_DIR/.files" get system_protected)" = true ] || return 12
+        service_cached_count=0; service_cached_bytes=0
+        while IFS= read -r service_cached_relative; do
+            case "$service_cached_relative" in ''|/*|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+/-]*|../*|*/../*|*/..|./*|*/./*|*/.|*//* ) return 11 ;; esac
+            service_cached_file="$SERVICE_VERSION_DIR/bin/$service_cached_relative"
+            installer_file_size "$service_cached_file" || return 11
+            service_cached_bytes=$((service_cached_bytes + INSTALLER_FILE_SIZE))
+            service_cached_count=$((service_cached_count + 1))
+            [ "$service_cached_count" -le "$INSTALLER_MAX_FILES" ] && [ "$service_cached_bytes" -le "$INSTALLER_MAX_EXPANDED" ] || return 11
+            [ "$("$ZSETUP_BIN" storage "$service_cached_file" get system_protected)" = true ] || return 12
+        done < "$SERVICE_VERSION_DIR/.files"
+        [ "$service_cached_count" -gt 0 ] || return 11
+        SERVICE_CACHED=1
+        status '      Using verified cached installed version'
+    fi
+}
+installer_service_copy() {
+    service_relative=$1
+    service_destination="$SERVICE_CANDIDATE/bin/$service_relative"
+    mkdir -p "${service_destination%/*}" || return 12
+    chmod 0755 "${service_destination%/*}"
+    installer_exec_native "$ZSETUP_BIN" capture -o "$service_destination" --max-bytes "$INSTALLER_MAX_EXPANDED" --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/products/$service_relative" || return $?
+    chmod 0755 "$service_destination" || return 12
+    printf '%s\n' "$service_relative" >> "$SERVICE_CANDIDATE/.files"
+}
+installer_service_stage() {
+    SERVICE_CANDIDATE="$INSTALLER_PREFIX/versions/.candidate.$$"
+    mkdir "$SERVICE_CANDIDATE" || return 12
+    mkdir "$SERVICE_CANDIDATE/bin" || return 12
+    chmod 0755 "$SERVICE_CANDIDATE" "$SERVICE_CANDIDATE/bin"
+    : > "$SERVICE_CANDIDATE/.files"
+    installer_service_replace "$SERVICE_EXEC" "'" "'\\''"
+    printf '#!/bin/sh\nexec '\''%s'\'' run\n' "$service_replaced" > "$SERVICE_CANDIDATE/bin/.service-run"
+    chmod 0755 "$SERVICE_CANDIDATE/bin/.service-run"
+    printf '%s\n' .service-run >> "$SERVICE_CANDIDATE/.files"
+}
+installer_service_commit_version() {
+    printf '%s\n' "$SERVICE_DIGEST" > "$SERVICE_CANDIDATE/.artifact-sha256"
+    chmod 0644 "$SERVICE_CANDIDATE/.artifact-sha256" "$SERVICE_CANDIDATE/.files" || return 12
+    [ ! -e "$SERVICE_VERSION_DIR" ] && [ ! -L "$SERVICE_VERSION_DIR" ] || return 2
+    mv "$SERVICE_CANDIDATE" "$SERVICE_VERSION_DIR" || return 12
+    SERVICE_CANDIDATE=; SERVICE_NEW_VERSION=1
+}
+installer_service_activate() {
+    installer_storage_check "$INSTALLER_PREFIX" "$INSTALLER_RESERVE" 1 1 || return $?
+    [ "$("$ZSETUP_BIN" storage "$SERVICE_VERSION_DIR/bin" get system_protected)" = true ] || return 12
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then installer_service_manager stop || return $?; fi
+    SERVICE_CHANGED=1
+    ln -s "versions/$SERVICE_VERSION" "$INSTALLER_PREFIX/.current.$$" || return 12
+    mv -fT "$INSTALLER_PREFIX/.current.$$" "$INSTALLER_PREFIX/current" || return 12
+    SERVICE_CONFIG_TOUCHED=1
+    "${SERVICE_APP}_register" || return $?
+    installer_service_definition "$SERVICE_EXEC" || { printf 'Installer: product returned success without the expected service definition.\n' >&2; return 11; }
+    installer_service_quote_unit || return $?
+    installer_service_manager reload || return $?
+    installer_service_manager enable || return $?
+    installer_service_manager start || return $?
+    installer_service_manager is-active || return $?
+    sleep 1
+    installer_service_manager is-active || return $?
+    installer_service_alias || return $?
+    if [ -n "$SERVICE_OLD" ] && [ "$SERVICE_OLD" != "versions/$SERVICE_VERSION" ]; then
+        ln -s "$SERVICE_OLD" "$INSTALLER_PREFIX/.previous.$$" || return 12
+        mv -fT "$INSTALLER_PREFIX/.previous.$$" "$INSTALLER_PREFIX/previous" || return 12
+    fi
+    SERVICE_GOOD=1; SERVICE_CHANGED=0; SERVICE_NEW_VERSION=0
+    service_previous=$(readlink "$INSTALLER_PREFIX/previous" 2>/dev/null || true)
+    for service_version_dir in "$INSTALLER_PREFIX"/versions/*; do
+        [ -d "$service_version_dir" ] && [ ! -L "$service_version_dir" ] || continue
+        service_target="versions/${service_version_dir##*/}"
+        [ "$service_target" != "versions/$SERVICE_VERSION" ] && [ "$service_target" != "$service_previous" ] || continue
+        [ -f "$service_version_dir/.artifact-sha256" ] && [ ! -L "$service_version_dir/.artifact-sha256" ] || continue
+        rm -rf "$service_version_dir" || return 12
+    done
+    status "Installed $SERVICE_APP: $SERVICE_COMMAND (system service; $SERVICE_EXEC)"
+}
+installer_service_cleanup() {
+    if [ "$SERVICE_CHANGED" = 1 ]; then
+        printf 'Installer: restoring the previous installation and service.\n' >&2
+        installer_service_manager stop || true
+        if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+            cp -p "$transaction_dir/old-unit" "$SERVICE_UNIT" || return 1
+        else
+            installer_service_manager disable || return 1
+            rm -f "$SERVICE_UNIT" || return 1
+        fi
+        if [ "$SERVICE_CONFIG_TOUCHED" = 1 ] && [ -n "$SERVICE_CONFIG" ]; then
+            if [ "$SERVICE_HAD_CONFIG" = 1 ]; then cp -p "$transaction_dir/old-config" "$SERVICE_CONFIG" || return 1
+            else rm -f "$SERVICE_CONFIG" || return 1; fi
+        fi
+        if [ -n "$SERVICE_OLD" ]; then
+            ln -s "$SERVICE_OLD" "$INSTALLER_PREFIX/.restore.$$" || return 1
+            mv -fT "$INSTALLER_PREFIX/.restore.$$" "$INSTALLER_PREFIX/current" || return 1
+        else rm -f "$INSTALLER_PREFIX/current" || return 1; fi
+        installer_service_manager reload || return 1
+        if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+            if [ "$SERVICE_WAS_ENABLED" = 1 ]; then installer_service_manager enable || return 1
+            else installer_service_manager disable || return 1; fi
+        fi
+        if [ "$SERVICE_WAS_ACTIVE" = 1 ]; then
+            installer_service_manager start || return 1
+            installer_service_manager is-active || return 1
+        fi
+        SERVICE_CHANGED=0
+    fi
+    [ -z "$SERVICE_CANDIDATE" ] || rm -rf "$SERVICE_CANDIDATE" || return 1
+    if [ "$SERVICE_NEW_VERSION" = 1 ]; then rm -rf "$SERVICE_VERSION_DIR" || return 1; fi
+    rm -f "$INSTALLER_PREFIX/.current.$$" "$INSTALLER_PREFIX/.previous.$$" "$INSTALLER_PREFIX/.restore.$$"
+    if [ "$SERVICE_DEST_LOCK_HELD" = 1 ]; then
+        rm -f "$INSTALLER_PREFIX/.service-lock/owner" || return 1
+        rmdir "$INSTALLER_PREFIX/.service-lock" || return 1
+        SERVICE_DEST_LOCK_HELD=0
+    fi
+}
+ddnsto_error() { printf 'DDNSTO: %s\n' "$*" >&2; }
+ddnsto_usage() {
+    printf '%s\n' 'Usage: ddnsto-install.sh [--token TOKEN] [--force-version lite|standard] [--verify-status]' \
+        'OpenWrt: token optional; automatic Lite selection below 900 MB.' \
+        'Linux x86_64/aarch64: --token required without an interactive terminal.'
+    printf '%s\n' 'Linux systemd: root/sudo -H, system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
+}
+ddnsto_parse_args() {
+    TOKEN=
+    FORCE_VERSION=
+    VERIFY_STATUS=0
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --token|--force-version)
+                [ "$#" -ge 2 ] && [ -n "$2" ] || { ddnsto_error "$1 requires a value"; return 2; }
+                case "$1" in --token) TOKEN=$2 ;; *) FORCE_VERSION=$2 ;; esac
+                shift 2 ;;
+            --token=*) TOKEN=${1#--token=}; [ -n "$TOKEN" ] || return 2; shift ;;
+            --force-version=*) FORCE_VERSION=${1#--force-version=}; shift ;;
+            --verify-status) VERIFY_STATUS=1; shift ;;
+            *) ddnsto_error "unknown argument: $1"; return 2 ;;
+        esac
+    done
+    case "$FORCE_VERSION" in ''|lite|standard) ;; *) ddnsto_error 'version must be lite or standard'; return 2 ;; esac
+}
+ddnsto_download() { installer_download "$@"; }
+ddnsto_verified_download() {
+    verified_relative=$1
+    verified_output=$2
+    verified_sha=$3
+    verified_marker="$verified_output.verified"
+    installer_package_immutable "$verified_marker" "$verified_sha" || return $?
+    ddnsto_download "$verified_relative" "$verified_output" "$verified_sha" || return $?
+    verified_size=$(wc -c < "$verified_output" | tr -d '[:space:]')
+    printf '%s:%s\n' "$verified_sha" "$verified_size" > "$transaction_dir/verified"
+    mv -f "$transaction_dir/verified" "$verified_marker"
+}
+ddnsto_checksum() {
+    "$ZSETUP_BIN" metadata sha256 "$1" "$2" || {
+        ddnsto_error "invalid, missing or duplicate SHA256 for $2"; return 11;
+    }
+}
+ddnsto_package_restore() {
+    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1; fi
+}
+ddnsto_register() {
+    if [ "$SERVICE_HAD_UNIT" = 1 ]; then
+        installer_service_manager disable || return $?
+        rm -f "$SERVICE_UNIT" || return 12
+        installer_service_manager reload || return $?
+    fi
+    installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -u "$TOKEN" -daemon
+}
+ddnsto_openwrt() {
+    case "$package_manager" in opkg) pkg_ext=ipk ;; apk) pkg_ext=apk ;; *) ddnsto_error 'OpenWrt requires opkg or apk'; return 2 ;; esac
+    case "$arch" in
+        x86_64|aarch64|mipsel) package_arch=$arch ;;
+        armv7|arm) package_arch=arm ;;
+        *) ddnsto_error "unsupported OpenWrt architecture: $arch"; return 2 ;;
+    esac
+    SELECTED_VERSION=$FORCE_VERSION
+    if [ -z "$SELECTED_VERSION" ]; then
+        mem_mb=${DDNSTO_MEM_MB:-${ZSETUP_MEMORY_TOTAL_MB:-$("$ZSETUP_BIN" context get memory_total_mb)}}
+        case "$mem_mb" in ''|*[!0123456789]*) mem_mb=0 ;; esac
+        if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 900 ]; then SELECTED_VERSION=lite; else SELECTED_VERSION=standard; fi
+    fi
+    status "[2/4] Checking DDNSTO $SELECTED_VERSION version ($package_manager/$arch)..."
+    version_pointer=VERSION
+    [ "$SELECTED_VERSION" != lite ] || version_pointer=VERSION_LITE
+    ddnsto_download "openwrt/$version_pointer" "$transaction_dir/version" '' 1 || return $?
+    version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version") || return $?
+    case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid version metadata'; return 11 ;; esac
+    version_folder=$SELECTED_VERSION
+    [ "$pkg_ext" != apk ] || version_folder="$version_folder-apk"
+    relative_folder="openwrt/$version_folder/$version_num"
+    ddnsto_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1 || return $?
+    status "      DDNSTO $version_num ($SELECTED_VERSION; Lite below 900 MB)"
+    status '[3/4] Downloading and verifying DDNSTO packages...'
+    installer_package_cache "$version_num-$version_folder" "$arch" || return $?
+    package_cache=$PACKAGE_CACHE
+    main_package="ddnsto_$package_arch.$pkg_ext"
+    ui_package="luci-app-ddnsto.$pkg_ext"
+    language_package="luci-i18n-ddnsto-zh-cn.$pkg_ext"
+    for package in "$main_package" "$ui_package" "$language_package"; do
+        digest=$(ddnsto_checksum "$transaction_dir/sums" "$package") || return $?
+        ddnsto_verified_download "$relative_folder/$package" "$package_cache/$package" "$digest" || return $?
+    done
+    status '[4/4] Installing DDNSTO packages...'
+    config_path=${DDNSTO_CONFIG_PATH:-/etc/config/ddnsto}
+    deprecated_config=0
+    if [ -f "$config_path" ] && grep -Eqi 'global' "$config_path"; then
+        cp -p "$config_path" "$transaction_dir/deprecated-config"
+        deprecated_config=1
+        rm -f "$config_path"
+    fi
+    if [ "$package_manager" = opkg ]; then
+        if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
+            installer_package_command update update && installer_package_command install install luci-compat || status 'DDNSTO: luci-compat installation failed'
+        fi
+        if ! installer_package_command query list-installed | grep -q '^luci-lua-runtime '; then
+            installer_package_command update update && installer_package_command install install luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
+        fi
+        installer_package_command remove remove app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
+        for package in "$main_package" "$ui_package" "$language_package"; do installer_package_command install install "$package_cache/$package" || return $?; done
+    else
+        if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
+            installer_package_command update update && installer_package_command add add luci-compat || status 'DDNSTO: luci-compat installation failed'
+        fi
+        if ! installer_package_command query info -e luci-lua-runtime >/dev/null 2>&1; then
+            installer_package_command update update && installer_package_command add add luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
+        fi
+        installer_package_command del del app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
+        for package in "$main_package" "$ui_package" "$language_package"; do installer_package_command add add --allow-untrusted "$package_cache/$package" || return $?; done
+    fi
+    installer_exec_native "$ZSETUP_BIN" run -- ddnsto -v || return $?
+    deprecated_config=0
+    if [ -n "$TOKEN" ]; then
+        installer_exec_native "$ZSETUP_BIN" run -- uci set "ddnsto.@ddnsto[0].token=$TOKEN" || return $?
+        installer_exec_native "$ZSETUP_BIN" run -- uci set 'ddnsto.@ddnsto[0].enabled=1' || return $?
+        installer_exec_native "$ZSETUP_BIN" run -- uci commit ddnsto || return $?
+        installer_exec_native "$ZSETUP_BIN" run -- "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" restart || return $?
+    else
+        status 'DDNSTO: get a token at https://www.ddnsto.com and configure it in LuCI'
+    fi
+    if [ "$VERIFY_STATUS" = 1 ]; then
+        installer_exec_native "$ZSETUP_BIN" run -- pgrep -x ddnstod >/dev/null || { ddnsto_error 'DDNSTO process not found'; return 1; }
+        installer_exec_native "$ZSETUP_BIN" run -- ddnsto -w || return $?
+    fi
+    status 'DDNSTO installation completed; refresh LuCI if its menu is missing'
+}
+ddnsto_linux_metadata() {
+    case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
+    [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
+    [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
+    if [ -z "$TOKEN" ]; then
+        if [ -t 0 ]; then
+            printf 'DDNSTO token: ' >&2
+            IFS= read -r TOKEN
+        else
+            ddnsto_error 'Linux needs --token TOKEN for noninteractive installation'; return 2
+        fi
+    fi
+    [ -n "$TOKEN" ] || { ddnsto_error 'empty token'; return 2; }
+    version_num=${DDNSTO_VERSION:-4.2.3}
+    case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid DDNSTO_VERSION'; return 2 ;; esac
+    status "[2/4] Checking DDNSTO standard $version_num ($arch)..."
+    archive_name="ddnsto-standard-$version_num.tar.gz"
+    ddnsto_download linux-binary/SHA256SUMS "$transaction_dir/sums" '' 1 || return $?
+    digest=$(ddnsto_checksum "$transaction_dir/sums" "$archive_name") || return $?
+}
+ddnsto_linux() {
+    ddnsto_linux_metadata || return $?
+    installer_service_cached "$version_num" "$digest" || return $?
+    if [ "$SERVICE_CACHED" = 0 ]; then
+        archive_path="$transaction_dir/product.tar.gz"
+        status '[3/4] Downloading DDNSTO with bounded staging...'
+        ddnsto_download "linux-binary/$archive_name" "$archive_path" "$digest" || return $?
+        mkdir -p "$transaction_dir/products"
+        installer_extract_member "$transaction_dir/products/ddnsto" tar -xOzf "$archive_path" "ddnsto-standard-$version_num/ddnsto.$arch" || return $?
+        chmod 0755 "$transaction_dir/products/ddnsto"
+        installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/products/ddnsto" -v || return $?
+        installer_service_stage || return $?
+        installer_service_copy ddnsto || return $?
+        installer_service_commit_version || return $?
+    else
+        installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -v || return $?
+    fi
+    status '[4/4] Installing and checking the DDNSTO system service...'
+    installer_service_activate || return $?
+    status 'DDNSTO installation completed'
+}
+ddnsto_install() {
+    : "${ZSETUP_BIN:?zsetup is required}" "${ZSETUP_SOURCE_BASES:?source group is required}"
+    ddnsto_parse_args "$@" || return $?
+    os=${ZSETUP_OS:-$("$ZSETUP_BIN" context get os)}
+    package_manager=${ZSETUP_PACKAGE_MANAGER:-$("$ZSETUP_BIN" context get package_manager)}
+    arch=${ZSETUP_ARCH:-$("$ZSETUP_BIN" context get arch)}
+    case "$os:$package_manager" in
+        openwrt:opkg|openwrt:apk) business_platform=openwrt ;;
+        ubuntu:apt|debian:apt|centos:yum|centos:dnf|rhel:yum|rhel:dnf|linux:*) business_platform=linux ;;
+        *) ddnsto_error "unsupported platform: $os/$package_manager"; return 2 ;;
+    esac
+    INSTALLER_REMOTE_APP=ddnsto
+    if [ "$business_platform" = linux ]; then
+        [ -z "${DDNSTO_BIN_PATH:-}" ] || { ddnsto_error 'DDNSTO_BIN_PATH is retired; use --installer-prefix for the protected installation root'; return 2; }
+        ip_uid=$("$ZSETUP_BIN" storage / get effective_uid) || return 12
+        if [ "$ip_uid" != 0 ]; then installer_privilege_install ddnsto "$@"; return $?; fi
+        installer_service_prepare ddnsto || return $?
+        ddnsto_linux || return $?
+        installer_transaction_finish
+        return $?
+    fi
+    installer_package_prepare ddnsto || return $?
+    INSTALLER_PACKAGE_CLEANUP=ddnsto_package_restore
+    ddnsto_openwrt || return $?
+    PACKAGE_PHASE=complete
+    installer_transaction_finish
+}
+installer_dispatch ddnsto "$@"
+ZSETUP_PRIVATE_ROOT_PROGRAM
+}
 
 bootstrap_and_run() {
     status "[1/4] Checking zsetup..."

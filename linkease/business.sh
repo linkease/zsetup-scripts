@@ -33,57 +33,11 @@ linkease_verified_download() {
     }
     le_file="$cache_dir/$le_name"
     le_marker="$le_file.verified"
-    linkease_download "$relative_folder/$le_name" "$le_file" "$le_digest"
+    installer_package_immutable "$le_marker" "$le_digest" || return $?
+    linkease_download "$relative_folder/$le_name" "$le_file" "$le_digest" || return $?
     le_size=$(wc -c < "$le_file" | tr -d '[:space:]')
     printf '%s:%s\n' "$le_digest" "$le_size" > "$transaction_dir/verified"
     mv -f "$transaction_dir/verified" "$le_marker"
-}
-
-linkease_privileged() {
-    if [ -n "${SUDO:-}" ]; then "$SUDO" "$@"; else "$@"; fi
-}
-
-linkease_stop_service() {
-    if command -v systemctl >/dev/null 2>&1; then
-        linkease_privileged systemctl stop com.linkease.linkeasedaemon.service
-    elif command -v service >/dev/null 2>&1; then
-        linkease_privileged service com.linkease.linkeasedaemon.service stop
-    else
-        linkease_privileged "${LINKEASE_SERVICE_PATH:-/etc/init.d/com.linkease.linkeasedaemon.service}" stop
-    fi
-}
-
-linkease_rollback() {
-    [ "${replacement_started:-0}" = 1 ] || return 0
-    status 'LinkEase: restoring the previous installation...'
-    linkease_stop_service || true
-    if [ -x "$app_dir/linkease" ]; then
-        linkease_privileged "$app_dir/linkease" --serviceControl uninstall || true
-    fi
-    for le_restore in linkease heif-converter linkease-media linkmount; do
-        linkease_privileged rm -rf "$app_dir/$le_restore" || return 1
-        if [ -e "$backup_dir/$le_restore" ]; then
-            linkease_privileged cp -Rp "$backup_dir/$le_restore" "$app_dir/$le_restore" || return 1
-        fi
-    done
-    if [ -f "$backup_dir/linkease" ]; then
-        linkease_privileged "$app_dir/linkease" --serviceControl install || return 1
-        linkease_privileged "$app_dir/linkease" --serviceControl start || return 1
-    fi
-    replacement_started=0
-}
-
-linkease_cleanup() {
-    le_recovery_failed=0
-    linkease_rollback || le_recovery_failed=1
-    if [ "$le_recovery_failed" = 1 ]; then
-        linkease_error "rollback incomplete; recovery files retained at $backup_dir"
-    elif [ -n "${backup_dir:-}" ]; then
-        linkease_privileged rm -rf "$backup_dir"
-    fi
-    [ -z "${candidate_dir:-}" ] || linkease_privileged rm -rf "$candidate_dir"
-    [ -z "${install_lock:-}" ] || linkease_privileged rmdir "$install_lock"
-    [ -z "${transaction_dir:-}" ] || rm -rf "$transaction_dir"
 }
 
 # Stream only requested members to regular staging files: no archive-provided paths/links are installed.
@@ -135,7 +89,7 @@ linkease_register() {
     installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" --serviceControl install
 }
 
-linkease_linux() {
+linkease_linux_metadata() {
     for le_tool in tar unzip; do
         command -v "$le_tool" >/dev/null 2>&1 || { linkease_error "$le_tool is required on Linux"; return 2; }
     done
@@ -147,6 +101,10 @@ linkease_linux() {
     archive_name="linkease-binary-$version_num.tar.gz"; mount_name="$mount_arch.zip"
     le_archive_sha=$("$ZSETUP_BIN" metadata sha256 "$transaction_dir/sums" "$archive_name") || return 11
     le_mount_sha=$("$ZSETUP_BIN" metadata sha256 "$transaction_dir/sums" "$mount_name") || return 11
+}
+
+linkease_linux() {
+    linkease_linux_metadata || return $?
     installer_service_cached "$version_num" "$le_archive_sha:$le_mount_sha" || return $?
     if [ "$SERVICE_CACHED" = 0 ]; then
         status '[3/4] Downloading and verifying LinkEase and linkmount...'
@@ -172,27 +130,27 @@ linkease_openwrt() {
     version_num=$version_override
     status "[2/4] Checking LinkEase OpenWrt version ($arch)..."
     if [ -z "$version_num" ]; then
-        linkease_download Openwrt/VERSION "$transaction_dir/version" '' 1
-        version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version")
+        linkease_download Openwrt/VERSION "$transaction_dir/version" '' 1 || return $?
+        version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version") || return $?
     fi
     relative_folder="Openwrt/$version_num"
-    linkease_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1
-    cache_dir="$work_dir/cache/openwrt/$version_num/$arch"
-    mkdir -p "$cache_dir"
+    linkease_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1 || return $?
+    installer_package_cache "$version_num" "$arch" || return $?
+    cache_dir=$PACKAGE_CACHE
     status '[3/4] Downloading and verifying LinkEase packages...'
     set -- "linkease_$package_arch.ipk" luci-app-linkease.ipk luci-i18n-linkease-zh-cn.ipk
     case "$arch" in x86_64|aarch64) set -- "$@" "linkmount_$arch.ipk" "ffmpeg-remux_$arch.ipk" ;; esac
-    for le_package in "$@"; do linkease_verified_download "$le_package"; done
+    for le_package in "$@"; do linkease_verified_download "$le_package" || return $?; done
     status '[4/4] Installing LinkEase packages...'
-    opkg remove app-meta-linkease luci-i18n-linkease-zh-cn luci-app-linkease linkease || true
-    for le_package in "$@"; do opkg install "$cache_dir/$le_package"; done
-    linkease showVersion
+    installer_package_command remove remove app-meta-linkease luci-i18n-linkease-zh-cn luci-app-linkease linkease || true
+    for le_package in "$@"; do installer_package_command install install "$cache_dir/$le_package" || return $?; done
+    installer_exec_native "$ZSETUP_BIN" run -- linkease showVersion || return $?
     status 'LinkEase installation completed; refresh LuCI if its menu is missing'
 }
 
 linkease_install() {
     : "${ZSETUP_BIN:?zsetup is required}" "${ZSETUP_SOURCE_BASES:?source group is required}"
-    linkease_parse_args "$@"
+    linkease_parse_args "$@" || return $?
     os=${ZSETUP_OS:-$("$ZSETUP_BIN" context get os)}
     package_manager=${ZSETUP_PACKAGE_MANAGER:-$("$ZSETUP_BIN" context get package_manager)}
     arch=${ZSETUP_ARCH:-$("$ZSETUP_BIN" context get arch)}
@@ -205,24 +163,15 @@ linkease_install() {
     INSTALLER_REMOTE_APP=LinkEase
     if [ "$business_platform" = linux ]; then
         [ -z "${LINKEASE_APP_DIR:-}" ] || { linkease_error 'LINKEASE_APP_DIR is retired; use --installer-prefix for the protected installation root'; return 2; }
+        ip_uid=$("$ZSETUP_BIN" storage / get effective_uid) || return 12
+        if [ "$ip_uid" != 0 ]; then installer_privilege_install linkease "$@"; return $?; fi
         installer_service_prepare linkease || return $?
         linkease_linux || return $?
         installer_transaction_finish
         return $?
     fi
-    [ -z "${installer_prefix:-}${installer_work_dir:-}" ] && [ "${installer_scope:-system}" = system ] || { linkease_error 'OpenWrt storage adapter is pending; do not apply Linux layout options to native packages'; return 2; }
-    installer_policy linkease || return $?
-    work_dir=${ZSETUP_WORK_DIR:-$WORK_ROOT/linkease}
-    mkdir -p "$work_dir"
-    chmod 0700 "$work_dir"
-    transaction_dir=$(mktemp -d "$work_dir/.transaction.XXXXXX")
-    replacement_started=0; candidate_dir=; backup_dir=; install_lock=; SUDO=
-    trap linkease_cleanup EXIT
-    trap 'exit 129' HUP
-    trap 'exit 130' INT
-    trap 'exit 143' TERM
-    if [ "$business_platform" = openwrt ]; then linkease_openwrt; else linkease_linux; fi
-    linkease_cleanup
-    transaction_dir=; candidate_dir=; backup_dir=; install_lock=
-    trap - EXIT HUP INT TERM
+    installer_package_prepare linkease || return $?
+    linkease_openwrt || return $?
+    PACKAGE_PHASE=complete
+    installer_transaction_finish
 }

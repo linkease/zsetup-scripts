@@ -42,7 +42,11 @@ installer_owned_native() {
     [ "$1" = "$ZSETUP_BIN" ] || return 2
     [ "$INSTALLER_SIGNAL" = 0 ] || return "$INSTALLER_SIGNAL"
     INSTALLER_SPAWNING=1
-    "$@" <&0 &
+    if [ "${INSTALLER_BRIDGE_OPEN:-0}" = 1 ]; then
+        "$@" <&0 3>&- 4>&- &
+    else
+        "$@" <&0 &
+    fi
     INSTALLER_CHILD=$!
     INSTALLER_SPAWNING=0
     [ "$INSTALLER_SIGNAL" = 0 ] || exit "$INSTALLER_SIGNAL"
@@ -89,6 +93,7 @@ installer_transaction_cleanup() {
 
 installer_transaction_exit() {
     it_exit=$1
+    INSTALLER_EXIT_CODE=$it_exit
     trap - EXIT
     trap '' HUP INT TERM
     installer_transaction_cleanup || { [ "$it_exit" != 0 ] || it_exit=12; }
@@ -96,6 +101,7 @@ installer_transaction_exit() {
 }
 
 installer_transaction_finish() {
+    INSTALLER_EXIT_CODE=0
     installer_transaction_cleanup || return $?
     trap - EXIT HUP INT TERM
 }

@@ -31,6 +31,15 @@ installer_download() {
         version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
         *) ib_metadata=0; ib_limit=$((INSTALLER_MAX_DOWNLOAD - INSTALLER_DOWNLOAD_BYTES)); [ "$ib_limit" -gt 0 ] || return 11 ;;
     esac
+    # Cross-UID inputs are copied into the root-owned destination with native
+    # bounds, then the ordinary native download path revalidates their digest.
+    # Untrusted metadata is never imported as the root phase's authority.
+    if [ "$ib_metadata" = 0 ] && [ -n "${ZSETUP_PRIVILEGED_STAGE:-}" ] && [ -n "$ib_sha" ]; then
+        ib_prepared="$ZSETUP_PRIVILEGED_STAGE/${ib_relative##*/}"
+        if [ -f "$ib_prepared" ] && [ ! -L "$ib_prepared" ]; then
+            installer_exec_native "$ZSETUP_BIN" capture -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE" --timeout 30s -- cat "$ib_prepared" || return $?
+        fi
+    fi
     set -- "$ZSETUP_BIN" download -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE"
     [ -z "$ib_sha" ] || set -- "$@" --sha256 "$ib_sha"
     [ "$ib_fresh" = 0 ] || set -- "$@" --no-cache

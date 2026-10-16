@@ -81,3 +81,45 @@ M5新待决：SysV真实生成的脚本无.service后缀、空格拆词有误，
 
 这不是新版本发布或生产安装证据；线上0.4.0缺新增storage/capture及下载限制参数，
 新脚本必须随未来具备这些能力的原生版本/最低版本配置一起发布，不能提前替换线上脚本。
+
+
+## M6 completed; M7 integration in progress
+
+Approved scope A: new raw Linux adapters target systemd. Keep SysV legacy
+unported; native OpenWrt opkg/apk semantics remain separate.
+
+Ordinary users prepare archives under ~/.local/state/linkease/APP/.staging
+(or --installer-work-dir / ZSETUP_WORK_DIR). The service prefix defaults to
+/opt/linkease/APP. Preparation executes no business payload. sudo -n requires
+existing credentials; authenticate with sudo -v in a terminal or explicitly
+invoke the reviewed installer as root. No unattended password prompt. The
+optional privilege bootstrap requires OS sha256sum or openssl, dd, mkfifo and
+sudo; ordinary root installation keeps native hashing without that dependency.
+The same generated business source is emitted locally for the root phase,
+including sh -c one-key entries with no readable script file. No self-download.
+
+The root coordinator copies bounded native/program/optional CA inputs into a
+private bootstrap directory, checks their hashes, signals ready, waits for go,
+and runs only those private copies. Its control EOF requests TERM followed by
+join and rollback; only then may the ordinary owner release preparation.
+Root re-fetches metadata and natively verifies imported archive copies before
+extraction/execution. Root staging is protected PREFIX/.staging; an ordinary
+user's work-dir does not become root executable staging. Peak budget includes
+both user and root archive copies. Root-owned nonsecret installed receipts are
+readable so repeated ordinary installs also avoid artifact requests.
+
+OpenWrt packages use persistent protected PREFIX/.packages, retain current and
+previous attempts, and place PM cache/tmp/lists under the private transaction.
+Installed paths remain package-owned; opkg search / apk info must identify an
+existing command. No deb/rpm mappings or raw fallback are invented. Each target
+has an independent .package-lock. A bounded package-result records phase and
+original exit code; package maintainer scripts cannot be promised transactional
+rollback. A missing or unsuitable / target cannot be fixed by moving staging.
+Unknown overlay backing is refused until proven persistent. Root package
+installation remains explicit; the sudo preparation bridge is for Linux systemd
+raw-service flows. OpenWrt usually runs as root; do not infer sudo support there.
+
+Real UID1000→0 sudo gate passed on the authorized test server in a disposable
+Ubuntu24.04 container, including denied credentials, Chinese/special token,
+root payload protection, UID1000 alias, cache and TERM rollback/complete cleanup.
+No host package manager or production service was modified.
