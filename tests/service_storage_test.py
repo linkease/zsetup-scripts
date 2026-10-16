@@ -36,7 +36,7 @@ def jail(native):
     with tempfile.TemporaryDirectory(prefix='service-jail-', dir=ROOT / 'dist') as name:
         root = Path(name)
         for folder in ('usr', 'bin', 'lib', 'lib64', 'proc', 'dev', 'source', 'tools',
-                       'fixtures', 'root', 'opt', 'etc/systemd/system', 'run/systemd/system'):
+                       'fixtures', 'root', 'opt', 'tmp', 'var/tmp', 'etc/systemd/system', 'run/systemd/system'):
             (root / folder).mkdir(parents=True, exist_ok=True)
         (root / 'tools/zsetup').touch()
         setup = root / 'setup.sh'
@@ -83,6 +83,7 @@ def product(app, version):
 case "$1" in
  -v|showVersion) echo '{app} {version}'; exit "${{VERSION_FAIL:-0}}" ;;
  stop) exit "${{STOP_FAIL:-0}}" ;;
+ run) printf '%s\\n' "$0" > "$TEST_RUN_PATH"; exit 0 ;;
  -u|--serviceControl)
    if [ "$1" = --serviceControl ] && [ "$2" = uninstall ]; then rm -f "$TEST_UNIT"; exit 0; fi
    if [ "$1" = --serviceControl ] && [ "$2" = start ]; then exit "${{START_FAIL:-0}}"; fi
@@ -122,7 +123,7 @@ esac
 ''')
             for app in ('ddnsto', 'linkease'):
                 case = root / app; case.mkdir()
-                prefix = case / '程序 space %n $literal "quote"' / app
+                prefix = case / '程序 space %n $literal "quote" apostrophe\'' / app
                 home = case / 'home'; home.mkdir()
                 unit = Path('/etc/systemd/system') / f'com.linkease.{"ddnstoshell" if app == "ddnsto" else "linkeasedaemon"}.service'
                 script = ROOT / app / f'{app}-install.sh'
@@ -131,7 +132,7 @@ esac
                     'ZSETUP_PACKAGE_MANAGER':'apt', 'ZSETUP_ARCH':'x86_64',
                     'ZSETUP_SOURCE_BASES':f'https://127.0.0.1:{server.server_address[1]}/binary',
                     'ZSETUP_SOURCE_FALLBACK':'', 'ZSETUP_CA_FILE':str(root / 'ca.crt'),
-                    'ZSETUP_INSTALL_PREFIX':str(prefix), 'TEST_UNIT':str(unit), 'TEST_ACTIONS':str(case / 'actions')}
+                    'ZSETUP_INSTALL_PREFIX':str(prefix), 'TEST_UNIT':str(unit), 'TEST_ACTIONS':str(case / 'actions'), 'TEST_RUN_PATH':str(case / 'run-path')}
                 for version in ('1.0.0', '2.0.0', '3.0.0'):
                     stream = io.BytesIO()
                     with tarfile.open(fileobj=stream, mode='w:gz') as tar:
@@ -159,8 +160,10 @@ esac
                 assert first.returncode == 0, first
                 installed = prefix / 'current/bin' / app
                 assert installed.is_file(), installed
-                verified_unit = subprocess.run(['systemd-analyze', 'verify', str(unit)], text=True, capture_output=True)
+                verified_unit = subprocess.run(['systemd-analyze', 'verify', str(unit)], cwd='/', text=True, capture_output=True)
                 assert verified_unit.returncode == 0, verified_unit
+                wrapper = subprocess.run(['sh', str(prefix / 'current/bin/.service-run')], env=env, text=True, capture_output=True, timeout=5)
+                assert wrapper.returncode == 0 and (case / 'run-path').read_text().strip() == str(installed.resolve()), wrapper
                 assert (home / '.local/bin' / app).resolve() == installed.resolve()
                 assert not list((prefix / '.staging').glob('.transaction.*'))
                 if app == 'linkease':
