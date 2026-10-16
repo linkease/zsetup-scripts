@@ -39,6 +39,7 @@ def jail(native):
                        'fixtures', 'root', 'opt', 'tmp', 'var/tmp', 'etc/systemd/system', 'run/systemd/system'):
             (root / folder).mkdir(parents=True, exist_ok=True)
         (root / 'tools/zsetup').touch()
+        (root / 'etc/os-release').write_text('ID=ubuntu\nVERSION_ID="22.04"\n')
         setup = root / 'setup.sh'
         setup.write_text('''set -eu
 jail=$1; source=$2; native=$3
