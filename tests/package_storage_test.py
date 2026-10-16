@@ -3,6 +3,8 @@
 import hashlib
 import http.server
 import os
+import signal
+import time
 from pathlib import Path
 import ssl
 import subprocess
@@ -33,7 +35,9 @@ while [ "$#" -gt 0 ]; do
  case "$1" in --cache|--cache-dir|--tmp-dir|--lists-dir) shift 2 ;; *) break ;; esac
 done
 case "$1" in
- list-installed) echo 'luci-lua-runtime - fixture' ;;
+ list-installed)
+  if [ \"${BLOCK_QUERY:-0}\" = 1 ]; then sleep 60 & child=$!; echo \"$child\" > \"$QUERY_CHILD\"; : > \"$QUERY_READY\"; wait \"$child\"; fi
+  echo 'luci-lua-runtime - fixture' ;;
  install|add) exit "${PKG_FAIL:-0}" ;;
 esac
 ''')
@@ -102,6 +106,15 @@ esac
                         assert not list(work.iterdir())
                         Handler.bodies[sums]=original
                         if app=='ddnsto' and manager=='opkg' and arch=='x86_64':
+                            ready=case/'query-ready'; child=case/'query-child'
+                            proc=subprocess.Popen(command,env=env|{'BLOCK_QUERY':'1','QUERY_READY':str(ready),'QUERY_CHILD':str(child)},stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+                            deadline=time.monotonic()+10
+                            while not ready.exists() and proc.poll() is None and time.monotonic()<deadline: time.sleep(.02)
+                            assert ready.exists(),proc.communicate(timeout=2)
+                            proc.send_signal(signal.SIGTERM); out,err=proc.communicate(timeout=10)
+                            assert proc.returncode==143,(proc.returncode,err)
+                            assert not Path('/proc',child.read_text().strip()).exists()
+                            assert not list(work.iterdir()) and not (prefix/'.package-lock').exists()
                             for memory, selected in [('899','lite'),('900','standard'),('unknown','standard')]:
                                 threshold=subprocess.run(command,env=env|{'DDNSTO_MEM_MB':memory},text=True,capture_output=True,timeout=30)
                                 assert threshold.returncode==0 and f'Checking DDNSTO {selected} version' in threshold.stderr,threshold

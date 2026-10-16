@@ -255,7 +255,9 @@ esac
                     Handler.bodies[sum_path]=original_sums.replace(hashlib.sha256(original_zip).hexdigest().encode(),hashlib.sha256(bad_zip).hexdigest().encode())
                     before=(case/'actions').read_bytes()
                     traversal=run('2.0.0')
-                    assert traversal.returncode==11 and (case/'actions').read_bytes()==before,traversal
+                    read_only=('manager show ', 'manager is-active ', 'manager is-enabled ')
+                    mutations=lambda data:[line for line in data.decode().splitlines() if not line.startswith(read_only)]
+                    assert traversal.returncode==11 and mutations((case/'actions').read_bytes())==mutations(before),traversal
                     assert not (root/'escape').exists()
                     Handler.bodies[zip_path],Handler.bodies[sum_path]=original_zip,original_sums
                 false = run('2.0.0', {'FALSE_SUCCESS':'1'})
