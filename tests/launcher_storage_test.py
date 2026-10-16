@@ -106,6 +106,11 @@ case "$url" in */zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;; esac
             Handler.bodies[f"/binary/{app}/{filename.replace('1.2.3', '1.2.5')}"] = changed
             result = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=10)
             assert result.returncode == 11 and (prefix / "current").read_bytes() == product, result
+            # Registry paths cannot redirect writes into somebody else's file.
+            victim = folder / "victim"; victim.write_text("untouched")
+            (prefix / ".managed").unlink(); (prefix / ".managed").symlink_to(victim)
+            result = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=10)
+            assert result.returncode == 2 and victim.read_text() == "untouched", result
     finally:
         server.shutdown(); server.server_close(); thread.join()
 print("Persistent launchers: real HTTPS, literal arguments, version activation, reuse, failure preservation and cleanup passed")

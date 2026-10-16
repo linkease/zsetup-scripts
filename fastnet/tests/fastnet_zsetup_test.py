@@ -70,7 +70,7 @@ def main() -> None:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        with tempfile.TemporaryDirectory(prefix="fastnet-zsetup-") as tmp_text:
+        with tempfile.TemporaryDirectory(prefix="fastnet-zsetup-", dir=SCRIPT.parents[1] / "dist") as tmp_text:
             tmp = Path(tmp_text)
             output = tmp / "args"
             base = f"https://127.0.0.1:{server.server_address[1]}/binary"
@@ -103,6 +103,8 @@ def main() -> None:
                 "ZSETUP_ARCH": "x86_64",
                 "ZSETUP_CA_FILE": str(cert_dir / "ca.crt"),
                 "ZSETUP_WORK_DIR": str(tmp / "work"),
+                "ZSETUP_INSTALL_PREFIX": str(tmp / "installed"),
+                "HOME": str(tmp / "home"),
                 "FASTNET_TEST_OUTPUT": str(output),
                 "ZSETUP_CONFIG": str(config_path),
                 "ZSETUP_CONFIG_CACHE": str(tmp / "config-cache.json"),

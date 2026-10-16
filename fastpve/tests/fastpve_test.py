@@ -48,7 +48,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def main():
     assert SCRIPT.is_file(), 'FastPVE canonical installer missing'
-    with tempfile.TemporaryDirectory(prefix='fastpve-test-') as temp:
+    with tempfile.TemporaryDirectory(prefix='fastpve-test-', dir=ROOT/'dist') as temp:
         root = Path(temp); cert = root/'server.crt'; key = root/'server.key'
         generate_certificate(root)
         server = http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
@@ -84,10 +84,10 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
                     'stable_zsetup':{'version':NATIVE_VERSION,'source_group':'fixture','artifacts':[{'arch':'x86_64','path':'zsetup/unused','sha256':'00'*32,'size':1}]},
                     'installers':[{'application':'fastpve','os':'*','package_manager':'*','arch':'x86_64','source_group':'fixture','path':'fastpve/0.1.6/fastpve-install.sh','sha256':hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),'size':SCRIPT.stat().st_size,'background':False,'min_version':NATIVE_VERSION}]}
             cfg=root/'config'; cfg.write_text(json.dumps(config))
-            work=root/'work'; output=root/'args'
+            work=root/'work'; output=root/'args'; prefix=root/'installed'
             env=os.environ | {'PATH':f'{fakebin}:/usr/bin:/bin','ZSETUP_BIN':str(ZSETUP),'ZSETUP_CA_FILE':str(root/'ca.crt'),'ZSETUP_CONFIG':str(cfg),
                 'ZSETUP_CONFIG_CACHE':str(root/'config-cache'),'ZSETUP_MANAGED_ROOT':str(root/'managed'),'ZSETUP_ROOT':str(root/'bootstrap'),
-                'ZSETUP_WORK_DIR':str(work),'ZSETUP_ARCH':'x86_64','ZSETUP_PACKAGE_MANAGER':'apt','ZSETUP_OS':'debian',
+                'ZSETUP_WORK_DIR':str(work),'ZSETUP_INSTALL_PREFIX':str(prefix),'HOME':str(root/'home'),'ZSETUP_ARCH':'x86_64','ZSETUP_PACKAGE_MANAGER':'apt','ZSETUP_OS':'debian',
                 'ZSETUP_SOURCE_BASES':base,'ZSETUP_SOURCE_FALLBACK':'','ZSETUP_BOOTSTRAP_BASES':base,'TEST_STABLE':str(stable),'TEST_OUTPUT':str(output)}
             def run(args=(), overrides=None, indexed=False):
                 command=[str(ZSETUP),'install','fastpve','--foreground','--',*args] if indexed else ['sh',str(SCRIPT),*args]
@@ -100,7 +100,7 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             assert not Handler.counts.get(entry), 'direct installer must not fetch itself'
             for step in ('[1/4]','[2/4]','[3/4]','[4/4]'): assert step in first.stderr,first.stderr
             assert Handler.fresh
-            cached=work/'FastPVE-0.1.8'; assert cached.read_bytes()==PRODUCT
+            cached=prefix/'versions/0.1.8/bin/fastpve'; assert cached.read_bytes()==PRODUCT
             product_path='/binary/fastpve/FastPVE-0.1.8'
             downloads=Handler.counts[product_path]
             second=run(['indexed'],indexed=True)
@@ -111,7 +111,7 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             cached.write_bytes(b'corrupt cache')
             assert run(indexed=True).returncode==0
             assert cached.read_bytes()==PRODUCT and Handler.counts[product_path]>downloads
-            (work/'FastPVE-0.1.8.verified').unlink()
+            (prefix/'versions/0.1.8/bin/fastpve.verified').unlink()
             before=Handler.counts[product_path]
             assert run().returncode==0 and Handler.counts[product_path]>before
             # A cache path that is a directory/symlink must never redirect atomic commits.
@@ -122,7 +122,7 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             assert bad.returncode==2 and not output.exists() and not list(outside.iterdir()),bad
             assert cached.is_symlink()
             cached.unlink(); executable(cached,PRODUCT)
-            marker=work/'FastPVE-0.1.8.verified'; marker_bytes=marker.read_bytes()
+            marker=prefix/'versions/0.1.8/bin/fastpve.verified'; marker_bytes=marker.read_bytes()
             marker.unlink(); marker.symlink_to(outside, target_is_directory=True)
             bad=run()
             assert bad.returncode==2 and not output.exists() and not list(outside.iterdir()),bad
@@ -150,17 +150,17 @@ case "$url" in */binary/zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;;
             # Wrong bytes, HTTP downgrade, and a validly hashed but unusable new program.
             publish('0.1.9'); Handler.bodies['/binary/fastpve/FastPVE-0.1.9']=b'wrong bytes'
             bad=run(); assert bad.returncode!=0 and not output.exists(),bad
-            assert cached.read_bytes()==PRODUCT and not (work/'FastPVE-0.1.9').exists(); clean()
+            assert cached.read_bytes()==PRODUCT and not (prefix/'versions/0.1.9').exists(); clean()
             publish('0.1.9')
             bad=run(overrides={'VERSION_FAIL':'41'})
             assert bad.returncode==41 and not output.exists(),bad
-            assert not (work/'FastPVE-0.1.9').exists(); clean()
+            assert not (prefix/'versions/0.1.9').exists(); clean()
             bad=run(overrides={'ZSETUP_INSTALLER_MODE':'1','ZSETUP_SOURCE_BASES':base.replace('https:','http:')})
             assert bad.returncode!=0 and not output.exists(),bad
             clean()
             # Version switching retains old immutable cache; business exit remains observable.
             new=run(['new'],indexed=True); assert new.returncode==0,new
-            assert cached.read_bytes()==PRODUCT and (work/'FastPVE-0.1.9').is_file()
+            assert cached.read_bytes()==PRODUCT and (prefix/'versions/0.1.9/bin/fastpve').is_file()
             result=run(['exit'],overrides={'PRODUCT_EXIT':'37'},indexed=True)
             assert result.returncode==37,result
             fallback=run(overrides={'ZSETUP_INSTALLER_MODE':'1','ZSETUP_SOURCE_BASES':base+'/missing','ZSETUP_SOURCE_FALLBACK':base,'ZSETUP_WORK_DIR':str(root/'fallback')})
