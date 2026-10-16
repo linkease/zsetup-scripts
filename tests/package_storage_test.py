@@ -78,9 +78,17 @@ esac
                         assert '23' in (prefix/'package-result').read_text()
                         assert not (prefix/'current').exists(), 'package error silently selected raw binaries'
                         # A complete digest failure must happen before any PM operation.
-                        sums=next(p for p in Handler.bodies if f'/{remote}/' in p and p.endswith('/SHA256SUMS') and (('/lite/' in p) if app=='ddnsto' else True))
-                        original=Handler.bodies[sums]; Handler.bodies[sums]=original.replace(hashlib.sha256(next(v for k,v in Handler.bodies.items() if k.startswith(sums.removesuffix('SHA256SUMS')) and not k.endswith('SHA256SUMS'))).hexdigest().encode(),b'0'*64)
-                        Handler.bodies[sums]=original  # targeted corrupt cases covered by owning original package tests
+                        selected=f'openwrt/lite{"-apk" if manager=="apk" else ""}/4.2.3' if app=='ddnsto' else 'Openwrt/4.2.3'
+                        sums=f'/binary/{remote}/{selected}/SHA256SUMS'
+                        main=f'{app}_{"arm" if arch=="armv7" else arch}.{ext}'
+                        original=Handler.bodies[sums]
+                        digest=hashlib.sha256(Handler.bodies[f'/binary/{remote}/{selected}/{main}']).hexdigest().encode()
+                        Handler.bodies[sums]=original.replace(digest,b'0'*64)
+                        before=log.read_bytes()
+                        corrupt=subprocess.run(command,env=env,text=True,capture_output=True,timeout=30)
+                        assert corrupt.returncode==11 and log.read_bytes()==before,corrupt
+                        assert not list(work.iterdir())
+                        Handler.bodies[sums]=original
                 if app=='linkease':
                     unsupported=subprocess.run(['sh',str(script)],env=env|{'ZSETUP_PACKAGE_MANAGER':'apk'},capture_output=True)
                     assert unsupported.returncode==2
