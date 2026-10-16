@@ -205,5 +205,104 @@
     "four-site immutable installer readback",
     "safe real FastNet canary via direct script and native install",
     "explicit production pointer activation authorization"
-  ]
+  ],
+  "final_read_only_recheck": {
+    "fastnet_entries_config_stable": "unchanged against initial baseline SHA256",
+    "ddnsto_untouched_files": [
+      {
+        "path": "ddnsto/openwrt/install_ddnsto.sh",
+        "sha256": "1f137a4f5ec0f76aadbf3d3dbdc8193ec93eb71f095e9110ce3881d5ef3e7707"
+      },
+      {
+        "path": "ddnsto/openwrt/setup_ddnsto.sh",
+        "sha256": "53b69f9d7a6d287405c6ba88fb891f78ab362cdbb964dbf73c62d0bc83a8ff52"
+      },
+      {
+        "path": "ddnsto/linux/install_ddnsto_linux.sh",
+        "sha256": "0dbb19088fd4aae18c597c8f5455eaf28b4ef3bbd5adac7f551b85077c572c86"
+      }
+    ]
+  },
+  "implementation_commit": "5d0e14e",
+  "local_candidate": "dist/fastnet-0.1.8-review-5d0e14e",
+  "public_core_pointer_readback": [
+    {
+      "url": "https://dl.istoreos.com/binary/zsetup/config.json",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "ea0ba7758054395a7be830617834fdc9837181b51bbf4bdd8ed9312bb79df5a5",
+      "matches_ssh_baseline": true
+    },
+    {
+      "url": "https://dl.istoreos.com/binary/zsetup/stable",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79",
+      "matches_ssh_baseline": true
+    },
+    {
+      "url": "https://fw.d4ctech.com/binary/zsetup/config.json",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "ea0ba7758054395a7be830617834fdc9837181b51bbf4bdd8ed9312bb79df5a5",
+      "matches_ssh_baseline": true
+    },
+    {
+      "url": "https://fw.d4ctech.com/binary/zsetup/stable",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79",
+      "matches_ssh_baseline": true
+    },
+    {
+      "url": "https://fw20.koolcenter.com/binary/zsetup/config.json",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "ea0ba7758054395a7be830617834fdc9837181b51bbf4bdd8ed9312bb79df5a5",
+      "matches_ssh_baseline": true
+    },
+    {
+      "url": "https://fw20.koolcenter.com/binary/zsetup/stable",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79",
+      "matches_ssh_baseline": true
+    },
+    {
+      "url": "https://fw.koolcenter.com/binary/zsetup/config.json",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "ea0ba7758054395a7be830617834fdc9837181b51bbf4bdd8ed9312bb79df5a5",
+      "matches_ssh_baseline": true
+    },
+    {
+      "url": "https://fw.koolcenter.com/binary/zsetup/stable",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79",
+      "matches_ssh_baseline": true
+    }
+  ],
+  "full_regression": {
+    "passed": true,
+    "exit_code": 0,
+    "command": "/var/cache/build-cache/run.sh -- sh scripts/check.sh /projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup-rust /projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup-rust/dist/storage-m7-reviewed-platform-package",
+    "scope": [
+      "module layout and generated entries",
+      "14 app-release cases",
+      "bootstrap platform and native minimum",
+      "storage, bounded extraction and transactions",
+      "persistent launchers and privilege bridge",
+      "FastPVE and FastNet",
+      "DDNSTO and LinkEase isolated service/package fixtures",
+      "full release byte identity, history, deterministic packaging and immutable conflicts"
+    ],
+    "does_not_prove": "native real-business production canary or core0.5.0 production release gates"
+  },
+  "candidate_manifest_sha256": "27bd7fe887529e5dc592fd48a55bb09c987a865891233cd6c0fcb232b72bc841",
+  "test_commits": [
+    "643b6fb",
+    "75c51da"
+  ],
+  "public_readback_total": 24
 }
