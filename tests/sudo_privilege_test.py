@@ -3,6 +3,7 @@
 import hashlib
 import http.server
 import io
+import json
 import os
 from pathlib import Path
 import signal
@@ -71,10 +72,24 @@ case "$1" in
     env=['PATH=/usr/bin:/bin','HOME=/home/tester','ZSETUP_INSTALLER_MODE=1','ZSETUP_BIN=/tools/zsetup',
          'ZSETUP_OS=ubuntu','ZSETUP_PACKAGE_MANAGER=apt','ZSETUP_ARCH=x86_64',
          'ZSETUP_SOURCE_BASES='+base,'ZSETUP_SOURCE_FALLBACK=','ZSETUP_CA_FILE='+str(fixture/'ca.crt')]
-    def command(version):
-        # sh -c models the supported curl-substitution entry, without a readable $0.
+    config=home/'config.json'
+    script_body=(ROOT/'ddnsto/ddnsto-install.sh').read_bytes()
+    Handler.bodies['/ddnsto/storage-native/install.sh']=script_body
+    native_version=subprocess.check_output(['/tools/zsetup','--version'],text=True).strip().removeprefix('zsetup ')
+    config.write_text(json.dumps({'schema_version':1,'config_version':'sudo-native',
+      'source_groups':[{'id':'fixture','primary_bases':[base]}],
+      'stable_zsetup':{'version':native_version,'source_group':'fixture','artifacts':[{'arch':'x86_64','path':'unused','sha256':'00'*32,'size':1}]},
+      'installers':[{'application':'ddnsto','os':'*','package_manager':'*','arch':'*','source_group':'fixture','path':'ddnsto/storage-native/install.sh','sha256':hashlib.sha256(script_body).hexdigest(),'size':len(script_body),'background':False,'min_version':native_version}]}))
+    os.chown(config,1000,1000)
+    env+=['ZSETUP_CONFIG='+str(config),'ZSETUP_CONFIG_CACHE='+str(home/'config-cache'),'ZSETUP_MANAGED_ROOT='+str(home/'managed')]
+    def command(version,mode='direct'):
+        if mode=='direct':
+            launch=['/bin/sh','-c',script_body.decode(),'one-key']
+        else: launch=['/tools/zsetup','install','ddnsto','--foreground','--']
+        # Owner PID is reported before exec, independently of optional proc
+        # children APIs. Direct mode still models a curl-substitution sh -c.
         return ['/usr/sbin/runuser','-u','tester','--','/usr/bin/env','-i',*env,'DDNSTO_VERSION='+version,
-                '/bin/sh','-c','printf \'%s\\n\' \"$$\" > \"$HOME/coordinator-pid\";\n'+(ROOT/'ddnsto/ddnsto-install.sh').read_text(),'one-key',
+                '/bin/sh','-c','printf \'%s\\n\' "$$" > "$HOME/coordinator-pid"; exec "$@"','test-owner',*launch,
                 '--installer-prefix',prefix,'--installer-work-dir','/home/tester/中文 staging','--','--token','中文 $() token']
     def run(version):
         result=subprocess.run(command(version),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60)
@@ -101,23 +116,28 @@ case "$1" in
         assert not list(home.rglob('.transaction.*'))
         assert not list(Path('/tmp').glob('zsetup-privileged.*'))
         run('1.0.0'); assert Handler.counts.get(url)==prepared_count+1,Handler.counts
+        indexed=subprocess.run(command('1.0.0','indexed'),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=30)
+        assert indexed.returncode==0,indexed.stderr.decode()
+        assert Handler.counts.get(url)==prepared_count+1 and Handler.counts['/ddnsto/storage-native/install.sh']==1,Handler.counts
         # TERM of the unprivileged coordinator closes control, joins root
         # rollback, then removes user staging. No unprivileged root kill.
         artifact('2.0.0',True)
-        proc=subprocess.Popen(command('2.0.0'),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-        deadline=time.monotonic()+20
-        while not (fixture/'ready').exists() and time.monotonic()<deadline: time.sleep(.05)
-        if not (fixture/'ready').exists():
-            proc.terminate(); out,err=proc.communicate(timeout=15); raise AssertionError(err.decode())
-        assert proc.poll() is None, proc.communicate(timeout=10)
-        os.kill(int((home/'coordinator-pid').read_text()),signal.SIGTERM)
-        out,err=proc.communicate(timeout=30)
-        assert proc.returncode==143,(proc.returncode,err.decode())
-        assert os.readlink(prefix+'/current')=='versions/1.0.0'
-        assert not Path('/proc', (fixture/'child').read_text().strip()).exists()
-        assert not list(home.rglob('.transaction.*'))
-        assert not list(Path('/tmp').glob('zsetup-privileged.*'))
-        assert not Path(prefix+'/.service-lock').exists()
+        for mode in ('direct','indexed'):
+            for marker in ['ready','child']: (fixture/marker).unlink(missing_ok=True)
+            proc=subprocess.Popen(command('2.0.0',mode),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            deadline=time.monotonic()+20
+            while not (fixture/'ready').exists() and time.monotonic()<deadline: time.sleep(.05)
+            if not (fixture/'ready').exists():
+                proc.terminate(); out,err=proc.communicate(timeout=15); raise AssertionError(err.decode())
+            assert proc.poll() is None, proc.communicate(timeout=10)
+            os.kill(int((home/'coordinator-pid').read_text()),signal.SIGTERM)
+            out,err=proc.communicate(timeout=30)
+            assert proc.returncode==143,(proc.returncode,err.decode())
+            assert os.readlink(prefix+'/current')=='versions/1.0.0'
+            assert not Path('/proc', (fixture/'child').read_text().strip()).exists()
+            assert not list(home.rglob('.transaction.*'))
+            assert not list(Path('/tmp').glob('zsetup-privileged.*'))
+            assert not Path(prefix+'/.service-lock').exists()
         print('native sudo: denied credentials, actual UID 1000→0, root verification, one-key entry, alias ownership, cache, TERM rollback and complete cleanup passed')
     finally:
         server.shutdown(); server.server_close(); thread.join()
