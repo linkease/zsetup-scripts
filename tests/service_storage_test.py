@@ -29,7 +29,7 @@ def executable(path, body):
     path.chmod(0o755)
 
 
-def jail(native):
+def jail(native, suite='/source/tests/service_storage_test.py'):
     os.umask(0o022)
     # A real persistent mount, rather than the host's unknown overlay /tmp.
     (ROOT / 'dist').mkdir(exist_ok=True)
@@ -42,7 +42,7 @@ def jail(native):
         (root / 'etc/os-release').write_text('ID=ubuntu\nVERSION_ID="22.04"\n')
         setup = root / 'setup.sh'
         setup.write_text('''set -eu
-jail=$1; source=$2; native=$3
+jail=$1; source=$2; native=$3; suite=$4
 mount --make-rprivate /
 mount --bind "$jail" "$jail"
 for folder in usr bin lib lib64; do
@@ -58,9 +58,9 @@ for device in null zero urandom; do
     touch "$jail/dev/$device"
     mount --bind "/dev/$device" "$jail/dev/$device"
 done
-chroot "$jail" /usr/bin/env -i PATH=/usr/bin:/bin HOME=/root TMPDIR=/fixtures OPENSSL_CONF=/dev/null PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 /source/tests/service_storage_test.py --inside
+chroot "$jail" /usr/bin/env -i PATH=/usr/bin:/bin HOME=/root TMPDIR=/fixtures OPENSSL_CONF=/dev/null PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$suite" --inside
 ''')
-        result = subprocess.run(['unshare', '-Urmpf', 'sh', str(setup), str(root), str(ROOT), str(native)], timeout=180)
+        result = subprocess.run(['unshare', '-Urmpf', 'sh', str(setup), str(root), str(ROOT), str(native), suite], timeout=180)
         assert result.returncode == 0, f'isolated service suite exited {result.returncode}'
 
 
