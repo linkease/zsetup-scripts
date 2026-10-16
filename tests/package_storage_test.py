@@ -113,6 +113,14 @@ esac
                         assert not list(work.iterdir())
                         Handler.bodies[sums]=original
                         if app=='ddnsto' and manager=='opkg' and arch=='x86_64':
+                            config=case/'legacy-config'
+                            config.write_text('global '+('x'*17000))
+                            before=log.read_bytes()
+                            oversized=subprocess.run(command,env=env|{'DDNSTO_CONFIG_PATH':str(config)},text=True,capture_output=True,timeout=30)
+                            assert oversized.returncode==11 and log.read_bytes()==before,oversized
+                            original='global legacy configuration\n'; config.write_text(original)
+                            config_failure=subprocess.run(command,env=env|{'DDNSTO_CONFIG_PATH':str(config),'PKG_FAIL':'23'},text=True,capture_output=True,timeout=30)
+                            assert config_failure.returncode==23 and config.read_text()==original,config_failure
                             ready=case/'query-ready'; child=case/'query-child'
                             proc=subprocess.Popen(command,env=env|{'BLOCK_QUERY':'1','QUERY_READY':str(ready),'QUERY_CHILD':str(child)},stdout=subprocess.PIPE,stderr=subprocess.PIPE)
                             deadline=time.monotonic()+10
