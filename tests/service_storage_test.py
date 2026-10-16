@@ -115,7 +115,7 @@ printf 'manager %s\n' "$*" >> "$TEST_ACTIONS"
 case "$1" in
  is-active) exit "${HEALTH_FAIL:-0}" ;;
  stop) exit "${STOP_FAIL:-0}" ;;
- show) printf '%s\n' "$TEST_UNIT" ;;
+ show) [ ! -f "$TEST_UNIT" ] || printf '%s\n' "$TEST_UNIT" ;;
 esac
 ''')
             for app in ('ddnsto', 'linkease'):
@@ -159,6 +159,12 @@ esac
                 assert installed.is_file() and str(installed.resolve()) in unit.read_text(), unit.read_text()
                 assert (home / '.local/bin' / app).resolve() == installed.resolve()
                 assert not list((prefix / '.staging').glob('.transaction.*'))
+                if app == 'linkease':
+                    library = prefix / 'current/bin/linkmount/lib/libfixture.so'
+                    library.chmod(0o666)
+                    unsafe = run()
+                    assert unsafe.returncode == 12, unsafe
+                    library.chmod(0o755)
                 counts = dict(Handler.counts)
                 assert run().returncode == 0
                 assert all(Handler.counts[k] == count for k, count in counts.items() if not k.endswith('SHA256SUMS'))
@@ -169,8 +175,8 @@ esac
                     assert str(old) in unit.read_text(), (failure, unit.read_text())
                 false = run('2.0.0', {'FALSE_SUCCESS':'1'})
                 assert false.returncode != 0 and installed.resolve() == old, false
-                assert run('2.0.0').returncode == 0
-                assert run('3.0.0').returncode == 0
+                second = run('2.0.0'); assert second.returncode == 0, second
+                third = run('3.0.0'); assert third.returncode == 0, third
                 assert sorted(p.name for p in (prefix / 'versions').iterdir()) == ['2.0.0', '3.0.0']
                 assert run(extra=['--installer-scope','user']).returncode == 2
                 # Unknown installation/service must never be stopped or overwritten.
