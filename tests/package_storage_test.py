@@ -40,6 +40,7 @@ esac
             for command in ('ddnsto','linkease','uci','service','pgrep'):
                 executable(fake/command, '#!/bin/sh\nexit 0\n')
             for app, managers, arches in [('ddnsto',('opkg','apk'),('x86_64','aarch64','armv7','mipsel')),('linkease',('opkg',),('x86_64','aarch64','armv7'))]:
+                if os.environ.get('ZSETUP_TEST_APP') not in ('',None,app): continue
                 remote='ddnsto' if app=='ddnsto' else 'LinkEase'
                 for manager in managers:
                     ext='ipk' if manager=='opkg' else 'apk'
@@ -81,8 +82,10 @@ esac
                         unsafe=subprocess.run(command,env=env,text=True,capture_output=True,timeout=30)
                         assert unsafe.returncode==12,unsafe
                         marker.chmod(0o644)
+                        cache_counts=dict(Handler.counts)
                         failed=subprocess.run(command,env=env|{'PKG_FAIL':'23'},text=True,capture_output=True,timeout=30)
                         assert failed.returncode==23,failed
+                        assert all(Handler.counts[k]==v for k,v in cache_counts.items() if not k.endswith(('SHA256SUMS','VERSION','VERSION_LITE'))),Handler.counts
                         assert not list(work.iterdir())
                         assert '23' in (prefix/'package-result').read_text()
                         assert not (prefix/'current').exists(), 'package error silently selected raw binaries'
@@ -98,6 +101,15 @@ esac
                         assert corrupt.returncode==11 and log.read_bytes()==before,corrupt
                         assert not list(work.iterdir())
                         Handler.bodies[sums]=original
+                        if app=='ddnsto' and manager=='opkg' and arch=='x86_64':
+                            for memory, selected in [('899','lite'),('900','standard'),('unknown','standard')]:
+                                threshold=subprocess.run(command,env=env|{'DDNSTO_MEM_MB':memory},text=True,capture_output=True,timeout=30)
+                                assert threshold.returncode==0 and f'Checking DDNSTO {selected} version' in threshold.stderr,threshold
+                            alias=case/'setup_ddnsto.sh'; alias.symlink_to(script)
+                            compatibility=subprocess.run(['sh',str(alias),'compatibility token'],env=env|{'ZSETUP_INSTALL_PREFIX':str(prefix),'ZSETUP_WORK_DIR':str(work)},text=True,capture_output=True,timeout=30)
+                            assert compatibility.returncode==0,compatibility
+                            for argument in ['--unknown','--force-version=bad','--token=']:
+                                assert subprocess.run([*command,argument],env=env,capture_output=True,timeout=10).returncode==2
                 if app=='linkease':
                     unsupported=subprocess.run(['sh',str(script)],env=env|{'ZSETUP_PACKAGE_MANAGER':'apk'},capture_output=True)
                     assert unsupported.returncode==2

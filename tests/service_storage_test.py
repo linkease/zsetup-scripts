@@ -54,7 +54,7 @@ def jail(native, suite='/source/tests/service_storage_test.py'):
             (root / 'etc/nsswitch.conf').write_text('passwd: files\ngroup: files\nshadow: files\n')
         setup = root / 'setup.sh'
         setup.write_text('''set -eu
-jail=$1; source=$2; native=$3; suite=$4
+jail=$1; source=$2; native=$3; suite=$4; test_app=$5
 mount --make-rprivate /
 mount --bind "$jail" "$jail"
 for folder in usr bin lib lib64; do
@@ -70,10 +70,10 @@ for device in null zero urandom; do
     touch "$jail/dev/$device"
     mount --bind "/dev/$device" "$jail/dev/$device"
 done
-chroot "$jail" /usr/bin/env -i PATH=/usr/bin:/bin HOME=/root TMPDIR=/fixtures OPENSSL_CONF=/dev/null PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$suite" --inside
+chroot "$jail" /usr/bin/env -i PATH=/usr/bin:/bin HOME=/root TMPDIR=/fixtures OPENSSL_CONF=/dev/null PYTHONDONTWRITEBYTECODE=1 ZSETUP_TEST_APP="$test_app" /usr/bin/python3 "$suite" --inside
 ''')
         flags = '-mpf' if os.geteuid() == 0 else '-Urmpf'
-        result = subprocess.run(['unshare', flags, 'sh', str(setup), str(root), str(ROOT), str(native), suite], timeout=240)
+        result = subprocess.run(['unshare', flags, 'sh', str(setup), str(root), str(ROOT), str(native), suite, os.environ.get("ZSETUP_TEST_APP", "")], timeout=240)
         assert result.returncode == 0, f'isolated service suite exited {result.returncode}'
 
 
@@ -151,10 +151,12 @@ printf 'manager %s\n' "$*" >> "$TEST_ACTIONS"
 case "$1" in
  is-active) exit "${HEALTH_FAIL:-0}" ;;
  stop) exit "${STOP_FAIL:-0}" ;;
+ start) exit "${MANAGER_START_FAIL:-0}" ;;
  show) [ ! -f "$TEST_UNIT" ] || printf '%s\n' "$TEST_UNIT" ;;
 esac
 ''')
             for app in ('ddnsto', 'linkease'):
+                if os.environ.get('ZSETUP_TEST_APP') not in ('', None, app): continue
                 case = root / app; case.mkdir()
                 prefix = case / '程序 space %n $literal "quote" apostrophe\'' / app
                 home = case / 'home'; home.mkdir()
@@ -229,6 +231,32 @@ esac
                     assert bad.returncode != 0 and installed.resolve() == old, (failure, bad)
                     assert (prefix / 'current/bin' / app).resolve() == old
                     if app == 'ddnsto': assert Path('/etc/ddnsto/ddnsto-config.json').read_bytes() == old_config
+                # Previously separate business regressions: stop-before-change,
+                # malformed arguments and archive traversal never mutate service.
+                stopped = run(changes={'STOP_FAIL':'38'})
+                assert stopped.returncode == 38 and installed.resolve() == old, stopped
+                for extra in (['--not-a-business-option'], ['--installer-scope','invalid']):
+                    before=(case/'actions').read_bytes()
+                    bad=run(extra=extra)
+                    assert bad.returncode==2 and (case/'actions').read_bytes()==before, bad
+                if app=='ddnsto':
+                    assert run(extra=['--force-version','lite']).returncode==2
+                    assert run(extra=['--verify-status']).returncode==2
+                    missing=subprocess.run(['sh',str(script)],env=env,text=True,capture_output=True,timeout=10)
+                    assert missing.returncode==2, missing
+                else:
+                    zip_path='/binary/LinkEase/LinuxStorage/2.0.0/amd64.zip'
+                    sum_path='/binary/LinkEase/LinuxStorage/2.0.0/SHA256SUMS'
+                    original_zip, original_sums=Handler.bodies[zip_path],Handler.bodies[sum_path]
+                    stream=io.BytesIO()
+                    with zipfile.ZipFile(stream,'w') as zip: zip.writestr('../escape',b'invalid')
+                    bad_zip=stream.getvalue(); Handler.bodies[zip_path]=bad_zip
+                    Handler.bodies[sum_path]=original_sums.replace(hashlib.sha256(original_zip).hexdigest().encode(),hashlib.sha256(bad_zip).hexdigest().encode())
+                    before=(case/'actions').read_bytes()
+                    traversal=run('2.0.0')
+                    assert traversal.returncode==11 and (case/'actions').read_bytes()==before,traversal
+                    assert not (root/'escape').exists()
+                    Handler.bodies[zip_path],Handler.bodies[sum_path]=original_zip,original_sums
                 false = run('2.0.0', {'FALSE_SUCCESS':'1'})
                 assert false.returncode != 0 and installed.resolve() == old, false
                 # Root coordinator cancellation joins the native register tree,
@@ -253,9 +281,28 @@ esac
                     if app == 'ddnsto': assert Path('/etc/ddnsto/ddnsto-config.json').read_bytes() == old_config
                 finally:
                     if proc.poll() is None: proc.terminate(); proc.communicate(timeout=15)
+                recovery=run('2.0.0',{'MANAGER_START_FAIL':'37'})
+                assert recovery.returncode==37 and 'recovery incomplete' in recovery.stderr,recovery
+                assert (prefix/'.service-lock').exists()
+                retained=list((prefix/'.staging').glob('.transaction.*'))
+                assert len(retained)==1 and (retained[0]/'old-unit').is_file()
+                assert installed.resolve()==old
+                # The test operator performs manual recovery only in this private
+                # fixture after all native children have returned/joined.
+                shutil.rmtree(prefix/'versions/2.0.0')
+                shutil.rmtree(retained[0]); shutil.rmtree(prefix/'.staging/.install-lock')
+                shutil.rmtree(prefix/'.service-lock')
                 second = run('2.0.0'); assert second.returncode == 0, second
                 third = run('3.0.0'); assert third.returncode == 0, third
                 assert sorted(p.name for p in (prefix / 'versions').iterdir()) == ['2.0.0', '3.0.0']
+                bg_args=['--token','background token'] if app=='ddnsto' else ['--version','3.0.0']
+                background=subprocess.run([native,'install',app,'--background','--',*bg_args],env=env|{'DDNSTO_VERSION':'3.0.0'},text=True,capture_output=True,timeout=10)
+                assert background.returncode==0,background
+                fields=dict(line.split('=',1) for line in background.stdout.splitlines())
+                result=Path(fields['result']); deadline=time.monotonic()+15
+                while not result.exists() and time.monotonic()<deadline: time.sleep(.05)
+                assert result.read_text().strip()=='0',Path(fields['log']).read_text()
+                assert '[4/4]' in Path(fields['log']).read_text()
                 assert run(extra=['--installer-scope','user']).returncode == 2
                 # Non-systemd is an explicitly deferred mapping, with no unit mutation.
                 actions = (case / 'actions').read_text()
