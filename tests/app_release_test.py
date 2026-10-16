@@ -1,5 +1,4 @@
 """Single-app release plans preserve unrelated live records and never publish."""
-import copy
 import hashlib
 import json
 import os
@@ -124,6 +123,90 @@ class AppRelease(unittest.TestCase):
         before = (self.output / "app-release-manifest.json").read_bytes()
         self.run_plan(False)
         self.assertEqual((self.output / "app-release-manifest.json").read_bytes(), before)
+
+    def server(self):
+        root = self.root / "server binary"
+        for name, data in (("zsetup/config.json", self.input.read_bytes()), ("zsetup/stable", b"0.5.0\n"),
+                           ("fastnet/fastnet-install.sh", b"old direct entry\n"), ("fastnet/install.sh", b"old compatibility entry\n"),
+                           ("ddnsto/openwrt/install_ddnsto.sh", b"do not touch DDNSTO\n"), ("fastnet/version.txt", b"business metadata\n"),
+                           ("fastnet/FastNet-0.7.6.amd64", b"server owned binary\n"), ("zsetup/stable-windows", b"0.4.0\n")):
+            path = root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)
+        (root / "fastnet/fastnet-install.sh").chmod(0o751)
+        self.original = {str(p.relative_to(root)): (p.read_bytes(), p.stat().st_mode & 0o777) for p in root.rglob("*") if p.is_file()}
+        return root
+
+    def transaction(self, mode, server, success=True, env=None):
+        result = subprocess.run(["sh", str(ROOT / "scripts/install-app-release.sh"), mode, str(self.output), str(server)],
+                                capture_output=True, text=True, timeout=10, env=env)
+        self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
+        return result
+
+    def assert_original(self, server):
+        for name, (data, mode) in self.original.items():
+            path = server / name
+            self.assertEqual(path.read_bytes(), data, name)
+            self.assertEqual(path.stat().st_mode & 0o777, mode, name)
+        self.assertFalse((server / "zsetup/.windows-release-lock").exists())
+
+    def test_stage_activate_rollback_preserves_other_businesses_and_modes(self):
+        self.run_plan(); server = self.server()
+        self.transaction("stage", server); self.assert_original(server)
+        self.transaction("activate", server)
+        self.assertEqual((server / "fastnet/install.sh").read_bytes(), (ROOT / "fastnet/fastnet-install.sh").read_bytes())
+        self.assertEqual((server / "fastnet/fastnet-install.sh").read_bytes(), (server / "fastnet/install.sh").read_bytes())
+        self.assertEqual((server / "ddnsto/openwrt/install_ddnsto.sh").read_bytes(), self.original["ddnsto/openwrt/install_ddnsto.sh"][0])
+        self.transaction("rollback", server); self.assert_original(server)
+        self.assertTrue((server / "fastnet/0.1.8/fastnet-install.sh").is_file())
+
+    def test_blocked_plan_cannot_stage_or_activate(self):
+        self.config["stable_zsetup"]["version"] = "0.4.0"
+        self.run_plan(); server = self.server()
+        self.transaction("stage", server, False); self.assert_original(server)
+        self.assertFalse((server / "fastnet/0.1.8").exists())
+        self.transaction("activate", server, False); self.assert_original(server)
+
+    def test_immutable_conflict_is_preserved(self):
+        self.run_plan(); server = self.server()
+        immutable = server / "fastnet/0.1.8/fastnet-install.sh"
+        immutable.parent.mkdir(); immutable.write_text("existing different immutable bytes")
+        self.transaction("stage", server, False); self.assert_original(server)
+        self.assertEqual(immutable.read_text(), "existing different immutable bytes")
+
+    def test_remote_config_and_entry_drift_prevent_activation(self):
+        self.run_plan(); server = self.server()
+        self.transaction("stage", server)
+        alias = server / "fastnet/install.sh"; alias.write_text("new publisher changed alias")
+        self.transaction("activate", server, False)
+        self.assertEqual(alias.read_text(), "new publisher changed alias")
+        self.assertEqual((server / "zsetup/config.json").read_bytes(), self.original["zsetup/config.json"][0])
+        alias.write_bytes(self.original["fastnet/install.sh"][0])
+        config = server / "zsetup/config.json"; config.write_text("new publisher changed config")
+        self.transaction("activate", server, False)
+        self.assertEqual(config.read_text(), "new publisher changed config")
+
+    def test_partial_activation_failure_restores_all_pointers(self):
+        self.run_plan(); server = self.server(); self.transaction("stage", server)
+        tools = self.root / "failure tools"; tools.mkdir()
+        mv = tools / "mv"
+        import shlex
+        marker = self.root / "failed-once"
+        mv.write_text("#!/bin/sh\ncase \"$*\" in *zsetup/config.json) if [ ! -e " + shlex.quote(str(marker)) +
+                      " ]; then touch " + shlex.quote(str(marker)) + "; exit 42; fi ;; esac\nexec /bin/mv \"$@\"\n")
+        mv.chmod(0o755)
+        self.transaction("activate", server, False, os.environ | {"PATH": str(tools) + ":" + os.environ["PATH"]})
+        self.assertTrue(marker.exists()); self.assert_original(server)
+
+    def test_symlink_target_and_out_of_order_rollback_are_refused(self):
+        self.run_plan(); server = self.server()
+        target = server / "fastnet/install.sh"; original = target.read_bytes()
+        target.unlink(); target.symlink_to(server / "ddnsto/openwrt/install_ddnsto.sh")
+        self.transaction("stage", server, False)
+        self.assertEqual((server / "ddnsto/openwrt/install_ddnsto.sh").read_bytes(), self.original["ddnsto/openwrt/install_ddnsto.sh"][0])
+        target.unlink(); target.write_bytes(original)
+        self.transaction("stage", server); self.transaction("activate", server)
+        (server / "zsetup/config.json").write_text("later release")
+        self.transaction("rollback", server, False)
+        self.assertEqual((server / "zsetup/config.json").read_text(), "later release")
 
 
 if __name__ == "__main__":
