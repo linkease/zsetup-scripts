@@ -72,6 +72,15 @@ esac
                         assert not list(work.iterdir()),list(work.iterdir())
                         assert 'cache' in lines[-1] and 'tmp' in lines[-1],lines
                         assert not any('/tmp/' in line for line in lines),lines
+                        # Target lease is shared even when callers select different staging.
+                        lock=prefix/'.package-lock'; lock.mkdir()
+                        conflict=subprocess.run(['sh',str(script),'--installer-prefix',str(prefix),'--installer-work-dir',str(case/'other staging')],env=env,text=True,capture_output=True,timeout=30)
+                        assert conflict.returncode==2,conflict
+                        lock.rmdir()
+                        marker=prefix/'.managed'; marker.chmod(0o666)
+                        unsafe=subprocess.run(command,env=env,text=True,capture_output=True,timeout=30)
+                        assert unsafe.returncode==12,unsafe
+                        marker.chmod(0o644)
                         failed=subprocess.run(command,env=env|{'PKG_FAIL':'23'},text=True,capture_output=True,timeout=30)
                         assert failed.returncode==23,failed
                         assert not list(work.iterdir())
