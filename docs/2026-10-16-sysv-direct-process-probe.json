@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "probes": [
+    {
+      "application": "ddnsto",
+      "version": "4.2.3",
+      "scope": "system",
+      "effective_uid": 0,
+      "probe_exit": 0,
+      "program_exit": 0,
+      "stdout": "",
+      "stderr": "2026/10/16 07:02:56 routerId: 020000000010 RouterIdx: 0 host: tunnel.kooldns.cn:4445 supplier: \n2026/10/16 07:02:58 Run in daemon result: OK\n",
+      "generated_units": {
+        "etc/init.d/com.linkease.ddnstoshell": "#!/bin/sh\n# For RedHat and cousins:\n# chkconfig: - 99 01\n# description: DdnstoShell Service\n# processname: /opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto\n\n### BEGIN INIT INFO\n# Provides:          /opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto\n# Required-Start:\n# Required-Stop:\n# Default-Start:     2 3 4 5\n# Default-Stop:      0 1 6\n# Short-Description: DdnstoShell Service\n# Description:       DdnstoShell Service\n### END INIT INFO\n\ncmd=\"/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto \"run\"\"\n\nname=$(basename $(readlink -f $0))\npid_file=\"/var/run/$name.pid\"\nstdout_log=\"/var/log/$name.log\"\nstderr_log=\"/var/log/$name.err\"\n\n[ -e /etc/sysconfig/$name ] && . /etc/sysconfig/$name\n\nget_pid() {\n    cat \"$pid_file\"\n}\n\nis_running() {\n    [ -f \"$pid_file\" ] && cat /proc/$(get_pid)/stat > /dev/null 2>&1\n}\n\ncase \"$1\" in\n    start)\n        if is_running; then\n            echo \"Already started\"\n        else\n            echo \"Starting $name\"\n            \n            $cmd >> \"$stdout_log\" 2>> \"$stderr_log\" &\n            echo $! > \"$pid_file\"\n            if ! is_running; then\n                echo \"Unable to start, see $stdout_log and $stderr_log\"\n                exit 1\n            fi\n        fi\n    ;;\n    stop)\n        if is_running; then\n            echo -n \"Stopping $name..\"\n            kill $(get_pid)\n            for i in $(seq 1 10)\n            do\n                if ! is_running; then\n                    break\n                fi\n                echo -n \".\"\n                sleep 1\n            done\n            echo\n            if is_running; then\n                echo \"Not stopped; may still be shutting down or shutdown may have failed\"\n                exit 1\n            else\n                echo \"Stopped\"\n                if [ -f \"$pid_file\" ]; then\n                    rm \"$pid_file\"\n                fi\n            fi\n        else\n            echo \"Not running\"\n        fi\n    ;;\n    restart)\n        $0 stop\n        if is_running; then\n            echo \"Unable to stop, will not attempt to start\"\n            exit 1\n        fi\n        $0 start\n    ;;\n    status)\n        if is_running; then\n            echo \"Running\"\n        else\n            echo \"Stopped\"\n            exit 1\n        fi\n    ;;\n    *)\n    echo \"Usage: $0 {start|stop|restart|status}\"\n    exit 1\n    ;;\nesac\nexit 0\n"
+      },
+      "service_actions": "",
+      "real_systemctl": false,
+      "network": "isolated",
+      "host_services_modified": false,
+      "configuration_files": {
+        "etc/passwd": "root:x:0:0::/root:/bin/sh\nuser:x:1000:1000::/home/user:/bin/sh\n",
+        "etc/os-release": "ID=ubuntu\nVERSION_ID=\"22.04\"\n",
+        "etc/ddnsto/ddnsto-config.json": "{\"token\":\"storage-probe-invalid-token\",\"routeridx\":0,\"supplierCode\":\"\"}",
+        "etc/init.d/com.linkease.ddnstoshell": "#!/bin/sh\n# For RedHat and cousins:\n# chkconfig: - 99 01\n# description: DdnstoShell Service\n# processname: /opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto\n\n### BEGIN INIT INFO\n# Provides:          /opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto\n# Required-Start:\n# Required-Stop:\n# Default-Start:     2 3 4 5\n# Default-Stop:      0 1 6\n# Short-Description: DdnstoShell Service\n# Description:       DdnstoShell Service\n### END INIT INFO\n\ncmd=\"/opt/linkease/ddnsto/versions/4.2.3/bin/ddnsto \"run\"\"\n\nname=$(basename $(readlink -f $0))\npid_file=\"/var/run/$name.pid\"\nstdout_log=\"/var/log/$name.log\"\nstderr_log=\"/var/log/$name.err\"\n\n[ -e /etc/sysconfig/$name ] && . /etc/sysconfig/$name\n\nget_pid() {\n    cat \"$pid_file\"\n}\n\nis_running() {\n    [ -f \"$pid_file\" ] && cat /proc/$(get_pid)/stat > /dev/null 2>&1\n}\n\ncase \"$1\" in\n    start)\n        if is_running; then\n            echo \"Already started\"\n        else\n            echo \"Starting $name\"\n            \n            $cmd >> \"$stdout_log\" 2>> \"$stderr_log\" &\n            echo $! > \"$pid_file\"\n            if ! is_running; then\n                echo \"Unable to start, see $stdout_log and $stderr_log\"\n                exit 1\n            fi\n        fi\n    ;;\n    stop)\n        if is_running; then\n            echo -n \"Stopping $name..\"\n            kill $(get_pid)\n            for i in $(seq 1 10)\n            do\n                if ! is_running; then\n                    break\n                fi\n                echo -n \".\"\n                sleep 1\n            done\n            echo\n            if is_running; then\n                echo \"Not stopped; may still be shutting down or shutdown may have failed\"\n                exit 1\n            else\n                echo \"Stopped\"\n                if [ -f \"$pid_file\" ]; then\n                    rm \"$pid_file\"\n                fi\n            fi\n        else\n            echo \"Not running\"\n        fi\n    ;;\n    restart)\n        $0 stop\n        if is_running; then\n            echo \"Unable to stop, will not attempt to start\"\n            exit 1\n        fi\n        $0 start\n    ;;\n    status)\n        if is_running; then\n            echo \"Running\"\n        else\n            echo \"Stopped\"\n            exit 1\n        fi\n    ;;\n    *)\n    echo \"Usage: $0 {start|stop|restart|status}\"\n    exit 1\n    ;;\nesac\nexit 0\n"
+      },
+      "init_system": "sysv",
+      "repeat_register": false,
+      "replace_before_repeat": false,
+      "native_owner": false,
+      "service_processes_before_namespace_exit": "/var/run/com.linkease.ddnstoshell.pid:42:true\n"
+    }
+  ]
+}

@@ -68,10 +68,16 @@ unit经真实systemd-analyze验证；root保护的固定.service-run只字面exe
 
 服务fixture在私有root/mount/PID namespace中，网络仅本地HTTPS fixture，systemctl及程序为stub。
 真实业务程序的独立probe使用隔离网络，未操作宿主服务；这些不等同真实systemd业务健康。
-详细证据见2026-10-16-service-storage-evidence.json及三个service probe JSON。
+详细证据见2026-10-16-service-storage-evidence.json及各service probe JSON。
 M5新待决：SysV真实生成的脚本无.service后缀、空格拆词有误，foreground owner还会回收
 其直接派生的daemon。首期仅交付systemd并保留SysV legacy，或本轮同时迁移SysV监督协议，
 待用户决定；在此之前新适配器对非systemd拒绝，旧入口及legacy参考保留。M6/M7未开始。
+
+补充真实DDNSTO SysV对照：补齐隔离PATH中的/usr/sbin和私有/var/run、/var/log后，
+直接注册返回OK且在namespace退出前PID存在；经canonical Rust foreground run注册同样
+返回OK，但owner返回前已回收该PID。见2026-10-16-sysv-{direct,owned}-process-probe.json。
+原首轮service找不到属于隔离设施，不当作产品缺陷；新的两次对照均实际调用了隔离SysV脚本。
+这仅证明PID可见性/回收差异，不证明认证、连通、重启恢复或LinkEase实际SysV启动。
 
 这不是新版本发布或生产安装证据；线上0.4.0缺新增storage/capture及下载限制参数，
 新脚本必须随未来具备这些能力的原生版本/最低版本配置一起发布，不能提前替换线上脚本。

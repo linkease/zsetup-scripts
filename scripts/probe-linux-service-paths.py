@@ -23,6 +23,7 @@ def main():
     parser.add_argument("--init-system", choices=["systemd", "sysv"], default="systemd")
     parser.add_argument("--repeat-register", action="store_true")
     parser.add_argument("--replace-before-repeat", action="store_true")
+    parser.add_argument("--native-owner", action="store_true")
     args = parser.parse_args()
     native = str(args.zsetup.resolve())
     previous = json.loads(args.report.read_text())["probes"] if args.report.exists() else []
@@ -43,7 +44,7 @@ def main():
             program.parent.mkdir(parents=True)
             subprocess.run([native, "capture", "-o", str(program), "--max-bytes", "67108864", "--", "tar", "-xOzf", str(archive), member], check=True)
             program.chmod(0o755)
-            for folder in ["usr", "bin", "lib", "lib64", "proc", "dev", "tmp", "root", "home/user", "run/systemd/system", "etc/systemd/system", "etc/init.d", "sandbox-bin"]:
+            for folder in ["usr", "bin", "lib", "lib64", "proc", "dev", "tmp", "root", "home/user", "run/systemd/system", "var/run", "var/log", "etc/systemd/system", "etc/init.d", "sandbox-bin"]:
                 (jail / folder).mkdir(parents=True, exist_ok=True)
             (jail / "etc/os-release").write_text('ID=ubuntu\nVERSION_ID="22.04"\n')
             (jail / "etc/passwd").write_text("root:x:0:0::/root:/bin/sh\nuser:x:1000:1000::/home/user:/bin/sh\n")
@@ -67,6 +68,19 @@ exit 0
                     probe = jail / "probe.sh"
                     text = probe.read_text().replace('cp "$original" "$original.next"', f'rm -f /etc/systemd/system/com.linkease.{"ddnstoshell" if app == "ddnsto" else "linkeasedaemon"}.service\ncp "$original" "$original.next"')
                     probe.write_text(text)
+            if args.native_owner:
+                probe = jail / "probe.sh"
+                probe.write_text(probe.read_text().replace('"$@"\nprobe_code=', '/probe-zsetup run -- "$@"\nprobe_code='))
+            probe = jail / "probe.sh"
+            probe.write_text(probe.read_text().replace('exit 0\n', '''for probe_pid_file in /var/run/*.pid; do
+    [ -f "$probe_pid_file" ] || continue
+    IFS= read -r probe_pid < "$probe_pid_file" || continue
+    case "$probe_pid" in ''|*[!0-9]*) continue ;; esac
+    if kill -0 "$probe_pid" 2>/dev/null; then probe_alive=true; else probe_alive=false; fi
+    printf '%s:%s:%s\\n' "$probe_pid_file" "$probe_pid" "$probe_alive" >> /service-processes
+done
+exit 0
+'''))
             # Linux refuses CLONE_NEWUSER after chroot. Map UID1000 before
             # chroot, using the new namespace's capabilities before exec drops
             # them. Privileged paths are separately read-only in this probe.
@@ -86,7 +100,8 @@ os.execve("/bin/sh", ["sh", "/probe.sh", *sys.argv[2:]], {"HOME":"/home/user", "
 set -eu
 ulimit -c 0
 ulimit -t 5
-jail=$1; probe_scope=$2; shift 2
+ulimit -f 1024
+jail=$1; probe_scope=$2; probe_native=$3; shift 3
 mount --make-rprivate /
 ip link add eth0 type veth peer name eth1
 ip link set dev eth0 address 02:00:00:00:00:10
@@ -99,6 +114,9 @@ for folder in usr bin lib lib64; do
     mount -o remount,bind,ro "$jail/$folder"
 done
 mount -t proc proc "$jail/proc"
+touch "$jail/probe-zsetup"
+mount --bind "$probe_native" "$jail/probe-zsetup"
+mount -o remount,bind,ro "$jail/probe-zsetup"
 for device in null zero urandom; do
     touch "$jail/dev/$device"
     mount --bind "/dev/$device" "$jail/dev/$device"
@@ -112,13 +130,13 @@ if [ "$probe_scope" = user ]; then
     mount -o remount,bind,ro "$jail/opt"
     /usr/bin/python3 "$jail/user-exec.py" "$jail" "$@"
 else
-    chroot "$jail" /usr/bin/env -i HOME=/root USER=root PATH=/sandbox-bin:/usr/bin:/bin /bin/sh /probe.sh "$@"
+    chroot "$jail" /usr/bin/env -i HOME=/root USER=root PATH=/sandbox-bin:/usr/sbin:/usr/bin:/bin /bin/sh /probe.sh "$@"
 fi
 probe_code=$?
 exit "$probe_code"
 ''')
             output = work / f"{app}.output"
-            cmd = [native, "capture", "-o", str(output), "--max-bytes", "16384", "--timeout", "10s" if args.repeat_register else "5s", "--", "unshare", "-Urnmpf", "sh", str(setup), str(jail), args.scope, "/" + str(program.relative_to(jail)), *invocation]
+            cmd = [native, "capture", "-o", str(output), "--max-bytes", "16384", "--timeout", "10s" if args.repeat_register or args.native_owner else "5s", "--", "unshare", "-Urnmpf", "sh", str(setup), str(jail), args.scope, native, "/" + str(program.relative_to(jail)), *invocation]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             units = {}
             for folder in [jail / "etc/systemd/system", jail / "etc/init.d"]:
@@ -135,6 +153,8 @@ exit "$probe_code"
             rows[-1]["init_system"] = args.init_system
             rows[-1]["repeat_register"] = args.repeat_register
             rows[-1]["replace_before_repeat"] = args.replace_before_repeat
+            rows[-1]["native_owner"] = args.native_owner
+            rows[-1]["service_processes_before_namespace_exit"] = (jail / "service-processes").read_text() if (jail / "service-processes").exists() else ""
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(json.dumps({"schema_version":1,"probes":rows}, ensure_ascii=False, indent=2) + "\n")
     print(args.report)

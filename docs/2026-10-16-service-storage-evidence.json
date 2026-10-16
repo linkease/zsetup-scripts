@@ -38,7 +38,9 @@
     "2026-10-16-service-path-probes.json",
     "2026-10-16-ddnsto-reregister-probe.json",
     "2026-10-16-ddnsto-unit-replace-probe.json",
-    "2026-10-16-sysv-service-probes.json"
+    "2026-10-16-sysv-service-probes.json",
+    "2026-10-16-sysv-direct-process-probe.json",
+    "2026-10-16-sysv-owned-process-probe.json"
   ],
   "pending": [
     "SysV product scope decision",
