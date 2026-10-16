@@ -121,6 +121,17 @@ def inside():
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         try:
             bindir = root / 'bin'; bindir.mkdir()
+            native_version = subprocess.check_output([native, '--version'], text=True).strip().removeprefix('zsetup ')
+            stable = root / 'stable'; stable.write_text(native_version + '\n')
+            executable(bindir / 'curl', '''#!/bin/sh
+out=; url=
+while [ "$#" -gt 0 ]; do
+ [ "$1" != -o ] || { shift; out=$1; shift; continue; }
+ case "$1" in https://*) url=$1 ;; esac
+ shift
+done
+case "$url" in */zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;; esac
+''')
             executable(bindir / 'systemctl', '''#!/bin/sh
 printf 'manager %s\n' "$*" >> "$TEST_ACTIONS"
 case "$1" in
@@ -135,11 +146,21 @@ esac
                 home = case / 'home'; home.mkdir()
                 unit = Path('/etc/systemd/system') / f'com.linkease.{"ddnstoshell" if app == "ddnsto" else "linkeasedaemon"}.service'
                 script = ROOT / app / f'{app}-install.sh'
+                entry = f'{app}/storage-test/{app}-install.sh'
+                Handler.bodies[f'/binary/{entry}'] = script.read_bytes()
+                base = f'https://127.0.0.1:{server.server_address[1]}/binary'
+                config = case / 'config.json'
+                config.write_text(json.dumps({'schema_version':1,'config_version':'service-storage',
+                    'source_groups':[{'id':'fixture','primary_bases':[base]}],
+                    'stable_zsetup':{'version':native_version,'source_group':'fixture','artifacts':[{'arch':'x86_64','path':'unused','sha256':'00'*32,'size':1}]},
+                    'installers':[{'application':app,'os':'*','package_manager':'*','arch':'*','source_group':'fixture','path':entry,'sha256':hashlib.sha256(script.read_bytes()).hexdigest(),'size':script.stat().st_size,'background':False,'min_version':native_version}]}))
                 env = os.environ | {'HOME':str(home), 'PATH':f'{bindir}:/usr/bin:/bin',
                     'ZSETUP_BIN':native, 'ZSETUP_INSTALLER_MODE':'1', 'ZSETUP_OS':'ubuntu',
                     'ZSETUP_PACKAGE_MANAGER':'apt', 'ZSETUP_ARCH':'x86_64',
                     'ZSETUP_SOURCE_BASES':f'https://127.0.0.1:{server.server_address[1]}/binary',
                     'ZSETUP_SOURCE_FALLBACK':'', 'ZSETUP_CA_FILE':str(root / 'ca.crt'),
+                    'ZSETUP_CONFIG':str(config),'ZSETUP_CONFIG_CACHE':str(case / 'config-cache'),'ZSETUP_MANAGED_ROOT':str(case / 'managed'),
+                    'ZSETUP_ROOT':str(case / 'bootstrap'),'ZSETUP_BOOTSTRAP_BASES':base,'TEST_STABLE':str(stable),
                     'ZSETUP_INSTALL_PREFIX':str(prefix), 'TEST_UNIT':str(unit), 'TEST_ACTIONS':str(case / 'actions'), 'TEST_RUN_PATH':str(case / 'run-path')}
                 for version in ('1.0.0', '2.0.0', '3.0.0'):
                     stream = io.BytesIO()
@@ -161,11 +182,13 @@ esac
                     sums = ''.join(f'{hashlib.sha256(body).hexdigest()}  {filename}\n' for filename, body in files.items()).encode()
                     if app == 'ddnsto': Handler.bodies[f'{folder}/SHA256SUMS'] = Handler.bodies.get(f'{folder}/SHA256SUMS', b'') + sums
                     else: Handler.bodies[f'{folder}/SHA256SUMS'] = sums
-                def run(version='1.0.0', changes=None, extra=()):
+                def run(version='1.0.0', changes=None, extra=(), mode='ready'):
                     args = ['--token', (changes or {}).get('TEST_TOKEN', '令牌 space $literal')] if app == 'ddnsto' else ['--version', version]
-                    return subprocess.run(['sh', str(script), *extra, *args], env=env | {'DDNSTO_VERSION':version} | (changes or {}), text=True, capture_output=True, timeout=30)
-                first = run()
+                    command = [native,'install',app,'--foreground','--'] if mode == 'indexed' else ['sh',str(script)]
+                    return subprocess.run([*command, *extra, *args], env=env | {'DDNSTO_VERSION':version,'ZSETUP_INSTALLER_MODE':'0' if mode == 'direct' else '1'} | (changes or {}), text=True, capture_output=True, timeout=30)
+                first = run(mode='direct', extra=['--installer-prefix',str(prefix),'--'])
                 assert first.returncode == 0, first
+                assert not Handler.counts.get(f'/binary/{entry}'), 'running script downloaded itself'
                 installed = prefix / 'current/bin' / app
                 assert installed.is_file(), installed
                 verified_unit = subprocess.run(['systemd-analyze', 'verify', str(unit)], cwd='/', text=True, capture_output=True)
@@ -181,7 +204,9 @@ esac
                     assert unsafe.returncode == 12, unsafe
                     library.chmod(0o755)
                 counts = dict(Handler.counts)
-                assert run().returncode == 0
+                indexed = run(mode='indexed')
+                assert indexed.returncode == 0, indexed
+                assert Handler.counts[f'/binary/{entry}'] == 1
                 assert all(Handler.counts[k] == count for k, count in counts.items() if not k.endswith('SHA256SUMS'))
                 old = installed.resolve()
                 old_config = Path('/etc/ddnsto/ddnsto-config.json').read_bytes() if app == 'ddnsto' else None
@@ -218,6 +243,14 @@ esac
                 third = run('3.0.0'); assert third.returncode == 0, third
                 assert sorted(p.name for p in (prefix / 'versions').iterdir()) == ['2.0.0', '3.0.0']
                 assert run(extra=['--installer-scope','user']).returncode == 2
+                # Non-systemd is an explicitly deferred mapping, with no unit mutation.
+                actions = (case / 'actions').read_text()
+                Path('/run/systemd/system').rmdir()
+                try:
+                    unsupported = run(mode='indexed')
+                    assert unsupported.returncode == 2 and 'legacy' in unsupported.stderr, unsupported
+                    assert (case / 'actions').read_text() == actions
+                finally: Path('/run/systemd/system').mkdir()
                 # Unknown installation/service must never be stopped or overwritten.
                 foreign = case / 'foreign'; foreign.mkdir(); (foreign / 'foreign').write_text('unowned')
                 before = (case / 'actions').read_text()
