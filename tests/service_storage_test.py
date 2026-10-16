@@ -88,10 +88,18 @@ case "$1" in
    if [ "$1" = --serviceControl ] && [ "$2" = uninstall ]; then rm -f "$TEST_UNIT"; exit 0; fi
    if [ "$1" = --serviceControl ] && [ "$2" = start ]; then exit "${{START_FAIL:-0}}"; fi
    printf '%s\\n' "$0" >> "$TEST_ACTIONS"
+   if [ '{app}' = ddnsto ]; then mkdir -p /etc/ddnsto; printf '%s\\n' "$2" > /etc/ddnsto/ddnsto-config.json; fi
    [ "${{FALSE_SUCCESS:-0}}" = 0 ] || exit 0
    # Real DDNSTO reports OK without rewriting an existing service definition.
    if [ '{app}' = ddnsto ] && [ -f "$TEST_UNIT" ]; then exit 0; fi
    printf '[Unit]\\nConditionFileIsExecutable=%s\\n[Service]\\nExecStart=%s "run"\\n' "$0" "$0" > "$TEST_UNIT"
+   if [ '{version}' = 2.0.0 ] && [ "${{BLOCK_REGISTER:-0}}" = 1 ]; then
+       sleep 60 &
+       child=$!
+       printf '%s\\n' "$child" > "$TEST_SLEEP_PID"
+       : > "$TEST_READY"
+       wait "$child"
+   fi
    [ '{version}' != 2.0.0 ] || exit "${{INSTALL_FAIL:-0}}"
    exit 0 ;;
 esac
@@ -154,7 +162,7 @@ esac
                     if app == 'ddnsto': Handler.bodies[f'{folder}/SHA256SUMS'] = Handler.bodies.get(f'{folder}/SHA256SUMS', b'') + sums
                     else: Handler.bodies[f'{folder}/SHA256SUMS'] = sums
                 def run(version='1.0.0', changes=None, extra=()):
-                    args = ['--token', '令牌 space $literal'] if app == 'ddnsto' else ['--version', version]
+                    args = ['--token', (changes or {}).get('TEST_TOKEN', '令牌 space $literal')] if app == 'ddnsto' else ['--version', version]
                     return subprocess.run(['sh', str(script), *extra, *args], env=env | {'DDNSTO_VERSION':version} | (changes or {}), text=True, capture_output=True, timeout=30)
                 first = run()
                 assert first.returncode == 0, first
@@ -176,12 +184,36 @@ esac
                 assert run().returncode == 0
                 assert all(Handler.counts[k] == count for k, count in counts.items() if not k.endswith('SHA256SUMS'))
                 old = installed.resolve()
+                old_config = Path('/etc/ddnsto/ddnsto-config.json').read_bytes() if app == 'ddnsto' else None
                 for failure in ('VERSION_FAIL', 'INSTALL_FAIL', 'HEALTH_FAIL'):
-                    bad = run('2.0.0', {failure:'37'})
+                    bad = run('2.0.0', {failure:'37', 'TEST_TOKEN':'replacement token'})
                     assert bad.returncode != 0 and installed.resolve() == old, (failure, bad)
                     assert (prefix / 'current/bin' / app).resolve() == old
+                    if app == 'ddnsto': assert Path('/etc/ddnsto/ddnsto-config.json').read_bytes() == old_config
                 false = run('2.0.0', {'FALSE_SUCCESS':'1'})
                 assert false.returncode != 0 and installed.resolve() == old, false
+                # Root coordinator cancellation joins the native register tree,
+                # then restores service/config. Another staging root must not
+                # bypass the destination lock while registration is blocked.
+                ready = case / 'ready'; sleeper = case / 'sleep-pid'
+                blocked_args = ['--token','replacement token'] if app == 'ddnsto' else ['--version','2.0.0']
+                proc = subprocess.Popen(['sh',str(script),*blocked_args], env=env | {'DDNSTO_VERSION':'2.0.0', 'BLOCK_REGISTER':'1', 'TEST_READY':str(ready), 'TEST_SLEEP_PID':str(sleeper)}, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                try:
+                    deadline = time.monotonic() + 15
+                    while not ready.exists() and proc.poll() is None and time.monotonic() < deadline: time.sleep(.02)
+                    assert ready.exists(), proc.communicate(timeout=2)
+                    concurrent = run('2.0.0', extra=['--installer-work-dir',str(case / 'other-staging')])
+                    assert concurrent.returncode == 2 and proc.poll() is None, concurrent
+                    proc.send_signal(signal.SIGTERM)
+                    out, err = proc.communicate(timeout=15)
+                    assert proc.returncode == 143 and installed.resolve() == old, (proc.returncode, out, err)
+                    assert not Path('/proc',sleeper.read_text().strip()).exists()
+                    assert not list((prefix / '.staging').iterdir())
+                    assert not list((case / 'other-staging').iterdir())
+                    assert not (prefix / '.service-lock').exists()
+                    if app == 'ddnsto': assert Path('/etc/ddnsto/ddnsto-config.json').read_bytes() == old_config
+                finally:
+                    if proc.poll() is None: proc.terminate(); proc.communicate(timeout=15)
                 second = run('2.0.0'); assert second.returncode == 0, second
                 third = run('3.0.0'); assert third.returncode == 0, third
                 assert sorted(p.name for p in (prefix / 'versions').iterdir()) == ['2.0.0', '3.0.0']
@@ -193,6 +225,7 @@ esac
                 assert refused.returncode != 0 and (case / 'actions').read_text() == before
                 assert (foreign / 'foreign').read_text() == 'unowned'
                 unit.unlink()
+                if app == 'ddnsto': Path('/etc/ddnsto/ddnsto-config.json').unlink()
             print('service storage: two apps, protected paths, bounded streams, cache, health, rollback, versions, conflicts passed')
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=2)
