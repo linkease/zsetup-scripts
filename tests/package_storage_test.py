@@ -87,6 +87,13 @@ esac
                         assert unsafe.returncode==12,unsafe
                         marker.chmod(0o644)
                         cache_counts=dict(Handler.counts)
+                        # A PM transaction owns global app state even if its
+                        # caller chooses an entirely different cache prefix.
+                        global_lock=Path('/etc/zsetup/install-locks')/app
+                        global_lock.mkdir(parents=True)
+                        other=subprocess.run(['sh',str(script),'--installer-prefix',str(case/'other-prefix'),'--installer-work-dir',str(case/'other-work')],env=env,text=True,capture_output=True,timeout=30)
+                        assert other.returncode==2,other
+                        global_lock.rmdir()
                         failed=subprocess.run(command,env=env|{'PKG_FAIL':'23'},text=True,capture_output=True,timeout=30)
                         assert failed.returncode==23,failed
                         assert all(Handler.counts[k]==v for k,v in cache_counts.items() if not k.endswith(('SHA256SUMS','VERSION','VERSION_LITE'))),Handler.counts
