@@ -4,6 +4,7 @@ installer_package_prepare() {
     PACKAGE_APP=$1; PACKAGE_PHASE=preflight
     PACKAGE_CACHE=; INSTALLER_PACKAGE_CLEANUP=
     PACKAGE_DEST_LOCK_HELD=0
+    PACKAGE_GLOBAL_LOCK_HELD=0
     installer_require_root || return $?
     installer_layout "$1" system || return $?
     [ "$INSTALLER_SCOPE" = system ] || return 2
@@ -42,6 +43,17 @@ installer_package_prepare() {
     [ ! -L "$INSTALLER_PREFIX/package-result" ] && [ ! -L "$INSTALLER_PREFIX/.packages" ] || return 2
     installer_transaction_begin || return $?
     INSTALLER_CLEANUP_HOOK=installer_package_cleanup
+    # Native package/config state is global even when input caches use distinct
+    # prefixes. This small root-owned lease serializes the whole app transaction.
+    PACKAGE_GLOBAL_LOCK="/etc/zsetup/install-locks/$PACKAGE_APP"
+    [ "$("$ZSETUP_BIN" storage "$PACKAGE_GLOBAL_LOCK" get system_protected)" = true ] || return 12
+    umask 022
+    mkdir -p /etc/zsetup/install-locks || return 12
+    umask 077
+    [ "$("$ZSETUP_BIN" storage /etc/zsetup/install-locks get system_protected)" = true ] || return 12
+    mkdir "$PACKAGE_GLOBAL_LOCK" 2>/dev/null || return 2
+    PACKAGE_GLOBAL_LOCK_HELD=1
+    printf '%s\n' "$$" > "$PACKAGE_GLOBAL_LOCK/owner"
     if ! mkdir "$INSTALLER_PREFIX/.package-lock" 2>/dev/null; then
         printf 'Installer: active or interrupted destination transaction at %s/.package-lock\n' "$INSTALLER_PREFIX" >&2
         return 2
@@ -142,7 +154,7 @@ installer_package_immutable() {
 }
 
 installer_package_cleanup() {
-    [ "$PACKAGE_DEST_LOCK_HELD" = 1 ] || return 0
+    if [ "$PACKAGE_DEST_LOCK_HELD" = 1 ]; then
     [ -z "$INSTALLER_PACKAGE_CLEANUP" ] || "$INSTALLER_PACKAGE_CLEANUP" || return 1
     printf 'application=%s\nmanager=%s\nphase=%s\nexit=%s\npackage_rollback=not_guaranteed\n' \
         "$PACKAGE_APP" "$package_manager" "$PACKAGE_PHASE" "${INSTALLER_EXIT_CODE:-0}" > "$INSTALLER_PREFIX/.package-result.$$" || return 1
@@ -150,4 +162,10 @@ installer_package_cleanup() {
     rm -f "$INSTALLER_PREFIX/.package-lock/owner" || return 1
     rmdir "$INSTALLER_PREFIX/.package-lock" || return 1
     PACKAGE_DEST_LOCK_HELD=0
+    fi
+    if [ "$PACKAGE_GLOBAL_LOCK_HELD" = 1 ]; then
+        rm -f "$PACKAGE_GLOBAL_LOCK/owner" || return 1
+        rmdir "$PACKAGE_GLOBAL_LOCK" || return 1
+        PACKAGE_GLOBAL_LOCK_HELD=0
+    fi
 }

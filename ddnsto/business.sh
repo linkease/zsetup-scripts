@@ -49,7 +49,10 @@ ddnsto_checksum() {
 }
 
 ddnsto_package_restore() {
-    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1; fi
+    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then
+        [ "$("$ZSETUP_BIN" storage "$config_path" get system_protected)" = true ] || return 1
+        installer_exec_native "$ZSETUP_BIN" run -- cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1
+    fi
 }
 
 ddnsto_register() {
@@ -102,8 +105,13 @@ ddnsto_openwrt() {
     # All packages are verified before touching dependencies or installed packages.
     config_path=${DDNSTO_CONFIG_PATH:-/etc/config/ddnsto}
     deprecated_config=0
+    if [ -e "$config_path" ] || [ -L "$config_path" ]; then
+        [ "$("$ZSETUP_BIN" storage "$config_path" get system_protected)" = true ] || return 12
+        installer_file_size "$config_path" || return 11
+        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+    fi
     if [ -f "$config_path" ] && grep -Eqi 'global' "$config_path"; then
-        cp -p "$config_path" "$transaction_dir/deprecated-config"
+        installer_exec_native "$ZSETUP_BIN" run -- cp -p "$config_path" "$transaction_dir/deprecated-config" || return $?
         deprecated_config=1
         rm -f "$config_path"
     fi

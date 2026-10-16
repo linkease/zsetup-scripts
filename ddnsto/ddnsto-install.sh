@@ -991,6 +991,7 @@ installer_package_prepare() {
     PACKAGE_APP=$1; PACKAGE_PHASE=preflight
     PACKAGE_CACHE=; INSTALLER_PACKAGE_CLEANUP=
     PACKAGE_DEST_LOCK_HELD=0
+    PACKAGE_GLOBAL_LOCK_HELD=0
     installer_require_root || return $?
     installer_layout "$1" system || return $?
     [ "$INSTALLER_SCOPE" = system ] || return 2
@@ -1029,6 +1030,17 @@ installer_package_prepare() {
     [ ! -L "$INSTALLER_PREFIX/package-result" ] && [ ! -L "$INSTALLER_PREFIX/.packages" ] || return 2
     installer_transaction_begin || return $?
     INSTALLER_CLEANUP_HOOK=installer_package_cleanup
+    # Native package/config state is global even when input caches use distinct
+    # prefixes. This small root-owned lease serializes the whole app transaction.
+    PACKAGE_GLOBAL_LOCK="/etc/zsetup/install-locks/$PACKAGE_APP"
+    [ "$("$ZSETUP_BIN" storage "$PACKAGE_GLOBAL_LOCK" get system_protected)" = true ] || return 12
+    umask 022
+    mkdir -p /etc/zsetup/install-locks || return 12
+    umask 077
+    [ "$("$ZSETUP_BIN" storage /etc/zsetup/install-locks get system_protected)" = true ] || return 12
+    mkdir "$PACKAGE_GLOBAL_LOCK" 2>/dev/null || return 2
+    PACKAGE_GLOBAL_LOCK_HELD=1
+    printf '%s\n' "$$" > "$PACKAGE_GLOBAL_LOCK/owner"
     if ! mkdir "$INSTALLER_PREFIX/.package-lock" 2>/dev/null; then
         printf 'Installer: active or interrupted destination transaction at %s/.package-lock\n' "$INSTALLER_PREFIX" >&2
         return 2
@@ -1129,7 +1141,7 @@ installer_package_immutable() {
 }
 
 installer_package_cleanup() {
-    [ "$PACKAGE_DEST_LOCK_HELD" = 1 ] || return 0
+    if [ "$PACKAGE_DEST_LOCK_HELD" = 1 ]; then
     [ -z "$INSTALLER_PACKAGE_CLEANUP" ] || "$INSTALLER_PACKAGE_CLEANUP" || return 1
     printf 'application=%s\nmanager=%s\nphase=%s\nexit=%s\npackage_rollback=not_guaranteed\n' \
         "$PACKAGE_APP" "$package_manager" "$PACKAGE_PHASE" "${INSTALLER_EXIT_CODE:-0}" > "$INSTALLER_PREFIX/.package-result.$$" || return 1
@@ -1137,6 +1149,12 @@ installer_package_cleanup() {
     rm -f "$INSTALLER_PREFIX/.package-lock/owner" || return 1
     rmdir "$INSTALLER_PREFIX/.package-lock" || return 1
     PACKAGE_DEST_LOCK_HELD=0
+    fi
+    if [ "$PACKAGE_GLOBAL_LOCK_HELD" = 1 ]; then
+        rm -f "$PACKAGE_GLOBAL_LOCK/owner" || return 1
+        rmdir "$PACKAGE_GLOBAL_LOCK" || return 1
+        PACKAGE_GLOBAL_LOCK_HELD=0
+    fi
 }
 
 # Only the optional sudo bootstrap uses OS copy/hash tools. Ordinary root
@@ -1459,7 +1477,10 @@ ddnsto_checksum() {
 }
 
 ddnsto_package_restore() {
-    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1; fi
+    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then
+        [ "$("$ZSETUP_BIN" storage "$config_path" get system_protected)" = true ] || return 1
+        installer_exec_native "$ZSETUP_BIN" run -- cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1
+    fi
 }
 
 ddnsto_register() {
@@ -1512,8 +1533,13 @@ ddnsto_openwrt() {
     # All packages are verified before touching dependencies or installed packages.
     config_path=${DDNSTO_CONFIG_PATH:-/etc/config/ddnsto}
     deprecated_config=0
+    if [ -e "$config_path" ] || [ -L "$config_path" ]; then
+        [ "$("$ZSETUP_BIN" storage "$config_path" get system_protected)" = true ] || return 12
+        installer_file_size "$config_path" || return 11
+        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+    fi
     if [ -f "$config_path" ] && grep -Eqi 'global' "$config_path"; then
-        cp -p "$config_path" "$transaction_dir/deprecated-config"
+        installer_exec_native "$ZSETUP_BIN" run -- cp -p "$config_path" "$transaction_dir/deprecated-config" || return $?
         deprecated_config=1
         rm -f "$config_path"
     fi
@@ -2314,7 +2340,10 @@ ddnsto_checksum() {
     }
 }
 ddnsto_package_restore() {
-    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1; fi
+    if [ "${deprecated_config:-0}" = 1 ] && [ -f "$transaction_dir/deprecated-config" ]; then
+        [ "$("$ZSETUP_BIN" storage "$config_path" get system_protected)" = true ] || return 1
+        installer_exec_native "$ZSETUP_BIN" run -- cp -p "$transaction_dir/deprecated-config" "$config_path" || return 1
+    fi
 }
 ddnsto_register() {
     if [ "$SERVICE_HAD_UNIT" = 1 ]; then
@@ -2361,8 +2390,13 @@ ddnsto_openwrt() {
     status '[4/4] Installing DDNSTO packages...'
     config_path=${DDNSTO_CONFIG_PATH:-/etc/config/ddnsto}
     deprecated_config=0
+    if [ -e "$config_path" ] || [ -L "$config_path" ]; then
+        [ "$("$ZSETUP_BIN" storage "$config_path" get system_protected)" = true ] || return 12
+        installer_file_size "$config_path" || return 11
+        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
+    fi
     if [ -f "$config_path" ] && grep -Eqi 'global' "$config_path"; then
-        cp -p "$config_path" "$transaction_dir/deprecated-config"
+        installer_exec_native "$ZSETUP_BIN" run -- cp -p "$config_path" "$transaction_dir/deprecated-config" || return $?
         deprecated_config=1
         rm -f "$config_path"
     fi

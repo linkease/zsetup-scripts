@@ -49,6 +49,7 @@ Linux systemd 普通用户仅下载校验归档，不执行业务程序。`sudo 
 可选提权桥需要 sudo、dd、mkfifo、sha256sum 或 openssl；普通 root 安装保持 native SHA，不新增外部摘要依赖。
 root 将有界 native/脚本/可选 CA 复制到私有引导目录校验，ready/go 后运行私有副本；
 重新取得元数据，导入归档经 native SHA 复验再执行。普通用户数据和参数不作为表达式求值。
+自动提权桥的root业务输出并入stderr，stdout控制帧不进入公共JSON/shell协议。
 每个协调器只等待自己的子进程。控制 EOF 触发 root TERM、join 和回滚；其结束后才释放普通用户准备。
 Rust install 的 POSIX 取消先给业务协调器最多30秒 TERM 回滚，再强制回收剩余进程树；
 无响应/强杀留下的锁仍需恢复。generic run/capture 保持原取消协议。
@@ -63,8 +64,9 @@ root 所有且不可写的非秘密版本回执允许普通用户读取，故普
 DDNSTO OpenWrt opkg/apk 支持 x86_64/aarch64/armv7/mipsel；Lite 在已知内存小于900MB时优先，未知为Standard。
 LinkEase OpenWrt 仅 opkg x86_64/aarch64/armv7，APK/MIPS未接入。没有经验证的 deb/rpm 映射，不虚构 apt/yum 包。
 OpenWrt 明确 root 调用；Linux systemd 的 sudo 准备桥不推定适用于 OpenWrt。
-原生包先验证所有输入，使用持久 .packages 保留当前/前次尝试，独立 .package-lock 防止跨暂存目录并发。
+原生包先验证所有输入，使用持久 .packages 保留当前/前次尝试，独立 .package-lock 防止跨暂存目录并发；/etc/zsetup/install-locks/APP 的小型root租约同时防止跨缓存前缀修改同一系统业务状态。
 已有命令必须由 opkg search / apk info 识别本包所有权；不覆盖其他安装方案。
+DDNSTO旧配置最多16KiB，先校验保护链及大小，恢复复制由native进程owner等待；超大配置拒绝11。
 PM 失败不切 raw 二进制；package-result 记录阶段/退出码，maintainer scripts 不承诺整体回滚。
 
 本地隔离 suites 覆盖真实 HTTPS/native fs/process 和业务/PM stub；真实服务器容器另验证
