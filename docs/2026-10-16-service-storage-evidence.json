@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "implementation": "84c3213",
+  "test_commit": "e445de1",
+  "native_debug_sha256": "dd6c85d5357dee163be5c213127f562db1a3b8b75ab7d7e49ffab0f7fdcbf101",
+  "command": "python3 tests/service_storage_test.py /var/cache/build-cache/users/911/projects/linkease-tunnel-650e0b63833e/cargo-target/debug/zsetup",
+  "result": "passed",
+  "applications": ["ddnsto", "linkease"],
+  "environment": {
+    "native_rust_download_and_capture": true,
+    "local_https": true,
+    "private_root_mount_pid_namespaces": true,
+    "effective_uid_in_namespace": 0,
+    "host_service_actions": false,
+    "fixture_products": true,
+    "stub_systemctl": true,
+    "real_unit_parser": "systemd-analyze 255.4-1ubuntu8.4",
+    "actual_business_service_health": "not verified"
+  },
+  "assertions_passed": [
+    "root-protected version payloads and user command link",
+    "Chinese, spaces, percent, dollar, double and single quote paths",
+    "real systemd unit syntax verification and literal wrapper exec",
+    "bounded download, extraction and commit use canonical native commands",
+    "verified installed cache avoids business artifact requests",
+    "three versions retain only current and previous",
+    "writable auxiliary library rejects reuse with exit12",
+    "unknown installation refuses mutation",
+    "version, registration, health and false-success failure rollback",
+    "DDNSTO token configuration restored after failed replacement",
+    "different staging roots cannot bypass destination lock",
+    "TERM returns143 after joining native register process and sleep descendant",
+    "cancellation restores previous current, configuration and service",
+    "staging and destination leases return to baseline"
+  ],
+  "real_program_probes": [
+    "2026-10-16-service-path-probes.json",
+    "2026-10-16-ddnsto-reregister-probe.json",
+    "2026-10-16-ddnsto-unit-replace-probe.json",
+    "2026-10-16-sysv-service-probes.json"
+  ],
+  "pending": [
+    "SysV product scope decision",
+    "ordinary-user prepare and privilege-boundary commit handoff",
+    "real sudo caller and second-UID command-link acceptance",
+    "OpenWrt package storage and privilege adapter (M6)",
+    "complete original business regression migration and both-entry acceptance (M7)",
+    "real service manager and auxiliary business paths in safe test environment (M7)"
+  ],
+  "published": false
+}

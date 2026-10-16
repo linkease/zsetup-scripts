@@ -3,7 +3,8 @@
 2026-10-16 用户批准实施 M0–M7，Zig 产品归档，仅 Rust zsetup 新增能力。
 权威计划与状态在 owning zsetup-rust/docs/2026-10-16-linux-install-storage.md。
 
-当前源码候选已接入FastNet/FastPVE，未公开发布，不改变线上安装行为。
+当前源码候选已接入FastNet/FastPVE；DDNSTO/LinkEase的systemd适配通过单项自检，
+M5整体仍待SysV覆盖范围决定。未公开发布，不改变线上安装行为。
 测试：python3 -B tests/install_storage_test.py（隔离挂载事实、PTY及无终端选择）。
 
 * 用户命令推荐 $HOME/.local/bin/ddnsto。版本程序与命令入口分离，系统独立安装
@@ -40,8 +41,37 @@ HOME/.local/bin/APP。FastNet默认user，FastPVE仅system且要求root/PVE。�
 close/join后清理；崩溃遗留lease需人工确认恢复，阻止再次累积，不猜测PID并清理在用文件。
 恢复hook失败保留暂存及lease。exec业务菜单前已释放事务；程序自身业务安装目录未迁移。
 
-M0–M4已完成。真实程序namespace服务注册probe证明DDNSTO/LinkEase能生成/opt引用；
-systemctl为stub，未验完整真实服务启动。UID1000下LinkEase返回0却报安装服务失败；
-DDNSTO返回OK但无unit/控制动作，用户常驻模式未验。M5等待默认系统/用户服务策略决定，
-DDNSTO/LinkEase业务函数仍原流程，不支持上述新安装参数，不虚构其迁移完成。
-这不是新版本发布或生产安装证据，新脚本必须随未来具备这些能力的原生版本发布。
+M0–M4已完成。用户已选A：DDNSTO/LinkEase保留系统服务，程序在root保护的
+PREFIX/versions/VERSION/bin（默认/opt/linkease/APP），current/previous保留两版，
+命令入口HOME/.local/bin/APP。Linux systemd支持上述公共参数；user scope明确拒绝。
+DDNSTO_BIN_PATH/LINKEASE_APP_DIR工程旧覆盖项退休，不能用它们绕过受管理目录。
+尚未迁移的OpenWrt分支暂不接受Linux布局参数，M6仍待实施。
+
+系统程序、暂存及祖先必须root所有且组/其他用户不可写，不经过符号链接。
+已有旧方案文件/服务、来源不明prefix或命令入口拒绝覆盖；跨暂存目录也共用目标锁。
+缓存有受保护文件清单，每个程序/辅助库均重查权限，元数据读取有界。
+下载/解压/跨盘提交仍走canonical Rust，有累计上限和8MiB余量。
+
+当前需要显式root执行，例如下载脚本并审阅后运行sudo -H sh SCRIPT；不自动请求密码。
+sudo调用者由getent确认，通过runuser降权创建其命令入口，root不写入可由该用户改动的目录。
+完整的“普通用户准备、仅提交时跨sudo边界”尚未完成，属于M6；当前方式不算该项通过。
+真实sudo/第二UID、旧业务完整回归、真实服务及辅助程序路径为M6/M7后续验收。
+
+业务原生注册退出0仍需核对unit、reload/enable/start及两次is-active。
+失败/TERM恢复旧current、unit、启用/运行状态及DDNSTO真实配置
+/etc/ddnsto/ddnsto-config.json。恢复失败保留lease与恢复文件，不报成功。
+真实DDNSTO从新位置重复注册返回OK但保留旧unit；新适配器只替换已证明归属的旧unit。
+unit经真实systemd-analyze验证；root保护的固定.service-run只字面exec已校验路径，
+不执行配置表达式。中文、空格、百分号、美元及单双引号路径与真实wrapper执行均已测。
+语法依据：[systemd.service](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml)、
+[解析实现](https://github.com/systemd/systemd/blob/main/src/core/load-fragment.c)。
+
+服务fixture在私有root/mount/PID namespace中，网络仅本地HTTPS fixture，systemctl及程序为stub。
+真实业务程序的独立probe使用隔离网络，未操作宿主服务；这些不等同真实systemd业务健康。
+详细证据见2026-10-16-service-storage-evidence.json及三个service probe JSON。
+M5新待决：SysV真实生成的脚本无.service后缀、空格拆词有误，foreground owner还会回收
+其直接派生的daemon。首期仅交付systemd并保留SysV legacy，或本轮同时迁移SysV监督协议，
+待用户决定；在此之前新适配器对非systemd拒绝，旧入口及legacy参考保留。M6/M7未开始。
+
+这不是新版本发布或生产安装证据；线上0.4.0缺新增storage/capture及下载限制参数，
+新脚本必须随未来具备这些能力的原生版本/最低版本配置一起发布，不能提前替换线上脚本。
