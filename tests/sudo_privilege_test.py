@@ -67,14 +67,14 @@ case "$1" in
         Handler.bodies['/ddnsto/linux-binary/'+name]=payload
         Handler.bodies['/ddnsto/linux-binary/SHA256SUMS']=(hashlib.sha256(payload).hexdigest()+'  '+name+'\n').encode()
         return '/ddnsto/linux-binary/'+name
-    base=f'https://localhost:{server.server_port}'
+    base=f'https://127.0.0.1:{server.server_port}'
     env=['PATH=/usr/bin:/bin','HOME=/home/tester','ZSETUP_INSTALLER_MODE=1','ZSETUP_BIN=/tools/zsetup',
          'ZSETUP_OS=ubuntu','ZSETUP_PACKAGE_MANAGER=apt','ZSETUP_ARCH=x86_64',
          'ZSETUP_SOURCE_BASES='+base,'ZSETUP_SOURCE_FALLBACK=','ZSETUP_CA_FILE='+str(fixture/'ca.crt')]
     def command(version):
         # sh -c models the supported curl-substitution entry, without a readable $0.
         return ['/usr/sbin/runuser','-u','tester','--','/usr/bin/env','-i',*env,'DDNSTO_VERSION='+version,
-                '/bin/sh','-c',(ROOT/'ddnsto/ddnsto-install.sh').read_text(),'one-key',
+                '/bin/sh','-c','printf \'%s\\n\' \"$$\" > \"$HOME/coordinator-pid\";\n'+(ROOT/'ddnsto/ddnsto-install.sh').read_text(),'one-key',
                 '--installer-prefix',prefix,'--installer-work-dir','/home/tester/中文 staging','--','--token','中文 $() token']
     def run(version):
         result=subprocess.run(command(version),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60)
@@ -102,10 +102,8 @@ case "$1" in
         while not (fixture/'ready').exists() and time.monotonic()<deadline: time.sleep(.05)
         if not (fixture/'ready').exists():
             proc.terminate(); out,err=proc.communicate(timeout=15); raise AssertionError(err.decode())
-        # runuser itself is outside the user shell. Find its ordinary child.
-        children=Path(f'/proc/{proc.pid}/task/{proc.pid}/children').read_text().split()
-        assert len(children)==1,children
-        os.kill(int(children[0]),signal.SIGTERM)
+        assert proc.poll() is None, proc.communicate(timeout=10)
+        os.kill(int((home/'coordinator-pid').read_text()),signal.SIGTERM)
         out,err=proc.communicate(timeout=30)
         assert proc.returncode==143,(proc.returncode,err.decode())
         assert os.readlink(prefix+'/current')=='versions/1.0.0'

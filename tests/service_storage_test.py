@@ -36,6 +36,7 @@ def jail(native, suite='/source/tests/service_storage_test.py'):
     (ROOT / 'dist').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='service-jail-', dir=ROOT / 'dist') as name:
         root = Path(name)
+        root.chmod(0o755)  # the chroot / must be searchable by the second UID
         for folder in ('usr', 'bin', 'lib', 'lib64', 'proc', 'dev', 'source', 'tools',
                        'fixtures', 'root', 'opt', 'tmp', 'var/tmp', 'etc/systemd/system', 'run/systemd/system'):
             (root / folder).mkdir(parents=True, exist_ok=True)
