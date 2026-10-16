@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "executed_products": false,
+  "temporary_products_retained": false,
+  "observations": [
+    {
+      "application": "fastnet",
+      "path": "fastnet/FastNet-0.7.6.amd64",
+      "expected_sha256": "be70f7f10a32507db85d80c0edf6761c42ffa5e312021dc61fed76a9ecf1f283",
+      "kind": "binary",
+      "exit": 0,
+      "size": 4513784,
+      "sha256": "be70f7f10a32507db85d80c0edf6761c42ffa5e312021dc61fed76a9ecf1f283",
+      "expanded_bytes": 4513784,
+      "members": 0
+    },
+    {
+      "application": "fastnet",
+      "path": "fastnet/FastNet-0.7.6.arm64",
+      "expected_sha256": "a4a56d2a8ae1b6caf5da6c0d9d385976082738925772ef84a68c252ffd2415c7",
+      "kind": "binary",
+      "exit": 0,
+      "size": 11600056,
+      "sha256": "a4a56d2a8ae1b6caf5da6c0d9d385976082738925772ef84a68c252ffd2415c7",
+      "expanded_bytes": 11600056,
+      "members": 0
+    },
+    {
+      "application": "fastnet",
+      "path": "fastnet/FastNet-0.7.6.armv7",
+      "expected_sha256": "7fc6e9ec0990d5fb468a7548a1e07772c028a1b6ad23d6dafb73b399649b1356",
+      "kind": "binary",
+      "exit": 0,
+      "size": 3976972,
+      "sha256": "7fc6e9ec0990d5fb468a7548a1e07772c028a1b6ad23d6dafb73b399649b1356",
+      "expanded_bytes": 3976972,
+      "members": 0
+    },
+    {
+      "application": "fastpve",
+      "path": "fastpve/FastPVE-0.1.8",
+      "expected_sha256": "0e92cf8ab6ca78cdb2b0125974cbe9d2948181735026f36e6adada0a0fc82486",
+      "kind": "binary",
+      "exit": 0,
+      "size": 9240868,
+      "sha256": "0e92cf8ab6ca78cdb2b0125974cbe9d2948181735026f36e6adada0a0fc82486",
+      "expanded_bytes": 9240868,
+      "members": 0
+    },
+    {
+      "application": "ddnsto",
+      "path": "ddnsto/linux-binary/ddnsto-standard-4.2.3.tar.gz",
+      "expected_sha256": "b982ebd38e8c145d955049eb5b73960c01941bc05f084c3a2115dfca2b6eea6e",
+      "kind": "tar",
+      "exit": 0,
+      "size": 16265464,
+      "sha256": "b982ebd38e8c145d955049eb5b73960c01941bc05f084c3a2115dfca2b6eea6e",
+      "expanded_bytes": 22712248,
+      "members": 9
+    },
+    {
+      "application": "linkease",
+      "path": "LinkEase/LinuxStorage/linkease-binary-1.7.5.tar.gz",
+      "expected_sha256": null,
+      "kind": "tar",
+      "exit": 0,
+      "size": 48727497,
+      "sha256": "f3ae319974d940f5741cd9fbd295a3a378164e7df82665defa99935608fe733a",
+      "expanded_bytes": 84964132,
+      "members": 10
+    },
+    {
+      "application": "linkease",
+      "path": "LinkEase/AutoUpgrade/linkmount/amd64.zip",
+      "expected_sha256": null,
+      "kind": "zip",
+      "exit": 0,
+      "size": 15637704,
+      "sha256": "ce651c41e54145210077521ad5cc077f484bf4610315e4d8bfbdfe72a0cf27e5",
+      "expanded_bytes": 44889496,
+      "members": 37
+    },
+    {
+      "application": "linkease",
+      "path": "LinkEase/AutoUpgrade/linkmount/arm64.zip",
+      "expected_sha256": null,
+      "kind": "zip",
+      "exit": 0,
+      "size": 14974981,
+      "sha256": "befa3a6b3ad0758c958d30275b24d7b55b15ecb19c861fa8a286500b46010acf",
+      "expanded_bytes": 47406176,
+      "members": 37
+    },
+    {
+      "application": "linkease",
+      "path": "LinkEase/AutoUpgrade/linkmount/arm.zip",
+      "expected_sha256": null,
+      "kind": "zip",
+      "exit": 0,
+      "size": 14500554,
+      "sha256": "eb08439f15bfaada23c7c733c5ad3876ea60e613745b95cbef5a5ad1383593fe",
+      "expanded_bytes": 34618312,
+      "members": 38
+    }
+  ]
+}
