@@ -225,6 +225,8 @@ esac
                 assert indexed.returncode == 0, indexed
                 assert Handler.counts[f'/binary/{entry}'] == 1
                 assert all(Handler.counts[k] == count for k, count in counts.items() if not k.endswith('SHA256SUMS'))
+                wrong_arch=run(changes={'ZSETUP_ARCH':'aarch64'})
+                assert wrong_arch.returncode==2 and 'architecture' in wrong_arch.stderr,wrong_arch
                 old = installed.resolve()
                 old_config = Path('/etc/ddnsto/ddnsto-config.json').read_bytes() if app == 'ddnsto' else None
                 for failure in ('VERSION_FAIL', 'INSTALL_FAIL', 'HEALTH_FAIL'):
@@ -323,6 +325,15 @@ esac
                 assert (foreign / 'foreign').read_text() == 'unowned'
                 unit.unlink()
                 if app == 'ddnsto': Path('/etc/ddnsto/ddnsto-config.json').unlink()
+                # First-install registration failure has no previous unit/version.
+                fresh_home=case/'fresh-home'; fresh_home.mkdir()
+                fresh_prefix=case/'fresh-install'
+                failed_first=run('2.0.0',{'HOME':str(fresh_home),'ZSETUP_INSTALL_PREFIX':str(fresh_prefix),'INSTALL_FAIL':'37'})
+                assert failed_first.returncode==37,failed_first
+                assert not unit.exists() and not (fresh_prefix/'current').exists()
+                assert not list((fresh_prefix/'versions').iterdir())
+                assert not list((fresh_prefix/'.staging').iterdir()) and not (fresh_prefix/'.service-lock').exists()
+
             print('service storage: two apps, protected paths, bounded streams, cache, health, rollback, versions, conflicts passed')
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=2)
