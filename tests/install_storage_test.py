@@ -17,7 +17,7 @@ class StoragePolicy(unittest.TestCase):
         self.native.write_text('''#!/bin/sh
 [ "$1" = storage ] || exit 2
 case "$4" in
- memory_backed) printf '%s\\n' "${FACT_MEMORY:-false}" ;;
+ memory_backed) if [ "$2" = "${FACT_REJECT_PATH:-}" ]; then echo true; else printf '%s\\n' "${FACT_MEMORY:-false}"; fi ;;
  available_bytes) printf '%s\\n' "${FACT_BYTES:-100000000}" ;;
  available_inodes) printf '%s\\n' "${FACT_INODES:-10000}" ;;
  read_only) printf '%s\\n' "${FACT_READONLY:-false}" ;;
@@ -66,6 +66,30 @@ esac
             self.assertEqual(result.returncode, 2, result)
         result = self.call('installer_scope=invalid; installer_layout ddnsto user')
         self.assertEqual(result.returncode, 2, result)
+
+    def test_unattended_selection_fails_without_prompt_or_mutation(self):
+        result = self.call('installer_storage_select "$1" 1000 1 1', self.root, FACT_MEMORY="true")
+        self.assertEqual(result.returncode, 12, result)
+        self.assertNotIn("Enter", result.stderr)
+
+    def test_interactive_selection_can_choose_literal_persistent_path(self):
+        import pty
+        master, slave = pty.openpty()
+        chosen = self.root / "中文 new target"
+        try:
+            process = subprocess.Popen(
+                ["sh", "-eu", "-c", '. "$1"; installer_storage_select "$2" 1000 1 1; printf "%s" "$INSTALLER_STORAGE_PATH"', "test", str(ROOT / "lib/install-storage.sh"), str(self.root)],
+                stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                env={**os.environ, "ZSETUP_BIN": str(self.native), "FACT_REJECT_PATH": str(self.root)},
+            )
+            os.write(master, (str(chosen) + "\n").encode())
+            out, err = process.communicate(timeout=5)
+            self.assertEqual(process.returncode, 0, err)
+            self.assertEqual(out.decode(), str(chosen))
+            self.assertFalse(chosen.exists())
+        finally:
+            os.close(master)
+            os.close(slave)
 
 
 if __name__ == "__main__":
