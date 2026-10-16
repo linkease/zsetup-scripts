@@ -195,6 +195,9 @@ esac
                             zip.writestr('amd64/bin/linkmount_bin', b'mount fixture')
                             zip.writestr('amd64/bin/lib/libfixture.so', b'library fixture')
                         files['amd64.zip'] = stream.getvalue()
+                        # Same artifact digest across selectors isolates the
+                        # installed architecture receipt guard from SHA checks.
+                        files['arm64.zip'] = stream.getvalue()
                     for filename, body in files.items(): Handler.bodies[f'{folder}/{filename}'] = body
                     sums = ''.join(f'{hashlib.sha256(body).hexdigest()}  {filename}\n' for filename, body in files.items()).encode()
                     if app == 'ddnsto': Handler.bodies[f'{folder}/SHA256SUMS'] = Handler.bodies.get(f'{folder}/SHA256SUMS', b'') + sums
