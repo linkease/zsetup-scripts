@@ -72,6 +72,19 @@ esac
         self.assertEqual(result.returncode, 12, result)
         self.assertNotIn("Enter", result.stderr)
 
+    def test_separate_staging_filesystem_is_checked_and_plan_creates_nothing(self):
+        chosen = self.root / "chosen"
+        work = self.root / "work"
+        code = 'installer_prefix=$1; installer_work_dir=$2; installer_preflight ddnsto user 1000 1'
+        result = self.call(code, chosen, work, FACT_REJECT_PATH=str(work))
+        self.assertEqual(result.returncode, 12, result)
+        self.assertFalse(chosen.exists())
+        self.assertFalse(work.exists())
+        result = self.call(code, chosen, work)
+        self.assertEqual(result.returncode, 0, result)
+        self.assertIn("Install plan:", result.stderr)
+        self.assertFalse(chosen.exists())
+
     def test_interactive_selection_can_choose_literal_persistent_path(self):
         import pty
         master, slave = pty.openpty()
