@@ -67,7 +67,9 @@ installer_transaction_cleanup() {
     fi
     if [ -n "$transaction_dir" ]; then
         case "$transaction_dir" in "$INSTALLER_WORK_ROOT"/.transaction.*) ;; *) return 12 ;; esac
-        [ ! -L "$transaction_dir" ] && [ -f "$transaction_dir/.owner" ] || return 12
+        [ ! -L "$transaction_dir" ] && [ ! -L "$transaction_dir/.owner" ] && [ -f "$transaction_dir/.owner" ] || return 12
+        set -- $(wc -c < "$transaction_dir/.owner")
+        [ "$1" -le 16 ] || return 12
         it_owner=
         IFS= read -r it_owner < "$transaction_dir/.owner" || return 12
         [ "$it_owner" = "$$" ] || return 12

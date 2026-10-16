@@ -15,6 +15,8 @@ def main():
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     common = (ROOT / "lib/bootstrap.sh").read_text().rstrip() + "\n\n"
+    for helper in ["install-storage.sh", "install-bounds.sh", "install-transaction.sh", "install-launcher.sh"]:
+        common += (ROOT / "lib" / helper).read_text().rstrip() + "\n\n"
     catalog = json.loads((ROOT / "catalog.json").read_text())
     for app in sorted({entry["application"] for entry in catalog["installers"]}):
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", app):
@@ -27,7 +29,7 @@ def main():
         content += "    ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}\n"
         content += "    ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}\n"
         content += "    export ZSETUP_BIN ZSETUP_ARCH ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK\n"
-        content += f"    {app}_install \"$@\"\n}}\n\n"
+        content += f"    installer_dispatch {app} \"$@\"\n}}\n\n"
         content += (folder / "main.sh").read_text()
         output = folder / f"{app}-install.sh"
         if args.check:
