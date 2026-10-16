@@ -135,7 +135,7 @@ case "$1" in
             assert proc.returncode==143,(proc.returncode,err.decode())
             assert os.readlink(prefix+'/current')=='versions/1.0.0'
             assert not Path('/proc', (fixture/'child').read_text().strip()).exists()
-            assert not list(home.rglob('.transaction.*'))
+            assert not list(home.rglob('.transaction.*')), (mode, [str(p) for p in home.rglob('.transaction.*')], err.decode())
             assert not list(Path('/tmp').glob('zsetup-privileged.*'))
             assert not Path(prefix+'/.service-lock').exists()
         print('native sudo: denied credentials, actual UID 1000→0, root verification, one-key entry, alias ownership, cache, TERM rollback and complete cleanup passed')
