@@ -28,6 +28,7 @@ def inside():
         root=Path(name); program=root/'program.sh'
         program.write_text('''#!/bin/sh
 set -eu
+[ "${1:-}" != --installer-prefix ] || shift 3
 printf '<%s>' "$@" > /fixtures/bridge-args
 id -u > /fixtures/bridge-uid
 if [ "${1:-}" = block ]; then
@@ -46,7 +47,8 @@ exit 0
             proc=subprocess.Popen(command(arguments,digest),env=os.environ|{'SUDO_UID':'0'},stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
             return proc
         proc=spawn(['中文 space','','literal $() "quote"'])
-        assert proc.stdout.read(1)==b'R'
+        first=proc.stdout.read(1)
+        assert first==b'R', (first, proc.communicate(timeout=10))
         assert not Path('/fixtures/bridge-args').exists(), 'payload executed before GO'
         proc.stdin.write(b'G\n'); proc.stdin.flush()
         assert proc.stdout.read(4)==b'000\n'
