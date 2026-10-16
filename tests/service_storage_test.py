@@ -88,6 +88,8 @@ case "$1" in
    if [ "$1" = --serviceControl ] && [ "$2" = start ]; then exit "${{START_FAIL:-0}}"; fi
    printf '%s\\n' "$0" >> "$TEST_ACTIONS"
    [ "${{FALSE_SUCCESS:-0}}" = 0 ] || exit 0
+   # Real DDNSTO reports OK without rewriting an existing service definition.
+   if [ '{app}' = ddnsto ] && [ -f "$TEST_UNIT" ]; then exit 0; fi
    printf '[Unit]\\nConditionFileIsExecutable=%s\\n[Service]\\nExecStart=%s "run"\\n' "$0" "$0" > "$TEST_UNIT"
    [ '{version}' != 2.0.0 ] || exit "${{INSTALL_FAIL:-0}}"
    exit 0 ;;
