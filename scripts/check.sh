@@ -12,6 +12,9 @@ else
 fi
 tunnel_root=$(CDPATH= cd -- "$zroot/.." && pwd)
 python3 -B "$root/tests/module_layout_test.py"
+if [ -f "$zroot/Cargo.toml" ]; then
+    python3 -B "$root/tests/app_release_test.py" "$zroot" "$native_dir/zsetup-linux-x86_64"
+fi
 python3 -B "$root/tests/bootstrap_platform_test.py"
 python3 -B "$root/tests/minimum_native_test.py"
 python3 -B "$root/tests/install_storage_test.py"

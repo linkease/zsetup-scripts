@@ -53,3 +53,18 @@
   Regression migration: docs/2026-10-16-regression-coverage.md.
 - Real sudo and systemd tests require the isolated lab container; fixture
   success is not native business package/procd or production connectivity proof.
+
+## FastNet independent rollout (2026-10-16)
+
+- Current rollout scope is FastNet only. Do not change DDNSTO, LinkEase,
+  FastPVE or other business files on the production server.
+- Read docs/fastnet-independent-release.md. release/applications.json enables
+  only FastNet; scripts/package-app-release.py reuses canonical Rust catalog
+  generation, preserves unrelated live index records/core/source groups, and
+  never uploads. The actual live0.4.0 baseline produces an explicitly blocked
+  review: FastNet0.1.8 needs0.5.0. A Linux core upgrade is a separate scope
+  decision; do not weaken the runtime floor or activate this blocked candidate.
+- scripts/install-app-release.sh is a low-level stage/activate/rollback
+  transaction. Public HTTPS readback, safe business canary and explicit
+  production authorization are coordinator prerequisites. Tests of this
+  primitive do not establish public activation readiness.

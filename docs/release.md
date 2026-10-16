@@ -1,5 +1,12 @@
 # 构建、配置与发布
 
+2026-10-16 FastNet 首期独立发布：新增仅准备本地候选的
+`scripts/package-app-release.py` 和受控 `install-app-release.sh` 事务。
+只替换实时配置中的 FastNet 记录，不把整个多业务候选覆盖线上；DDNSTO 等线上
+数据不变。实际0.4.0核心与新脚本不兼容，当前候选 blocked；Linux0.5.0核心连带
+升级范围待单独决定。完整命令、四站点校验及回滚边界见
+[FastNet 独立发布](fastnet-independent-release.md)。下文 aggregate 包仍用于完整候选检查。
+
 2026-10-14 更新：后续原生 zsetup 统一 Rust；本仓库脚本候选为 scripts-0.1.7。
 使用 `scripts/package-release.py --zsetup-root /path/to/zsetup-rust
 --zsetup-release /path/to/RUST-RELEASE-PACKAGE` 和对应 `scripts/check.sh` 两参数。

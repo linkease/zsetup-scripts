@@ -1,0 +1,209 @@
+{
+  "date": "2026-10-16T15:00:46.016115+00:00",
+  "host": "root@192.168.3.1",
+  "publication_root": "/mnt/sata3-1/istore-data/public_html/binary",
+  "read_only": true,
+  "remote_writes": false,
+  "files": [
+    {
+      "path": "fastnet/fastnet-install.sh",
+      "sha256": "982925b5b9474176b57d64c658102b675d1a6e8a674537f51ebdee4bea9b8072",
+      "size": 3494
+    },
+    {
+      "path": "fastnet/install.sh",
+      "sha256": "21aa238f92e491887e9b7d3e7f2845796891844fce035cf4da4cdb8fe5cbc2a1",
+      "size": 10165
+    },
+    {
+      "path": "fastnet/version.txt",
+      "sha256": "541b1b2099d9a9179812d69cd78dfa4cf705594174638b2aaba1b50363a12eaf",
+      "size": 272
+    },
+    {
+      "path": "zsetup/config.json",
+      "sha256": "ea0ba7758054395a7be830617834fdc9837181b51bbf4bdd8ed9312bb79df5a5",
+      "size": 1648
+    },
+    {
+      "path": "zsetup/stable",
+      "sha256": "40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79",
+      "size": 6
+    }
+  ],
+  "public_version_readback": [
+    {
+      "url": "https://dl.istoreos.com/binary/fastnet/version.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "541b1b2099d9a9179812d69cd78dfa4cf705594174638b2aaba1b50363a12eaf"
+    },
+    {
+      "url": "https://fw.d4ctech.com/binary/fastnet/version.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "541b1b2099d9a9179812d69cd78dfa4cf705594174638b2aaba1b50363a12eaf"
+    },
+    {
+      "url": "https://fw20.koolcenter.com/binary/fastnet/version.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "541b1b2099d9a9179812d69cd78dfa4cf705594174638b2aaba1b50363a12eaf"
+    },
+    {
+      "url": "https://fw.koolcenter.com/binary/fastnet/version.txt",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "541b1b2099d9a9179812d69cd78dfa4cf705594174638b2aaba1b50363a12eaf"
+    }
+  ],
+  "initial_version_probe": {
+    "exit_code": 2,
+    "reason": "verification command used --timeout; download requires --overall-timeout; no request was sent"
+  },
+  "public_product_readback": [
+    {
+      "url": "https://dl.istoreos.com/binary/fastnet/FastNet-0.7.6.amd64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "be70f7f10a32507db85d80c0edf6761c42ffa5e312021dc61fed76a9ecf1f283",
+      "size": 4513784,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://dl.istoreos.com/binary/fastnet/FastNet-0.7.6.arm64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "a4a56d2a8ae1b6caf5da6c0d9d385976082738925772ef84a68c252ffd2415c7",
+      "size": 11600056,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://dl.istoreos.com/binary/fastnet/FastNet-0.7.6.armv7",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "7fc6e9ec0990d5fb468a7548a1e07772c028a1b6ad23d6dafb73b399649b1356",
+      "size": 3976972,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw.d4ctech.com/binary/fastnet/FastNet-0.7.6.amd64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "be70f7f10a32507db85d80c0edf6761c42ffa5e312021dc61fed76a9ecf1f283",
+      "size": 4513784,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw.d4ctech.com/binary/fastnet/FastNet-0.7.6.arm64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "a4a56d2a8ae1b6caf5da6c0d9d385976082738925772ef84a68c252ffd2415c7",
+      "size": 11600056,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw.d4ctech.com/binary/fastnet/FastNet-0.7.6.armv7",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "7fc6e9ec0990d5fb468a7548a1e07772c028a1b6ad23d6dafb73b399649b1356",
+      "size": 3976972,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw20.koolcenter.com/binary/fastnet/FastNet-0.7.6.amd64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "be70f7f10a32507db85d80c0edf6761c42ffa5e312021dc61fed76a9ecf1f283",
+      "size": 4513784,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw20.koolcenter.com/binary/fastnet/FastNet-0.7.6.arm64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "a4a56d2a8ae1b6caf5da6c0d9d385976082738925772ef84a68c252ffd2415c7",
+      "size": 11600056,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw20.koolcenter.com/binary/fastnet/FastNet-0.7.6.armv7",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "7fc6e9ec0990d5fb468a7548a1e07772c028a1b6ad23d6dafb73b399649b1356",
+      "size": 3976972,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw.koolcenter.com/binary/fastnet/FastNet-0.7.6.amd64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "be70f7f10a32507db85d80c0edf6761c42ffa5e312021dc61fed76a9ecf1f283",
+      "size": 4513784,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw.koolcenter.com/binary/fastnet/FastNet-0.7.6.arm64",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "a4a56d2a8ae1b6caf5da6c0d9d385976082738925772ef84a68c252ffd2415c7",
+      "size": 11600056,
+      "digest_verified_by_canonical_zsetup": true
+    },
+    {
+      "url": "https://fw.koolcenter.com/binary/fastnet/FastNet-0.7.6.armv7",
+      "exit_code": 0,
+      "stderr": "",
+      "expected_sha256": "7fc6e9ec0990d5fb468a7548a1e07772c028a1b6ad23d6dafb73b399649b1356",
+      "size": 3976972,
+      "digest_verified_by_canonical_zsetup": true
+    }
+  ],
+  "scope": "FastNet-only release preparation; production server read-only",
+  "source_changes": "single-app registration/package/transaction tests and docs; no business installer byte change",
+  "transaction_tests": {
+    "count": 14,
+    "passed": true,
+    "environment": "temporary local server tree, real Rust0.5.0 schema validator; synthetic business payloads",
+    "cases": [
+      "test_only_fastnet_files_and_index_record_change",
+      "test_old_native_generates_explicit_blocked_plan",
+      "test_unrelated_live_app_is_not_added_or_removed",
+      "test_other_application_is_disabled_in_first_rollout",
+      "test_source_group_conflict_is_refused",
+      "test_invalid_live_schema_is_refused_by_native_parser",
+      "test_old_native_validator_cannot_validate_new_installer",
+      "test_existing_review_directory_is_never_overwritten",
+      "test_stage_activate_rollback_preserves_other_businesses_and_modes",
+      "test_blocked_plan_cannot_stage_or_activate",
+      "test_immutable_conflict_is_preserved",
+      "test_remote_config_and_entry_drift_prevent_activation",
+      "test_partial_activation_failure_restores_all_pointers",
+      "test_symlink_target_and_out_of_order_rollback_are_refused"
+    ]
+  },
+  "fastnet_regressions": {
+    "bootstrap": "passed",
+    "native_install": "passed",
+    "persistent_launchers": "passed; fixture products",
+    "actual_business_execution": false
+  },
+  "production_state": {
+    "linux_core_stable": "0.4.0",
+    "fastnet_product_version": "0.7.6",
+    "new_installer_requires_runtime_floor": "0.5.0",
+    "new_installer_size": 33259,
+    "new_installer_sha256": "cb44ee56ebd967b323737af2ca431e0fbe76f3540a62d2a7259a9a29aa937012",
+    "candidate_readiness": "blocked",
+    "online_config_changed": false,
+    "online_business_files_changed": false,
+    "pending_decision": "whether the FastNet rollout may include a Linux-only core0.5.0 upgrade; no Windows/macOS/other-business activation"
+  },
+  "publication_prerequisites": [
+    "Linux core scope decision and exact candidate acceptance",
+    "fresh live config snapshot after any core activation",
+    "four-site immutable installer readback",
+    "safe real FastNet canary via direct script and native install",
+    "explicit production pointer activation authorization"
+  ]
+}

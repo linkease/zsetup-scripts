@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "applications": {
+    "fastnet": {
+      "minimum_runtime": "0.5.0",
+      "public_entries": [
+        "fastnet/fastnet-install.sh",
+        "fastnet/install.sh"
+      ]
+    }
+  }
+}
