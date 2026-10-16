@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import ssl
 import subprocess
 import sys
@@ -40,6 +41,16 @@ def jail(native, suite='/source/tests/service_storage_test.py'):
             (root / folder).mkdir(parents=True, exist_ok=True)
         (root / 'tools/zsetup').touch()
         (root / 'etc/os-release').write_text('ID=ubuntu\nVERSION_ID="22.04"\n')
+        if os.geteuid() == 0:
+            # Actual root is used only inside the isolated remote lab container.
+            # It allows a real second UID; the development user namespace does not.
+            for folder in ('pam.d', 'security'):
+                shutil.copytree('/etc/' + folder, root / 'etc' / folder, dirs_exist_ok=True)
+            (root / 'etc/passwd').write_text('root:x:0:0:root:/root:/bin/sh\ntester:x:1000:1000:test:/home/tester:/bin/sh\n')
+            (root / 'etc/group').write_text('root:x:0:\ntester:x:1000:\n')
+            (root / 'etc/shadow').write_text('root:!:20000:0:99999:7:::\ntester:!:20000:0:99999:7:::\n')
+            (root / 'etc/shadow').chmod(0o600)
+            (root / 'etc/nsswitch.conf').write_text('passwd: files\ngroup: files\nshadow: files\n')
         setup = root / 'setup.sh'
         setup.write_text('''set -eu
 jail=$1; source=$2; native=$3; suite=$4
@@ -60,7 +71,8 @@ for device in null zero urandom; do
 done
 chroot "$jail" /usr/bin/env -i PATH=/usr/bin:/bin HOME=/root TMPDIR=/fixtures OPENSSL_CONF=/dev/null PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$suite" --inside
 ''')
-        result = subprocess.run(['unshare', '-Urmpf', 'sh', str(setup), str(root), str(ROOT), str(native), suite], timeout=180)
+        flags = '-mpf' if os.geteuid() == 0 else '-Urmpf'
+        result = subprocess.run(['unshare', flags, 'sh', str(setup), str(root), str(ROOT), str(native), suite], timeout=240)
         assert result.returncode == 0, f'isolated service suite exited {result.returncode}'
 
 
