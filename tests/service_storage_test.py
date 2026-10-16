@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shlex
 import shutil
 import ssl
 import subprocess
@@ -298,7 +299,7 @@ esac
                 bg_args=['--token','background token'] if app=='ddnsto' else ['--version','3.0.0']
                 background=subprocess.run([native,'install',app,'--background','--',*bg_args],env=env|{'DDNSTO_VERSION':'3.0.0'},text=True,capture_output=True,timeout=10)
                 assert background.returncode==0,background
-                fields=dict(line.split('=',1) for line in background.stdout.splitlines())
+                fields=dict(field.split('=',1) for field in shlex.split(background.stdout))
                 result=Path(fields['result']); deadline=time.monotonic()+15
                 while not result.exists() and time.monotonic()<deadline: time.sleep(.05)
                 assert result.read_text().strip()=='0',Path(fields['log']).read_text()

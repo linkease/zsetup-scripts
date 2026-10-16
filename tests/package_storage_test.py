@@ -63,7 +63,7 @@ esac
                         env=os.environ | {'PATH':f'{fake}:/usr/bin:/bin','ZSETUP_BIN':'/tools/zsetup','ZSETUP_INSTALLER_MODE':'1',
                             'ZSETUP_OS':'openwrt','ZSETUP_PACKAGE_MANAGER':manager,'ZSETUP_ARCH':arch,
                             'ZSETUP_SOURCE_BASES':f'https://127.0.0.1:{server.server_port}/binary','ZSETUP_SOURCE_FALLBACK':'',
-                            'ZSETUP_CA_FILE':str(root/'ca.crt'),'DDNSTO_MEM_MB':'512','TEST_LOG':str(log)}
+                            'ZSETUP_CA_FILE':str(root/'ca.crt'),'DDNSTO_SERVICE_PATH':str(fake/'service'),'DDNSTO_MEM_MB':'512','TEST_LOG':str(log)}
                         script=ROOT/app/f'{app}-install.sh'
                         command=['sh',str(script),'--installer-prefix',str(prefix),'--installer-work-dir',str(work)]
                         good=subprocess.run(command,env=env,text=True,capture_output=True,timeout=30)
