@@ -85,15 +85,22 @@ case "$1" in
         assert denied.returncode==2,denied.stderr
         assert Handler.counts.get(url,0)==0
         sudoers=Path('/etc/sudoers'); sudoers.write_text('Defaults !use_pty\ntester ALL=(root) NOPASSWD: ALL\n'); sudoers.chmod(0o440)
+        # Cached credentials may authorize true but refuse the real command.
+        sudoers.write_text('Defaults !use_pty\n'+'tester ALL=(root) NOPASSWD: /usr/bin/true\n'); sudoers.chmod(0o440)
+        refused=subprocess.run(command('1.0.0'),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=15)
+        assert refused.returncode==2,refused.stderr.decode()
+        assert not list(home.rglob('.transaction.*'))
+        sudoers.write_text('Defaults !use_pty\ntester ALL=(root) NOPASSWD: ALL\n'); sudoers.chmod(0o440)
+        prepared_count=Handler.counts.get(url,0)
         run('1.0.0')
         assert (fixture/'business-uid').read_text().strip()=='0'
         alias=home/'.local/bin/ddnsto'
         assert alias.is_symlink() and alias.lstat().st_uid==1000
         assert os.readlink(prefix+'/current')=='versions/1.0.0'
-        assert Handler.counts.get(url)==1,Handler.counts
+        assert Handler.counts.get(url)==prepared_count+1,Handler.counts
         assert not list(home.rglob('.transaction.*'))
         assert not list(Path('/tmp').glob('zsetup-privileged.*'))
-        run('1.0.0'); assert Handler.counts.get(url)==1,Handler.counts
+        run('1.0.0'); assert Handler.counts.get(url)==prepared_count+1,Handler.counts
         # TERM of the unprivileged coordinator closes control, joins root
         # rollback, then removes user staging. No unprivileged root kill.
         artifact('2.0.0',True)
