@@ -1,12 +1,15 @@
 {
   "schema_version": 1,
   "date": "2026-10-16",
-  "implementation": "84c3213",
-  "test_commit": "e445de1",
+  "implementation": "1724b518a3d603ef22b4824adad4e3669729a328",
+  "test_commit": "a909a60",
   "native_debug_sha256": "dd6c85d5357dee163be5c213127f562db1a3b8b75ab7d7e49ffab0f7fdcbf101",
   "command": "python3 tests/service_storage_test.py /var/cache/build-cache/users/911/projects/linkease-tunnel-650e0b63833e/cargo-target/debug/zsetup",
   "result": "passed",
-  "applications": ["ddnsto", "linkease"],
+  "applications": [
+    "ddnsto",
+    "linkease"
+  ],
   "environment": {
     "native_rust_download_and_capture": true,
     "local_https": true,
@@ -32,7 +35,10 @@
     "different staging roots cannot bypass destination lock",
     "TERM returns143 after joining native register process and sleep descendant",
     "cancellation restores previous current, configuration and service",
-    "staging and destination leases return to baseline"
+    "staging and destination leases return to baseline",
+    "direct bootstrap and native install converge",
+    "first install failure removes new unit/payload/current and leases",
+    "cross-architecture installed receipt refuses reuse"
   ],
   "real_program_probes": [
     "2026-10-16-service-path-probes.json",
@@ -43,12 +49,11 @@
     "2026-10-16-sysv-owned-process-probe.json"
   ],
   "pending": [
-    "SysV product scope decision",
-    "ordinary-user prepare and privilege-boundary commit handoff",
-    "real sudo caller and second-UID command-link acceptance",
-    "OpenWrt package storage and privilege adapter (M6)",
-    "complete original business regression migration and both-entry acceptance (M7)",
-    "real service manager and auxiliary business paths in safe test environment (M7)"
+    "SysV frozen legacy, unported under approved scope A",
+    "real business server artifacts/connectivity and OpenWrt PM/procd device canary before publication"
   ],
-  "published": false
+  "published": false,
+  "native_release_sha256": "9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617",
+  "native_lab_evidence": "owning zsetup-rust/docs/2026-10-16-storage-native-lab.json",
+  "original_business_regression": "passed migrated app-scoped service/package suites; coverage in 2026-10-16-regression-coverage.md"
 }
