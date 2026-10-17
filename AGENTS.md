@@ -46,6 +46,9 @@
   download/capture and coordinator-aware cancellation). Old0.4.0 cannot run
   these scripts. Preserve old immutable paths; do not publish until separately
   authorized and native/server/device gates are satisfied.
+- FastNet0.1.8 alone was authorized and published with Linux core0.5.0 on
+  2026-10-17. Other apps'0.1.8 entries remain local candidates and must not be
+  imported or uploaded by a whole-catalog production deployment.
 - New Linux raw services target systemd; SysV legacy is frozen/unported.
   Linux user preparation/sudo -n commit and explicit root flows share generated
   sources. Never redownload a running installer or weaken root path protection.
@@ -61,9 +64,11 @@
 - Read docs/fastnet-independent-release.md. release/applications.json enables
   only FastNet; scripts/package-app-release.py reuses canonical Rust catalog
   generation, preserves unrelated live index records/core/source groups, and
-  never uploads. The actual live0.4.0 baseline produces an explicitly blocked
-  review: FastNet0.1.8 needs0.5.0. A Linux core upgrade is a separate scope
-  decision; do not weaken the runtime floor or activate this blocked candidate.
+  never uploads. The historical live0.4.0 baseline produced an explicitly
+  blocked review: FastNet0.1.8 needs0.5.0. The user separately authorized the
+  Linux core upgrade and FastNet rollout on2026-10-17; both are now live.
+  Regenerate from a fresh actual live configuration for any future release;
+  never reuse the old blocked0.4.0 candidate or weaken the runtime floor.
 - scripts/install-app-release.sh is a low-level stage/activate/rollback
   transaction. Public HTTPS readback, safe business canary and explicit
   production authorization are coordinator prerequisites. Tests of this

@@ -1,7 +1,18 @@
 # FastNet 独立发布
 
 2026-10-16。用户认可分业务目录发布，首期只处理 FastNet，其他业务线上数据不变。
-本次完成本地候选、路径登记和部署事务验证；正式服务器全程只读。
+16日完成本地候选、路径登记和部署事务验证，正式服务器只读。
+17日用户明确回复“确认允许。”，已完成Linux核心0.5.0和FastNet0.1.8独立发布。
+下面的线上盘点表是切换前基线，blocked描述保留为历史；其他业务线上文件始终未迁移。
+
+发布后实际状态：两个固定入口及fastnet/0.1.8/fastnet-install.sh都是同一33259字节，
+SHA256为cb44ee56ebd967b323737af2ca431e0fbe76f3540a62d2a7259a9a29aa937012。
+最终Linux配置只登记FastNet，stable为0.5.0；Windows仍0.4.0、macOS指针不变。
+48项不可变URL和16项最终指针URL回读通过；1070项其他业务文件元数据前后一致，
+16项关键历史入口、产品和桌面文件摘要一致。联合回滚在真实候选沙箱验证，未反复切换生产。
+真实FastNet0.7.6已在隔离的普通用户容器中完成公开脚本首次自举、旧0.4.0收敛、缓存、
+默认~/.local/bin/fastnet入口和持久业务路径验证，仅运行version，未操作宿主服务或业务菜单。
+完整逐项证据归属linkease-tunnel/zsetup-rust/docs/2026-10-17-linux-0.5.0-fastnet-publish.json。
 
 ## 任务与验收
 
@@ -34,7 +45,7 @@
 两个 FastNet 入口目前字节不同，线上 Linux 配置只登记 fastnet/install.sh，
 stable/config 均为核心0.4.0。FastNet业务产品0.7.6的三个架构实文件摘要与
 version.txt 一致。四个公开 HTTPS 站点的 version.txt 回读一致；产品回读另见证据。
-本地候选入口为33259字节，SHA256
+本轮发布入口为33259字节，SHA256
 `cb44ee56ebd967b323737af2ca431e0fbe76f3540a62d2a7259a9a29aa937012`。
 
 ## 本地准备
@@ -68,7 +79,7 @@ catalog 中其他业务版本无需跟随改变。
 ## 低层部署事务合同
 
 `install-app-release.sh stage|activate|rollback PACKAGE BINARY_ROOT` 是供受控部署流程
-调用的低层原语，本次仅在临时目录测试。它本身不上传、不执行公开 HTTPS 回读或
+调用的低层原语，16日本地测试后17日已用于本次正式部署。它本身不上传、不执行公开 HTTPS 回读或
 业务canary，也不证明生产授权；不得把成功 stage 当作已完成上线。
 
 使用前须校验包和授权范围。stage检查 readiness、实际stable和配置基线摘要，
@@ -90,14 +101,14 @@ activate重新验证包、不可变文件、stable、原配置和入口快照，
 避免新脚本短暂遇到不兼容的旧核心；核心回退仍使用其独立快照。
 物理I/O或恢复失败会返回错误并保留快照，需人工按证据恢复，不能宣称回滚成功。
 
-## 当前阻塞和下一步决策
+## 2026-10-16 阻塞记录（已于17日处理）
 
-本地生产预览为 blocked：新入口需要0.5.0的storage/bounded download能力，线上是0.4.0。
+16日本地生产预览为 blocked：新入口需要0.5.0的storage/bounded download能力，当时线上是0.4.0。
 不能只替换FastNet脚本，否则bootstrap和install都会失败；不能降低脚本底线冒充兼容。
 现有CLI的min_version是完整字符串精确合同，不是通用semver范围；能力底线只由
 发布工具检查，生成的可上线记录仍绑定实际stable完整版本。
 
-需要单独明确是否连带发布**Linux核心0.5.0**：只升级Linux四架构及其完整配置/stable，
+当时需要单独明确是否连带发布**Linux核心0.5.0**：只升级Linux四架构及其完整配置/stable，
 保留Windows/macOS指针和其他业务线上数据。此项不是当前打包器的隐式副作用。
 0.5.0已有Linux开发验收，但仍需对应发布门禁及安全环境公开FastNet canary；
 Windows/macOS未跑新版本原生门禁，不随本次FastNet发布激活。
@@ -105,3 +116,5 @@ Windows/macOS未跑新版本原生门禁，不随本次FastNet发布激活。
 确认该范围后，先完成Linux核心精确产物门禁/回读与切换，再重新读取实际线上配置
 打包FastNet，执行上述stage/readback/canary/activate及最终固定入口/索引回读。
 当前blocked候选不得直接上传激活；底层事务同样拒绝blocked计划。
+17日已按单独授权完成上述流程；FastNet生产包基于核心切换后的真实配置重新生成，
+没有重用16日的blocked计划，也没有上传其他业务候选。

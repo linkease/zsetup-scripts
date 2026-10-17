@@ -1,5 +1,11 @@
 # 构建、配置与发布
 
+2026-10-17：已获单独明确授权并上线Linux核心0.5.0和FastNet脚本0.1.8。
+FastNet两个公开入口与不可变脚本为同一33259字节；最终配置只登记FastNet。
+DDNSTO/LinkEase/FastPVE等线上文件、Windows/macOS指针不变。
+真实FastNet0.7.6的首次自举、旧0.4.0自动收敛、缓存和默认用户命令已在隔离环境验证。
+以下16日blocked状态是切换前历史；实际结果见[FastNet独立发布](fastnet-independent-release.md)。
+
 2026-10-16 FastNet 首期独立发布：新增仅准备本地候选的
 `scripts/package-app-release.py` 和受控 `install-app-release.sh` 事务。
 只替换实时配置中的 FastNet 记录，不把整个多业务候选覆盖线上；DDNSTO 等线上

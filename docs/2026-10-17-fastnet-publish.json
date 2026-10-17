@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-17T00:47:40.599696+00:00",
+  "published": true,
+  "scope": "FastNet0.1.8 only, dependent Linux zsetup0.5.0; other business files untouched",
+  "core_repo_evidence": "linkease-tunnel/zsetup-rust/docs/2026-10-17-linux-0.5.0-fastnet-publish.json",
+  "core_evidence_sha256": "c9fb060d3b2f938e59a431a75fdab1b64c9d78204981084bdb7c561beb5fe384",
+  "business_source_at_activation": "78ff0c4",
+  "fastnet_script_sha256": "cb44ee56ebd967b323737af2ca431e0fbe76f3540a62d2a7259a9a29aa937012",
+  "fastnet_script_size": 33259,
+  "production_config_sha256": "1ccb19e0a2fb17c933d81d05fdae30b7373e100da75d114b5a79c3d96ef88ae7",
+  "production_config_size": 2396,
+  "installed_command": "~/.local/bin/fastnet",
+  "business_payload": "~/.local/lib/linkease/fastnet/versions/0.7.6/bin/fastnet",
+  "native_real_product_canaries": {
+    "fastnet-business-preflight": {
+      "native_execution": true,
+      "passed": true,
+      "exit_code": 0,
+      "actual_business_product": "FastNet0.7.6 amd64",
+      "scope": "non-root isolated read-only-rootfs container; exact candidate business entry; version command only; no host service/installation",
+      "binary_sha256": "9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617",
+      "script_sha256": "cb44ee56ebd967b323737af2ca431e0fbe76f3540a62d2a7259a9a29aa937012"
+    },
+    "fastnet-public-index-preflight": {
+      "passed": true,
+      "exit_code": 0,
+      "scope": "candidate-authoritative config + public immutable SHA/size installer + real FastNet0.7.6 cache in nonroot isolated container",
+      "before_core_activation": true
+    },
+    "first-entry-public-canary": {
+      "passed": true,
+      "exit_code": 0,
+      "native_execution": true,
+      "attempt": 2,
+      "scope": "nonroot isolated container; cold public bootstrap, old0.4.0 to0.5.0 cloud convergence, real product cache, user command and persistent business path",
+      "fixture_correction": "Docker default tmpfs noexec confirmed via native storage and exec126; explicitly enable exec for bootstrap work root",
+      "before_fixed_entry_activation": true
+    },
+    "final-fixed-entry-canary": {
+      "passed": true,
+      "exit_code": 0,
+      "native_execution": true,
+      "scope": "actual published fixed URL via curl + sh-c, cold nonroot bootstrap, real FastNet0.7.6, ~/.local/bin entry and persistent business path; isolated container"
+    }
+  },
+  "preservation": {
+    "passed": true,
+    "other_business_file_metadata_count": 1070,
+    "before_and_after_metadata_sha256": "ec6c471cd6525a46bdb3971ce450d6b37b9ef4747919a1919b769fd25cc14d3c",
+    "windows_pointers_and_old_desktop_artifacts_match": true,
+    "critical_entries_and_product_hashes": [
+      {
+        "path": "LinkEase/LinuxStorage/install_linux.sh",
+        "sha256": "19e38713db5155b00f73470c918fff6f3430ca200daa92f45063e29f861e2b87"
+      },
+      {
+        "path": "LinkEase/Openwrt/install_linkease.sh",
+        "sha256": "efdf86db8947790ce64af67d475916d68416aed9eeb627f976089b5b9b1c0d6c"
+      },
+      {
+        "path": "ddnsto/linux/install_ddnsto_linux.sh",
+        "sha256": "0dbb19088fd4aae18c597c8f5455eaf28b4ef3bbd5adac7f551b85077c572c86"
+      },
+      {
+        "path": "ddnsto/openwrt/install_ddnsto.sh",
+        "sha256": "1f137a4f5ec0f76aadbf3d3dbdc8193ec93eb71f095e9110ce3881d5ef3e7707"
+      },
+      {
+        "path": "ddnsto/openwrt/setup_ddnsto.sh",
+        "sha256": "53b69f9d7a6d287405c6ba88fb891f78ab362cdbb964dbf73c62d0bc83a8ff52"
+      },
+      {
+        "path": "fastnet/FastNet-0.7.6.amd64",
+        "sha256": "be70f7f10a32507db85d80c0edf6761c42ffa5e312021dc61fed76a9ecf1f283"
+      },
+      {
+        "path": "fastnet/FastNet-0.7.6.arm64",
+        "sha256": "a4a56d2a8ae1b6caf5da6c0d9d385976082738925772ef84a68c252ffd2415c7"
+      },
+      {
+        "path": "fastnet/FastNet-0.7.6.armv7",
+        "sha256": "7fc6e9ec0990d5fb468a7548a1e07772c028a1b6ad23d6dafb73b399649b1356"
+      },
+      {
+        "path": "fastnet/version.txt",
+        "sha256": "541b1b2099d9a9179812d69cd78dfa4cf705594174638b2aaba1b50363a12eaf"
+      },
+      {
+        "path": "fastpve/fastpve-install.sh",
+        "sha256": "5a8babfcfe46c341cde7c35ebda47bafaa19b5b72d95653843e7d595f2445a97"
+      },
+      {
+        "path": "zsetup/0.4.0/zsetup-macos-aarch64",
+        "sha256": "0c0dba18596bece096b719d0b699604cc80370d57c900b3298fbc2d346a5f457"
+      },
+      {
+        "path": "zsetup/0.4.0/zsetup-macos-x86_64",
+        "sha256": "215d70d3f19fd37c05eb286080e88e4a5b596e28a94fed0f2327b9a7c649dbc5"
+      },
+      {
+        "path": "zsetup/0.4.0/zsetup-windows-i686.exe",
+        "sha256": "858633b03f4808417bc4724f28e8ab0cb17c9f09fe4e665c9532f488cc1f83a3"
+      },
+      {
+        "path": "zsetup/bootstrap-windows.ps1",
+        "sha256": "e93c961326fe9da26636b2a45e50e344adc149fa237f5e255ac896eeea9a2c45"
+      },
+      {
+        "path": "zsetup/config-windows.json",
+        "sha256": "807eff5aff44a33e4c3e0f2b07e1aa5baca118bcb5d80dfccba3ab17b7ffc912"
+      },
+      {
+        "path": "zsetup/stable-windows",
+        "sha256": "40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79"
+      }
+    ],
+    "business_payloads_modified": false,
+    "initial_inventory_difference": "only this release own .fastnet-upload staging files; removed before final comparison"
+  },
+  "rollback": {
+    "order": [
+      "FastNet entries/config",
+      "Linux core config/stable"
+    ],
+    "core_snapshot": "/mnt/sata3-1/istore-data/public_html/binary/zsetup/.windows-rollback-20261017T003732Z-3108677",
+    "fastnet_snapshot": "/mnt/sata3-1/istore-data/public_html/binary/fastnet/.installer-rollback-1ccb19e0a2fb17c933d81d05fdae30b7373e100da75d114b5a79c3d96ef88ae7",
+    "immutable_files_retained": true,
+    "production_rollback_exercised": false,
+    "exact_candidate_sandbox_rollback_passed": true
+  },
+  "business_menu_and_host_service_actions_not_tested": true
+}
