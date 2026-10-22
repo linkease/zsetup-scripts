@@ -26,12 +26,23 @@ def main():
             # checkout are needed on the target device.
             content = '#!/bin/sh\nif [ "$(uname -s)" = Darwin ]; then\n(\n'
             content += (folder / "install-macos.sh").read_text().rstrip() + '\n)\nexit "$?"\nfi\n\n'
-        content += common + "\n# Business logic: maintained in " + app + "/business.sh\n"
+        content += common
+        if app == "ddnsto":
+            content += (folder / "bootstrap-policy.sh").read_text().rstrip() + "\n\n"
+        content += "\n# Business logic: maintained in " + app + "/business.sh\n"
         content += (folder / "business.sh").read_text().rstrip() + "\n\n"
         if app == "ddnsto":
+            content += (folder / "docker-probe.sh").read_text().rstrip() + "\n\n"
+            content += (folder / "docker-lifecycle.sh").read_text().rstrip() + "\n\n"
+            content += (folder / "method-selection.sh").read_text().rstrip() + "\n\n"
             content += (folder / "product-pins.sh").read_text().rstrip() + "\n\n"
             content += (folder / "linux-service.sh").read_text().rstrip() + "\n\n"
-        content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n    bootstrap_zsetup\n"
+            content += (folder / "linux-lifecycle.sh").read_text().rstrip() + "\n\n"
+            content += (folder / "openwrt-lifecycle.sh").read_text().rstrip() + "\n\n"
+            content += (folder / "synology-download.sh").read_text().rstrip() + "\n\n"
+            content += (folder / "service-management.sh").read_text().rstrip() + "\n\n"
+        content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n"
+        content += "    ddnsto_bootstrap_zsetup || return $?\n" if app == "ddnsto" else "    bootstrap_zsetup\n"
         content += "    status \"      zsetup $RESCUE_VERSION is ready\"\n    ZSETUP_BIN=$ACTIVE_ZSETUP\n"
         content += "    ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}\n"
         content += "    ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}\n"

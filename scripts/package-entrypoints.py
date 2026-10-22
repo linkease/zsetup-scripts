@@ -38,6 +38,9 @@ def main():
                 target = staging / 'binary' / directory / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT / 'ddnsto' / name, target)
+        # Audit metadata travels with the candidate, never fetched as executable
+        # policy at runtime. Each public entry remains standalone.
+        shutil.copy2(ROOT / 'ddnsto/install-rules.json', staging / 'binary' / version_dir / 'install-rules.json')
         files = [{'path': str(p.relative_to(staging)), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'size': p.stat().st_size}
                  for p in sorted(staging.rglob('*')) if p.is_file()]
         manifest = {'schema_version': 1, 'config_version': catalog['config_version'],

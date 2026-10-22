@@ -46,7 +46,15 @@ readlink() {
 curl() { printf 'health %s\n' "$*" >> "$TEST_LOG"; [ "${HEALTH_BROKEN:-0}" = 0 ] && printf ok; }
 wget() { curl "$@"; }
 sleep() { :; }
-ddnsto_install --token fixture-token
+if [ "${TEST_ACTION:-update}" = install ]; then
+    ddnsto_install --token fixture-token
+elif [ "${TEST_ACTION:-update}" = retainedinstall ]; then
+    # Retained reinstall must never receive a credential or prompt for one.
+    ddnsto_prompt_token() { printf 'unexpected Token prompt\n' >&2; return 2; }
+    ddnsto_install --action install
+else
+    ddnsto_install --action update
+fi
 '''
 
 
@@ -79,17 +87,31 @@ class LinuxService(unittest.TestCase):
             'ZSETUP_WORK_DIR': str(self.root / 'work'), 'DDNSTO_BIN_PATH': str(self.binary),
             'DDNSTO_LINUX_CONFIG_DIR': str(self.root / 'config'), 'ARCHIVE': str(archive),
             'SERVICE_ACTIVE': str(self.root / 'active'), 'TEST_LOG': str(self.root / 'log'),
+            'DDNSTO_LOCK_DIR': str(self.root / 'installer.lock'),
         }
 
     def run_install(self, **env):
-        return subprocess.run(['sh', '-eu', '-c', HARNESS], env=self.env | env,
-                              capture_output=True, text=True, timeout=10)
+        lock = self.root / 'installer.lock'
+        had_lock = lock.exists()
+        result = subprocess.run(['sh', '-eu', '-c', HARNESS], env=self.env | env,
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(lock.exists(), had_lock, 'leaked lock or removed foreign lock')
+        return result
 
     def test_missing_manager_rejected_before_download_or_replace(self):
         result = self.run_install(NO_MANAGER='1')
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertEqual(self.binary.read_text(), self.old)
         self.assertNotIn('download', (self.root / 'log').read_text())
+
+    def test_busy_management_lock_rejects_update_before_download(self):
+        lock = self.root / 'installer.lock'
+        lock.mkdir()
+        result = self.run_install()
+        self.assertEqual(result.returncode, 16, result.stderr)
+        self.assertTrue(lock.exists())
+        self.assertFalse((self.root / 'log').exists())
+        self.assertEqual(self.binary.read_text(), self.old)
 
     def test_unpinned_linux_version_rejected_before_download_or_replace(self):
         result = self.run_install(DDNSTO_VERSION='9.9.9')
@@ -109,7 +131,7 @@ class LinuxService(unittest.TestCase):
         self.binary.unlink()
         self.config.unlink()
         (self.root / 'active').unlink()
-        result = self.run_install(START_BROKEN='1')
+        result = self.run_install(START_BROKEN='1', TEST_ACTION='install')
         self.assertNotEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.binary.exists())
         self.assertFalse(self.config.exists())
@@ -120,7 +142,39 @@ class LinuxService(unittest.TestCase):
         self.assertIn('local_service=healthy', result.stderr)
         self.assertIn('http://127.0.0.1:18334/healthz', (self.root / 'log').read_text())
         self.assertIn('cloud_status=unverified', result.stderr)
+        self.assertEqual(self.config.read_text(), 'old-token', 'update must not pass -u or overwrite configuration')
         self.assertFalse(list(self.binary.parent.glob('.ddnsto-backup.*')))
+
+    def test_retained_install_without_token_preserves_config_and_identity(self):
+        self.binary.unlink()
+        (self.root / 'active').unlink()
+        # Exercise the complete install transaction, starting from uninstall's
+        # persisted state, rather than just checking the existing-policy flag.
+        config_bytes = b'{\r\n  "token": "retained-token", "routeridx": 7,\r\n  "custom": {"preserve": true}\r\n}\r\n'
+        self.config.write_bytes(config_bytes)
+        identity = self.config.parent / '.ddnsto_boot.cfg'
+        identity_bytes = b'retained-device-identity\x00\r\n'
+        identity.write_bytes(identity_bytes)
+        retained = self.config.parent / '.uninstalled-linux-v1'
+        installed = self.config.parent / '.installer-linux-v1'
+        marker_bytes = f'ddnsto-linux-v1\n{self.binary}\n{self.config}\n'.encode()
+        retained.write_bytes(marker_bytes)
+
+        result = self.run_install(TEST_ACTION='retainedinstall')
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.binary.read_text(), BINARY.replace('VERSION', 'new'))
+        self.assertTrue((self.root / 'active').exists())
+        self.assertIn('local_service=healthy', result.stderr)
+        self.assertIn('cloud_status=unverified', result.stderr)
+        self.assertEqual(self.config.read_bytes(), config_bytes)
+        self.assertEqual(identity.read_bytes(), identity_bytes)
+        self.assertEqual(installed.read_bytes(), marker_bytes)
+        self.assertFalse(retained.exists())
+        self.assertIn('download', (self.root / 'log').read_text())
+        self.assertIn('http://127.0.0.1:18334/healthz', (self.root / 'log').read_text())
+        self.assertFalse(list(self.binary.parent.glob('.ddnsto-backup.*')))
+        self.assertNotIn('retained-token', result.stdout + result.stderr)
 
     def test_other_process_health_does_not_count_as_success(self):
         result = self.run_install(WRONG_PID='1')

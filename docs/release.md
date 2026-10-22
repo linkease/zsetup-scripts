@@ -1,5 +1,62 @@
 # 构建、配置与发布
 
+## 0.2.0 本地候选：未发布
+
+本轮原生生命周期、群晖手动交接和受限 Docker 的能力/限制以 [0.2.0 候选说明](candidate-0.2.0.md)为准。已报告 macOS 56 项、Windows 7 组、OpenWrt 29 项测试通过，Linux 分项模拟已有通过记录；冻结版全量测试、生成入口及候选打包已通过，详见 [验证报告](verification-0.2.0.md)。Linux 新增生命周期仅 systemd；Docker 不具备完整生命周期；群晖下载不代表安装完成。
+
+Linux OpenRC 仅保留 install/update/status：legacy marker 不能认证 shell 服务脚本，其他写动作 fail closed。OpenWrt 已实现 update/卸载保留状态重装闭环：临时 UCI 禁用防止包钩子提前启动，随后恢复原配置和原 enabled；生命周期 29 项、pinned products 5 项通过，后者覆盖 16 组合。不承诺包级原子回滚，固件原生行为仍待验收，见 [OpenWrt 集成证据](openwrt-lifecycle-integration.md)。冻结版全量测试、真实下载夹具及打包均通过，见 [验证报告](verification-0.2.0.md)；不将测试通过当作发布验收。
+
+本候选构建与共享独立入口分发不需要 zsetup 核心源码。仅使用以下直接入口流程，历史 `package-release.py` / 全局索引 / native release 构建不作为前置：
+
+```sh
+# 在 zsetup-scripts 仓库目录；先由集成人对齐 catalog 的 0.2.0 版本
+python3 -B scripts/build-entrypoints.py
+python3 -B scripts/build-entrypoints.py --check
+python3 -B ddnsto/tests/cross_platform_installer_test.py
+python3 -B scripts/package-entrypoints.py --output dist/ddnsto-entrypoints-0.2.0
+(cd dist/ddnsto-entrypoints-0.2.0 && sha256sum -c SHA256SUMS)
+```
+
+目录必须全新。打包器按 catalog 生成 `binary/ddnsto/install.sh`、`install.ps1` 及版本目录副本、摘要与 manifest，并在固定版本目录包含 `install-rules.json` 审计元数据；目录名不会自行设置安装器版本。该 JSON 纳入摘要和 manifest，不是运行时远程策略，各脚本仍独立执行。产物不含 zsetup/客户端，不会部署、不激活全局索引。DDNSTO 固定使用已发布的 zsetup Linux/OpenWrt 0.5.0、macOS 0.3.0、Windows 0.4.0；FastNet 不变。缺 pwsh 导致的 Windows 跳过必须在最终结果中列明。
+
+部署是另一个需授权和留证的步骤：仅新增独立不可变候选目录，回读两入口与摘要后，显式给调试环境设置候选 HTTPS URL。旧 `0.1.10/20261015-6c624972f4c9/` 目录和官网默认不变，不覆盖旧不可变字节，不把本地输出目录当作已发布 URL。最终用户使用 HTTPS 包装命令，不 clone、不手工安装 zsetup，模板见候选说明。
+
+正式推广须满足候选说明中的[外部验收门槛](candidate-0.2.0.md#发布前外部验收门槛)：原生服务/重启/恢复及身份、OpenWrt 包行为、DSM 包中心导入与身份迁移、Docker 网络和身份持久化均须有实测证据。当前不填写“最终全部测试通过”，不宣布已发布或全平台完成。
+
+## 0.1.x 历史记录
+
+下文的“当前”、版本指针、未实现项与完整索引命令均为对应日期的历史状态，不覆盖上面的 0.2.0 直接入口流程。
+
+## 0.1.16 本地开发候选（未发布）
+
+Windows 入口增加 `-Action repair`，仅修复托管安装的计划任务，保留程序、Token、配置与设备身份，不调用下载器。新增隔离任务 API 测试，覆盖任务缺失、失败恢复、备份保留、锁及路径保护。客户端、zsetup 版本与官网生产行为不变。DDNSTO 配置/入口发布命名空间和桌面候选更新为 0.1.16，FastNet 不变。其他平台修复和统一卸载未实现；未进行真机验收、提交、推送或部署。
+
+## 0.1.15 本地开发候选（未发布）
+
+Linux/OpenWrt 业务安装、更新和服务写操作增加共享操作锁，覆盖业务下载、安装事务及失败恢复；获取失败返回 16，不抢占或删除已有锁。只读操作与默认无修改退出保持不加锁，首次 zsetup bootstrap 仍在业务锁之外。DDNSTO 入口/配置/桌面候选命名空间递增至 0.1.15，FastNet 仍不变。验证与恢复边界见[实施契约](universal-install-contract.md)。无提交、推送、部署或官网生产改动。
+
+## 0.1.14 本地开发候选（未发布）
+
+新增 Linux/OpenWrt/Windows 服务管理，与 macOS 对齐 status/start/stop/restart。服务管理绕过下载入口，保留 Token/配置；Windows 校验任务路径并复用安装锁。Linux/OpenWrt 暂无共享并发锁，不能并发安装/管理。实现和未交付边界见[实施契约](universal-install-contract.md)。入口、索引和桌面候选命名空间递增到 0.1.14；FastNet 不变，不覆盖旧测试链接、不改变官网生产行为。本轮无部署、提交或推送。
+
+## 0.1.13 本地开发候选（未发布）
+
+四类入口增加默认无修改重跑策略和显式 update。Shell 交互退出/更新菜单、Linux 无下载离线退出、Linux 更新复用现有配置、Windows/macOS 更新前 Token 参数保护已接入。OpenWrt 用已有主程序与配置检测重跑；包升级和配置保留仍待真机验证。不存在已有安装时拒绝 update，不把更新当首次安装。
+
+版本及桌面候选命名空间递增到 0.1.13；FastNet 不变。测试中的更新与失败恢复用例改为显式 update，保留首次安装用例，避免把默认退出当作“更新通过”。Docker 4.0.5 的发布元数据已核查，但未启用执行器；详情见[实施契约](universal-install-contract.md)。未发布、提交或推送。
+
+## 0.1.12 本地开发候选（未发布）
+
+新增 Shell/PowerShell 只读计划预览、macOS/Windows 平台与方法约束、Linux/OpenWrt Docker 本机探测、macOS 服务 status/start/stop/restart、Linux/OpenWrt 可见 Token 输入。没有安装 Docker 或 NAS，没有改变官网生产行为。DDNSTO 直接入口与历史完整打包器的桌面候选命名空间均改为 0.1.12，避免覆盖旧不可变内容；FastNet 仍 0.1.3。
+
+源码维护点：`ddnsto/docker-probe.sh` 构建时嵌入 Shell，设备端无需相邻文件。`--plan` 不依赖核心源码、已装 zsetup 或联网下载；其本地初筛不替代安装时的 zsetup context 与服务权限检查。当前能力和限制见[实施契约](universal-install-contract.md)。本轮不部署、不提交、不推送。
+
+## 0.1.11 本地开发候选（2026-10-21，未发布）
+
+DDNSTO 入口/config_version 递增至 0.1.11，FastNet 保持 0.1.3。新增 Linux/OpenWrt `--platform`、`--method` 约束；识别到群晖、QNAP、Unraid 时拒绝普通 Linux 安装，Docker 请求明确失败而不是回退原生。未增加 NAS/Docker 执行器、重跑菜单或管理命令，桌面参数暂不变。
+
+只依赖已发布 zsetup 能力，不以核心源码或全局索引发布为前置条件。共享 bootstrap 暂仍沿用 stable，固定各平台 zsetup 的新需求尚未实现；不要把新候选标记为完成整个产品方案。当前状态与后续顺序见 [统一命令实施契约](universal-install-contract.md)。历史 0.1.10 测试链接不变；本候选未部署、提交或推送。
+
 ## 0.1.10 macOS 禁用状态修复（2026-10-15）
 
 当前候选 `config_version=scripts-0.1.10`，DDNSTO 入口 0.1.10，FastNet 仍 0.1.3。修复 `launchctl disable` 后重装时报 `Bootstrap failed: 5`；重新启用失败时不停止原服务，后续安装失败则恢复原禁用状态。已增量发布新测试目录并更新本地官网地址，未覆盖历史入口、部署官网或提交推送 Git。详见 [修复与验收记录](macos-disabled-fix-2026-10-15.md)。以下 0.1.9 / 0.1.8 为历史记录。

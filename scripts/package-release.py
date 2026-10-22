@@ -29,7 +29,7 @@ def copy_desktop_candidates(binary, include):
     """No stable aliases: desktop support has not passed native acceptance."""
     if include:
         for relative in ("install.ps1", "install-macos.sh"):
-            copy_immutable(ROOT / "ddnsto" / relative, binary / "ddnsto" / "desktop-candidate-0.1.10" / relative)
+            copy_immutable(ROOT / "ddnsto" / relative, binary / "ddnsto" / "desktop-candidate-0.2.0" / relative)
 
 
 def main():

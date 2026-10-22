@@ -1,5 +1,52 @@
 # DDNSTO 一键安装架构与流程
 
+## 0.2.0 候选架构（未发布）
+
+最终用户从明确指定的候选 HTTPS URL 获取独立 `install.sh` 或 `install.ps1`，无需仓库和 zsetup 核心源码。官网默认及旧 0.1.10 测试 URL 不变；只有显式配置候选 URL 的调试环境使用新入口。本地集成证据见 [验证报告](verification-0.2.0.md)，仍未发布或完成原生验收。
+
+```mermaid
+flowchart TD
+    U[显式候选 HTTPS 包装命令] --> E[单文件 Shell / PowerShell 入口]
+    E --> P[识别平台和架构；校验参数与安装方式]
+    P --> Q{动作与平台}
+    Q -->|plan / 默认已有安装退出| R[本地检查；不安装]
+    Q -->|已有原生生命周期| L[检查托管归属与操作锁；复用配置；失败恢复]
+    Q -->|原生安装或更新 / 群晖下载| Z[固定 zsetup 与产品摘要校验]
+    Z --> N[原生平台安装器]
+    Z --> S[群晖：独立目录 SPK；交给包中心]
+    Q -->|显式 Docker| D[本地 Linux amd64 引擎；归属校验；受限容器操作]
+    N --> O[报告本地结果；云端未验证]
+    L --> O
+    S --> H[人工导入；检查身份迁移]
+    D --> I[仅报告容器运行；身份持久化未验证]
+    O --> C[控制台核对真实设备身份与在线状态]
+    H --> C
+    I --> C
+```
+
+| 维护点 | 当前职责与边界 |
+|---|---|
+| `business.sh`、`main.sh`、`method-selection.sh` | 参数、系统事实、显式方法与动作分发；已识别 NAS 不误入普通 Linux |
+| `bootstrap-policy.sh`、共享 `lib/bootstrap.sh` | DDNSTO Linux/OpenWrt 固定 zsetup 0.5.0 与摘要；不跟随 stable、不允许 HTTP 降级；不改变 FastNet |
+| `linux-service.sh`、`linux-lifecycle.sh`、`service-management.sh` | 原生服务管理、健康检查和托管生命周期；新增 repair/configure/uninstall 仅可验证归属的 systemd，configure 依赖 jq |
+| `openwrt-lifecycle.sh`、`business.sh` | 包管理器/UCI/procd 生命周期；update/保留状态重装临时 UCI 禁用防止包钩子提前启动，再恢复原配置与原 enabled；29 项生命周期、4 项 pinned products 测试通过，后者覆盖 16 组合；包回滚非原子，固件原生待验收 |
+| `install-macos.sh`、`install.ps1` | launchd 用户服务 / SYSTEM 任务；macOS 56 项、Windows 7 组模拟测试通过，zsetup 分别固定 0.3.0 / 0.4.0，仍待真机验收 |
+| `synology-download.sh` | 仅校验下载 SPK，默认 `$PWD/ddnsto-downloads` 独立子目录；auto/native 可用；download=0、install=20 人工交接，不调用 synopkg |
+| `docker-probe.sh`、`docker-lifecycle.sh` | 显式 Linux amd64 候选；写操作 root shell，首次创建及已有管理；update 同 pin no-op、repair 仅 start，身份未验证禁止重建/卸载后重装 |
+| `install-rules.json`、`product-pins.sh` | 可审计能力与固定产品来源；不能用规则声明扩大执行器实际能力 |
+| `build-entrypoints.py`、`package-entrypoints.py` | 生成自包含入口并打包两个入口/版本副本/摘要/manifest；固定版本目录含 `install-rules.json` 审计元数据，各脚本不依赖该文件独立运行；无需 core，不打包客户端或下载器，不部署 |
+
+原生默认重跑不修改；显式 configure 才更新本地 Token，uninstall 保留配置与身份，后续 install 复用保留状态。该语义不能直接套给 Docker 或群晖。Docker 无 configure，卸载后不得绕过身份保护重新创建；群晖只提供经校验的下载和人工导入提醒。
+
+Linux OpenRC 仅保留 install/update/status；legacy marker 无法认证 shell 服务脚本，其他写动作 fail closed。OpenWrt update 与保留状态重装通过临时提交 UCI `enabled=0` 防止包钩子提前启动，包操作后恢复原配置字节和原 enabled 状态；钩子仍可调用 start，保护依据为已核查包的禁用配置语义。这不是原子包回滚，固件原生行为仍需验收，见 [OpenWrt 集成证据](openwrt-lifecycle-integration.md)。此前全量套件已报告通过，冻结版及真实下载夹具最终结果由主 agent 补填。
+
+本地健康、任务运行、容器运行、云端在线是不同观察。Linux 安装健康检查不能替代其他平台的验收；Docker 不以容器运行证明客户端进程健康。Token 不进入公开文档或发布产物。完整用法、发布边界与外部验收见 [0.2.0 候选说明](candidate-0.2.0.md)。
+
+<details>
+<summary>0.1.8 历史架构与验证记录（非当前能力声明）</summary>
+
+> 2026-10-21：下文保留 0.1.8 时点架构。当前已确认的通用命令、分设备命令及群晖/Docker 扩展目标见 [统一命令实施契约](universal-install-contract.md)。0.1.11 仅在本地实现 Linux/OpenWrt 目标约束和已知 NAS 防误装；不代表扩展全部完成，也不依赖 zsetup 核心源码。0.1.10 测试域名仍是既有发布，不因本地修改而改变。
+
 更新：2026-10-14，安装入口候选0.1.8。用户只负责执行适合终端的一条命令、按提示输入控制台 Token；无需手动下载 zsetup、克隆仓库或选择架构包。
 
 **下载站只读，入口先从 GitHub 固定 commit 获取。** `/binary/zsetup/` 及已有客户端包直接复用；业务版本、路径和SHA256内置在入口，不补写下载站的任何文件。此前 `web.toany.net` 隔离目录不是当前架构依赖。命令见[GitHub测试指南](github-testing.md)。
@@ -102,3 +149,5 @@ Linux/OpenWrt 跟随官方 stable，当前已验证0.4.0；Windows固定0.4.0及
 - 正式推广仍需全平台 canary；群晖/QNAP/厂商路由器等既有专用安装方式没有因此自动变为统一入口已适配。上游更新同名LuCI文件可能使旧固定入口校验失败，需维护者核验后发布新安装器。
 - 系统开机自启、ARM64、OpenWrt/macOS/Windows 真机、真实 Token 绑定与控制台闭环、跨版本更新仍需专项验收。
 - 本轮结果见 [服务误报修复与验证](verification-2026-10-14-service-fix.md)；之前真实服务误报证据见 [0.1.5 测试部署](verification-2026-10-14.md)。
+
+</details>

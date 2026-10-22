@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "product": "ddnsto",
+  "status": "engineering-candidate",
+  "candidate": true,
+  "production_ready": false,
+  "cloud_online_verified": false,
+  "scope": "Declarative direct-entry capabilities; no core source or global catalog required. Executor availability is subject to local preflight, not production acceptance.",
+  "unsupported_platforms": ["qnap", "unraid"],
+  "unsupported_methods": [],
+  "method_selection": "Only explicitly declared platform, architecture and method combinations are available; absence from unsupported lists does not imply support.",
+  "platforms": {
+    "linux": {
+      "architectures": ["x86_64", "aarch64"],
+      "method": "native",
+      "actions": ["install", "update", "status", "start", "stop", "restart", "repair", "configure", "uninstall"],
+      "action_requirements": {"configure": ["jq"]},
+      "lifecycle_requirements": {
+        "actions": ["start", "stop", "restart", "repair", "configure", "uninstall"],
+        "executors": ["systemd"]
+      },
+      "limitations": {
+        "openrc": {
+          "supported_actions": ["install", "update", "status"],
+          "unsupported_actions": ["start", "stop", "restart", "repair", "configure", "uninstall"]
+        }
+      },
+      "executors": ["systemd", "openrc"],
+      "requirements": ["root-or-sudo", "initialized-service-manager"],
+      "client_versions": {"standard": "4.2.3"},
+      "zsetup_release": "linux-0.5.0",
+      "native_canary_verified": false
+    },
+    "openwrt": {
+      "architectures": ["x86_64", "aarch64", "armv7", "mipsel"],
+      "product_arch_aliases": {"armv7": "arm"},
+      "method": "native",
+      "actions": ["install", "update", "status", "start", "stop", "restart", "repair", "configure", "uninstall"],
+      "executors": ["opkg", "apk"],
+      "requirements": ["root", "compatible-package-abi", "little-endian-mips-only"],
+      "client_versions": {"standard": "4.2.6", "lite": "4.2.2"},
+      "zsetup_release": "linux-0.5.0",
+      "native_canary_verified": false
+    },
+    "macos": {
+      "architectures": ["x86_64", "aarch64"],
+      "method": "native",
+      "actions": ["install", "update", "status", "start", "stop", "restart", "repair", "configure", "uninstall"],
+      "executors": ["launchd-user"],
+      "requirements": ["logged-in-user-launchd-domain"],
+      "client_versions": {"standard": "4.2.1"},
+      "zsetup_release": "macos-0.3.0",
+      "native_canary_verified": false
+    },
+    "windows": {
+      "architectures": ["x86_64"],
+      "method": "native",
+      "actions": ["install", "update", "status", "start", "stop", "restart", "repair", "configure", "uninstall"],
+      "executors": ["scheduled-task-system"],
+      "requirements": ["administrator", "windows-x64", "i686-bootstrap-execution"],
+      "client_versions": {"standard": "4.2.1"},
+      "zsetup_release": "windows-0.4.0",
+      "native_canary_verified": false
+    },
+    "synology": {
+      "architectures": ["x86_64", "armv7"],
+      "unsupported_architectures": ["aarch64"],
+      "dsm_minimum_builds": {"6": 5940, "7": 41890},
+      "method": "download",
+      "executors": ["spk-download-manual-handoff"],
+      "client_versions": {"spk": "4.2.7-4"},
+      "actions": ["download", "install"],
+      "action_results": {
+        "download": {"exit_code": 0, "installation_performed": false, "manual_handoff_required": true},
+        "install": {"exit_code": 20, "installation_performed": false, "manual_handoff_required": true}
+      },
+      "handoff": "Manually install the verified SPK through DSM Package Center; download completion is not installation success.",
+      "artifacts": {
+        "synology/ddnsto_arm-dsm6.spk": "0595dd1ae1681213acb35dfc61e15d877bfee19e59d5f4242a366540922b7f89",
+        "synology/ddnsto_arm-dsm7.spk": "bde9af2d3ff17f4bc5c609b79af39da7efd7209c59d03935492d1748bb84eba5",
+        "synology/ddnsto_x86-dsm6.spk": "89d5871b7162edba9e4467a619d5d2eae19744d9cf637692e0695a1a4a701a83",
+        "synology/ddnsto_x86-dsm7.spk": "cccf82a0240c235d5eea6465ca9a339a9d92977345418ab72deb79ce2a3c8b59"
+      },
+      "candidate": true,
+      "native_canary_verified": false
+    }
+  },
+  "method_capabilities": {
+    "docker": {
+      "platforms": ["linux"],
+      "architectures": ["x86_64"],
+      "engine_platform": "linux/amd64",
+      "engine_requirements": {"endpoint": "local-unix-socket", "rootless": false, "desktop": false},
+      "required_explicit_inputs": ["network", "device-name"],
+      "networks": ["bridge", "host"],
+      "token_policy": "validated-safe-value-private-env-file",
+      "actions": ["install", "update", "status", "start", "stop", "restart", "uninstall", "repair"],
+      "unsupported_actions": ["configure"],
+      "client_version": "4.2.6",
+      "image": "linkease/ddnsto@sha256:f70d2afbb0da6b21ff8865a4f3d9869775360bfbec1fff03474e5478a702ad30",
+      "update_policy": "same-pin-no-op-recreation-blocked",
+      "repair_policy": "start-existing-owned-container-only",
+      "reinstall_policy": "blocked-identity-unverified",
+      "full_lifecycle_supported": false,
+      "write_privilege": "root-shell-required",
+      "interactive_inputs": "fresh-no-conflict-only-visible-token-name-network",
+      "identity_persistence_verified": false,
+      "candidate": true,
+      "native_canary_verified": false
+    }
+  },
+  "zsetup_releases": {
+    "linux-0.5.0": {
+      "version": "0.5.0",
+      "pin_source": "bootstrap-policy.sh",
+      "checksum_provenance": "https://fw.koolcenter.com/binary/zsetup/0.5.0/SHA256SUMS",
+      "runtime_metadata": "embedded-only",
+      "http_bootstrap": false,
+      "hash_tool_required": true,
+      "artifacts": {
+        "zsetup-linux-x86_64": "9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617",
+        "zsetup-linux-aarch64": "70cc54fcfdc6c6516965485879f0929e7dc9aabc1bd0fe09cbab099dd4619020",
+        "zsetup-linux-armv7": "16eca14c00167ef45dac13e536c5ef2880f682ec48c70661044ee453724a66aa",
+        "zsetup-linux-mipsel": "4821bbeae11fdcdfa9eb5e0b46b63e9751e069c21b1e0e598c5658eb73383a7b"
+      }
+    },
+    "macos-0.3.0": {
+      "version": "0.3.0",
+      "pin_source": "install-macos.sh",
+      "policy": "existing-desktop-policy-unchanged",
+      "artifacts": {
+        "zsetup-macos-x86_64": "608323145bcd8f083c0845b4bd0481eabccf0d74b99aa2aa6a88e59b34ce5b31",
+        "zsetup-macos-aarch64": "06ec453f851bd0395cf9ea8539de168f80a9628d1a25597dd598c85f9dc633b0"
+      }
+    },
+    "windows-0.4.0": {
+      "version": "0.4.0",
+      "pin_source": "install.ps1",
+      "policy": "existing-desktop-policy-unchanged",
+      "artifacts": {
+        "zsetup-windows-i686.exe": "858633b03f4808417bc4724f28e8ab0cb17c9f09fe4e665c9532f488cc1f83a3"
+      }
+    }
+  }
+}
