@@ -21,6 +21,7 @@ ddnsto_linux_preflight() {
         ddnsto_error 'a running systemd or initialized OpenRC environment is required; no service changes made'
         return 2
     fi
+    [ "${1:-}" != management ] || return 0
     command -v readlink >/dev/null 2>&1 || return 2
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || {
         ddnsto_error 'curl or wget is required for the local health check'; return 2;

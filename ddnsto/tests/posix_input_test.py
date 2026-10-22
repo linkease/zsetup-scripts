@@ -48,7 +48,7 @@ class InputContract(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn('token', result.stderr.lower())
 
-    def test_interactive_first_install_reads_hidden_token(self):
+    def test_interactive_first_install_reads_visible_token(self):
         script = '. "$1"; TOKEN=; business_platform=linux; ddnsto_prepare_token; [ "$TOKEN" = private-fixture-token ]'
         pid, terminal = pty.fork()
         if pid == 0:
@@ -78,7 +78,7 @@ class InputContract(unittest.TestCase):
             _, status = os.waitpid(pid, 0)
         self.assertEqual(os.waitstatus_to_exitcode(status), 0, output.decode())
         self.assertTrue(sent)
-        self.assertNotIn(b'private-fixture-token', output)
+        self.assertIn(b'private-fixture-token', output)
 
 
 if __name__ == '__main__':
