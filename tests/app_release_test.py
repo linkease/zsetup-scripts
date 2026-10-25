@@ -220,7 +220,10 @@ class AppRelease(unittest.TestCase):
         self.assertEqual([r for r in proposed["installers"] if r["application"] != "linkspace"], self.config["installers"])
         records = [r for r in proposed["installers"] if r["application"] == "linkspace"]
         self.assertEqual({r["arch"] for r in records}, {"x86_64", "aarch64", "armv7"})
-        self.assertTrue(all(r["os"] == "linux" and r["min_version"] == "0.5.0" for r in records))
+        self.assertTrue(all(r["min_version"] == "0.5.0" for r in records))
+        self.assertEqual({r["os"] for r in records}, {"linux", "ubuntu", "debian", "centos", "rhel", "openwrt", "asuswrt"})
+        actual_os = subprocess.check_output([str(NATIVE), "context", "get", "os"], text=True).strip()
+        self.assertTrue(any(r["os"] == actual_os and r["arch"] == "x86_64" for r in records))
         server = self.server()
         self.transaction("stage", server); self.assert_original(server)
         self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
