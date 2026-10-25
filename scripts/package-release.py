@@ -46,9 +46,14 @@ def main():
     if is_rust:
         spec = importlib.util.spec_from_file_location("native_release", zroot / "scripts/release-preflight.py")
         native = importlib.util.module_from_spec(spec); spec.loader.exec_module(native)
-        native.validate_payload(package)  # Integrity only; never claims native/public acceptance.
+        linux_only = manifest.get("target") == "linux"
+        # Integrity only; native execution and public activation remain separate gates.
+        if linux_only:
+            native.validate_linux_payload(package)
+        else:
+            native.validate_payload(package)
         release = package / "immutable/zsetup" / manifest["version"]
-        if not (release / "platform-release-manifest.json").is_file():
+        if not linux_only and not (release / "platform-release-manifest.json").is_file():
             raise ValueError("complete canonical Rust platform package required")
     else:
         release = package
