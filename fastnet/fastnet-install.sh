@@ -385,7 +385,7 @@ installer_policy() {
     INSTALLER_DOWNLOAD_BYTES=0; INSTALLER_EXPANDED_BYTES=0; INSTALLER_FILE_COUNT=0
     INSTALLER_RESERVE=8388608
     case "$1" in
-        fastnet|fastpve) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
+        fastnet|fastpve|linkspace) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
         ddnsto) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16 ;;
         linkease) INSTALLER_MAX_DOWNLOAD=134217728; INSTALLER_MAX_EXPANDED=268435456; INSTALLER_MAX_FILES=128 ;;
         *) return 2 ;;
@@ -406,7 +406,7 @@ installer_file_size() {
 # Single canonical download adapter shared by all business policies. Metadata
 # remains data; no source/eval, redirects/HTTPS/roots/SHA remain native-owned.
 installer_download() {
-    ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}
+    ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}; ib_expected_size=${5:-}
     case "${ib_relative##*/}" in
         version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
         *) ib_metadata=0; ib_limit=$((INSTALLER_MAX_DOWNLOAD - INSTALLER_DOWNLOAD_BYTES)); [ "$ib_limit" -gt 0 ] || return 11 ;;
@@ -422,6 +422,7 @@ installer_download() {
     fi
     set -- "$ZSETUP_BIN" download -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE"
     [ -z "$ib_sha" ] || set -- "$@" --sha256 "$ib_sha"
+    [ -z "${ib_expected_size:-}" ] || set -- "$@" --size "$ib_expected_size"
     [ "$ib_fresh" = 0 ] || set -- "$@" --no-cache
     [ -z "${ZSETUP_CA_FILE:-}" ] || set -- "$@" --ca-file "$ZSETUP_CA_FILE"
     for ib_base in $ZSETUP_SOURCE_BASES; do set -- "$@" "${ib_base%/}/$INSTALLER_REMOTE_APP/$ib_relative"; done
@@ -664,11 +665,15 @@ installer_launcher_activate() {
         if [ "$il_record" = "$il_sha:$il_payload_size" ]; then il_cached=1; fi
     fi
     if [ "$il_cached" = 1 ]; then
+        if [ "${INSTALLER_VERIFY_CACHE:-0}" = 1 ]; then
+            installer_download "$il_remote_name" "$INSTALLER_EXECUTABLE" "$il_sha" 0 "${INSTALLER_EXPECTED_SIZE:-}" || return $?
+            chmod 0755 "$INSTALLER_EXECUTABLE" || return 12
+        fi
         status "[3/4] $il_display is already downloaded (verified cached version)"
         installer_exec_native "$ZSETUP_BIN" run -- "$INSTALLER_EXECUTABLE" version || return $?
     else
         status "[3/4] Downloading $il_display..."
-        installer_download "$il_remote_name" "$transaction_dir/product" "$il_sha" || return $?
+        installer_download "$il_remote_name" "$transaction_dir/product" "$il_sha" 0 "${INSTALLER_EXPECTED_SIZE:-}" || return $?
         chmod 0755 "$transaction_dir/product"
         installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/product" version || return $?
         if [ ! -d "$il_version_dir" ]; then

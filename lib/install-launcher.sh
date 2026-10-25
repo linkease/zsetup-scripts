@@ -105,11 +105,15 @@ installer_launcher_activate() {
         if [ "$il_record" = "$il_sha:$il_payload_size" ]; then il_cached=1; fi
     fi
     if [ "$il_cached" = 1 ]; then
+        if [ "${INSTALLER_VERIFY_CACHE:-0}" = 1 ]; then
+            installer_download "$il_remote_name" "$INSTALLER_EXECUTABLE" "$il_sha" 0 "${INSTALLER_EXPECTED_SIZE:-}" || return $?
+            chmod 0755 "$INSTALLER_EXECUTABLE" || return 12
+        fi
         status "[3/4] $il_display is already downloaded (verified cached version)"
         installer_exec_native "$ZSETUP_BIN" run -- "$INSTALLER_EXECUTABLE" version || return $?
     else
         status "[3/4] Downloading $il_display..."
-        installer_download "$il_remote_name" "$transaction_dir/product" "$il_sha" || return $?
+        installer_download "$il_remote_name" "$transaction_dir/product" "$il_sha" 0 "${INSTALLER_EXPECTED_SIZE:-}" || return $?
         chmod 0755 "$transaction_dir/product"
         installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/product" version || return $?
         if [ ! -d "$il_version_dir" ]; then

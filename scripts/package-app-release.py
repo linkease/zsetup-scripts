@@ -150,7 +150,7 @@ def prepare(args):
             "unchanged": ["other application files and installer records", "all core binaries, stable and platform pointers", "source groups"],
             "activation_order": [immutable_path, *public_entries, "zsetup/config.json"],
             "required_before_activation": ["no blockers", "live config still matches baseline SHA256", "snapshot current public entry bytes/modes",
-                                           "four-site HTTPS SHA256/size readback of immutable installer", "safe FastNet canary via both entries",
+                                           "four-site HTTPS SHA256/size readback of immutable installer", f"safe {app} canary via direct entry and zsetup install",
                                            "explicit production activation authorization"],
         }
         (stage / "app-release-manifest.json").write_bytes(json_bytes(plan))
@@ -163,7 +163,7 @@ def prepare(args):
         (stage / "PACKAGE-SHA256SUMS").write_text("".join(f"{digest(p)}  {p.relative_to(stage)}\n" for p in checksummed))
         # Output must remain absent: a review is immutable once materialized.
         stage.rename(output)
-    print(f"FastNet-only local review: {output}; {plan['readiness']}; no remote changes")
+    print(f"{app}-only local review: {output}; {plan['readiness']}; no remote changes")
     return plan
 
 

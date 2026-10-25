@@ -73,3 +73,13 @@
   transaction. Public HTTPS readback, safe business canary and explicit
   production authorization are coordinator prerequisites. Tests of this
   primitive do not establish public activation readiness.
+
+## Linkspace independent rollout (2026-10-25)
+
+- Linkspace is explicitly authorized alongside its product binaries. Scoped tools
+  enable fastnet and linkspace with separate exact public entry lists; all other
+  applications remain disabled. Linkspace installer0.1.0 supports Linux x86_64,
+  aarch64 and armv7, reusing the user launcher with native SHA/size cache checks.
+- Production changes remain per application; do not upload the aggregate package.
+  Use fresh live config, immutable staging, four-site HTTPS and isolated real
+  product canaries before locked activation. See linkspace/README.md.

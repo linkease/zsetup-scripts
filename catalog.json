@@ -451,6 +451,33 @@
       "script": "fastpve/fastpve-install.sh",
       "path": "fastpve/0.1.8/fastpve-install.sh",
       "background": false
+    },
+    {
+      "application": "linkspace",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "linkspace/linkspace-install.sh",
+      "path": "linkspace/0.1.0/linkspace-install.sh",
+      "background": false
+    },
+    {
+      "application": "linkspace",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "linkspace/linkspace-install.sh",
+      "path": "linkspace/0.1.0/linkspace-install.sh",
+      "background": false
+    },
+    {
+      "application": "linkspace",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "armv7",
+      "script": "linkspace/linkspace-install.sh",
+      "path": "linkspace/0.1.0/linkspace-install.sh",
+      "background": false
     }
   ]
 }

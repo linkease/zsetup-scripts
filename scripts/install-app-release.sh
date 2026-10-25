@@ -1,5 +1,5 @@
 #!/bin/sh
-# Low-level transaction for an already verified, explicitly authorized FastNet
+# Low-level transaction for an already verified, explicitly authorized application
 # release. Stage first; public HTTPS readback/canary precede activate. No network
 # calls or core/version changes are performed by this script.
 set -eu
@@ -12,7 +12,7 @@ die() { printf 'app release: %s\n' "$1" >&2; exit 1; }
 case "$dst" in /*) ;; *) die 'absolute binary root required' ;; esac
 case "$dst" in /|*/../*|*/..|*/./*|*/.|*\\*) die 'unsafe binary root' ;; esac
 [ -d "$dst" ] && [ ! -L "$dst" ] || die 'binary root is missing or a symlink'
-for dir in fastnet zsetup; do
+for dir in zsetup; do
  [ -d "$dst/$dir" ] && [ ! -L "$dst/$dir" ] || die 'application/core directory is missing or a symlink'
 done
 [ -f "$src/PACKAGE-SHA256SUMS" ] && [ ! -L "$src/PACKAGE-SHA256SUMS" ] || die 'missing package checksums'
@@ -26,7 +26,13 @@ done
  IFS= read -r new_config_sha
  IFS= read -r installer_sha
 } < "$src/release-state.txt" || die 'incomplete release state'
-[ "$app" = fastnet ] || die 'only FastNet is enabled'
+case "$app" in
+ fastnet) entries='fastnet/fastnet-install.sh fastnet/install.sh' ;;
+ linkspace) entries='linkspace/linkspace-install.sh' ;;
+ *) die 'application is not enabled' ;;
+esac
+[ ! -L "$dst/$app" ] || die 'application directory is a symlink'
+[ ! -e "$dst/$app" ] || [ -d "$dst/$app" ] || die 'application directory is invalid'
 [ "$readiness" = ready-for-staging ] || die 'candidate has unresolved blockers'
 case "$version" in ''|.*|stable|latest|*[!0-9A-Za-z._+-]*) die 'unsafe immutable version' ;; esac
 case "$stable" in ''|*[!0-9.]*) die 'unsafe stable version' ;; esac
@@ -34,9 +40,9 @@ for sha in "$old_config_sha" "$new_config_sha" "$installer_sha"; do
  [ "${#sha}" -eq 64 ] || die 'invalid digest length'
  case "$sha" in *[!0-9a-f]*) die 'invalid digest' ;; esac
 done
-targets='fastnet/fastnet-install.sh fastnet/install.sh zsetup/config.json'
-immutable="fastnet/$version/fastnet-install.sh"
-snapshot="$dst/fastnet/.installer-rollback-$new_config_sha"
+targets="$entries zsetup/config.json"
+immutable="$app/$version/$app-install.sh"
+snapshot="$dst/$app/.installer-rollback-$new_config_sha"
 lock="$dst/zsetup/.windows-release-lock"
 locked=0
 switching=0
@@ -65,7 +71,7 @@ cleanup() {
  trap - 0 1 2 15
  if [ "$switching" -eq 1 ] && [ "$result" -ne 0 ]; then
   if restore; then
-   printf '%s\n' 'app release: activation failed; previous FastNet entries and config restored' >&2
+   printf 'app release: activation failed; previous %s entries and config restored\n' "$app" >&2
   else
    printf 'app release: restoration failed; retain snapshot %s\n' "$snapshot" >&2
   fi
@@ -82,21 +88,22 @@ trap cleanup 0
 trap 'exit 1' 1 2 15
 mkdir "$lock" 2>/dev/null || die 'another core/application publisher owns the lock'
 locked=1
+mkdir -p "$dst/$app"
 for target in $targets; do regular_or_missing "$dst/$target" || die 'pointer is a symlink or non-regular file'; done
 [ ! -L "$dst/zsetup/stable" ] && [ -f "$dst/zsetup/stable" ] || die 'stable is missing or a symlink'
 [ "$(cat "$dst/zsetup/stable")" = "$stable" ] || die 'live core stable changed; prepare a fresh release'
 [ -f "$src/immutable/$immutable" ] && [ ! -L "$src/immutable/$immutable" ] || die 'immutable source missing'
 [ "$(checksum "$src/immutable/$immutable")" = "$installer_sha" ] || die 'immutable source digest differs'
-for target in fastnet/fastnet-install.sh fastnet/install.sh; do
+for target in $entries; do
  [ "$(checksum "$src/pointers/$target")" = "$installer_sha" ] || die 'public entry differs from immutable installer'
 done
 [ "$(checksum "$src/pointers/zsetup/config.json")" = "$new_config_sha" ] || die 'config differs from release identity'
-[ ! -L "$dst/fastnet/$version" ] || die 'immutable directory is a symlink'
+[ ! -L "$dst/$app/$version" ] || die 'immutable directory is a symlink'
 if [ "$mode" = stage ]; then
  [ "$(checksum "$dst/zsetup/config.json")" = "$old_config_sha" ] || die 'live config changed; prepare a fresh release'
  [ ! -e "$snapshot" ] && [ ! -L "$snapshot" ] || die 'release snapshot already exists; refusing overwrite'
- if [ -e "$dst/fastnet/$version" ]; then
-  [ -d "$dst/fastnet/$version" ] && [ ! -L "$dst/$immutable" ] && [ -f "$dst/$immutable" ] || die 'immutable target is invalid'
+ if [ -e "$dst/$app/$version" ]; then
+  [ -d "$dst/$app/$version" ] && [ ! -L "$dst/$immutable" ] && [ -f "$dst/$immutable" ] || die 'immutable target is invalid'
   [ "$(checksum "$dst/$immutable")" = "$installer_sha" ] || die 'immutable version has different bytes'
  fi
  mkdir "$snapshot"
@@ -111,19 +118,19 @@ if [ "$mode" = stage ]; then
   fi
  done
  printf '%s\n' "$new_config_sha" > "$snapshot/identity"
- if [ ! -d "$dst/fastnet/$version" ]; then
-  stage_dir="$dst/fastnet/.installer-stage-$$"
+ if [ ! -d "$dst/$app/$version" ]; then
+  stage_dir="$dst/$app/.installer-stage-$$"
   mkdir "$stage_dir"
-  cp "$src/immutable/$immutable" "$stage_dir/fastnet-install.sh"
-  chmod 0755 "$stage_dir/fastnet-install.sh"
-  [ "$(checksum "$stage_dir/fastnet-install.sh")" = "$installer_sha" ] || die 'staged installer checksum failed'
+  cp "$src/immutable/$immutable" "$stage_dir/$app-install.sh"
+  chmod 0755 "$stage_dir/$app-install.sh"
+  [ "$(checksum "$stage_dir/$app-install.sh")" = "$installer_sha" ] || die 'staged installer checksum failed'
   chmod 0755 "$stage_dir"
-  mv "$stage_dir" "$dst/fastnet/$version"
+  mv "$stage_dir" "$dst/$app/$version"
   stage_dir=''
  fi
  printf '%s\n' staged > "$snapshot/phase"
  building_snapshot=0
- printf 'Staged FastNet %s; public entries/config unchanged; snapshot %s\n' "$version" "$snapshot"
+ printf 'Staged %s %s; public entries/config unchanged; snapshot %s\n' "$app" "$version" "$snapshot"
  exit 0
 fi
 [ -d "$snapshot" ] && [ ! -L "$snapshot" ] || die 'staged snapshot missing'
@@ -136,7 +143,7 @@ if [ "$mode" = rollback ]; then
  done
  restore || die 'rollback failed; snapshot retained'
  printf '%s\n' rolled-back > "$snapshot/phase"
- printf 'Restored FastNet entries/config from %s; immutable installer retained\n' "$snapshot"
+ printf 'Restored %s entries/config from %s; immutable installer retained\n' "$app" "$snapshot"
  exit 0
 fi
 [ "$(cat "$snapshot/phase")" = staged ] || die 'release is not staged'
@@ -156,4 +163,4 @@ for target in $targets; do
 done
 printf '%s\n' activated > "$snapshot/phase"
 switching=0
-printf 'Activated FastNet %s; rollback snapshot %s\n' "$version" "$snapshot"
+printf 'Activated %s %s; rollback snapshot %s\n' "$app" "$version" "$snapshot"

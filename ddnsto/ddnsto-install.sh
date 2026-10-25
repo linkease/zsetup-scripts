@@ -385,7 +385,7 @@ installer_policy() {
     INSTALLER_DOWNLOAD_BYTES=0; INSTALLER_EXPANDED_BYTES=0; INSTALLER_FILE_COUNT=0
     INSTALLER_RESERVE=8388608
     case "$1" in
-        fastnet|fastpve) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
+        fastnet|fastpve|linkspace) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
         ddnsto) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16 ;;
         linkease) INSTALLER_MAX_DOWNLOAD=134217728; INSTALLER_MAX_EXPANDED=268435456; INSTALLER_MAX_FILES=128 ;;
         *) return 2 ;;
@@ -406,7 +406,7 @@ installer_file_size() {
 # Single canonical download adapter shared by all business policies. Metadata
 # remains data; no source/eval, redirects/HTTPS/roots/SHA remain native-owned.
 installer_download() {
-    ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}
+    ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}; ib_expected_size=${5:-}
     case "${ib_relative##*/}" in
         version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
         *) ib_metadata=0; ib_limit=$((INSTALLER_MAX_DOWNLOAD - INSTALLER_DOWNLOAD_BYTES)); [ "$ib_limit" -gt 0 ] || return 11 ;;
@@ -422,6 +422,7 @@ installer_download() {
     fi
     set -- "$ZSETUP_BIN" download -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE"
     [ -z "$ib_sha" ] || set -- "$@" --sha256 "$ib_sha"
+    [ -z "${ib_expected_size:-}" ] || set -- "$@" --size "$ib_expected_size"
     [ "$ib_fresh" = 0 ] || set -- "$@" --no-cache
     [ -z "${ZSETUP_CA_FILE:-}" ] || set -- "$@" --ca-file "$ZSETUP_CA_FILE"
     for ib_base in $ZSETUP_SOURCE_BASES; do set -- "$@" "${ib_base%/}/$INSTALLER_REMOTE_APP/$ib_relative"; done
@@ -1764,7 +1765,7 @@ installer_policy() {
     INSTALLER_DOWNLOAD_BYTES=0; INSTALLER_EXPANDED_BYTES=0; INSTALLER_FILE_COUNT=0
     INSTALLER_RESERVE=8388608
     case "$1" in
-        fastnet|fastpve) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
+        fastnet|fastpve|linkspace) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
         ddnsto) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16 ;;
         linkease) INSTALLER_MAX_DOWNLOAD=134217728; INSTALLER_MAX_EXPANDED=268435456; INSTALLER_MAX_FILES=128 ;;
         *) return 2 ;;
@@ -1781,7 +1782,7 @@ installer_file_size() {
     INSTALLER_FILE_SIZE=$1
 }
 installer_download() {
-    ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}
+    ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}; ib_expected_size=${5:-}
     case "${ib_relative##*/}" in
         version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
         *) ib_metadata=0; ib_limit=$((INSTALLER_MAX_DOWNLOAD - INSTALLER_DOWNLOAD_BYTES)); [ "$ib_limit" -gt 0 ] || return 11 ;;
@@ -1794,6 +1795,7 @@ installer_download() {
     fi
     set -- "$ZSETUP_BIN" download -o "$ib_output" --max-bytes "$ib_limit" --min-free-bytes "$INSTALLER_RESERVE"
     [ -z "$ib_sha" ] || set -- "$@" --sha256 "$ib_sha"
+    [ -z "${ib_expected_size:-}" ] || set -- "$@" --size "$ib_expected_size"
     [ "$ib_fresh" = 0 ] || set -- "$@" --no-cache
     [ -z "${ZSETUP_CA_FILE:-}" ] || set -- "$@" --ca-file "$ZSETUP_CA_FILE"
     for ib_base in $ZSETUP_SOURCE_BASES; do set -- "$@" "${ib_base%/}/$INSTALLER_REMOTE_APP/$ib_relative"; done
