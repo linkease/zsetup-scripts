@@ -31,6 +31,10 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
     config = json.loads((binary / "zsetup/config.json").read_text())
     assert config["stable_zsetup"]["version"] == EXPECTED_VERSION
+    if IS_RUST and RELEASE_MANIFEST.get("target") == "linux":
+        assert {r["arch"] for r in config["stable_zsetup"]["artifacts"]} == {"x86_64", "aarch64", "armv7", "mipsel"}
+        assert {p.name for p in (binary / "zsetup").iterdir()} == {EXPECTED_VERSION, "config.json", "stable"}
+        assert not any("windows" in p.name or "macos" in p.name for p in (binary / "zsetup" / EXPECTED_VERSION).iterdir())
     assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease", "fastpve"}
     assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "fastpve", "zsetup"}
     assert not (binary / "legacy").exists()
