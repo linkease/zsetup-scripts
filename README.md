@@ -1,6 +1,6 @@
 # zsetup-scripts
 
-FastNet、DDNSTO、LinkEase、FastPVE 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)，最低版本 **0.2.4**。
+FastNet、DDNSTO、LinkEase、FastPVE 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.8 的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
 
 设备已有 zsetup：
 
@@ -22,7 +22,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastpve/fastpve-install.sh)
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
 
-**当前状态：安装脚本与配置候选，尚未公网发布。** FastNet/DDNSTO/LinkEase/FastPVE 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。原线上入口继续保留；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
+**当前发布范围：FastNet 已公网发布，其他业务的新入口仍为本地候选。** 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。FastNet 使用独立发布流程，不能用完整多业务候选覆盖线上；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
 
 | 应用标识 | 支持平台 | 架构 | 业务参数与交互 |
 |---|---|---|---|
@@ -52,9 +52,9 @@ zsetup-scripts/
   catalog.json      # 统一安装索引的构建输入
 ```
 
-共享 bootstrap 构建时嵌入各模块的唯一 APP-install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh、linkease/linkease-install.sh、fastpve/fastpve-install.sh 或 zsetup install，原业务仓库保持不变。
+共享 bootstrap 构建时嵌入各模块的唯一 APP-install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh、linkease/linkease-install.sh、fastpve/fastpve-install.sh 或 zsetup install。FastNet仓库仅同步本仓库的生成入口，其他业务仓库保持原状。
 
-正式服务器部署 `dist/release/binary/` 中的五个目录：`fastnet/`、`ddnsto/`、`linkease/`、`fastpve/`、`zsetup/`，映射到站点 `/binary/`。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变，共享完整配置在 zsetup/config.json。目录映射、首个新服务器的业务产物要求及发布顺序见 [发布流程](docs/release.md)。
+当前生产部署只使用 [FastNet 独立发布](docs/fastnet-independent-release.md) 生成的明确文件清单，映射到站点 `/binary/fastnet/` 和共享索引 `/binary/zsetup/config.json`。完整 aggregate 包用于候选验收，不能批量激活其他业务。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变；核心升级使用 zsetup-rust 的独立 Linux 发布流程。
 
 开发与验收：
 
