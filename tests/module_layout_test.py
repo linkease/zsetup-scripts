@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",)), ("linkease", ("linkease_test.py",)), ("fastpve", ("fastpve_test.py",))):
+for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",)), ("linkease", ("linkease_test.py",)), ("fastpve", ("fastpve_test.py",)), ("linkspace", ("linkspace_test.py",))):
     module = ROOT / app
     for filename in ("business.sh", "main.sh", f"{app}-install.sh", "README.md"):
         assert (module / filename).is_file(), f"missing {app}/{filename}"
@@ -36,6 +36,7 @@ script_version = catalog["config_version"].removeprefix("scripts-")
 for record in catalog["installers"]:
     app = record["application"]
     assert record["script"] == f"{app}/{app}-install.sh"
-    assert record["path"] == f"{app}/{script_version}/{app}-install.sh"
+    version = "0.1.0" if app == "linkspace" else script_version
+    assert record["path"] == f"{app}/{version}/{app}-install.sh"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")

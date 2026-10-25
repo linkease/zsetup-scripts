@@ -43,9 +43,9 @@ class AppRelease(unittest.TestCase):
                 "source_group": "koolcenter", "path": app + "/old/install.sh", "sha256": "11" * 32,
                 "size": 10, "background": False, "min_version": "0.5.0"}
 
-    def run_plan(self, success=True, extra=()):
+    def run_plan(self, success=True, extra=(), app="fastnet"):
         self.input.write_text(json.dumps(self.config))
-        result = subprocess.run([sys.executable, "-B", str(ENTRY), "--application", "fastnet",
+        result = subprocess.run([sys.executable, "-B", str(ENTRY), "--application", app,
                                  "--live-config", str(self.input), "--zsetup-root", str(ZROOT),
                                  "--native-cli", str(NATIVE), "--output", str(self.output), *extra],
                                 env=self.env, capture_output=True, text=True, timeout=20)
@@ -207,6 +207,40 @@ class AppRelease(unittest.TestCase):
         (server / "zsetup/config.json").write_text("later release")
         self.transaction("rollback", server, False)
         self.assertEqual((server / "zsetup/config.json").read_text(), "later release")
+
+
+    def test_linkspace_scoped_rollout_and_rollback(self):
+        self.run_plan(app="linkspace")
+        plan = json.loads((self.output / "app-release-manifest.json").read_text())
+        self.assertEqual({f["destination"] for f in plan["files"]}, {
+            "linkspace/0.1.0/linkspace-install.sh", "linkspace/linkspace-install.sh", "zsetup/config.json"})
+        proposed = json.loads((self.output / "pointers/zsetup/config.json").read_text())
+        self.assertEqual(proposed["stable_zsetup"], self.config["stable_zsetup"])
+        self.assertEqual(proposed["source_groups"], self.config["source_groups"])
+        self.assertEqual([r for r in proposed["installers"] if r["application"] != "linkspace"], self.config["installers"])
+        records = [r for r in proposed["installers"] if r["application"] == "linkspace"]
+        self.assertEqual({r["arch"] for r in records}, {"x86_64", "aarch64", "armv7"})
+        self.assertTrue(all(r["os"] == "linux" and r["min_version"] == "0.5.0" for r in records))
+        server = self.server()
+        self.transaction("stage", server); self.assert_original(server)
+        self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
+        self.transaction("activate", server)
+        self.assertEqual((server / "linkspace/linkspace-install.sh").read_bytes(), (ROOT / "linkspace/linkspace-install.sh").read_bytes())
+        self.transaction("rollback", server); self.assert_original(server)
+        self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
+        self.assertTrue((server / "linkspace/0.1.0/linkspace-install.sh").is_file())
+
+    def test_linkspace_conflict_and_drift_are_refused(self):
+        self.run_plan(app="linkspace"); server = self.server()
+        immutable = server / "linkspace/0.1.0/linkspace-install.sh"
+        immutable.parent.mkdir(parents=True); immutable.write_text("conflict")
+        self.transaction("stage", server, False); self.assert_original(server)
+        self.assertEqual(immutable.read_text(), "conflict")
+        immutable.write_bytes((ROOT / "linkspace/linkspace-install.sh").read_bytes())
+        self.transaction("stage", server)
+        (server / "zsetup/config.json").write_text("new publisher")
+        self.transaction("activate", server, False)
+        self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
 
 
 if __name__ == "__main__":
