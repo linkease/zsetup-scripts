@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import ssl
+import signal
+import time
 import subprocess
 import sys
 import tempfile
@@ -17,12 +19,19 @@ sys.path.insert(0, str(ROOT / "tests"))
 from tls_fixture import generate_certificate
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    bodies = {}; counts = {}
+    bodies = {}; counts = {}; slow_path = None; started = threading.Event()
     def do_GET(self):
         self.counts[self.path] = self.counts.get(self.path, 0) + 1
         body = self.bodies.get(self.path)
         if body is None: self.send_error(404); return
-        self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+        self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers()
+        if self.path == self.slow_path:
+            self.started.set()
+            try:
+                for offset in range(0,len(body),1024):
+                    self.wfile.write(body[offset:offset+1024]); self.wfile.flush(); time.sleep(0.05)
+            except (BrokenPipeError,ConnectionResetError,ssl.SSLError): pass
+        else: self.wfile.write(body)
     def log_message(self, *_): pass
 
 # /projects is a real persistent filesystem, deliberately unlike container aufs
@@ -115,6 +124,25 @@ case "$url" in */zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;; esac
             Handler.bodies[f"/binary/{app}/{filename.replace('1.2.3', '1.2.5')}"] = changed
             result = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=10)
             assert result.returncode == 11 and (prefix / "current").read_bytes() == product, result
+            # Cancellation while downloading a new version preserves the previous
+            # installation and joins the native child before clearing the lease.
+            slow = product + b"#" + b"x" * 131072 + b"\n"
+            Handler.bodies[f"/binary/{app}/version.txt"] = f"VERSION=1.2.6\n{key}={hashlib.sha256(slow).hexdigest()}\nLINKSPACE_AMD64_SIZE={len(slow)}\n".encode()
+            Handler.slow_path = f"/binary/{app}/1.2.6/linkspace-linux-amd64"
+            Handler.bodies[Handler.slow_path] = slow
+            proc = subprocess.Popen(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            assert Handler.started.wait(10)
+            proc.send_signal(signal.SIGTERM)
+            out, err = proc.communicate(timeout=15)
+            assert proc.returncode == 143, (proc.returncode,out,err)
+            assert (prefix / "current").read_bytes() == product
+            assert not (prefix / "versions/1.2.6").exists() and not list(work.iterdir())
+            # Digest failure also leaves the old version and no staging debris.
+            Handler.slow_path = None
+            Handler.bodies[f"/binary/{app}/1.2.6/linkspace-linux-amd64"] = b"bad payload"
+            result = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=15)
+            assert result.returncode != 0 and (prefix / "current").read_bytes() == product, result
+            assert not list(work.iterdir())
             # Registry paths cannot redirect writes into somebody else's file.
             victim = folder / "victim"; victim.write_text("untouched")
             (prefix / ".managed").unlink(); (prefix / ".managed").symlink_to(victim)
