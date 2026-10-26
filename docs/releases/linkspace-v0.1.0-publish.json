@@ -1,0 +1,979 @@
+{
+  "schema_version": 1,
+  "application": "linkspace",
+  "product_version": "v0.1.0",
+  "installer_version": "0.1.0",
+  "published_at_utc": "2026-10-26T00:15:19.946953+00:00",
+  "binary_source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be",
+  "installer_source_commit": "0d7997c036d1bb600a44aa290026b4c71768bdde",
+  "runtime_version": "0.5.1",
+  "shared_core_modified": false,
+  "platforms": [
+    "linux-amd64",
+    "linux-arm64",
+    "linux-armv7"
+  ],
+  "native_validation": [
+    "Linux amd64 in isolated Ubuntu container, uid1000, read-only root, no capabilities"
+  ],
+  "unverified": [
+    "ARM64 real device",
+    "ARMv7 real device",
+    "Windows/macOS/MIPS not released"
+  ],
+  "files": [
+    {
+      "path": "linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+      "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+      "size": 792,
+      "architecture": null,
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/SHA256SUMS",
+      "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+      "size": 549,
+      "architecture": null,
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/linkspace-linux-amd64",
+      "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+      "size": 18280632,
+      "architecture": "amd64",
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+      "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+      "size": 7264626,
+      "architecture": "amd64",
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/linkspace-linux-arm64",
+      "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+      "size": 16777400,
+      "architecture": "arm64",
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+      "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+      "size": 6595091,
+      "architecture": "arm64",
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/linkspace-linux-armv7",
+      "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+      "size": 17105080,
+      "architecture": "armv7",
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+      "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+      "size": 6855602,
+      "architecture": "armv7",
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/release-manifest.json",
+      "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+      "size": 3204,
+      "architecture": null,
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/v0.1.0/version.txt",
+      "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+      "size": 369,
+      "architecture": null,
+      "source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be"
+    },
+    {
+      "path": "linkspace/0.1.0/linkspace-install.sh",
+      "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+      "size": 34231,
+      "architecture": "shell/config",
+      "source_commit": "0d7997c036d1bb600a44aa290026b4c71768bdde"
+    },
+    {
+      "path": "linkspace/linkspace-install.sh",
+      "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+      "size": 34231,
+      "architecture": "shell/config",
+      "source_commit": "0d7997c036d1bb600a44aa290026b4c71768bdde"
+    },
+    {
+      "path": "zsetup/config.json",
+      "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+      "size": 10249,
+      "architecture": "shell/config",
+      "source_commit": "0d7997c036d1bb600a44aa290026b4c71768bdde"
+    }
+  ],
+  "scope": {
+    "passed": true,
+    "protected_regular_file_metadata_count": 1251,
+    "protected_sha256_count": 7,
+    "changed_outside_scope": [],
+    "unexpected_files_outside_scope": [],
+    "source_groups_preserved": true,
+    "stable_zsetup_preserved": true,
+    "non_linkspace_installers_preserved": true,
+    "linkspace_installer_records": 21,
+    "final_config_sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+    "rollback_archive_sha256": "30c1417ca69e87a8e454227a66a926810a61738c8be4b660b66203eeda2a8b1f"
+  },
+  "checks": {
+    "go_test_packages_passed": 74,
+    "publication_regressions": 3,
+    "scoped_release_regressions": 16,
+    "full_scripts_acceptance": true,
+    "generated_entry_consistency": true,
+    "offline_help_commands": 104,
+    "fixture_failure_recovery_and_cancellation": true,
+    "reports": {
+      "preflight-canary": {
+        "passed": true,
+        "returncode": 0,
+        "image": "sha256:db01586d61048c499389b3951bcd55514eb04bdc43e8935cd15ea2b72576529d",
+        "native_execution": true,
+        "uid": 1000,
+        "read_only_root": true,
+        "capabilities": [],
+        "temporary_volume_removed": true,
+        "business_version": "v0.1.0",
+        "runtime_version": "0.5.1",
+        "scope": "public installer, indexed install, cache, invalid argument exit and ephemeral localhost web; no host services",
+        "log_sha256": "11d92c83d241bb8fcb427278c2b0e8201346f5776811d3e31860a26f7e336680"
+      },
+      "public-canary": {
+        "passed": true,
+        "returncode": 0,
+        "image": "sha256:db01586d61048c499389b3951bcd55514eb04bdc43e8935cd15ea2b72576529d",
+        "native_execution": true,
+        "uid": 1000,
+        "read_only_root": true,
+        "capabilities": [],
+        "temporary_volume_removed": true,
+        "business_version": "v0.1.0",
+        "runtime_version": "0.5.1",
+        "scope": "public installer, indexed install, cache, invalid argument exit and ephemeral localhost web; no host services",
+        "log_sha256": "38d597945f63ba76c911cd99ae0e5416eab15feeb40b6297ec69ea60db0bf9c1"
+      },
+      "scope-audit": {
+        "passed": true,
+        "protected_regular_file_metadata_count": 1251,
+        "protected_sha256_count": 7,
+        "changed_outside_scope": [],
+        "unexpected_files_outside_scope": [],
+        "source_groups_preserved": true,
+        "stable_zsetup_preserved": true,
+        "non_linkspace_installers_preserved": true,
+        "linkspace_installer_records": 21,
+        "final_config_sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+        "rollback_archive_sha256": "30c1417ca69e87a8e454227a66a926810a61738c8be4b660b66203eeda2a8b1f"
+      },
+      "combined-rollback": {
+        "passed": true,
+        "uses_actual_packages": true,
+        "production_changed": false,
+        "transactions": [
+          {
+            "kind": "product",
+            "mode": "stage",
+            "stdout": "Staged linkspace v0.1.0; version.txt unchanged; snapshot /projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-20261025/transaction-sandbox/linkspace/.binary-rollback-v0.1.0\n"
+          },
+          {
+            "kind": "product",
+            "mode": "activate",
+            "stdout": "activate linkspace v0.1.0; immutable artifacts retained\n"
+          },
+          {
+            "kind": "app",
+            "mode": "stage",
+            "stdout": "Staged linkspace 0.1.0; public entries/config unchanged; snapshot /projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-20261025/transaction-sandbox/linkspace/.installer-rollback-d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed\n"
+          },
+          {
+            "kind": "app",
+            "mode": "activate",
+            "stdout": "Activated linkspace 0.1.0; rollback snapshot /projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-20261025/transaction-sandbox/linkspace/.installer-rollback-d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed\n"
+          },
+          {
+            "kind": "app",
+            "mode": "rollback",
+            "stdout": "Restored linkspace entries/config from /projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-20261025/transaction-sandbox/linkspace/.installer-rollback-d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed; immutable installer retained\n"
+          },
+          {
+            "kind": "product",
+            "mode": "rollback",
+            "stdout": "rollback linkspace v0.1.0; immutable artifacts retained\n"
+          }
+        ]
+      },
+      "executable-rollback-test": {
+        "passed": true,
+        "sandbox": true,
+        "production_changed": false,
+        "stdout": "Linkspace v0.1.0 pointers and index rolled back; immutable history retained\n",
+        "rollback_sha256": "43ef68e2086ca835f61f86bee2af04db2b5dcf5a5bf5d92dff907d8e7d31e87b"
+      },
+      "staging-cleanup": {
+        "passed": true,
+        "path": "/tmp/linkspace-publish-20261025",
+        "removed": true,
+        "rollback_snapshots_retained": true
+      }
+    },
+    "https": {
+      "product": {
+        "passed": true,
+        "checks": [
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          }
+        ],
+        "errors": []
+      },
+      "metadata": {
+        "passed": true,
+        "checks": [
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          }
+        ],
+        "errors": []
+      },
+      "installer": {
+        "passed": true,
+        "checks": [
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          }
+        ],
+        "errors": []
+      },
+      "pointers": {
+        "passed": true,
+        "checks": [
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          }
+        ],
+        "errors": []
+      },
+      "final": {
+        "passed": true,
+        "checks": [
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/0.1.0/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/linkspace-install.sh",
+            "size": 34231,
+            "sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/PUBLICATION-SHA256SUMS",
+            "size": 792,
+            "sha256": "4430d3c91baf9264183dc03a3ddec1bc320629828bb114c634cb4cd5e4732534",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/SHA256SUMS",
+            "size": 549,
+            "sha256": "c5ce9b0485b3c941d94a0672a3a2297ca7d853cd2a9c0787cef7d8a96b139270",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64",
+            "size": 18280632,
+            "sha256": "ce5f57bf9460c1e3a3e7dfed6a57d992877e854a544e4ecc635c5456fd47ed67",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-amd64.tar.gz",
+            "size": 7264626,
+            "sha256": "1ccb6e7f93502b944cbe3f77e6a1fa7785ead299a01bfac3b30a02793c125735",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64",
+            "size": 16777400,
+            "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-arm64.tar.gz",
+            "size": 6595091,
+            "sha256": "ea6ee6febeda4bca84d1bdc38e0da7c90a54ea6977b55aec6e089d19e5db7f1e",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7",
+            "size": 17105080,
+            "sha256": "08679b01e6790b87ebd9722df5b762275168aa77c70e1c367d00ebd1d87a3a0f",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/linkspace-linux-armv7.tar.gz",
+            "size": 6855602,
+            "sha256": "48a540dae1c1402b33e924dfde5b2ec857dac38d21fe918708bc8ad6b23d7eda",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/release-manifest.json",
+            "size": 3204,
+            "sha256": "a8cb5969b3894fbaf8f2ab77cf748f58147f00974c73b627979c8b621e273d28",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/v0.1.0/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/linkspace/version.txt",
+            "size": 369,
+            "sha256": "e0b6b899263d5963a314b8e7e3c2097f4bc60877b3a2d028181febe781a83a86",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/zsetup/config.json",
+            "size": 10249,
+            "sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+            "passed": true
+          }
+        ],
+        "errors": []
+      }
+    }
+  },
+  "rollbacks": {
+    "order": [
+      "restore installer entry and complete configuration",
+      "restore product version.txt"
+    ],
+    "server_root": "/mnt/sata3-1/istore-data/public_html/binary",
+    "installer_snapshot": "linkspace/.installer-rollback-d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+    "binary_snapshot": "linkspace/.binary-rollback-v0.1.0",
+    "executable": "docs/releases/rollback-linkspace-v0.1.0.sh",
+    "tested_in_sandbox": true,
+    "executed_in_production": false,
+    "immutable_history_retained": true
+  },
+  "observations": [
+    "Initial immutable HTTPS readback returned 404 on all four sources; exact failing URLs saved. Readback later passed without server configuration/service changes; root cause not established.",
+    "First two preflight attempts failed in the test driver JSON parser: shared version precheck emits a plain version object and business --json emits a result envelope. Both actual formats were verified locally before the third successful run; published installer and product bytes were unchanged.",
+    "Other generated application entries changed locally because of shared optional helper support; their live files and index records were not published or changed."
+  ],
+  "raw_evidence_directory": "/projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-20261025"
+}
