@@ -45,12 +45,12 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert path.is_file()
         assert path.stat().st_size == record["size"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]
-    for app in ("fastnet", "ddnsto", "linkease", "fastpve", "linkspace"):
+    for app in ("fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder"):
         record = next(r for r in config["installers"] if r["application"] == app)
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        expected_version = "0.1.0" if app == "linkspace" else CATALOG["config_version"].removeprefix("scripts-")
+        expected_version = "0.1.0" if app in {"ks-cli", "kspeeder"} else "0.1.1" if app == "linkspace" else CATALOG["config_version"].removeprefix("scripts-")
         assert record["path"] == f"{app}/{expected_version}/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()

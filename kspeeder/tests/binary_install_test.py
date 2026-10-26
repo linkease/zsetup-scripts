@@ -236,6 +236,21 @@ class BinaryInstall(unittest.TestCase):
         self.assertIn("--installer-prefix", result.stdout)
         self.assertFalse(Handler.counts)
 
+    def test_one_key_bootstrap_uses_same_logic_without_refetching_itself(self):
+        self.product("ks-cli")
+        Handler.bodies["/binary/zsetup/stable"] = (VERSION + "\n").encode()
+        Handler.bodies[f"/binary/zsetup/{VERSION}/SHA256SUMS"] = (
+            hashlib.sha256(NATIVE.read_bytes()).hexdigest() + "  zsetup-linux-x86_64\n").encode()
+        entry = ROOT / "kspeeder/ks-cli/ks-cli-install.sh"
+        result = subprocess.run(["sh", "-c", entry.read_text(), "ks-cli", *self.argv("ks-cli")[2:]],
+            env=self.env | {"ZSETUP_INSTALLER_MODE": "0", "ZSETUP_ROOT": str(self.folder / "bootstrap"),
+                "ZSETUP_BOOTSTRAP_BASES": self.base + "/binary", "CURL_CA_BUNDLE": str(self.root / "ca.crt")},
+            capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.current().is_symlink())
+        self.assertFalse(any("ks-cli-install.sh" in path for path in Handler.counts))
+        self.assertFalse(self.marker.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

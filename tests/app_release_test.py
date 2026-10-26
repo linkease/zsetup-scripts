@@ -65,7 +65,7 @@ class AppRelease(unittest.TestCase):
         self.assertEqual(config["source_groups"], self.config["source_groups"])
         self.assertEqual([r for r in config["installers"] if r["application"] != "fastnet"], self.config["installers"][1:])
         paths = {r["path"] for r in plan["files"]}
-        self.assertEqual(paths, {"immutable/fastnet/0.1.8/fastnet-install.sh", "pointers/fastnet/fastnet-install.sh",
+        self.assertEqual(paths, {"immutable/fastnet/0.1.9/fastnet-install.sh", "pointers/fastnet/fastnet-install.sh",
                                 "pointers/fastnet/install.sh", "pointers/zsetup/config.json"})
         script = (ROOT / "fastnet/fastnet-install.sh").read_bytes()
         for record in config["installers"]:
@@ -156,18 +156,18 @@ class AppRelease(unittest.TestCase):
         self.assertEqual((server / "fastnet/fastnet-install.sh").read_bytes(), (server / "fastnet/install.sh").read_bytes())
         self.assertEqual((server / "ddnsto/openwrt/install_ddnsto.sh").read_bytes(), self.original["ddnsto/openwrt/install_ddnsto.sh"][0])
         self.transaction("rollback", server); self.assert_original(server)
-        self.assertTrue((server / "fastnet/0.1.8/fastnet-install.sh").is_file())
+        self.assertTrue((server / "fastnet/0.1.9/fastnet-install.sh").is_file())
 
     def test_blocked_plan_cannot_stage_or_activate(self):
         self.config["stable_zsetup"]["version"] = "0.4.0"
         self.run_plan(); server = self.server()
         self.transaction("stage", server, False); self.assert_original(server)
-        self.assertFalse((server / "fastnet/0.1.8").exists())
+        self.assertFalse((server / "fastnet/0.1.9").exists())
         self.transaction("activate", server, False); self.assert_original(server)
 
     def test_immutable_conflict_is_preserved(self):
         self.run_plan(); server = self.server()
-        immutable = server / "fastnet/0.1.8/fastnet-install.sh"
+        immutable = server / "fastnet/0.1.9/fastnet-install.sh"
         immutable.parent.mkdir(); immutable.write_text("existing different immutable bytes")
         self.transaction("stage", server, False); self.assert_original(server)
         self.assertEqual(immutable.read_text(), "existing different immutable bytes")
@@ -213,7 +213,7 @@ class AppRelease(unittest.TestCase):
         self.run_plan(app="linkspace")
         plan = json.loads((self.output / "app-release-manifest.json").read_text())
         self.assertEqual({f["destination"] for f in plan["files"]}, {
-            "linkspace/0.1.0/linkspace-install.sh", "linkspace/linkspace-install.sh", "zsetup/config.json"})
+            "linkspace/0.1.1/linkspace-install.sh", "linkspace/linkspace-install.sh", "zsetup/config.json"})
         proposed = json.loads((self.output / "pointers/zsetup/config.json").read_text())
         self.assertEqual(proposed["stable_zsetup"], self.config["stable_zsetup"])
         self.assertEqual(proposed["source_groups"], self.config["source_groups"])
@@ -231,11 +231,11 @@ class AppRelease(unittest.TestCase):
         self.assertEqual((server / "linkspace/linkspace-install.sh").read_bytes(), (ROOT / "linkspace/linkspace-install.sh").read_bytes())
         self.transaction("rollback", server); self.assert_original(server)
         self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
-        self.assertTrue((server / "linkspace/0.1.0/linkspace-install.sh").is_file())
+        self.assertTrue((server / "linkspace/0.1.1/linkspace-install.sh").is_file())
 
     def test_linkspace_conflict_and_drift_are_refused(self):
         self.run_plan(app="linkspace"); server = self.server()
-        immutable = server / "linkspace/0.1.0/linkspace-install.sh"
+        immutable = server / "linkspace/0.1.1/linkspace-install.sh"
         immutable.parent.mkdir(parents=True); immutable.write_text("conflict")
         self.transaction("stage", server, False); self.assert_original(server)
         self.assertEqual(immutable.read_text(), "conflict")
