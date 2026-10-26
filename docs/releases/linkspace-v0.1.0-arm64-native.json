@@ -1,0 +1,136 @@
+{
+  "passed": true,
+  "host": "root@192.168.30.93",
+  "remote_directory": "/mnt/nvme0n1-1/.linkspace-arm64-v010-9f58dc1bea",
+  "native_execution": true,
+  "emulation": false,
+  "product_version": "v0.1.0",
+  "expected_sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+  "existing_services_modified": false,
+  "windows_macos": "deferred by user",
+  "checks": {
+    "cold_bootstrap_versions": [
+      "v0.1.0",
+      "v0.1.0"
+    ],
+    "cloud_index_versions": [
+      "v0.1.0",
+      "v0.1.0"
+    ],
+    "verified_cache": {
+      "ok": true,
+      "source_tier": "cache",
+      "winner_index": 0,
+      "bytes_written": 16777400,
+      "sha256": "75676b377544b18d857d771106f6c5cac4c504e976200a87555cae3410ef25e2",
+      "attempts": 0
+    },
+    "offline_json_help_commands": 104,
+    "business": {
+      "search": true,
+      "capacity_snapshot": true,
+      "failed_capacity_update_preserves_generation": true,
+      "backup_restore_byte_exact": true,
+      "source_unchanged": true
+    },
+    "web": {
+      "ready": {
+        "backupConfigured": false,
+        "lanURLs": [],
+        "listen": "127.0.0.1:33489",
+        "scanStarted": false,
+        "snapshot": "",
+        "snapshotStore": "/mnt/nvme0n1-1/.linkspace-arm64-v010-9f58dc1bea/fixtures/snapshots",
+        "sourceFilesWritable": false,
+        "storage": {
+          "schemaVersion": 1,
+          "ready": true,
+          "path": "/mnt/nvme0n1-1/.linkspace-arm64-v010-9f58dc1bea/fixtures/snapshots",
+          "mode": "persistent",
+          "source": "flag",
+          "filesystemIdentity": "{[72809649 1049317193]}",
+          "mountPath": "/mnt/nvme0n1-1",
+          "persistent": true,
+          "availableBytes": "65444147200",
+          "reserveBytes": "2147483648",
+          "maxWriteBytes": "0",
+          "usedStoreBytes": "0",
+          "maxStoreBytes": "0",
+          "keepGenerations": 0,
+          "lifetimeSeconds": 0,
+          "dockerExpiresAt": "0001-01-01T00:00:00Z",
+          "storeBase": "/mnt/nvme0n1-1/.linkspace-arm64-v010-9f58dc1bea/fixtures/snapshots",
+          "expiresAt": "0001-01-01T00:00:00Z",
+          "reasonCode": "bound_location",
+          "reason": "reusing the previously bound storage filesystem",
+          "scanStarted": false,
+          "candidates": [
+            {
+              "path": "/mnt/nvme0n1-1/.linkspace-arm64-v010-9f58dc1bea/fixtures/snapshots",
+              "mountPath": "/mnt/nvme0n1-1",
+              "filesystemIdentity": "{[72809649 1049317193]}",
+              "filesystem": "ext4",
+              "totalBytes": "125410328576",
+              "availableBytes": "65444147200",
+              "system": false,
+              "local": true,
+              "persistent": true,
+              "writable": true,
+              "removable": false,
+              "temporary": false
+            }
+          ]
+        },
+        "tabs": [
+          "backup",
+          "search",
+          "space",
+          "docker-space"
+        ],
+        "url": "http://127.0.0.1:33489/space.html"
+      },
+      "http_200_html": true,
+      "graceful_term_and_join": true
+    },
+    "existing_services_unchanged": true,
+    "literal_installer_argument_and_exit_code_2": true,
+    "default_path_under_isolated_home": true,
+    "staging_empty_after_install": true
+  },
+  "device_facts": "Linux iStoreOS 6.6.144 #0 SMP Wed Jul 29 05:40:29 2026 aarch64 GNU/Linux\naarch64\nNAME=\"iStoreOS\"\nVERSION=\"24.10.8\"\nID=\"istoreos\"\nID_LIKE=\"lede openwrt\"\nPRETTY_NAME=\"iStoreOS 24.10.8\"\nVERSION_ID=\"24.10.8\"\nHOME_URL=\"https://github.com/istoreos\"\nBUG_URL=\"https://github.com/istoreos/istoreos/issues\"\nSUPPORT_URL=\"https://forum.openwrt.org/\"\nBUILD_ID=\"2026073111\"\nOPENWRT_BOARD=\"rockchip/armv8\"\nOPENWRT_ARCH=\"aarch64_generic\"\nOPENWRT_TAINTS=\"busybox\"\nOPENWRT_DEVICE_MANUFACTURER=\"OpenWrt\"\nOPENWRT_DEVICE_MANUFACTURER_URL=\"https://openwrt.org/\"\nOPENWRT_DEVICE_PRODUCT=\"Generic\"\nOPENWRT_DEVICE_REVISION=\"v0\"\nOPENWRT_RELEASE=\"iStoreOS 24.10.8 2026073111\"\nOPENWRT_BUILD_DATE=\"1785303629\"\nFilesystem                Size      Used Available Use% Mounted on\n/dev/nvme0n1p1          116.8G     49.9G     61.0G  45% /mnt/nvme0n1-1\nuid=0(root) gid=0(root)\n",
+  "context": {
+    "os": "openwrt",
+    "os_version": "24.10.8",
+    "device": "openwrt",
+    "package_manager": "opkg",
+    "arch": "aarch64",
+    "libc": "musl",
+    "init": "procd",
+    "memory_total_mb": 3927
+  },
+  "storage": {
+    "available_bytes": 65444724736,
+    "available_inodes": 7679195,
+    "effective_uid": 0,
+    "filesystem_type": "ext4",
+    "memory_backed": false,
+    "mount_point": "/mnt/nvme0n1-1",
+    "noexec": false,
+    "private_directory": true,
+    "probed_path": "/mnt/nvme0n1-1/.linkspace-arm64-v010-9f58dc1bea/home",
+    "read_only": false,
+    "schema_version": 1,
+    "system_protected": false,
+    "writable": true
+  },
+  "remote_directory_removed": true,
+  "protected_state_preserved": true,
+  "verified_at_utc": "2026-10-26T01:33:08.769542+00:00",
+  "artifact_size": 16777400,
+  "artifact_source_commit": "c968f01e190606bb7ba9589f75c56644c141b9be",
+  "installer_source_commit": "0d7997c036d1bb600a44aa290026b4c71768bdde",
+  "installer_sha256": "caa0c486544d498164d55473a7a0e8fabf18818597108c628870ec495d62a022",
+  "commands_logged": 145,
+  "driver_sha256": "0a6039e6210786eae4d3500b24467d17a2847b6c245674f6fda4f63b1adbfb01",
+  "raw_evidence_directory": "/projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-arm64-20261026"
+}

@@ -43,7 +43,7 @@ capabilities、独立临时卷，无宿主服务操作。验收通过后持共�
 与入口基线，原子替换入口、最后替换完整索引。切换后 12 项指针及 56 项最终公开文件
 回读通过，并在另一全新容器使用公开固定入口和实际云端索引再次完成自举/安装、
 精确 v0.1.0、默认持久路径、SHA 缓存复用、参数/退出码、localhost Web HTTP 及 TERM 验收。
-容器和卷已删除。ARM64/ARMv7 只有正式交叉构建和静态检查，未进行真实设备验收。
+容器和卷已删除。首次发布时 ARM64/ARMv7 仅完成交叉构建和静态检查；ARM64 后续真机验收见下文。
 
 首次不可变文件回读曾全部404，文件权限与源站摘要正常，后续不改服务器配置/服务即
 恢复可见并通过全字节校验；根因未确定，逐URL失败记录保留。前两次候选容器失败发生在
@@ -76,4 +76,21 @@ binary/linkspace/.installer-rollback-d8839c8dc1efd18a4017962b81caa5addb0cdc294d5
 原始证据在 dist/linkspace-20261025/，包括线上完整基线、前后清单、测试完整日志、失败
 记录、逐URL校验、实际命令、容器报告、正式独立包、回滚快照归档和 EVIDENCE-SHA256SUMS。
 正式产品另保存在 apptunnel/bin/linkspace-release/v0.1.0/；完整索引与快照摘要已纳入机器证据。
-本次未验证 ARM 真实设备、Windows/macOS/MIPS；不将编译、fixture 或容器结果称为这些平台验收。
+ARMv7 真实设备尚未验证；Windows/macOS 按用户要求留待后续，MIPS 不在发布矩阵。
+
+2026-10-26 后续 ARM64 真机验收已通过，证据见 [ARM64 原生报告](linkspace-v0.1.0-arm64-native.json)。
+目标 root@192.168.30.93，iStoreOS24.10.8 / Linux6.6.144 / aarch64（rockchip/armv8）。
+从实际公开 HTTPS 获取安装器，在独立 NVMe 目录和隔离 HOME 中直接执行，未使用 QEMU
+或以容器结果替代设备进程；设备原本没有 zsetup，本次成功冷自举0.5.1并经真实云端索引
+安装正式 linkspace v0.1.0。16777400字节与已发布 ARM64 SHA256 完全匹配；缓存报告
+source_tier=cache、attempts=0，安装前后文件 inode/mtime/size 不变。
+
+实际通过104项离线 JSON 帮助、业务参数/退出码2传递、搜索建库与查询、容量快照构建、
+空间不足失败后旧 generation 保留、备份/逐字节恢复、源文件不变、localhost Web HTTP
+及 TERM/join/stopped 事件。暂存目录为空，测试目录已删除；既有预览 Linkspace PID5252
+的 exe/starttime、系统业务入口和现有容器清单前后一致。没有修改或重启真实业务服务，
+没有改动固件根目录中的系统命令或正式用户安装，也没有为验收填满磁盘。
+
+仅增加仓库验收记录，不重写线上不可变 v0.1.0 产物或 release-manifest；原始发布时的
+验证描述作为历史保留。原始命令、stdout/stderr、设备事实、前后保护清单、驱动与校验和
+位于 dist/linkspace-arm64-20261026/。Windows/macOS 按用户要求后续再验证。

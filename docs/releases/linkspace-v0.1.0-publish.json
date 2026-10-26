@@ -14,10 +14,10 @@
     "linux-armv7"
   ],
   "native_validation": [
-    "Linux amd64 in isolated Ubuntu container, uid1000, read-only root, no capabilities"
+    "Linux amd64 in isolated Ubuntu container, uid1000, read-only root, no capabilities",
+    "ARM64 native iStoreOS 24.10.8 / Linux 6.6.144 on root@192.168.30.93; published bytes executed directly, no emulation"
   ],
   "unverified": [
-    "ARM64 real device",
     "ARMv7 real device",
     "Windows/macOS/MIPS not released"
   ],
@@ -975,5 +975,14 @@
     "First two preflight attempts failed in the test driver JSON parser: shared version precheck emits a plain version object and business --json emits a result envelope. Both actual formats were verified locally before the third successful run; published installer and product bytes were unchanged.",
     "Other generated application entries changed locally because of shared optional helper support; their live files and index records were not published or changed."
   ],
-  "raw_evidence_directory": "/projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-20261025"
+  "raw_evidence_directory": "/projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/linkspace-20261025",
+  "post_release_acceptance": {
+    "arm64": {
+      "verified_at_utc": "2026-10-26T01:33:08.769542+00:00",
+      "passed": true,
+      "evidence": "linkspace-v0.1.0-arm64-native.json",
+      "sha256": "bcb202b3ddc4be2762782da6f6937e0df752a9bebf08821f85ae75716237d615"
+    },
+    "windows_macos": "deferred by user; no activation or validation attempted"
+  }
 }
