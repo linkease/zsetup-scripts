@@ -1,0 +1,393 @@
+{
+  "date": "2026-10-26",
+  "completed_at": "2026-10-26T11:53:37.057500+00:00",
+  "status": "published",
+  "authorization": {
+    "user_message": "同意，继续",
+    "scope": "publish ks-cli and kspeeder Linux binary installers; no core or service installation"
+  },
+  "scripts_commit": "1e21eef0a5d7640801213419eda321871f194674",
+  "host": "root@192.168.3.1",
+  "binary_root": "/mnt/sata3-1/istore-data/public_html/binary",
+  "core_version": "0.5.1",
+  "core_changed": false,
+  "service_operations": false,
+  "run_directory": "/projects/workspace-linkease-ubuntu/linkease-github/zsetup-scripts/dist/kspeeder-publish-20261026T113533Z-ee6ea9",
+  "remote_packages_root": "/mnt/sata3-1/istore-data/kspeeder-publish-20261026T113533Z-ee6ea9",
+  "initial_config_sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+  "final_config_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+  "applications": {
+    "ks-cli": {
+      "installer_version": "0.1.0",
+      "installer_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+      "installer_size": 36385,
+      "immutable_path": "ks-cli/0.1.0/ks-cli-install.sh",
+      "public_path": "ks-cli/ks-cli-install.sh",
+      "remote_package": "/mnt/sata3-1/istore-data/kspeeder-publish-20261026T113533Z-ee6ea9/ks-cli-package",
+      "rollback_snapshot": "/mnt/sata3-1/istore-data/public_html/binary/ks-cli/.installer-rollback-2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+      "candidate_canary": {
+        "version": "0.8.5",
+        "binary_sha256": "217b22b4800bd70d325c2a4822dcde548dc3ef570400fd41f730d4bbdca12e77",
+        "size": 15009660,
+        "staging_clean": true,
+        "service_operations": false
+      },
+      "public_canary": {
+        "version": "0.8.5",
+        "binary_sha256": "217b22b4800bd70d325c2a4822dcde548dc3ef570400fd41f730d4bbdca12e77",
+        "size": 15009660,
+        "staging_clean": true,
+        "service_operations": false,
+        "config_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c"
+      },
+      "validated_public_config_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+      "four_site_readbacks": {
+        "immutable-readback": [
+          {
+            "url": "https://dl.istoreos.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          }
+        ],
+        "final-readback": [
+          {
+            "url": "https://dl.istoreos.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/ks-cli/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/zsetup/config.json",
+            "expected_sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "expected_size": 15712,
+            "status": 200,
+            "size": 15712,
+            "sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/ks-cli/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/zsetup/config.json",
+            "expected_sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "expected_size": 15712,
+            "status": 200,
+            "size": 15712,
+            "sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/ks-cli/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/zsetup/config.json",
+            "expected_sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "expected_size": 15712,
+            "status": 200,
+            "size": 15712,
+            "sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/ks-cli/0.1.0/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/ks-cli/ks-cli-install.sh",
+            "expected_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "expected_size": 36385,
+            "status": 200,
+            "size": 36385,
+            "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/zsetup/config.json",
+            "expected_sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "expected_size": 15712,
+            "status": 200,
+            "size": 15712,
+            "sha256": "2705702a3c243dcff6a68d29388ca816f976a4296d918e232c78bb7aa7789e5e",
+            "passed": true
+          }
+        ]
+      }
+    },
+    "kspeeder": {
+      "installer_version": "0.1.0",
+      "installer_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+      "installer_size": 36399,
+      "immutable_path": "kspeeder/0.1.0/kspeeder-install.sh",
+      "public_path": "kspeeder/kspeeder-install.sh",
+      "remote_package": "/mnt/sata3-1/istore-data/kspeeder-publish-20261026T113533Z-ee6ea9/kspeeder-package-2705702a3c24",
+      "rollback_snapshot": "/mnt/sata3-1/istore-data/public_html/binary/kspeeder/.installer-rollback-b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+      "candidate_canary": {
+        "version": "0.8.5",
+        "binary_sha256": "bda7b3a4aa31fad0baacc5e5bd5f3f58e98fed594495ca0c4e746ff42787d9b9",
+        "size": 11681976,
+        "staging_clean": true,
+        "service_operations": false
+      },
+      "public_canary": {
+        "version": "0.8.5",
+        "binary_sha256": "bda7b3a4aa31fad0baacc5e5bd5f3f58e98fed594495ca0c4e746ff42787d9b9",
+        "size": 11681976,
+        "staging_clean": true,
+        "service_operations": false
+      },
+      "validated_public_config_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+      "four_site_readbacks": {
+        "immutable-readback": [
+          {
+            "url": "https://dl.istoreos.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          }
+        ],
+        "final-readback": [
+          {
+            "url": "https://dl.istoreos.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/kspeeder/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://dl.istoreos.com/binary/zsetup/config.json",
+            "expected_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "expected_size": 21270,
+            "status": 200,
+            "size": 21270,
+            "sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/kspeeder/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.d4ctech.com/binary/zsetup/config.json",
+            "expected_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "expected_size": 21270,
+            "status": 200,
+            "size": 21270,
+            "sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/kspeeder/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw20.koolcenter.com/binary/zsetup/config.json",
+            "expected_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "expected_size": 21270,
+            "status": 200,
+            "size": 21270,
+            "sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/kspeeder/0.1.0/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/kspeeder/kspeeder-install.sh",
+            "expected_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "expected_size": 36399,
+            "status": 200,
+            "size": 36399,
+            "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+            "passed": true
+          },
+          {
+            "url": "https://fw.koolcenter.com/binary/zsetup/config.json",
+            "expected_sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "expected_size": 21270,
+            "status": 200,
+            "size": 21270,
+            "sha256": "b87910d393bf0a3ff1c5b30d50231eff761844271bd36ef0c1dd918ff229512c",
+            "passed": true
+          }
+        ]
+      }
+    }
+  },
+  "protected_files_audit": {
+    "protected_metadata_files": 1270,
+    "protected_sha256_files": 18,
+    "applications": [
+      "fastnet",
+      "ks-cli",
+      "kspeeder",
+      "linkspace"
+    ],
+    "passed": true
+  },
+  "initial_404": {
+    "observed": true,
+    "root_cause": "unconfirmed; source bytes, permissions and script logic were unchanged before successful readback"
+  },
+  "untested": [
+    "ARM native execution",
+    "Windows/macOS installers",
+    "OpenWrt package workflow",
+    "service installation and acceleration operation"
+  ],
+  "local_canary_installations_cleaned": true,
+  "release_lock_cleaned": true
+}

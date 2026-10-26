@@ -1,11 +1,11 @@
 # 用户与 AI 调用协议
 
-Linux候选新增`zsetup install ks-cli --foreground`与`zsetup install kspeeder --foreground`，
+Linux已发布入口`zsetup install ks-cli --foreground`与`zsetup install kspeeder --foreground`，
 源码分别为`kspeeder/ks-cli`和`kspeeder/kspeeder`。两者只安装二进制，接受前置
 `--installer-prefix ABS`/`--installer-work-dir ABS`，拒绝system scope和业务参数；
 不自动启动服务。安装后stdout为`application/version/command/prefix`四行字段，
-进度在stderr；版本检查仅执行受限`version`。这些入口尚未上线，不能把本地catalog
-记录解释为生产可安装。平台/发布限制见[安装器说明](kspeeder-installers.md)。
+进度在stderr；版本检查仅执行受限`version`。这两个脚本0.1.0已于2026-10-26上线；
+其他本地catalog记录仍需按实时生产配置核实。平台/发布限制见[安装器说明](kspeeder-installers.md)。
 
 复用现有 zsetup 命令，未新增服务或网络 RPC。先用 `zsetup context --json` 获取系统事实，`zsetup install --list` 获取配置中的应用标识；列表表示索引声明，不保证当前设备匹配。Product Configuration 中平台匹配由 zsetup 执行，业务脚本再次校验支持范围。
 

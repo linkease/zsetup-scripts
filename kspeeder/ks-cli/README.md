@@ -2,7 +2,7 @@
 
 唯一源码是本目录的 `business.sh`、`main.sh` 及 `../lib`；根生成器输出
 `ks-cli-install.sh`。软件标识为 `ks-cli`，脚本版本 0.1.0，最低 Linux
-zsetup 0.5.0。本地候选尚未发布，以下公网命令在独立发布后生效。
+zsetup 0.5.0。Linux入口已于2026-10-26独立发布，以下公网命令已生效。
 
 ```sh
 zsetup install ks-cli --foreground
