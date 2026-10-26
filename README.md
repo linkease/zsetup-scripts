@@ -1,6 +1,8 @@
 # zsetup-scripts
 
-FastNet、DDNSTO、LinkEase、FastPVE 的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.8 的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
+FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.9 本地候选的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
+
+新增[`kspeeder/ks-cli`](kspeeder/ks-cli/README.md)与[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md)两个Linux二进制安装器：按官方版本/SHA256下载，支持持久目录与版本切换，不自动安装或启动服务。候选尚未公开发布；服务器同步方案见[发布说明](docs/kspeeder-installers.md)。
 
 设备已有 zsetup：
 
@@ -22,7 +24,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastpve/fastpve-install.sh)
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
 
-**当前发布范围：FastNet 已公网发布，其他业务的新入口仍为本地候选。** 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。FastNet 使用独立发布流程，不能用完整多业务候选覆盖线上；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
+**当前发布范围：FastNet、Linkspace 已有公网索引，本轮新增的 ks-cli/KSpeeder 入口及其他业务的新入口仍为本地候选。** 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。应用使用独立发布流程，不能用完整多业务候选覆盖线上；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
 
 | 应用标识 | 支持平台 | 架构 | 业务参数与交互 |
 |---|---|---|---|

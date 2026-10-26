@@ -1,4 +1,12 @@
-# KSpeeder Windows 接入准备
+# KSpeeder 项目安装器
+
+两个独立软件共用同一个项目分组：[`ks-cli/`](ks-cli/README.md) 与
+[`kspeeder/`](kspeeder/README.md)。Linux薄安装器负责正确二进制、版本校验和
+可选持久目录；不安装或启动系统服务。脚本0.1.0当前为本地候选。
+公共命令分别是`zsetup install ks-cli`和`zsetup install kspeeder`，发布后生效。
+未来服务器同步与独立发布见[安装器发布说明](../docs/kspeeder-installers.md)。
+
+## Windows 接入准备（已有工作与未完成项）
 
 当前仅交付共享 `../lib/bootstrap.ps1` 和 `tests/windows_bootstrap_test.py`；还没有公开 Windows 业务入口或 catalog 映射，不宣称真实业务安装已经验收。非 Windows 四业务入口及 legacy 原样保留。
 

@@ -83,3 +83,19 @@
 - Production changes remain per application; do not upload the aggregate package.
   Use fresh live config, immutable staging, four-site HTTPS and isolated real
   product canaries before locked activation. See linkspace/README.md.
+
+## KSpeeder binary installer candidates (2026-10-26)
+
+- Canonical product directories are `kspeeder/ks-cli` and `kspeeder/kspeeder`,
+  sharing `kspeeder/lib`. Keep public application ids/namespaces `ks-cli` and
+  `kspeeder`; the catalog records the nested source paths.
+- Installer0.1.0 is Linux binary deployment only: official product metadata,
+  native SHA verification, selectable persistent user prefix, exact version,
+  current/previous. Never automatically register/start a service or invoke the
+  old official installers after installing these managed binaries.
+- Desktop/OpenWrt mappings are absent. CLI desktop checksums and native platform
+  acceptance remain prerequisites; do not substitute server checksums.
+- Shared helper changes use new candidate paths (scripts0.1.9, Linkspace0.1.1),
+  preserving already published immutable scripts. Scoped release tools can
+  prepare each new app independently; no publication occurred in this task.
+- Future server layout and sync procedure: `docs/kspeeder-installers.md`.

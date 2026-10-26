@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-26",
+  "platform": "linux-x86_64",
+  "native_version": "zsetup 0.5.1",
+  "service_operations": false,
+  "products": [
+    {
+      "application": "ks-cli",
+      "exit_code": 0,
+      "installer_sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
+      "version": "0.8.5",
+      "sha256": "217b22b4800bd70d325c2a4822dcde548dc3ef570400fd41f730d4bbdca12e77",
+      "size": 15009660,
+      "staging_clean": true,
+      "installer_version": "0.1.0",
+      "product_origin": "https://kspeeder.com/bin/"
+    },
+    {
+      "application": "kspeeder",
+      "exit_code": 0,
+      "installer_sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
+      "version": "0.8.5",
+      "sha256": "bda7b3a4aa31fad0baacc5e5bd5f3f58e98fed594495ca0c4e746ff42787d9b9",
+      "size": 11681976,
+      "staging_clean": true,
+      "installer_version": "0.1.0",
+      "product_origin": "https://kspeeder.com/bin/"
+    }
+  ],
+  "cleanup_completed": true,
+  "scope": "Linux binary installation only; no services or public activation",
+  "release_candidates": {
+    "ks-cli": {
+      "readiness": "ready-for-staging",
+      "live_stable_version": "0.5.1",
+      "live_config_sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+      "public_release_authorized": false,
+      "business_products_included": false,
+      "files": [
+        "ks-cli/0.1.0/ks-cli-install.sh",
+        "ks-cli/ks-cli-install.sh",
+        "zsetup/config.json"
+      ]
+    },
+    "kspeeder": {
+      "readiness": "ready-for-staging",
+      "live_stable_version": "0.5.1",
+      "live_config_sha256": "d8839c8dc1efd18a4017962b81caa5addb0cdc294d5bfc540b25c545765731ed",
+      "public_release_authorized": false,
+      "business_products_included": false,
+      "files": [
+        "kspeeder/0.1.0/kspeeder-install.sh",
+        "kspeeder/kspeeder-install.sh",
+        "zsetup/config.json"
+      ]
+    }
+  },
+  "verification": {
+    "full_check_exit_code": 0,
+    "full_check_log_sha256": "d583922772f37056c1aaf5863a255df146b01ecdffc516be83d99b02f72c8b7e",
+    "new_binary_tests": 11,
+    "scoped_release_tests": 17,
+    "generated_entries": "passed",
+    "git_diff_check": "passed"
+  },
+  "platform_gaps": [
+    "ARM native execution",
+    "Windows/macOS installers",
+    "OpenWrt package workflow",
+    "service registration/lifecycle",
+    "public publication"
+  ]
+}

@@ -5,7 +5,7 @@ installer_policy() {
     INSTALLER_DOWNLOAD_BYTES=0; INSTALLER_EXPANDED_BYTES=0; INSTALLER_FILE_COUNT=0
     INSTALLER_RESERVE=8388608
     case "$1" in
-        fastnet|fastpve|linkspace) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
+        fastnet|fastpve|linkspace|ks-cli|kspeeder) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
         ddnsto) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16 ;;
         linkease) INSTALLER_MAX_DOWNLOAD=134217728; INSTALLER_MAX_EXPANDED=268435456; INSTALLER_MAX_FILES=128 ;;
         *) return 2 ;;
@@ -28,7 +28,7 @@ installer_file_size() {
 installer_download() {
     ib_relative=$1; ib_output=$2; ib_sha=${3:-}; ib_fresh=${4:-0}; ib_expected_size=${5:-}
     case "${ib_relative##*/}" in
-        version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
+        version.txt|ks-cli-version.txt|VERSION|VERSION_LITE|SHA256SUMS) ib_metadata=1; ib_limit=16384 ;;
         *) ib_metadata=0; ib_limit=$((INSTALLER_MAX_DOWNLOAD - INSTALLER_DOWNLOAD_BYTES)); [ "$ib_limit" -gt 0 ] || return 11 ;;
     esac
     # Cross-UID inputs are copied into the root-owned destination with native

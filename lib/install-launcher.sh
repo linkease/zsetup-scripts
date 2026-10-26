@@ -20,7 +20,9 @@ installer_dispatch() {
             *) break ;;
         esac
     done
-    "${il_app}_install" "$@"
+    # Application ids are fixed safe tokens; split/join needs no external tool.
+    il_function=$(IFS=-; set -- $il_app; IFS=_; printf '%s' "$*")
+    "${il_function}_install" "$@"
 }
 
 installer_launcher_prepare() {
@@ -62,6 +64,14 @@ installer_launcher_prepare() {
     mkdir -p "$INSTALLER_PREFIX/versions"
 }
 
+installer_launcher_verify() {
+    if [ -n "$il_verify_hook" ]; then
+        "$il_verify_hook" "$1" "$il_version"
+    else
+        installer_exec_native "$ZSETUP_BIN" run -- "$1" version
+    fi
+}
+
 installer_launcher_cleanup() {
     if [ "$il_activated" = 1 ]; then
         if [ -n "$il_previous" ]; then
@@ -79,6 +89,7 @@ installer_launcher_cleanup() {
 
 installer_launcher_activate() {
     il_version=$1; il_remote_name=$2; il_sha=$3
+    il_verify_hook=${4:-}
     il_version_dir="$INSTALLER_PREFIX/versions/$il_version"
     INSTALLER_EXECUTABLE="$il_version_dir/bin/$il_application"
     il_marker="$INSTALLER_EXECUTABLE.verified"
@@ -110,12 +121,12 @@ installer_launcher_activate() {
             chmod 0755 "$INSTALLER_EXECUTABLE" || return 12
         fi
         status "[3/4] $il_display is already downloaded (verified cached version)"
-        installer_exec_native "$ZSETUP_BIN" run -- "$INSTALLER_EXECUTABLE" version || return $?
+        installer_launcher_verify "$INSTALLER_EXECUTABLE" || return $?
     else
         status "[3/4] Downloading $il_display..."
         installer_download "$il_remote_name" "$transaction_dir/product" "$il_sha" 0 "${INSTALLER_EXPECTED_SIZE:-}" || return $?
         chmod 0755 "$transaction_dir/product"
-        installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/product" version || return $?
+        installer_launcher_verify "$transaction_dir/product" || return $?
         if [ ! -d "$il_version_dir" ]; then
             mkdir "$il_version_dir" || return 12
             il_new_version=1

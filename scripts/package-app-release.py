@@ -101,7 +101,8 @@ def prepare(args):
     scripts = {r["script"] for r in catalog["installers"] if r["application"] == app}
     require(len(scripts) == 1, "application has multiple source entries")
     source = (ROOT / scripts.pop()).resolve(strict=True)
-    require(source.is_relative_to(ROOT / app), "installer source escapes application owner")
+    owner = (ROOT / settings.get("source_directory", app)).resolve(strict=True)
+    require(owner.is_relative_to(ROOT) and source.parent == owner, "installer source escapes application owner")
     groups = [g for g in live["source_groups"] if g["id"] == "koolcenter"]
     require(len(groups) == 1 and groups[0].get("primary_bases") == BASES and groups[0].get("fallback_base") == FALLBACK,
             "live source group conflicts with canonical installer sources")

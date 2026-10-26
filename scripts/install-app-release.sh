@@ -29,6 +29,7 @@ done
 case "$app" in
  fastnet) entries='fastnet/fastnet-install.sh fastnet/install.sh' ;;
  linkspace) entries='linkspace/linkspace-install.sh' ;;
+ ks-cli|kspeeder) entries="$app/$app-install.sh" ;;
  *) die 'application is not enabled' ;;
 esac
 [ ! -L "$dst/$app" ] || die 'application directory is a symlink'

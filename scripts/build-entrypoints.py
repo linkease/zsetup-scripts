@@ -22,13 +22,21 @@ def main():
     for app in sorted({entry["application"] for entry in catalog["installers"]}):
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", app):
             raise ValueError("invalid application id")
-        folder = ROOT / app
+        sources = {entry["script"] for entry in catalog["installers"] if entry["application"] == app}
+        if len(sources) != 1:
+            raise ValueError(f"{app} must have one canonical entry")
+        source = ROOT / sources.pop()
+        folder = source.parent
+        if source.name != f"{app}-install.sh" or not folder.resolve().is_relative_to(ROOT.resolve()):
+            raise ValueError("invalid canonical entry path")
         common = helper("bootstrap.sh") + foundation
         if app in {"ddnsto", "linkease"}:
             common += dispatch + helper("install-service.sh") + helper("install-package.sh") + helper("install-privilege.sh")
         else:
             common += helper("install-launcher.sh")
-        content = common + "\n# Business logic: maintained in " + app + "/business.sh\n"
+        if app in {"ks-cli", "kspeeder"}:
+            common += (ROOT / "kspeeder/lib/binary.sh").read_text().rstrip() + "\n\n"
+        content = common + "\n# Business logic: maintained in " + str(folder.relative_to(ROOT)) + "/business.sh\n"
         content += (folder / "business.sh").read_text().rstrip() + "\n\n"
         # Emit the same maintained sources for the root phase. A running
         # one-key sh -c entry need not be a file and never downloads itself.

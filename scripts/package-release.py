@@ -88,7 +88,10 @@ def main():
         for record in catalog["installers"]:
             copy_immutable(ROOT / record["script"], binary / record["path"])
         for app in sorted(applications):
-            installer = ROOT / app / f"{app}-install.sh"
+            scripts = {record["script"] for record in catalog["installers"] if record["application"] == app}
+            if len(scripts) != 1:
+                raise ValueError("application must have one canonical entry")
+            installer = ROOT / scripts.pop()
             shutil.copy2(installer, binary / app / installer.name)
             shutil.copy2(installer, binary / app / "install.sh")  # Existing public URL.
         # Native desktop entrypoints are public business installers, but are
