@@ -35,8 +35,8 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert {r["arch"] for r in config["stable_zsetup"]["artifacts"]} == {"x86_64", "aarch64", "armv7", "mipsel"}
         assert {p.name for p in (binary / "zsetup").iterdir()} == {EXPECTED_VERSION, "config.json", "stable"}
         assert not any("windows" in p.name or "macos" in p.name for p in (binary / "zsetup" / EXPECTED_VERSION).iterdir())
-    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace"}
-    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "zsetup"}
+    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder"}
+    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder", "zsetup"}
     assert not (binary / "legacy").exists()
     assert not any(p.name in {"business.sh", "main.sh", "README.md"} or p.suffix == ".py" for p in binary.rglob("*"))
 
@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     subprocess.run(["sha256sum", "-c", "PACKAGE-SHA256SUMS"], cwd=output, check=True, stdout=subprocess.DEVNULL)
     env = __import__("os").environ | {"ZSETUP_CONFIG": str(binary / "zsetup/config.json")}
     listed = subprocess.run([str(RELEASE / "immutable/zsetup" / EXPECTED_VERSION / "zsetup-linux-x86_64" if IS_RUST else RELEASE / "zsetup-linux-x86_64"), "install", "--list"], env=env, text=True, capture_output=True, check=True)
-    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace"}
+    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder"}
     archive = next(output.glob("*.tar.gz"))
     first = archive.read_bytes()
     subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)

@@ -35,8 +35,9 @@ catalog = json.loads((ROOT / "catalog.json").read_text())
 script_version = catalog["config_version"].removeprefix("scripts-")
 for record in catalog["installers"]:
     app = record["application"]
-    assert record["script"] == f"{app}/{app}-install.sh"
-    version = "0.1.0" if app == "linkspace" else script_version
+    directory = f"kspeeder/{app}" if app in {"ks-cli", "kspeeder"} else app
+    assert record["script"] == f"{directory}/{app}-install.sh"
+    version = "0.1.0" if app in {"linkspace", "ks-cli", "kspeeder"} else script_version
     assert record["path"] == f"{app}/{version}/{app}-install.sh"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")

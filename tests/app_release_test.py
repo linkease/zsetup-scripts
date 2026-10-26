@@ -245,6 +245,25 @@ class AppRelease(unittest.TestCase):
         self.transaction("activate", server, False)
         self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
 
+    def test_nested_kspeeder_products_use_independent_public_namespaces(self):
+        for app in ("ks-cli", "kspeeder"):
+            with self.subTest(app=app):
+                self.output = self.root / (app + "-review")
+                self.run_plan(app=app)
+                plan = json.loads((self.output / "app-release-manifest.json").read_text())
+                self.assertEqual({f["destination"] for f in plan["files"]}, {
+                    f"{app}/0.1.0/{app}-install.sh", f"{app}/{app}-install.sh", "zsetup/config.json"})
+                source = ROOT / "kspeeder" / app / f"{app}-install.sh"
+                self.assertEqual((self.output / f"pointers/{app}/{app}-install.sh").read_bytes(), source.read_bytes())
+                server = self.server()
+                self.transaction("stage", server)
+                self.assert_original(server)
+                self.transaction("activate", server)
+                self.assertEqual((server / f"{app}/{app}-install.sh").read_bytes(), source.read_bytes())
+                self.transaction("rollback", server)
+                self.assert_original(server)
+                self.assertFalse((server / f"{app}/{app}-install.sh").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
