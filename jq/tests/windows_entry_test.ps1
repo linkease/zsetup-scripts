@@ -15,7 +15,7 @@ foreach ($key in @('ZSETUP_BIN','ZSETUP_BASH_BIN','ZSETUP_OS','ZSETUP_ARCH','ZSE
 }
 function Invoke-Entry([string[]]$Arguments) {
     $json64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @($Arguments) -Compress)))
-    $script = '$a=@([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('''+$json64+'''))|ConvertFrom-Json);$e=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('''+$entry64+'''));& $e @a;exit $LASTEXITCODE'
+    $script = '$a=[string[]]([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('''+$json64+'''))|ConvertFrom-Json);$e=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('''+$entry64+'''));& $e @a;exit $LASTEXITCODE'
     $info = New-Object Diagnostics.ProcessStartInfo
     $info.FileName = $engine
     $info.Arguments = '-NoLogo -NoProfile -NonInteractive -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -59,13 +59,13 @@ public static class JqEntryArgvFixture {
 }
 '@
     $env:ZSETUP_BASH_BIN = $fixture
-    $values = @('', 'space text', '中文', 'a"b', 'a\"b', 'trailing\', '$(literal)', '; echo literal')
+    $values = @('', 'space text', ([string][char]0x4E2D + [char]0x6587), 'a"b', 'a\"b', 'trailing\', '$(literal)', '; echo literal')
     $result = Invoke-Entry $values
     if ($result.code -ne 37) { throw ('Native exit 37 was lost: '+$result.code+' '+$result.err) }
     $actual = @($result.out -split '\r?\n' | Where-Object { $_.StartsWith('ARG=') } | ForEach-Object {
         [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_.Substring(4)))
     })
-    if ($actual.Count -lt $values.Count) { throw 'Native argv count mismatch' }
+    if ($actual.Count -lt $values.Count) { throw ('Native argv count mismatch: actual='+$actual.Count+' expected='+$values.Count+' outputBytes='+$result.out.Length) }
     $offset = $actual.Count - $values.Count
     for ($i=0; $i -lt $values.Count; $i++) {
         if ($actual[$offset+$i] -cne $values[$i]) { throw ('Native argument was changed at index '+$i) }
