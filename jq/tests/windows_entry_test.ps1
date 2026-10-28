@@ -48,7 +48,7 @@ try {
     if ($invalid.code -ne 2) { throw 'Empty argument was lost instead of being rejected with exit 2' }
     # External native executable fixture records the public process argv verbatim.
     $fixture = Join-Path $work 'argv fixture.exe'
-    Add-Type -OutputAssembly $fixture -OutputType ConsoleApplication -TypeDefinition @'
+    $fixtureSource = @'
 using System;
 using System.Text;
 public static class JqEntryArgvFixture {
@@ -58,6 +58,13 @@ public static class JqEntryArgvFixture {
     }
 }
 '@
+    # PS7 cannot emit an executable with Add-Type. Windows' built-in PS5
+    # compiler produces the same external argv fixture for either test engine.
+    $fixture64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($fixture))
+    $source64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($fixtureSource))
+    $compile = '$ErrorActionPreference="Stop";$p=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('''+$fixture64+'''));$s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('''+$source64+'''));Add-Type -OutputAssembly $p -OutputType ConsoleApplication -TypeDefinition $s'
+    & powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($compile)))
+    if ($LASTEXITCODE -ne 0) { throw 'Could not compile the native argv fixture' }
     $env:ZSETUP_BASH_BIN = $fixture
     $values = @('', 'space text', ([string][char]0x4E2D + [char]0x6587), 'a"b', 'a\"b', 'trailing\', '$(literal)', '; echo literal')
     $result = Invoke-Entry $values
