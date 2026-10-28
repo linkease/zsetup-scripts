@@ -35,8 +35,8 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert {r["arch"] for r in config["stable_zsetup"]["artifacts"]} == {"x86_64", "aarch64", "armv7", "mipsel"}
         assert {p.name for p in (binary / "zsetup").iterdir()} == {EXPECTED_VERSION, "config.json", "stable"}
         assert not any("windows" in p.name or "macos" in p.name for p in (binary / "zsetup" / EXPECTED_VERSION).iterdir())
-    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder"}
-    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder", "zsetup"}
+    assert {r["application"] for r in config["installers"]} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder", "jq"}
+    assert {p.name for p in binary.iterdir()} == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder", "jq", "zsetup"}
     assert not (binary / "legacy").exists()
     assert not any(p.name in {"business.sh", "main.sh", "README.md"} or p.suffix == ".py" for p in binary.rglob("*"))
 
@@ -45,17 +45,19 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert path.is_file()
         assert path.stat().st_size == record["size"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]
-    for app in ("fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder"):
+    for app in ("fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder", "jq"):
         record = next(r for r in config["installers"] if r["application"] == app)
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        expected_version = "0.1.0" if app in {"ks-cli", "kspeeder"} else "0.1.1" if app == "linkspace" else CATALOG["config_version"].removeprefix("scripts-")
+        expected_version = "0.1.0" if app in {"ks-cli", "kspeeder", "jq"} else "0.1.1" if app == "linkspace" else CATALOG["config_version"].removeprefix("scripts-")
         assert record["path"] == f"{app}/{expected_version}/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()
         # Historical public URL remains an identical compatibility copy.
         assert (binary / app / "install.sh").read_bytes() == current.read_bytes()
+    assert (binary/'jq/jq-install.ps1').read_bytes() == (ROOT/'jq/jq-install.ps1').read_bytes()
+    assert (binary/'jq/0.1.0/jq-install.ps1').read_bytes() == (ROOT/'jq/jq-install.ps1').read_bytes()
     def select(app, os_name, pm, arch):
         matches = [r for r in config["installers"] if r["application"] == app and all(r[k] in ("*", v) for k,v in (("os", os_name), ("package_manager", pm), ("arch", arch)))]
         assert len(matches) == 1, (app, os_name, pm, arch, matches)
@@ -81,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     subprocess.run(["sha256sum", "-c", "PACKAGE-SHA256SUMS"], cwd=output, check=True, stdout=subprocess.DEVNULL)
     env = __import__("os").environ | {"ZSETUP_CONFIG": str(binary / "zsetup/config.json")}
     listed = subprocess.run([str(RELEASE / "immutable/zsetup" / EXPECTED_VERSION / "zsetup-linux-x86_64" if IS_RUST else RELEASE / "zsetup-linux-x86_64"), "install", "--list"], env=env, text=True, capture_output=True, check=True)
-    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder"}
+    assert set(listed.stdout.splitlines()) == {"fastnet", "ddnsto", "linkease", "fastpve", "linkspace", "ks-cli", "kspeeder", "jq"}
     archive = next(output.glob("*.tar.gz"))
     first = archive.read_bytes()
     subprocess.run(argv, check=True, stdout=subprocess.DEVNULL)
