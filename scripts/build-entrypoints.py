@@ -22,6 +22,9 @@ def main():
     for app in sorted({entry["application"] for entry in catalog["installers"]}):
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", app):
             raise ValueError("invalid application id")
+        if app == 'jq':
+            subprocess.run(['python3', '-B', str(ROOT/'jq/build.py'), *(['--check'] if args.check else [])], check=True)
+            continue
         sources = {entry["script"] for entry in catalog["installers"] if entry["application"] == app}
         if len(sources) != 1:
             raise ValueError(f"{app} must have one canonical entry")
@@ -74,6 +77,20 @@ def main():
             finally:
                 temporary.unlink(missing_ok=True)
         subprocess.run(["sh", "-n", str(output)], check=True)
+
+    # Owner-provided offline removal resource; no bootstrap or network access.
+    output = ROOT / "scripts/remove-managed.sh"
+    content = ('#!/bin/sh\nset -eu\n' + helper("install-storage.sh") + helper("install-transaction.sh") + helper("remove-managed.sh")).rstrip() + '\n'
+    if args.check:
+        if not output.is_file() or output.read_text() != content:
+            raise SystemExit(f"stale generated entry: {output}")
+    else:
+        with tempfile.NamedTemporaryFile(mode="w", dir=output.parent, prefix=".entry-", delete=False) as stream:
+            stream.write(content)
+            temporary = Path(stream.name)
+        temporary.chmod(0o755)
+        temporary.replace(output)
+    subprocess.run(["sh", "-n", str(output)], check=True)
 
 
 if __name__ == "__main__":

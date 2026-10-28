@@ -18,6 +18,10 @@ fi
 python3 -B "$root/tests/bootstrap_platform_test.py"
 python3 -B "$root/tests/minimum_native_test.py"
 python3 -B "$root/tests/install_storage_test.py"
+python3 -B "$root/tests/managed_remove_test.py" "$native_dir/zsetup-linux-x86_64"
+python3 -B "$root/jq/tests/jq_install_test.py" "$native_dir/zsetup-linux-x86_64"
+sh -n "$root/jq/business.sh"
+sh -n "$root/jq/jq-install.sh"
 for script in "$root"/kspeeder/ks-cli/*.sh "$root"/kspeeder/kspeeder/*.sh "$root"/kspeeder/lib/*.sh "$root"/linkspace/*.sh "$root"/fastnet/*.sh "$root"/ddnsto/*.sh "$root"/linkease/*.sh "$root"/fastpve/*.sh "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh; do
     sh -n "$script"
 done

@@ -80,7 +80,7 @@ def main():
             parts = file.relative_to(previous_binary).parts
             if len(parts) != 3 or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", parts[1]) or parts[1] in {".", "..", "stable", "latest"}:
                 continue
-            if (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] in {"install.sh", f"{parts[0]}-install.sh"}):
+            if (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] in {"install.sh", f"{parts[0]}-install.sh", f"{parts[0]}-install.ps1"}):
                 copy_immutable(file, binary.joinpath(*parts))
         # Refuse replacing any previously staged immutable executable or installer.
         for file in sorted(release.iterdir()):
@@ -89,6 +89,15 @@ def main():
             copy_immutable(ROOT / record["script"], binary / record["path"])
         for app in sorted(applications):
             scripts = {record["script"] for record in catalog["installers"] if record["application"] == app}
+            if app == 'jq':
+                expected={'jq/jq-install.sh','jq/jq-install.ps1'}
+                if scripts != expected:
+                    raise ValueError('jq requires exactly one shell entry and one native Windows bridge')
+                for source in sorted(scripts):
+                    installer=ROOT/source
+                    shutil.copy2(installer,binary/app/installer.name)
+                shutil.copy2(ROOT/'jq/jq-install.sh',binary/app/'install.sh')
+                continue
             if len(scripts) != 1:
                 raise ValueError("application must have one canonical entry")
             installer = ROOT / scripts.pop()

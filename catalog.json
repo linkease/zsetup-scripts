@@ -910,6 +910,231 @@
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
       "path": "kspeeder/0.1.0/kspeeder-install.sh",
       "background": false
+    },
+    {
+      "application": "jq",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "armv7",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "mipsel",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "ubuntu",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "ubuntu",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "ubuntu",
+      "package_manager": "*",
+      "arch": "armv7",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "ubuntu",
+      "package_manager": "*",
+      "arch": "mipsel",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "debian",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "debian",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "debian",
+      "package_manager": "*",
+      "arch": "armv7",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "debian",
+      "package_manager": "*",
+      "arch": "mipsel",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "istoreos",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "istoreos",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "istoreos",
+      "package_manager": "*",
+      "arch": "armv7",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "istoreos",
+      "package_manager": "*",
+      "arch": "mipsel",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "openwrt",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "openwrt",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "openwrt",
+      "package_manager": "*",
+      "arch": "armv7",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "openwrt",
+      "package_manager": "*",
+      "arch": "mipsel",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "jq/jq-install.sh",
+      "path": "jq/0.1.0/jq-install.sh",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "jq/jq-install.ps1",
+      "path": "jq/0.1.0/jq-install.ps1",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "jq/jq-install.ps1",
+      "path": "jq/0.1.0/jq-install.ps1",
+      "background": false
+    },
+    {
+      "application": "jq",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86",
+      "script": "jq/jq-install.ps1",
+      "path": "jq/0.1.0/jq-install.ps1",
+      "background": false
     }
   ]
 }
