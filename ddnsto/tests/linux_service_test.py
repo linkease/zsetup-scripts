@@ -76,7 +76,7 @@ class LinuxService(unittest.TestCase):
         archive = self.root / 'archive.tar.gz'
         payload = BINARY.replace('VERSION', 'new').encode()
         with tarfile.open(archive, 'w:gz') as tar:
-            member = tarfile.TarInfo('ddnsto-standard-4.2.3/ddnsto.x86_64')
+            member = tarfile.TarInfo('ddnsto-standard-4.2.8/ddnsto.x86_64')
             member.size = len(payload)
             tar.addfile(member, io.BytesIO(payload))
         self.env = os.environ | {

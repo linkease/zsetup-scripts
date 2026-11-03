@@ -10,7 +10,7 @@ import unittest
 from openwrt_lifecycle_test import FAKE
 
 ROOT = Path(__file__).resolve().parents[2]
-HISTORY = json.loads((ROOT / 'docs/ddnsto-artifacts-2026-10-08.json').read_text())
+HISTORY = json.loads((ROOT / 'docs/ddnsto-artifacts-2026-11-03.json').read_text())
 EXPECTED = {x['source_path']: x['sha256'] for x in HISTORY['files']
             if not x['source_path'].endswith(('VERSION', 'VERSION_LITE'))}
 HARNESS = r'''
@@ -35,6 +35,13 @@ ddnsto_openwrt
 
 
 class PinnedProducts(unittest.TestCase):
+    def test_windows_archive_and_executable_match_published_428(self):
+        artifact = next(x for x in HISTORY['files'] if x['source_path'].startswith('windows/'))
+        source = (ROOT / 'ddnsto/install.ps1').read_text()
+        self.assertIn("$Version = '4.2.8'", source)
+        self.assertIn('--sha256 ' + artifact['sha256'], source)
+        self.assertIn(artifact['members']['ddnsto_cli.x86_64.exe'], source)
+
     def test_verification_failure_propagates_even_in_conditional_caller(self):
         with tempfile.TemporaryDirectory() as tmp:
             script = r'''
@@ -65,7 +72,7 @@ ddnsto_verified_download product "$2/package" "$3"
 
     def test_all_openwrt_targets_use_existing_paths_and_pinned_digests(self):
         for pm, ext in [('opkg', 'ipk'), ('apk', 'apk')]:
-            for variant, version in [('standard', '4.2.6'), ('lite', '4.2.2')]:
+            for variant, version in [('standard', '4.2.8'), ('lite', '4.2.8')]:
                 for arch, member in [('x86_64', 'x86_64'), ('aarch64', 'aarch64'), ('armv7', 'arm'), ('mipsel', 'mipsel')]:
                     with self.subTest(pm=pm, variant=variant, arch=arch), tempfile.TemporaryDirectory() as tmp:
                         # The shared tool fixture models package ownership and
@@ -105,7 +112,7 @@ ddnsto_verified_download product "$2/package" "$3"
     def test_linux_archive_digest_is_pinned(self):
         source = ROOT / 'ddnsto/product-pins.sh'
         self.assertTrue(source.is_file(), 'missing embedded product pins')
-        path = 'linux-binary/ddnsto-standard-4.2.3.tar.gz'
+        path = 'linux-binary/ddnsto-standard-4.2.8.tar.gz'
         result = subprocess.run(['sh', '-c', '. "$1"; ddnsto_pinned_sha "$2"', 'sh', str(source), path], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), EXPECTED[path])

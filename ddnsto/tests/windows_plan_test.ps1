@@ -6,7 +6,7 @@ function Get-DDNSTOHostArchitecture { return 'AMD64' }
 function Invoke-DDNSTOInstall { throw 'MUTATION: plan called installer' }
 $result = Invoke-DDNSTOEntry -Plan -Platform windows -Method native
 Assert (($result -join "`n") -match 'installation_performed=false') 'plan performed installation'
-Assert (($result -join "`n") -match 'client_version=4.2.1') 'missing pinned version'
+Assert (($result -join "`n") -match 'client_version=4.2.8') 'missing pinned version'
 Assert (($result -join "`n") -match 'platform=windows') 'missing platform'
 foreach ($case in @(
     @{Platform='linux'}, @{Method='docker'}, @{Method='typo'},

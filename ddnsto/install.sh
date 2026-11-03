@@ -5,7 +5,7 @@ if [ "$(uname -s)" = Darwin ]; then
 # Engineering candidate: bootstraps zsetup automatically; native canary pending.
 set -eu
 umask 077
-VERSION=${DDNSTO_VERSION:-4.2.1}
+VERSION=${DDNSTO_VERSION:-4.2.8}
 INSTALL_DIR=${DDNSTO_INSTALL_DIR:-$HOME/.local/bin}
 CONFIG_DIR=${DDNSTO_CONFIG_DIR:-$HOME/Library/Application Support/DDNSTO}
 AGENTS_DIR=${DDNSTO_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}
@@ -27,7 +27,7 @@ while [ "$#" -gt 0 ]; do
             shift 2 ;;
         --token=*) TOKEN=${1#--token=}; shift ;;
         --plan) PLAN_ONLY=1; shift ;;
-        --help|-h) printf '%s\n' 'Usage: install-macos.sh [--plan] [--action install|update|status|start|stop|restart|repair|uninstall|configure] [--platform auto|macos] [--method auto|native] [--token TOKEN | --token-file FILE] [--version 4.2.1]' 'Existing installations default to no changes. Update/repair preserve configuration. Uninstall retains configuration and identity; install reuses them without Token.' 'Configure requires a new Token, preserves identity and restarts the service; failure attempts rollback.'; exit 0 ;;
+        --help|-h) printf '%s\n' 'Usage: install-macos.sh [--plan] [--action install|update|status|start|stop|restart|repair|uninstall|configure] [--platform auto|macos] [--method auto|native] [--token TOKEN | --token-file FILE] [--version 4.2.8]' 'Existing installations default to no changes. Update/repair preserve configuration. Uninstall retains configuration and identity; install reuses them without Token.' 'Configure requires a new Token, preserves identity and restarts the service; failure attempts rollback.'; exit 0 ;;
         *) fail 'unknown argument' ;;
     esac
 done
@@ -40,7 +40,7 @@ if [ "$ACTION" != install ]; then
     [ "$PLAN_ONLY" = 0 ] || fail '--plan cannot be combined with service actions'
 fi
 case "$(uname -m)" in x86_64|amd64) member=ddnsto_cli.amd64 ;; arm64|aarch64) member=ddnsto_cli.arm64 ;; *) fail 'unsupported macOS architecture' ;; esac
-[ "$VERSION" = 4.2.1 ] || fail 'no pinned artifact for requested version'
+[ "$VERSION" = 4.2.8 ] || fail 'no pinned artifact for requested version'
 if [ "$PLAN_ONLY" = 1 ]; then
     [ -z "$TOKEN$TOKEN_FILE" ] || fail '--plan does not accept credentials'
     printf '%s\n' 'facts_source=local-preflight' 'platform=macos' "arch=${member#ddnsto_cli.}" \
@@ -48,7 +48,7 @@ if [ "$PLAN_ONLY" = 1 ]; then
         'docker_installable=false' 'installation_performed=false'
     exit 0
 fi
-archive_sha=46aad0f28da7ad67175cfed1bc973b1eea68bed4242c8779d8cbd1ba57ed31d7
+archive_sha=8bb1e102160c8e52f670839051ca341f0a083720634da79c2142a1de6d13f446
 ZSETUP_BIN=${ZSETUP_BIN:-}
 for tool in launchctl tar sed grep; do command -v "$tool" >/dev/null || fail "missing dependency: $tool"; done
 for directory in "$INSTALL_DIR" "$CONFIG_DIR" "$AGENTS_DIR"; do
@@ -1091,13 +1091,13 @@ ddnsto_plan() {
     native_status=executor-unavailable client_version=unavailable
     case "$detected_platform:$arch" in
         linux:x86_64|linux:aarch64)
-            [ "${DDNSTO_VERSION:-4.2.3}" = 4.2.3 ] || { ddnsto_error 'no pinned artifact for requested version'; return 2; }
+            [ "${DDNSTO_VERSION:-4.2.8}" = 4.2.8 ] || { ddnsto_error 'no pinned artifact for requested version'; return 2; }
             [ "$FORCE_VERSION" != lite ] && [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error 'OpenWrt options are not supported on Linux'; return 2; }
             native_status=requires-service-preflight
-            client_version=${DDNSTO_VERSION:-4.2.3} ;;
+            client_version=${DDNSTO_VERSION:-4.2.8} ;;
         openwrt:*)
             native_status=requires-package-preflight
-            client_version=standard-4.2.6-or-lite-4.2.2 ;;
+            client_version=standard-4.2.8-or-lite-4.2.8 ;;
     esac
     printf '%s\n' 'facts_source=local-preflight' "platform=$detected_platform" "arch=$arch" \
         "requested_method=$REQUESTED_METHOD" "native_status=$native_status" "client_version=$client_version" \
@@ -1462,7 +1462,7 @@ ddnsto_linux() {
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
     [ -n "$TOKEN" ] || [ "$ACTION" = update ] || [ "${RETAINED_CONFIG:-0}" = 1 ] || { ddnsto_error 'empty token'; return 2; }
     ddnsto_linux_preflight
-    version_num=${DDNSTO_VERSION:-4.2.3}
+    version_num=${DDNSTO_VERSION:-4.2.8}
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid DDNSTO_VERSION'; return 2 ;; esac
     status "[2/4] Checking DDNSTO standard $version_num ($arch)..."
     archive_name="ddnsto-standard-$version_num.tar.gz"
@@ -1909,39 +1909,38 @@ ddnsto_offer_install_method() {
 }
 
 # Maintained product metadata; embedded in install.sh, never fetched at runtime.
-# All 21 existing HTTPS artifacts re-downloaded and verified 2026-10-14.
-# See docs/github-testing.md. Bump installer version when updating any pin.
+# HTTPS bytes verified 2026-11-03; see docs/ddnsto-artifacts-2026-11-03.json.
+# lite retains the package naming used by the Micro client release.
 ddnsto_pinned_version() {
     case "$1" in
-        standard) printf '%s\n' 4.2.6 ;;
-        lite) printf '%s\n' 4.2.2 ;;
+        standard|lite) printf '%s\n' 4.2.8 ;;
         *) printf '%s\n' 'DDNSTO: unknown pinned variant' >&2; return 11 ;;
     esac
 }
 
 ddnsto_pinned_sha() {
     case "$1" in
-        linux-binary/ddnsto-standard-4.2.3.tar.gz) printf '%s\n' b982ebd38e8c145d955049eb5b73960c01941bc05f084c3a2115dfca2b6eea6e ;;
-        openwrt/lite-apk/4.2.2/ddnsto_aarch64.apk) printf '%s\n' fa8715e298357b1f194fd303b7bc53fe97fc2d62847099c8942fb1d833c44bba ;;
-        openwrt/lite-apk/4.2.2/ddnsto_arm.apk) printf '%s\n' a0d748be8936b8515a4a83e624529ee9873728c434b44e330e03159e2f7fd4b4 ;;
-        openwrt/lite-apk/4.2.2/ddnsto_mipsel.apk) printf '%s\n' 34cf69a86b7c22993e974d54b973ad65eda9a81b59b79a77eff68140bf3f421d ;;
-        openwrt/lite-apk/4.2.2/ddnsto_x86_64.apk) printf '%s\n' 291a24cb1e8e821f127ad08249bcfbc1517501189b895fbad261c950e2aa0abf ;;
-        openwrt/lite/4.2.2/ddnsto_aarch64.ipk) printf '%s\n' 4f1542dc9e8f14a2da69800190e2d2b5f20288c96c2067eb1ada62e9d9999d0c ;;
-        openwrt/lite/4.2.2/ddnsto_arm.ipk) printf '%s\n' 3ccdc5100c4e43e7a75a6fd1cbfd5718e8ba7fce40ac4626da83487db2f3ea96 ;;
-        openwrt/lite/4.2.2/ddnsto_mipsel.ipk) printf '%s\n' 22df2e1f8c9238e861954778d9b48f149660ee7b0fd8639b1e73731454209fbe ;;
-        openwrt/lite/4.2.2/ddnsto_x86_64.ipk) printf '%s\n' 1434d56a8122d4fdb470a744a512373741307631fabde0a31e37733984461ca4 ;;
-        openwrt/standard-apk/4.2.6/ddnsto_aarch64.apk) printf '%s\n' 55e0d89060bbd8d6df3ca473ca114f257dd1312587ea703963ce812877e7a509 ;;
-        openwrt/standard-apk/4.2.6/ddnsto_arm.apk) printf '%s\n' a90951eb323a19f79964b597af9cdefbb728e675b8077c0fd115fa061011f62a ;;
-        openwrt/standard-apk/4.2.6/ddnsto_mipsel.apk) printf '%s\n' ebd0f3eeed46ec8f45a585b0e49403725fbd18a48de42d9ed0380609ed0d76ed ;;
-        openwrt/standard-apk/4.2.6/ddnsto_x86_64.apk) printf '%s\n' 470e4ea428f897cc8e38f7528b9387b0dd7373d5c727ef334e1d79c8dead7da2 ;;
-        openwrt/standard/4.2.6/ddnsto_aarch64.ipk) printf '%s\n' 413aef536307542e08fde749af9c9b5db239280fb2cdee5f48ced5cb61ef545a ;;
-        openwrt/standard/4.2.6/ddnsto_arm.ipk) printf '%s\n' 167ff8ba20965f72471bf8be9a1010eb776ca54b336033d807bb83c19e1f3917 ;;
-        openwrt/standard/4.2.6/ddnsto_mipsel.ipk) printf '%s\n' 9a0c740708cb1ede7e680112bcec5c9dad9f00739ef8587b334f305898d2763c ;;
-        openwrt/standard/4.2.6/ddnsto_x86_64.ipk) printf '%s\n' a7d868da03dea6e6e9b4cb02bc6f2ccfa31d2eeba62f0ac088338bc83e31e9eb ;;
-        openwrt/luci-app-ddnsto.apk) printf '%s\n' 74c1905d95ec90077cd3f4b4d907782c093ad977f0c7c4c93137190106e1e566 ;;
-        openwrt/luci-i18n-ddnsto-zh-cn.apk) printf '%s\n' 96fcf176a2d2be9d3ad85d0687d5f0adaa37282be4cb0c95cee609c6dde60fb4 ;;
-        openwrt/luci-app-ddnsto.ipk) printf '%s\n' f3c87b000e7ec6ed640783232354b7462a274323d5edd5d2cc857c03192bda13 ;;
-        openwrt/luci-i18n-ddnsto-zh-cn.ipk) printf '%s\n' 6c5f3e287b70704181769f23b1775c064bf1d4bf2c6ee1fb0a226377478c1a04 ;;
+        linux-binary/ddnsto-standard-4.2.8.tar.gz) printf '%s\n' 3bf7ada14448b5aa04afa171e497f85d0b8bb4adcf2209991e52ef5826d4e975 ;;
+        openwrt/lite-apk/4.2.8/ddnsto_aarch64.apk) printf '%s\n' aaf16937cad6373849ad1d1f15d64b9a085a55d4f44778c2458997fb2af0b65d ;;
+        openwrt/lite-apk/4.2.8/ddnsto_arm.apk) printf '%s\n' 2834dfe9fe683d6dfffed8b73a71a7d84867789fbd8537fe3e21f8ea7e4e8c6b ;;
+        openwrt/lite-apk/4.2.8/ddnsto_mipsel.apk) printf '%s\n' 91cfe44983494d3efea407fe5bd4ee5c76e227e821cd5729684ef92f46d3043e ;;
+        openwrt/lite-apk/4.2.8/ddnsto_x86_64.apk) printf '%s\n' b725dab7fd7387527c03015f37cfa1e5424e13d550cc0d2fba3a7067627cef96 ;;
+        openwrt/lite/4.2.8/ddnsto_aarch64.ipk) printf '%s\n' f400d53e82b4ad83da42e05b8561e3a92afbaca21f228fb994d2a5ed659474a7 ;;
+        openwrt/lite/4.2.8/ddnsto_arm.ipk) printf '%s\n' c9ab02d44f753eb1129570687ec1fd31246f654444fc77dc219a7dd91fb7417e ;;
+        openwrt/lite/4.2.8/ddnsto_mipsel.ipk) printf '%s\n' 3e331d2f59f891f33b2f3c00a8cecd429a266c5a52810966f78051aef267c1fb ;;
+        openwrt/lite/4.2.8/ddnsto_x86_64.ipk) printf '%s\n' ed4bd946f54840a61312e4121cc6887e874baea00506711c2ce3e69f4f8411ac ;;
+        openwrt/luci-app-ddnsto.apk) printf '%s\n' edd733e46d476b688da2dc046f6d87eee5365c72b1be34c82c6b9f5ef4b87a18 ;;
+        openwrt/luci-app-ddnsto.ipk) printf '%s\n' 702828cdfc1cf2e33dc1b2894ec69a49f1739dfd3ece8948da0d093c6348d123 ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.apk) printf '%s\n' dbb3b6d2176f1c223e82ca46e6be4fda50ff30f449c9302be3382eb6162d8e2d ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.ipk) printf '%s\n' fff0850c893a75eb597d9e60cada9350caf5bc22219628a8c212f79f82e90679 ;;
+        openwrt/standard-apk/4.2.8/ddnsto_aarch64.apk) printf '%s\n' 67e3e784a38a05aa8d3c8693caa8fd20d8316ca950268b956f688df6a1f11d8f ;;
+        openwrt/standard-apk/4.2.8/ddnsto_arm.apk) printf '%s\n' 4d5c656af9560ba2a039f7305968ad086788204dcc678e8bc6bbbe345a481bf9 ;;
+        openwrt/standard-apk/4.2.8/ddnsto_mipsel.apk) printf '%s\n' 8ef767b45b7546e2b4e979ac0fc426d663e34988c816e465a6c0b8b54a62d9b8 ;;
+        openwrt/standard-apk/4.2.8/ddnsto_x86_64.apk) printf '%s\n' 6740fea1fbc6f58de41d5024af0d4c6d523599947c50b70889c15646f0a482c0 ;;
+        openwrt/standard/4.2.8/ddnsto_aarch64.ipk) printf '%s\n' 5f291b4c28daefe4298f33d8dae9860945091bdb4af357d58b1c4553e41828cf ;;
+        openwrt/standard/4.2.8/ddnsto_arm.ipk) printf '%s\n' acc8df1f81049cde0695357347aeeeecec1f99046e5e91fed1cfdde5cbedc3c6 ;;
+        openwrt/standard/4.2.8/ddnsto_mipsel.ipk) printf '%s\n' 0afd87b8a17db1616b73e64625badd7eae714cf1bcdb963cc46038b8288a0553 ;;
+        openwrt/standard/4.2.8/ddnsto_x86_64.ipk) printf '%s\n' d2965019064df274cea7a04433aabeb767a4b49502f724d61aa26adf641eda63 ;;
         *) printf '%s\n' "DDNSTO: no pinned artifact for $1; use a reviewed newer installer" >&2; return 11 ;;
     esac
 }
@@ -2740,15 +2739,15 @@ ddnsto_synology_download() (
         *) synology_error 'Synology SPK supports only x86_64 and armv7'; exit 2 ;;
     esac
     case "$family:$major" in
-        arm:6) digest=0595dd1ae1681213acb35dfc61e15d877bfee19e59d5f4242a366540922b7f89 ;;
-        arm:7) digest=bde9af2d3ff17f4bc5c609b79af39da7efd7209c59d03935492d1748bb84eba5 ;;
-        x86:6) digest=89d5871b7162edba9e4467a619d5d2eae19744d9cf637692e0695a1a4a701a83 ;;
-        x86:7) digest=cccf82a0240c235d5eea6465ca9a339a9d92977345418ab72deb79ce2a3c8b59 ;;
+        arm:6) digest=b83750595c95db591be99eb06749a7a657597426d13e4b699bce4c0ad16c3e60 ;;
+        arm:7) digest=7286134081b518e5e339b60be7f51bc270979cbd4708998121f61e1d08470ad9 ;;
+        x86:6) digest=9f3409198a7794212931e044c095a3133489c1241320f2fb45acea0c08011f03 ;;
+        x86:7) digest=2842ea8b3b191528ccd8bf0f0600c99de540a56812531fe8b3fa4aacdde3fb87 ;;
     esac
     filename="ddnsto_${family}-dsm${major}.spk"
-    relative="synology/$filename"
+    relative="synology/4.2.8-7/$filename"
     handoff() {
-        printf '%s\n' 'platform=synology' 'package_version=4.2.7-4' \
+        printf '%s\n' 'platform=synology' 'package_version=4.2.8-7' \
             "dsm_major=$major" "dsm_build=$build" "arch=$arch" \
             'installation_performed=false' 'installation_status=manual-required' \
             'Open DSM Package Center > Manual Install and import the downloaded SPK.' \

@@ -61,20 +61,20 @@ class SynologyDownload(unittest.TestCase):
                 r, calls, count = self.invoke(arch, major, build)
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertEqual(count, 1)
-                self.assertIn(f'synology/ddnsto_{family}-dsm{major}.spk', calls)
+                self.assertIn(f'synology/4.2.8-7/ddnsto_{family}-dsm{major}.spk', calls)
                 self.assertRegex(calls, r' [a-f0-9]{64}\n')
                 self.assertIn('installation_performed=false', r.stdout)
                 self.assertIn('manual-required', r.stdout)
                 self.assertIn('Package Center', r.stdout)
                 self.assertIn('identity', r.stdout)
-                self.assertIn('4.2.7-4', r.stdout)
+                self.assertIn('4.2.8-7', r.stdout)
 
     def test_pinned_checksums(self):
         expected = {
-            ('armv7l', '6'): '0595dd1ae1681213acb35dfc61e15d877bfee19e59d5f4242a366540922b7f89',
-            ('armv7l', '7'): 'bde9af2d3ff17f4bc5c609b79af39da7efd7209c59d03935492d1748bb84eba5',
-            ('x86_64', '6'): '89d5871b7162edba9e4467a619d5d2eae19744d9cf637692e0695a1a4a701a83',
-            ('x86_64', '7'): 'cccf82a0240c235d5eea6465ca9a339a9d92977345418ab72deb79ce2a3c8b59',
+            ('armv7l', '6'): 'b83750595c95db591be99eb06749a7a657597426d13e4b699bce4c0ad16c3e60',
+            ('armv7l', '7'): '7286134081b518e5e339b60be7f51bc270979cbd4708998121f61e1d08470ad9',
+            ('x86_64', '6'): '9f3409198a7794212931e044c095a3133489c1241320f2fb45acea0c08011f03',
+            ('x86_64', '7'): '2842ea8b3b191528ccd8bf0f0600c99de540a56812531fe8b3fa4aacdde3fb87',
         }
         for (arch, major), digest in expected.items():
             r, calls, _ = self.invoke(arch=arch, major=major)
