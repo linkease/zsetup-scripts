@@ -44,7 +44,7 @@ class InstallRulesTest(unittest.TestCase):
         self.assertEqual(synology['architectures'], ['x86_64', 'armv7'])
         self.assertIn('aarch64', synology['unsupported_architectures'])
         self.assertEqual(synology['dsm_minimum_builds'], {'6': 5940, '7': 41890})
-        self.assertEqual(synology['client_versions'], {'spk': '4.2.7-4'})
+        self.assertEqual(synology['client_versions'], {'spk': '4.2.8-7'})
         self.assertEqual(synology['method'], 'download')
         self.assertEqual(synology['executors'], ['spk-download-manual-handoff'])
         self.assertEqual(synology['actions'], ['download', 'install'])
@@ -58,7 +58,7 @@ class InstallRulesTest(unittest.TestCase):
         self.assertEqual(len(pins), 4)
         expected = {}
         for family, dsm, digest in pins:
-            expected[f'synology/ddnsto_{family}-dsm{dsm}.spk'] = digest
+            expected[f'synology/4.2.8-7/ddnsto_{family}-dsm{dsm}.spk'] = digest
         self.assertEqual(synology['artifacts'], expected)
         self.assertIn('package_version=' + synology['client_versions']['spk'], source)
         for dsm, minimum in synology['dsm_minimum_builds'].items():

@@ -196,13 +196,13 @@ ddnsto_plan() {
     native_status=executor-unavailable client_version=unavailable
     case "$detected_platform:$arch" in
         linux:x86_64|linux:aarch64)
-            [ "${DDNSTO_VERSION:-4.2.3}" = 4.2.3 ] || { ddnsto_error 'no pinned artifact for requested version'; return 2; }
+            [ "${DDNSTO_VERSION:-4.2.8}" = 4.2.8 ] || { ddnsto_error 'no pinned artifact for requested version'; return 2; }
             [ "$FORCE_VERSION" != lite ] && [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error 'OpenWrt options are not supported on Linux'; return 2; }
             native_status=requires-service-preflight
-            client_version=${DDNSTO_VERSION:-4.2.3} ;;
+            client_version=${DDNSTO_VERSION:-4.2.8} ;;
         openwrt:*)
             native_status=requires-package-preflight
-            client_version=standard-4.2.6-or-lite-4.2.2 ;;
+            client_version=standard-4.2.8-or-lite-4.2.8 ;;
     esac
     printf '%s\n' 'facts_source=local-preflight' "platform=$detected_platform" "arch=$arch" \
         "requested_method=$REQUESTED_METHOD" "native_status=$native_status" "client_version=$client_version" \
@@ -567,7 +567,7 @@ ddnsto_linux() {
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
     [ -n "$TOKEN" ] || [ "$ACTION" = update ] || [ "${RETAINED_CONFIG:-0}" = 1 ] || { ddnsto_error 'empty token'; return 2; }
     ddnsto_linux_preflight
-    version_num=${DDNSTO_VERSION:-4.2.3}
+    version_num=${DDNSTO_VERSION:-4.2.8}
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid DDNSTO_VERSION'; return 2 ;; esac
     status "[2/4] Checking DDNSTO standard $version_num ($arch)..."
     archive_name="ddnsto-standard-$version_num.tar.gz"

@@ -110,13 +110,13 @@ def main():
             bodies[f"/binary/zsetup/{native_version}/SHA256SUMS"] = ('0' * 64 + '  zsetup-linux-x86_64\n').encode()
             archive = io.BytesIO()
             with tarfile.open(fileobj=archive, mode="w:gz") as tar:
-                member = tarfile.TarInfo("ddnsto-standard-4.2.3/ddnsto.x86_64")
+                member = tarfile.TarInfo("ddnsto-standard-4.2.8/ddnsto.x86_64")
                 member.size = len(BINARY)
                 member.mode = 0o755
                 tar.addfile(member, io.BytesIO(BINARY))
-            bodies["/binary/ddnsto/linux-binary/ddnsto-standard-4.2.3.tar.gz"] = archive.getvalue()
+            bodies["/binary/ddnsto/linux-binary/ddnsto-standard-4.2.8.tar.gz"] = archive.getvalue()
             for variant in ("lite", "standard"):
-                version = '4.2.2' if variant == 'lite' else '4.2.6'
+                version = '4.2.8' if variant == 'lite' else '4.2.8'
                 for ext in ("ipk", "apk"):
                     folder = variant + ("-apk" if ext == "apk" else "")
                     prefix = f"/binary/ddnsto/openwrt/{folder}/{version}/"
@@ -128,7 +128,7 @@ def main():
             # Patch only pinned product bytes in a private fixture copy. No
             # runtime checksum bypass or test-only switch exists in production.
             source = SCRIPT.read_text()
-            history = json.loads((ROOT / 'docs/ddnsto-artifacts-2026-10-08.json').read_text())
+            history = json.loads((ROOT / 'docs/ddnsto-artifacts-2026-11-03.json').read_text())
             for item in history['files']:
                 path = '/binary/ddnsto/' + item['source_path']
                 if path in bodies:
@@ -350,7 +350,7 @@ cp "$BOOTSTRAP_WEB/$relative" "$out"
             assert native_fetches.splitlines() == [f'{base}/zsetup/0.5.0/zsetup-linux-x86_64'], native_fetches
             for directory in (root / 'rescue', root / 'rescue/bootstrap', root / 'rescue/rescue', root / 'rescue/rescue/0.5.0'):
                 assert directory.stat().st_mode & 0o777 == 0o700, directory
-            archive_path = "/binary/ddnsto/linux-binary/ddnsto-standard-4.2.3.tar.gz"
+            archive_path = "/binary/ddnsto/linux-binary/ddnsto-standard-4.2.8.tar.gz"
             count = Handler.counts[archive_path]
             listed = subprocess.run([str(ZSETUP), "install", "--list"], env=env, text=True, capture_output=True)
             assert listed.returncode == 0 and "ddnsto" in listed.stdout, listed

@@ -27,7 +27,7 @@
       },
       "executors": ["systemd", "openrc"],
       "requirements": ["root-or-sudo", "initialized-service-manager"],
-      "client_versions": {"standard": "4.2.3"},
+      "client_versions": {"standard": "4.2.8"},
       "zsetup_release": "linux-0.5.0",
       "native_canary_verified": false
     },
@@ -38,7 +38,7 @@
       "actions": ["install", "update", "status", "start", "stop", "restart", "repair", "configure", "uninstall"],
       "executors": ["opkg", "apk"],
       "requirements": ["root", "compatible-package-abi", "little-endian-mips-only"],
-      "client_versions": {"standard": "4.2.6", "lite": "4.2.2"},
+      "client_versions": {"standard": "4.2.8", "lite": "4.2.8"},
       "zsetup_release": "linux-0.5.0",
       "native_canary_verified": false
     },
@@ -48,7 +48,7 @@
       "actions": ["install", "update", "status", "start", "stop", "restart", "repair", "configure", "uninstall"],
       "executors": ["launchd-user"],
       "requirements": ["logged-in-user-launchd-domain"],
-      "client_versions": {"standard": "4.2.1"},
+      "client_versions": {"standard": "4.2.8"},
       "zsetup_release": "macos-0.3.0",
       "native_canary_verified": false
     },
@@ -58,7 +58,7 @@
       "actions": ["install", "update", "status", "start", "stop", "restart", "repair", "configure", "uninstall"],
       "executors": ["scheduled-task-system"],
       "requirements": ["administrator", "windows-x64", "i686-bootstrap-execution"],
-      "client_versions": {"standard": "4.2.1"},
+      "client_versions": {"standard": "4.2.8"},
       "zsetup_release": "windows-0.4.0",
       "native_canary_verified": false
     },
@@ -68,7 +68,7 @@
       "dsm_minimum_builds": {"6": 5940, "7": 41890},
       "method": "download",
       "executors": ["spk-download-manual-handoff"],
-      "client_versions": {"spk": "4.2.7-4"},
+      "client_versions": {"spk": "4.2.8-7"},
       "actions": ["download", "install"],
       "action_results": {
         "download": {"exit_code": 0, "installation_performed": false, "manual_handoff_required": true},
@@ -76,10 +76,10 @@
       },
       "handoff": "Manually install the verified SPK through DSM Package Center; download completion is not installation success.",
       "artifacts": {
-        "synology/ddnsto_arm-dsm6.spk": "0595dd1ae1681213acb35dfc61e15d877bfee19e59d5f4242a366540922b7f89",
-        "synology/ddnsto_arm-dsm7.spk": "bde9af2d3ff17f4bc5c609b79af39da7efd7209c59d03935492d1748bb84eba5",
-        "synology/ddnsto_x86-dsm6.spk": "89d5871b7162edba9e4467a619d5d2eae19744d9cf637692e0695a1a4a701a83",
-        "synology/ddnsto_x86-dsm7.spk": "cccf82a0240c235d5eea6465ca9a339a9d92977345418ab72deb79ce2a3c8b59"
+        "synology/4.2.8-7/ddnsto_arm-dsm6.spk": "b83750595c95db591be99eb06749a7a657597426d13e4b699bce4c0ad16c3e60",
+        "synology/4.2.8-7/ddnsto_arm-dsm7.spk": "7286134081b518e5e339b60be7f51bc270979cbd4708998121f61e1d08470ad9",
+        "synology/4.2.8-7/ddnsto_x86-dsm6.spk": "9f3409198a7794212931e044c095a3133489c1241320f2fb45acea0c08011f03",
+        "synology/4.2.8-7/ddnsto_x86-dsm7.spk": "2842ea8b3b191528ccd8bf0f0600c99de540a56812531fe8b3fa4aacdde3fb87"
       },
       "candidate": true,
       "native_canary_verified": false

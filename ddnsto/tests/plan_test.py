@@ -36,14 +36,14 @@ class PlanTest(unittest.TestCase):
         r = self.run_plan(('--platform', 'linux', '--method', 'native'))
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('platform=linux', r.stdout)
-        self.assertIn('client_version=4.2.3', r.stdout)
+        self.assertIn('client_version=4.2.8', r.stdout)
         self.assertIn('installation_performed=false', r.stdout)
 
     def test_mac_plan_uses_shared_public_entry(self):
         r = self.run_plan(('--platform', 'macos', '--method', 'native'), system='Darwin', arch='arm64')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('platform=macos', r.stdout)
-        self.assertIn('client_version=4.2.1', r.stdout)
+        self.assertIn('client_version=4.2.8', r.stdout)
 
     def test_mac_target_mismatch(self):
         r = self.run_plan(('--platform', 'linux'), system='Darwin')

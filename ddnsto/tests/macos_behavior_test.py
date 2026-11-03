@@ -546,7 +546,7 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
     def test_selected_version_is_explained_as_pinned_not_latest(self):
         result = self.run_script()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('selected client version 4.2.1', result.stderr)
+        self.assertIn('selected client version 4.2.8', result.stderr)
         self.assertIn('pinned by this installer; latest release not checked', result.stderr)
 
     def test_first_start_failure_removes_only_owned_files(self):

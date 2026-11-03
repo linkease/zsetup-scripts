@@ -1,5 +1,9 @@
 # 用户与 AI 调用协议
 
+## 0.2.1 产品版本增量（2026-11-03）
+
+Linux/OpenWrt Standard/Lite、Windows CLI、macOS 固定 4.2.8，群晖固定版本路径 `synology/4.2.8-7/`。所有更新的摘要来自完整 HTTPS 下载，不跟随远端版本指针。Docker 固定 4.2.6 不变。命令、默认无修改重跑、身份保留及平台限制沿用 0.2.0，详见 [测试交接](testing-client-4.2.8.md)。
+
 ## 当前入口：0.2.0 工程候选，未发布
 
 当前能力与限制以 [候选使用与验收说明](candidate-0.2.0.md) 和 `ddnsto/install-rules.json` 为准。下方版本段落均为历史快照，不能用作当前能力清单。

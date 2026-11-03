@@ -1,5 +1,5 @@
 # Engineering candidate. Automatic zsetup bootstrap; native canary pending.
-param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.1',
+param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
       [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
       [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'install')
 $ErrorActionPreference = 'Stop'
@@ -12,7 +12,7 @@ function Get-DDNSTOHostArchitecture {
 }
 
 function Invoke-DDNSTOEntry {
-    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.1',
+    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
           [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
           [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'install')
     if ($Action -notin @('install', 'update', 'status', 'start', 'stop', 'restart', 'repair', 'uninstall', 'configure')) { throw 'DDNSTO: unknown action' }
@@ -22,11 +22,11 @@ function Invoke-DDNSTOEntry {
     if ($Plan) {
         if ($Action -ne 'install') { throw 'DDNSTO: -Plan requires the install action' }
         if ($Token -or $TokenFile) { throw 'DDNSTO: -Plan does not accept credentials' }
-        if ($Version -ne '4.2.1') { throw 'DDNSTO: no pinned artifact for requested version' }
+        if ($Version -ne '4.2.8') { throw 'DDNSTO: no pinned artifact for requested version' }
         if ((Get-DDNSTOHostArchitecture) -ne 'AMD64') { throw 'DDNSTO: unsupported architecture; requires Windows x64' }
         # No admin check, download, token file read, directory or task creation.
         return @('facts_source=local-preflight', 'platform=windows', 'arch=x86_64',
-            'client_version=4.2.1', 'zsetup_version=0.4.0',
+            'client_version=4.2.8', 'zsetup_version=0.4.0',
             'native_status=requires-admin-task-preflight', 'docker_installable=false',
             'installation_performed=false')
     }
@@ -83,11 +83,11 @@ function Get-DDNSTOManagedState($InstallDir) {
 # Uninstall preserves all data except the managed executable and task. Reinstall
 # consumes that explicit retained state; configure changes only the top-level Token.
 function Invoke-DDNSTOLifecycle {
-    param([string]$InstallDir, [string]$Action, [string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.1')
+    param([string]$InstallDir, [string]$Action, [string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8')
     Assert-DDNSTOPlatform
     if ($Action -notin @('uninstall', 'reinstall', 'configure')) { throw 'DDNSTO: unknown lifecycle action' }
     if ($Action -ne 'configure' -and ($Token -or $TokenFile)) { throw 'DDNSTO: this action preserves credentials' }
-    if ($Action -eq 'reinstall' -and $Version -ne '4.2.1') { throw 'DDNSTO: no pinned artifact for requested version' }
+    if ($Action -eq 'reinstall' -and $Version -ne '4.2.8') { throw 'DDNSTO: no pinned artifact for requested version' }
     $state = Get-DDNSTOManagedState $InstallDir
     if ($state -eq 'recovery-required') { throw 'DDNSTO: manual recovery from retained backup required' }
     if ($Action -eq 'reinstall' -and $state -ne 'retained') { throw 'DDNSTO: retained installation required' }
@@ -380,12 +380,12 @@ function Get-DDNSTOZsetup($Work) {
 function Receive-DDNSTOCandidate($Work, $Version) {
     $zsetup = Get-DDNSTOZsetup $Work
     $archive = Join-Path $Work 'client.zip'
-    & $zsetup download -o $archive --sha256 bf77c4a16b6b1914a0015e3491b39649602ce767d908da73d06a9feb1b3455db "https://fw.koolcenter.com/binary/ddnsto/windows/ddnsto_windows_cli_$Version.zip" | Out-Null
+    & $zsetup download -o $archive --sha256 5b09cf2be048e1592668b8b5fed922206849b35f9fe6469122b0460aeee64688 "https://fw.koolcenter.com/binary/ddnsto/windows/ddnsto_windows_cli_$Version.zip" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'DDNSTO: zsetup download or checksum verification failed' }
     $extract = Join-Path $Work 'extract'
     Expand-Archive -LiteralPath $archive -DestinationPath $extract
     $candidate = Join-Path $extract 'ddnsto_cli.x86_64.exe'
-    if ((Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash -ine 'd606a3501b594beb1cab912f87bddc741119e54cc07645cb4c2a741c9f9a6946') {
+    if ((Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash -ine '5ef383feb22857dd3cbfe8b60f49018218855c1b67e778d27e34ba702f64aa8d') {
         throw 'DDNSTO: client checksum mismatch'
     }
     return $candidate
@@ -423,11 +423,11 @@ function Read-DDNSTOToken {
     return Read-Host 'DDNSTO token (visible; paste from console)'
 }
 function Invoke-DDNSTOInstall {
-    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.1', [string]$InstallDir, [string]$Action = 'install')
+    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8', [string]$InstallDir, [string]$Action = 'install')
     if ($Action -notin @('install', 'update')) { throw 'DDNSTO: unknown action' }
     if ($Action -eq 'update' -and ($Token -or $TokenFile)) { throw 'DDNSTO: update preserves existing Token; do not supply credentials' }
     Assert-DDNSTOPlatform
-    if ($Version -ne '4.2.1') { throw 'DDNSTO: no pinned artifact for requested version' }
+    if ($Version -ne '4.2.8') { throw 'DDNSTO: no pinned artifact for requested version' }
     if (-not [IO.Path]::IsPathRooted($InstallDir)) { throw 'DDNSTO: installation path must be absolute' }
     Assert-DDNSTOSafePaths $InstallDir
     if (Test-Path -LiteralPath (Join-Path $InstallDir '.installer-windows-v1')) {

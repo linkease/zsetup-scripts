@@ -1,5 +1,11 @@
 # 构建、配置与发布
 
+## 0.2.1 / 4.2.8 产品 pin 更新
+
+2026-11-03：独立入口命名空间递增为 0.2.1，FastNet 和 zsetup 版本不变。Linux/OpenWrt/Windows/macOS 及群晖更新为已核验的 4.2.8 产物；Docker 保留既有 4.2.6 镜像。macOS 补齐后的新产物目录为 `dist/ddnsto-entrypoints-0.2.1-macos/`，不覆盖旧产物。测试入口已发布到 `https://web.toany.net/ddnsto-install/0.2.1/20261103-a80245f87de8/`，两个脚本 HTTPS 回读 SHA-256 一致；未发布正式下载站。
+
+详见 [测试交接](testing-client-4.2.8.md) 与 [HTTPS 实际产物证据](ddnsto-artifacts-2026-11-03.json)。原生 canary 与正式推广门槛不变；客户端包已发布不等于业务安装入口已部署。
+
 ## 0.2.0 本地候选：未发布
 
 本轮原生生命周期、群晖手动交接和受限 Docker 的能力/限制以 [0.2.0 候选说明](candidate-0.2.0.md)为准。已报告 macOS 56 项、Windows 7 组、OpenWrt 29 项测试通过，Linux 分项模拟已有通过记录；冻结版全量测试、生成入口及候选打包已通过，详见 [验证报告](verification-0.2.0.md)。Linux 新增生命周期仅 systemd；Docker 不具备完整生命周期；群晖下载不代表安装完成。

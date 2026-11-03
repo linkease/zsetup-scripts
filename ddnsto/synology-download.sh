@@ -54,15 +54,15 @@ ddnsto_synology_download() (
         *) synology_error 'Synology SPK supports only x86_64 and armv7'; exit 2 ;;
     esac
     case "$family:$major" in
-        arm:6) digest=0595dd1ae1681213acb35dfc61e15d877bfee19e59d5f4242a366540922b7f89 ;;
-        arm:7) digest=bde9af2d3ff17f4bc5c609b79af39da7efd7209c59d03935492d1748bb84eba5 ;;
-        x86:6) digest=89d5871b7162edba9e4467a619d5d2eae19744d9cf637692e0695a1a4a701a83 ;;
-        x86:7) digest=cccf82a0240c235d5eea6465ca9a339a9d92977345418ab72deb79ce2a3c8b59 ;;
+        arm:6) digest=b83750595c95db591be99eb06749a7a657597426d13e4b699bce4c0ad16c3e60 ;;
+        arm:7) digest=7286134081b518e5e339b60be7f51bc270979cbd4708998121f61e1d08470ad9 ;;
+        x86:6) digest=9f3409198a7794212931e044c095a3133489c1241320f2fb45acea0c08011f03 ;;
+        x86:7) digest=2842ea8b3b191528ccd8bf0f0600c99de540a56812531fe8b3fa4aacdde3fb87 ;;
     esac
     filename="ddnsto_${family}-dsm${major}.spk"
-    relative="synology/$filename"
+    relative="synology/4.2.8-7/$filename"
     handoff() {
-        printf '%s\n' 'platform=synology' 'package_version=4.2.7-4' \
+        printf '%s\n' 'platform=synology' 'package_version=4.2.8-7' \
             "dsm_major=$major" "dsm_build=$build" "arch=$arch" \
             'installation_performed=false' 'installation_status=manual-required' \
             'Open DSM Package Center > Manual Install and import the downloaded SPK.' \

@@ -2,7 +2,7 @@
 # Engineering candidate: bootstraps zsetup automatically; native canary pending.
 set -eu
 umask 077
-VERSION=${DDNSTO_VERSION:-4.2.1}
+VERSION=${DDNSTO_VERSION:-4.2.8}
 INSTALL_DIR=${DDNSTO_INSTALL_DIR:-$HOME/.local/bin}
 CONFIG_DIR=${DDNSTO_CONFIG_DIR:-$HOME/Library/Application Support/DDNSTO}
 AGENTS_DIR=${DDNSTO_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}
@@ -24,7 +24,7 @@ while [ "$#" -gt 0 ]; do
             shift 2 ;;
         --token=*) TOKEN=${1#--token=}; shift ;;
         --plan) PLAN_ONLY=1; shift ;;
-        --help|-h) printf '%s\n' 'Usage: install-macos.sh [--plan] [--action install|update|status|start|stop|restart|repair|uninstall|configure] [--platform auto|macos] [--method auto|native] [--token TOKEN | --token-file FILE] [--version 4.2.1]' 'Existing installations default to no changes. Update/repair preserve configuration. Uninstall retains configuration and identity; install reuses them without Token.' 'Configure requires a new Token, preserves identity and restarts the service; failure attempts rollback.'; exit 0 ;;
+        --help|-h) printf '%s\n' 'Usage: install-macos.sh [--plan] [--action install|update|status|start|stop|restart|repair|uninstall|configure] [--platform auto|macos] [--method auto|native] [--token TOKEN | --token-file FILE] [--version 4.2.8]' 'Existing installations default to no changes. Update/repair preserve configuration. Uninstall retains configuration and identity; install reuses them without Token.' 'Configure requires a new Token, preserves identity and restarts the service; failure attempts rollback.'; exit 0 ;;
         *) fail 'unknown argument' ;;
     esac
 done
@@ -37,7 +37,7 @@ if [ "$ACTION" != install ]; then
     [ "$PLAN_ONLY" = 0 ] || fail '--plan cannot be combined with service actions'
 fi
 case "$(uname -m)" in x86_64|amd64) member=ddnsto_cli.amd64 ;; arm64|aarch64) member=ddnsto_cli.arm64 ;; *) fail 'unsupported macOS architecture' ;; esac
-[ "$VERSION" = 4.2.1 ] || fail 'no pinned artifact for requested version'
+[ "$VERSION" = 4.2.8 ] || fail 'no pinned artifact for requested version'
 if [ "$PLAN_ONLY" = 1 ]; then
     [ -z "$TOKEN$TOKEN_FILE" ] || fail '--plan does not accept credentials'
     printf '%s\n' 'facts_source=local-preflight' 'platform=macos' "arch=${member#ddnsto_cli.}" \
@@ -45,7 +45,7 @@ if [ "$PLAN_ONLY" = 1 ]; then
         'docker_installable=false' 'installation_performed=false'
     exit 0
 fi
-archive_sha=46aad0f28da7ad67175cfed1bc973b1eea68bed4242c8779d8cbd1ba57ed31d7
+archive_sha=8bb1e102160c8e52f670839051ca341f0a083720634da79c2142a1de6d13f446
 ZSETUP_BIN=${ZSETUP_BIN:-}
 for tool in launchctl tar sed grep; do command -v "$tool" >/dev/null || fail "missing dependency: $tool"; done
 for directory in "$INSTALL_DIR" "$CONFIG_DIR" "$AGENTS_DIR"; do

@@ -1,5 +1,13 @@
 # DDNSTO
 
+## 0.2.1 / 客户端 4.2.8 测试候选（2026-11-03）
+
+Linux Standard、OpenWrt Standard/Lite（Micro 内核）及 Windows CLI 更新为 4.2.8；群晖改用版本目录内的 4.2.8-7 SPK。26 个 HTTPS 产物已实际下载并计算摘要，Windows 同时核验归档内 EXE 摘要。更新仍为显式 `--action update` / `-Action update`，保留原有配置与 Token。
+
+macOS 4.2.8 归档已发布并完成下载摘要核验，Intel / Apple Silicon 均固定为 4.2.8。Docker 镜像独立于下载站，仍固定既有 4.2.6 digest 和生命周期限制。未扩大平台、架构或安装方式支持范围。
+
+测试命令、校验记录和交付边界见 [4.2.8 测试交接](../docs/testing-client-4.2.8.md)。仅生成本地候选，未激活正式入口或修改官网默认地址；下方 0.2.0 是上一候选的能力说明。
+
 ## 当前快照：0.2.0 本地候选，未发布
 
 本轮 Windows/macOS 完整原生生命周期分项模拟通过：安装、更新、状态、启停、重启、修复、显式配置、卸载保留配置与身份、保留状态重装，以及默认无修改重跑。已报告 macOS 56 项测试、Windows 7 组测试通过；这不是最终全量结果。Linux 提供同类托管流程，但 repair/configure/uninstall 当前仅接受可验证归属的 **systemd**；configure 需要 jq。OpenRC 仅保留 install/update/status，其他写动作 fail closed；legacy marker 不能认证 shell 服务脚本，不能宣称完整管理或生命周期。
