@@ -229,7 +229,6 @@ function Invoke-ScoopBusiness {
         executable = $false
         arguments = $literal
     } | ConvertTo-Json -Depth 4 -Compress
-    return 0
 }
 
 $script:ScoopEntryArguments = @($args)
