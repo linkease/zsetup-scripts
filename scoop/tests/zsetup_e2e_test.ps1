@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory = $true)][string]$SealedBundle,
     [Parameter(Mandatory = $true)][string]$Zsetup,
     [Parameter(Mandatory = $true)][string]$Ca,
-    [Parameter(Mandatory = $true)][string]$Pfx
+    [Parameter(Mandatory = $true)][string]$Pfx,
+    [switch]$AllowAdmin
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,7 +78,8 @@ try {
     $env:ZSETUP_CONFIG_CACHE = Join-Path $RunRoot 'lkg.json'
     $env:ZSETUP_MANAGED_ROOT = Join-Path $RunRoot 'managed'
     $env:ZSETUP_CACHE_DIR = Join-Path $RunRoot 'installer-cache'
-    $arguments = @('install', '--index', $indexPath, 'scoop', '--foreground', '--', '--installer-scope', 'user', '--installer-root', $root, '--installer-cache', $cache, '--installer-bundle', $SealedBundle, '--installer-allow-admin')
+    $arguments = @('install', '--index', $indexPath, 'scoop', '--foreground', '--', '--installer-scope', 'user', '--installer-root', $root, '--installer-cache', $cache, '--installer-bundle', $SealedBundle)
+    if ($AllowAdmin) { $arguments += '--installer-allow-admin' }
     $result = Invoke-Native $Zsetup $arguments
     [IO.File]::WriteAllText((Join-Path $RunRoot 'zsetup.stdout'), $result.stdout, $utf8)
     [IO.File]::WriteAllText((Join-Path $RunRoot 'zsetup.stderr'), $result.stderr, $utf8)
@@ -98,5 +100,5 @@ try {
     schema_version = 1; status = 'passed'; transport = 'local-https-entry-plus-sealed-business'
     zsetup_version = (& $Zsetup --version).Trim(); zsetup_sha256 = (Get-FileHash $Zsetup -Algorithm SHA256).Hash.ToLowerInvariant()
     entry_sha256 = $entryHash; sealed_bundle_sha256 = (Get-FileHash $SealedBundle -Algorithm SHA256).Hash.ToLowerInvariant()
-    root = $root; cache = $cache; explicit_admin_override = $true
+    root = $root; cache = $cache; explicit_admin_override = [bool]$AllowAdmin
 } | ConvertTo-Json -Depth 5
