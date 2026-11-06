@@ -126,6 +126,11 @@ class WindowsAppRelease(unittest.TestCase):
         ], capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
 
+    def test_generated_entry_declares_utf8_for_redirected_json(self):
+        entry = (ROOT / "scoop/scoop-install.ps1").read_text(encoding="utf-8")
+        self.assertIn("[Console]::OutputEncoding = $script:ScoopUtf8NoBom", entry)
+        self.assertIn("$OutputEncoding = $script:ScoopUtf8NoBom", entry)
+
     def test_wrong_minimum_extension_source_or_core_identity_is_refused(self):
         registration = json.loads((ROOT / "release/windows-applications.json").read_text())
         cases = {}
