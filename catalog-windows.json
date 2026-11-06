@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "config_version": "windows-apps-0.1.0-m5",
+  "installers": [
+    {
+      "application": "scoop",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "scoop/scoop-install.ps1",
+      "path": "scoop/0.1.0-m5/scoop-install.ps1",
+      "background": false
+    }
+  ]
+}
+

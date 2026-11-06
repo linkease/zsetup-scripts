@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "platform": "windows",
+  "source_group": {
+    "id": "release",
+    "primary_bases": [
+      "https://dl.istoreos.com/binary",
+      "https://fw.d4ctech.com/binary",
+      "https://fw20.koolcenter.com/binary"
+    ],
+    "fallback_base": "https://fw.koolcenter.com/binary"
+  },
+  "applications": {
+    "scoop": {
+      "minimum_runtime": "0.4.0",
+      "source_directory": "scoop",
+      "public_entries": ["scoop/scoop-install.ps1"]
+    }
+  }
+}
+

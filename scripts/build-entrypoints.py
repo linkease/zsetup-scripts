@@ -99,6 +99,17 @@ def main():
                 temporary.unlink(missing_ok=True)
         subprocess.run(["sh", "-n", str(output)], check=True)
 
+    windows_catalog = json.loads((ROOT / "catalog-windows.json").read_text())
+    if set(windows_catalog) != {"schema_version", "config_version", "installers"} or windows_catalog["schema_version"] != 1:
+        raise ValueError("invalid Windows installer catalog")
+    windows_apps = {entry["application"] for entry in windows_catalog["installers"]}
+    if windows_apps != {"scoop"}:
+        raise ValueError("unsupported Windows generated-entry set")
+    subprocess.run([
+        "python3", "-B", str(ROOT / "scoop/build.py"),
+        *(["--check"] if args.check else []),
+    ], check=True)
+
     # Owner-provided offline removal resource; no bootstrap or network access.
     output = ROOT / "scripts/remove-managed.sh"
     content = ('#!/bin/sh\nset -eu\n' + helper("install-storage.sh") + helper("install-transaction.sh") + helper("remove-managed.sh")).rstrip() + '\n'
