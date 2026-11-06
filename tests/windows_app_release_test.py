@@ -103,7 +103,7 @@ class WindowsAppRelease(unittest.TestCase):
         self.assertEqual(scoop[0]["sha256"], hashlib.sha256(entry.read_bytes()).hexdigest())
         destinations = {item["destination"] for item in manifest["files"]}
         self.assertEqual(destinations, {
-            "scoop/0.1.0-m5/scoop-install.ps1", "scoop/scoop-install.ps1",
+            "scoop/0.1.0/scoop-install.ps1", "scoop/scoop-install.ps1",
             "zsetup/config-windows.json",
         })
         self.assertFalse((review / "pointers/zsetup/stable-windows").exists())
@@ -180,7 +180,7 @@ class WindowsAppRelease(unittest.TestCase):
         for name, data in self.original.items():
             self.assertEqual((server / name).read_bytes(), data, name)
         self.assertFalse((server / "scoop/scoop-install.ps1").exists())
-        self.assertTrue((server / "scoop/0.1.0-m5/scoop-install.ps1").is_file())
+        self.assertTrue((server / "scoop/0.1.0/scoop-install.ps1").is_file())
 
     def test_tamper_conflict_and_drift_do_not_partially_activate(self):
         self.run_plan()
