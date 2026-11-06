@@ -1,4 +1,9 @@
 # Generated from lib/bootstrap.ps1, scoop/business.ps1 and scoop/main.ps1.
+$script:ScoopUtf8NoBom = [Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $script:ScoopUtf8NoBom
+[Console]::OutputEncoding = $script:ScoopUtf8NoBom
+$OutputEncoding = $script:ScoopUtf8NoBom
+
 # Shared first-dependency bootstrap. Business packages use canonical zsetup.
 # Kept separate from business functions and embedded by the entry generator.
 $script:BootstrapPrimaryBases = @('https://dl.istoreos.com/binary', 'https://fw.d4ctech.com/binary', 'https://fw20.koolcenter.com/binary')

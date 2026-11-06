@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def render():
     parts = [
         "# Generated from lib/bootstrap.ps1, scoop/business.ps1 and scoop/main.ps1.\n",
+        "$script:ScoopUtf8NoBom = [Text.UTF8Encoding]::new($false)\n",
+        "[Console]::InputEncoding = $script:ScoopUtf8NoBom\n",
+        "[Console]::OutputEncoding = $script:ScoopUtf8NoBom\n",
+        "$OutputEncoding = $script:ScoopUtf8NoBom\n\n",
         (ROOT / "lib/bootstrap.ps1").read_text(encoding="utf-8").rstrip() + "\n\n",
         (ROOT / "scoop/business.ps1").read_text(encoding="utf-8").rstrip() + "\n\n",
         (ROOT / "scoop/main.ps1").read_text(encoding="utf-8").rstrip() + "\n",
