@@ -44,7 +44,10 @@ foreach ($fault in @('after-stage', 'after-root-swap', 'after-config', 'after-pa
     $failed = $false
     try {
         Invoke-ScoopBusiness -InstallerArguments @('--installer-scope', 'user', '--installer-root', $faultRoot, '--installer-cache', $faultCache, '--installer-bundle', $SealedBundle) | Out-Null
-    } catch { $failed = $_.Exception.Message -match 'fault injection' }
+    } catch {
+        $failed = $_.Exception.Message -match 'fault injection'
+        if (-not $failed) { throw ("unexpected failure before " + $fault + ': ' + $_.Exception.Message) }
+    }
     Assert-True $failed ("fault point was not triggered: " + $fault)
     Assert-True (-not (Test-Path -LiteralPath $faultRoot)) ("root was not rolled back: " + $fault)
     Assert-True (-not (Test-Path -LiteralPath $configPath)) ("config was not rolled back: " + $fault)
@@ -63,6 +66,8 @@ Assert-True (Test-Path -LiteralPath (Join-Path $root '.linkease-scoop-receipt.js
 Assert-True ($script:FixtureUserPath.StartsWith((Join-Path $root 'shims') + ';')) 'user PATH was not updated through the seam'
 $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
 Assert-True ($config.root_path -eq $root -and $config.cache_path -eq $cache) 'Scoop config paths mismatch'
+$versionOutput = @(& (Join-Path $root 'shims\scoop.ps1') --version *>&1)
+Assert-True (($versionOutput -join "`n") -match 'Current Scoop version:') ('scoop --version failed: ' + ($versionOutput -join ' | '))
 
 $second = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Json
 Assert-True ($second.status -eq 'passed' -and $second.idempotent -eq $true) 'repeat install was not idempotent'
