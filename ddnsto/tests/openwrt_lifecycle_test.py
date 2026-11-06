@@ -17,10 +17,22 @@ import unittest
 SOURCE = Path(__file__).resolve().parents[1] / 'openwrt-lifecycle.sh'
 MAIN_HARNESS = r'''
 . "$APP/business.sh"
+. "$APP/managed-cli.sh"
+. "$APP/../lib/install-launcher.sh"
 . "$APP/openwrt-lifecycle.sh"
+. "$APP/openwrt-adapter.sh"
 . "$APP/product-pins.sh"
 if [ -f "$APP/method-selection.sh" ]; then . "$APP/method-selection.sh"; fi
 id() { printf '%s\n' "${FAKE_UID:-0}"; }
+stat() { if [ "$1:$2" = '-c:%u' ]; then printf '0\n'; else command stat "$@"; fi; }
+ddnsto_bootstrap_safe_ancestors() { return 0; }
+ddnsto_machine_locked() {
+    [ "$(id -u)" = 0 ] || return 2
+    mkdir "$DDNSTO_LOCK_DIR" || return 16
+    rc=0; ( "$@" ) || rc=$?
+    rmdir "$DDNSTO_LOCK_DIR"
+    return "$rc"
+}
 ddnsto_local_platform() { detected_platform=openwrt; package_manager=$PACKAGE_MANAGER; }
 status() { :; }
 ddnsto_verified_download() {
@@ -33,7 +45,20 @@ bootstrap_and_run() {
     work_dir=$FIXTURE/work
     transaction_dir=$FIXTURE/transaction
     mkdir -p "$transaction_dir"
-    ddnsto_with_operation_lock ddnsto_openwrt
+    ZSETUP_BIN=fixture_native; ZSETUP_SOURCE_BASES=https://fixture.invalid
+    ZSETUP_OS=openwrt; ZSETUP_PACKAGE_MANAGER=$PACKAGE_MANAGER; ZSETUP_ARCH=x86_64
+    ddnsto_machine_locked ddnsto_install "$@"
+}
+fixture_native() { [ "$1" = run ] && shift && [ "$1" = -- ] && shift; "$@"; }
+installer_exec_native() { "$@"; }
+installer_package_prepare() { :; }
+installer_package_cache() { PACKAGE_CACHE=$FIXTURE/cache; mkdir -p "$PACKAGE_CACHE"; }
+installer_transaction_finish() { :; }
+installer_package_command() {
+    phase=$1; shift
+    if [ "$phase" = query ]; then
+        output=$1; shift; "$package_manager" "$@" > "$output"
+    else "$package_manager" "$@"; fi
 }
 sleep() { :; }
 . "$APP/main.sh"

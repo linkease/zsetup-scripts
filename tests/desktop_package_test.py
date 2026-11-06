@@ -15,12 +15,13 @@ class DesktopPackage(unittest.TestCase):
     def test_opt_in_isolation_and_immutability(self):
         with tempfile.TemporaryDirectory() as tmp:
             binary = Path(tmp) / 'binary'
+            self.assertIn('copy_desktop_candidates', MODULE)
             copy = MODULE['copy_desktop_candidates']
             copy(binary, False)
             self.assertFalse(binary.exists())
             copy(binary, True)
             for name in ('install.ps1', 'install-macos.sh'):
-                path = binary / 'ddnsto/desktop-candidate-0.2.1' / name
+                path = binary / 'ddnsto/desktop-candidate-0.2.2' / name
                 self.assertEqual(path.read_bytes(), (ROOT / 'ddnsto' / name).read_bytes())
                 self.assertFalse((binary / 'ddnsto' / name).exists())
             copy(binary, True)

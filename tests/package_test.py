@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     for relative in ("openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh", "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh"):
         assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/ddnsto-install.sh").read_bytes()
     for relative in ("install.ps1", "install-macos.sh"):
-        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto" / relative).read_bytes()
+        assert not (binary / "ddnsto" / relative).exists(), 'desktop candidates must not activate aliases'
     config = json.loads((binary / "zsetup/config.json").read_text())
     assert config["stable_zsetup"]["version"] == EXPECTED_VERSION
     if IS_RUST and RELEASE_MANIFEST.get("target") == "linux":
@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        expected_version = "0.1.0" if app in {"ks-cli", "kspeeder", "jq"} else "0.1.1" if app == "linkspace" else CATALOG["config_version"].removeprefix("scripts-")
+        expected_version = "0.2.2" if app == 'ddnsto' else "0.1.0" if app in {"ks-cli", "kspeeder", "jq"} else "0.1.1" if app == "linkspace" else "0.1.9"
         assert record["path"] == f"{app}/{expected_version}/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()

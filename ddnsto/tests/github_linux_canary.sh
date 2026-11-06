@@ -77,12 +77,11 @@ print("CLOUD_EGRESS_BLOCKED")'
 
 # Execute only the already verified entry; retain stdin like the user's command.
 # Repeat from the same bytes without reopening cloud-host egress.
-entry=$(cat /tmp/github-entry.sh)
-sh -c "$entry" install.sh --token-file /tmp/canary-token
+sh /tmp/github-entry.sh --token-file /tmp/canary-token
 rc-service com.linkease.ddnstoshell status
 curl -fsS http://127.0.0.1:18333/healthz
 printf '\n%s\n' 'COLD_INSTALL_OK'
-sh -c "$entry" install.sh --token-file /tmp/canary-token
+sh /tmp/github-entry.sh --token-file /tmp/canary-token
 rc-service com.linkease.ddnstoshell status
 curl -fsS http://127.0.0.1:18333/healthz
 printf '\n%s\n' 'REPEAT_INSTALL_OK cloud_status=not_tested'

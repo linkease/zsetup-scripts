@@ -28,51 +28,27 @@ PINS = {
 
 class BootstrapEmbeddingTest(unittest.TestCase):
     def test_generator_embeds_policy_only_for_ddnsto_without_writing_entries(self):
-        generated = {}
-        read_text = Path.read_text
-        run = subprocess.run
-
-        class CheckedContent(str):
-            def __new__(cls, path):
-                value = super().__new__(cls, '')
-                value.path = path
-                return value
-
-            def __ne__(self, expected):
-                # Capture --check's expected content in memory. Never generate
-                # or rewrite an entry, including in a temporary checkout.
-                generated[self.path] = expected
-                return False
-
-        def read(path, *args, **kwargs):
-            if path in (ROOT / 'ddnsto/install.sh', ROOT / 'fastnet/install.sh'):
-                return CheckedContent(path)
-            return read_text(path, *args, **kwargs)
-
-        def check_syntax(args, **kwargs):
-            self.assertEqual(args[:2], ['sh', '-n'])
-            return run(['sh', '-n'], input=generated[Path(args[2])], text=True, check=True)
-
-        generator = runpy.run_path(str(ROOT / 'scripts/build-entrypoints.py'))
-        with mock.patch('sys.argv', ['build-entrypoints.py', '--check']), \
-                mock.patch.object(Path, 'read_text', read), \
-                mock.patch.object(subprocess, 'run', check_syntax), \
-                mock.patch.object(tempfile, 'NamedTemporaryFile', side_effect=AssertionError('entry write forbidden')):
-            generator['main']()
-        ddnsto = generated[ROOT / 'ddnsto/install.sh']
-        common = read_text(ROOT / 'lib/bootstrap.sh').rstrip()
-        policy = read_text(POLICY).rstrip()
-        business = read_text(ROOT / 'ddnsto/business.sh').rstrip()
+        # Exercise the real shared generator, including jq and managed removal.
+        entries = list(ROOT.glob('**/*-install.sh')) + [ROOT / 'scripts/remove-managed.sh']
+        before = {p: p.read_bytes() for p in entries if 'dist' not in p.parts}
+        result = subprocess.run(['python3', '-B', str(ROOT / 'scripts/build-entrypoints.py'), '--check'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for path, data in before.items():
+            self.assertEqual(path.read_bytes(), data, str(path))
+        ddnsto = (ROOT / 'ddnsto/ddnsto-install.sh').read_text()
+        common = (ROOT / 'lib/bootstrap.sh').read_text().rstrip()
+        policy = POLICY.read_text().rstrip()
+        business = (ROOT / 'ddnsto/business.sh').read_text().rstrip()
         self.assertIn(policy, ddnsto)
         self.assertLess(ddnsto.index(common), ddnsto.index(policy))
         self.assertLess(ddnsto.index(policy), ddnsto.index(business))
         wrapper = ddnsto.split('\nbootstrap_and_run() {', 1)[1].split('\n}', 1)[0]
         self.assertIn('    ddnsto_bootstrap_zsetup || return $?\n', wrapper)
         self.assertNotIn('\n    bootstrap_zsetup\n', wrapper)
-        for name in ('docker-probe.sh', 'product-pins.sh', 'linux-service.sh',
-                     'linux-lifecycle.sh', 'service-management.sh'):
-            self.assertIn(read_text(ROOT / 'ddnsto' / name).rstrip(), ddnsto)
-        self.assertEqual(generated[ROOT / 'fastnet/install.sh'], read_text(ROOT / 'fastnet/install.sh'))
+        for name in ('docker-probe.sh', 'product-pins.sh', 'synology-download.sh'):
+            self.assertIn((ROOT / 'ddnsto' / name).read_text().rstrip(), ddnsto)
+        self.assertNotIn(policy, (ROOT / 'fastnet/fastnet-install.sh').read_text())
 
 
 class BootstrapPolicyTest(unittest.TestCase):

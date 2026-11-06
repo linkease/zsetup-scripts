@@ -38,7 +38,7 @@ for record in catalog["installers"]:
     directory = f"kspeeder/{app}" if app in {"ks-cli", "kspeeder"} else app
     extension = 'ps1' if app == 'jq' and record['os'] == 'windows' else 'sh'
     assert record["script"] == f"{directory}/{app}-install.{extension}"
-    version = "0.1.0" if app in {"ks-cli", "kspeeder", "jq"} else "0.1.1" if app == "linkspace" else script_version
+    version = "0.2.2" if app == 'ddnsto' else "0.1.0" if app in {"ks-cli", "kspeeder", "jq"} else "0.1.1" if app == "linkspace" else "0.1.9"
     assert record["path"] == f"{app}/{version}/{app}-install.{extension}"
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
 print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")

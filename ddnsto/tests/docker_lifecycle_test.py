@@ -115,9 +115,10 @@ class DockerLifecycle(unittest.TestCase):
             DDNSTO_BIN_PATH=str(self.root/'native'), DDNSTO_LINUX_CONFIG_DIR=str(self.root/'native-config'))
 
     def command(self, plan=False):
-        return ['sh', '-eu', '-c', '. "$1"; . "$2"; ' +
+        return ['sh', '-eu', '-c', '. "$1"; . "$2"; . "$3"; ' +
                 ('ddnsto_docker_plan' if plan else 'ddnsto_docker_lifecycle'),
-                'fixture', str(SOURCE.parent / 'business.sh'), str(SOURCE)]
+                'fixture', str(SOURCE.parent / 'business.sh'), str(SOURCE),
+                str(SOURCE.parent / 'managed-cli.sh')]
 
     def invoke(self, action='install', plan=False, **kw):
         self.assertTrue(SOURCE.exists(), 'missing Docker lifecycle implementation')

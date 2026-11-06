@@ -15,12 +15,20 @@ EXPECTED = {x['source_path']: x['sha256'] for x in HISTORY['files']
             if not x['source_path'].endswith(('VERSION', 'VERSION_LITE'))}
 HARNESS = r'''
 . "$BUSINESS"
-. "$LIFECYCLE"
+. "$LIBRARY/install-bounds.sh"
+. "$LIBRARY/install-package.sh"
 [ ! -f "$PINS" ] || . "$PINS"
 status() { :; }
 id() { printf '0\n'; }
 ddnsto_download() { printf 'UNEXPECTED_METADATA %s\n' "$1"; return 91; }
-ddnsto_verified_download() { printf 'PRODUCT %s %s\n' "$1" "$3"; printf fixture > "$2"; }
+product_count=0
+ddnsto_verified_download() {
+    printf 'PRODUCT %s %s\n' "$1" "$3"
+    product_count=$((product_count + 1))
+    # End before package mutation; the native namespace suite tests installation.
+    [ "$product_count" -lt 3 ] || return 77
+}
+installer_package_cache() { PACKAGE_CACHE=$TEST_ROOT/cache; }
 FORCE_VERSION=$VARIANT
 VERIFY_STATUS=0
 TOKEN=
@@ -46,11 +54,13 @@ class PinnedProducts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             script = r'''
 . "$1"
+. "$4/install-bounds.sh"
+. "$4/install-package.sh"
 ddnsto_download() { return 11; }
 transaction_dir=$2
 if ddnsto_verified_download product "$2/package" "$3"; then exit 0; else exit "$?"; fi
 '''
-            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'ddnsto/business.sh'), tmp, 'a' * 64], text=True, capture_output=True)
+            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'ddnsto/business.sh'), tmp, 'a' * 64, str(ROOT / 'lib')], text=True, capture_output=True)
             self.assertEqual(r.returncode, 11, r.stderr)
             self.assertFalse((Path(tmp) / 'package.verified').exists())
 
@@ -61,12 +71,14 @@ if ddnsto_verified_download product "$2/package" "$3"; then exit 0; else exit "$
             (Path(tmp) / 'package.verified').write_text('a' * 64 + ':4\n')
             script = r'''
 . "$1"
+. "$4/install-bounds.sh"
+. "$4/install-package.sh"
 status() { :; }
 ddnsto_download() { printf 'verified-download\n'; printf good > "$2"; }
 transaction_dir=$2
 ddnsto_verified_download product "$2/package" "$3"
 '''
-            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'ddnsto/business.sh'), tmp, 'a' * 64], text=True, capture_output=True)
+            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'ddnsto/business.sh'), tmp, 'a' * 64, str(ROOT / 'lib')], text=True, capture_output=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(artifact.read_bytes(), b'good')
 
@@ -87,6 +99,7 @@ ddnsto_verified_download product "$2/package" "$3"
                             executable.chmod(0o755)
                         env = os.environ | {'BUSINESS': str(ROOT / 'ddnsto/business.sh'),
                             'LIFECYCLE': str(ROOT / 'ddnsto/openwrt-lifecycle.sh'),
+                            'LIBRARY': str(ROOT / 'lib'),
                             'PINS': str(ROOT / 'ddnsto/product-pins.sh'), 'TEST_ROOT': tmp,
                             'FIXTURE': tmp, 'PATH': str(fixture / 'tools') + ':' + os.environ['PATH'],
                             'DDNSTO_CONFIG_PATH': tmp + '/etc/config/ddnsto',
@@ -94,7 +107,7 @@ ddnsto_verified_download product "$2/package" "$3"
                             'DDNSTO_SERVICE_PATH': tmp + '/etc/init.d/ddnsto',
                             'PM': pm, 'ARCH': arch, 'VARIANT': variant}
                         result = subprocess.run(['sh', '-eu', '-c', HARNESS], env=env, capture_output=True, text=True)
-                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertEqual(result.returncode, 77, result.stdout + result.stderr)
                         folder = variant + ('-apk' if pm == 'apk' else '')
                         paths = [f'openwrt/{folder}/{version}/ddnsto_{member}.{ext}',
                                  f'openwrt/luci-app-ddnsto.{ext}', f'openwrt/luci-i18n-ddnsto-zh-cn.{ext}']
