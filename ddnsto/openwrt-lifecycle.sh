@@ -267,7 +267,7 @@ ddnsto_openwrt_lifecycle() (
     set +e
     umask 077
     export LC_ALL=C
-    case "${ACTION:-}" in configure|repair|uninstall) ;; *) ddnsto_ow_error 'unsupported lifecycle action'; return 2 ;; esac
+    case "${ACTION:-}" in start|stop|restart|configure|repair|uninstall) ;; *) ddnsto_ow_error 'unsupported lifecycle action'; return 2 ;; esac
     case "${package_manager:-}" in opkg|apk) ;; *) ddnsto_ow_error 'opkg or apk required'; return 2 ;; esac
     [ "${REQUESTED_METHOD:-auto}" != docker ] || { ddnsto_ow_error 'container migration is not supported'; return 2; }
     if [ "$ACTION" = configure ]; then
@@ -331,15 +331,24 @@ ddnsto_openwrt_lifecycle() (
     }
     if [ "$ACTION" = configure ]; then
         uci -c "$ow_work/config" -t "$ow_work/delta" -q set "ddnsto.@ddnsto[0].token=$TOKEN" >/dev/null 2>&1 || return 2
-    else
+    elif [ "$ACTION" != stop ]; then
         ow_token=$(uci -c "$ow_work/config" -t "$ow_work/delta" -q get 'ddnsto.@ddnsto[0].token' 2>/dev/null)
         [ -n "$ow_token" ] || { ddnsto_ow_error 'existing token required; use configure first'; return 2; }
         unset ow_token
     fi
-    uci -c "$ow_work/config" -t "$ow_work/delta" -q set 'ddnsto.@ddnsto[0].enabled=1' >/dev/null 2>&1 || return 2
+    ow_enable=1
+    [ "$ACTION" != stop ] || ow_enable=0
+    uci -c "$ow_work/config" -t "$ow_work/delta" -q set "ddnsto.@ddnsto[0].enabled=$ow_enable" >/dev/null 2>&1 || return 2
     uci -c "$ow_work/config" -t "$ow_work/delta" -q commit ddnsto >/dev/null 2>&1 || return 2
     ow_dirty=1
     mv -f "$ow_work/config/ddnsto" "$config" || return 2
+    if [ "$ACTION" = stop ]; then
+        "$service_path" disable >/dev/null 2>&1 && "$service_path" stop >/dev/null 2>&1 &&
+            ddnsto_ow_wait_service stopped || return 13
+        ow_dirty=0
+        printf 'operation=stop local_service=stopped cloud_status=unverified\n'
+        return 0
+    fi
     "$service_path" enable >/dev/null 2>&1 || return 13
     "$service_path" restart >/dev/null 2>&1 || return 13
     ow_attempt=0

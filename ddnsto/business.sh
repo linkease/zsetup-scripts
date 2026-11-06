@@ -1,31 +1,7 @@
 # Included at build time; only ddnsto-install.sh is a public installer.
 ddnsto_error() { printf 'DDNSTO: %s\n' "$*" >&2; }
 
-ddnsto_usage() {
-    printf '%s\n' 'Usage: ddnsto-install.sh [--token TOKEN] [--force-version lite|standard] [--verify-status]' \
-        'OpenWrt: token optional; automatic Lite selection below 900 MB.' \
-        'Linux x86_64/aarch64: --token required without an interactive terminal.'
-    printf '%s\n' 'Linux systemd: user preparation + sudo -n commit (or explicit root), system scope; --installer-prefix PATH and --installer-work-dir PATH precede business arguments.'
-}
-
-ddnsto_parse_args() {
-    TOKEN=
-    FORCE_VERSION=
-    VERIFY_STATUS=0
-    while [ "$#" -gt 0 ]; do
-        case "$1" in
-            --token|--force-version)
-                [ "$#" -ge 2 ] && [ -n "$2" ] || { ddnsto_error "$1 requires a value"; return 2; }
-                case "$1" in --token) TOKEN=$2 ;; *) FORCE_VERSION=$2 ;; esac
-                shift 2 ;;
-            --token=*) TOKEN=${1#--token=}; [ -n "$TOKEN" ] || return 2; shift ;;
-            --force-version=*) FORCE_VERSION=${1#--force-version=}; shift ;;
-            --verify-status) VERIFY_STATUS=1; shift ;;
-            *) ddnsto_error "unknown argument: $1"; return 2 ;;
-        esac
-    done
-    case "$FORCE_VERSION" in ''|lite|standard) ;; *) ddnsto_error 'version must be lite or standard'; return 2 ;; esac
-}
+# CLI/platform helpers are composed from managed-cli.sh in both entry programs.
 
 ddnsto_download() { installer_download "$@"; }
 
@@ -56,13 +32,15 @@ ddnsto_package_restore() {
 }
 
 ddnsto_register() {
-    # DDNSTO reports OK but keeps an existing unit's executable path. Only
-    # remove the already-proven managed definition, with rollback owned by
-    # installer_service_cleanup; never uninstall a foreign service.
+    if [ "${ACTION:-install}" = update ]; then
+        SERVICE_CONFIG_TOUCHED=0
+        ddnsto_managed_rewrite_unit
+        return $?
+    fi
+    # Rebinding requires explicit configure, never a repeated install.
     if [ "$SERVICE_HAD_UNIT" = 1 ]; then
-        installer_service_manager disable || return $?
-        rm -f "$SERVICE_UNIT" || return 12
-        installer_service_manager reload || return $?
+        ddnsto_error 'already installed; use update to preserve identity or configure to change Token'
+        return 2
     fi
     installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -u "$TOKEN" -daemon
 }
@@ -81,15 +59,10 @@ ddnsto_openwrt() {
         if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 900 ]; then SELECTED_VERSION=lite; else SELECTED_VERSION=standard; fi
     fi
     status "[2/4] Checking DDNSTO $SELECTED_VERSION version ($package_manager/$arch)..."
-    version_pointer=VERSION
-    [ "$SELECTED_VERSION" != lite ] || version_pointer=VERSION_LITE
-    ddnsto_download "openwrt/$version_pointer" "$transaction_dir/version" '' 1 || return $?
-    version_num=$("$ZSETUP_BIN" metadata version "$transaction_dir/version") || return $?
-    case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid version metadata'; return 11 ;; esac
+    version_num=$(ddnsto_pinned_version "$SELECTED_VERSION") || return $?
     version_folder=$SELECTED_VERSION
     [ "$pkg_ext" != apk ] || version_folder="$version_folder-apk"
     relative_folder="openwrt/$version_folder/$version_num"
-    ddnsto_download "$relative_folder/SHA256SUMS" "$transaction_dir/sums" '' 1 || return $?
     status "      DDNSTO $version_num ($SELECTED_VERSION; Lite below 900 MB)"
     status '[3/4] Downloading and verifying DDNSTO packages...'
     installer_package_cache "$version_num-$version_folder" "$arch" || return $?
@@ -98,23 +71,17 @@ ddnsto_openwrt() {
     ui_package="luci-app-ddnsto.$pkg_ext"
     language_package="luci-i18n-ddnsto-zh-cn.$pkg_ext"
     for package in "$main_package" "$ui_package" "$language_package"; do
-        digest=$(ddnsto_checksum "$transaction_dir/sums" "$package") || return $?
-        ddnsto_verified_download "$relative_folder/$package" "$package_cache/$package" "$digest" || return $?
+        case "$package" in ddnsto_*) product_path="$relative_folder/$package" ;; *) product_path="openwrt/$package" ;; esac
+        digest=$(ddnsto_pinned_sha "$product_path") || return $?
+        ddnsto_verified_download "$product_path" "$package_cache/$package" "$digest" || return $?
     done
     status '[4/4] Installing DDNSTO packages...'
-    # All packages are verified before touching dependencies or installed packages.
-    config_path=${DDNSTO_CONFIG_PATH:-/etc/config/ddnsto}
-    deprecated_config=0
-    if [ -e "$config_path" ] || [ -L "$config_path" ]; then
-        [ "$("$ZSETUP_BIN" storage "$config_path" get system_protected)" = true ] || return 12
-        installer_file_size "$config_path" || return 11
-        [ "$INSTALLER_FILE_SIZE" -le 16384 ] || return 11
-    fi
-    if [ -f "$config_path" ] && grep -Eqi 'global' "$config_path"; then
-        installer_exec_native "$ZSETUP_BIN" run -- cp -p "$config_path" "$transaction_dir/deprecated-config" || return $?
-        deprecated_config=1
-        rm -f "$config_path"
-    fi
+    ddnsto_openwrt_apply
+}
+
+# Package hooks run while the retained-config wrapper has disabled the service.
+# Do not remove existing packages first: opkg upgrade preserves dependency state.
+ddnsto_openwrt_apply_packages() {
     if [ "$package_manager" = opkg ]; then
         if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
             installer_package_command update update && installer_package_command install install luci-compat || status 'DDNSTO: luci-compat installation failed'
@@ -128,8 +95,7 @@ ddnsto_openwrt() {
         if [ "$ddnsto_has_runtime" = 0 ]; then
             installer_package_command update update && installer_package_command install install luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
         fi
-        installer_package_command remove remove app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
-        for package in "$main_package" "$ui_package" "$language_package"; do installer_package_command install install "$package_cache/$package" || return $?; done
+        for package in "$main_package" "$ui_package" "$language_package"; do installer_package_command install install --force-reinstall "$package_cache/$package" || return $?; done
     else
         if [ -f /www/luci-static/resources/luci.js ] && [ ! -f /usr/lib/lua/luci/cbi.lua ]; then
             installer_package_command update update && installer_package_command add add luci-compat || status 'DDNSTO: luci-compat installation failed'
@@ -137,31 +103,17 @@ ddnsto_openwrt() {
         if ! installer_package_command query "$transaction_dir/pm-query" info -e luci-lua-runtime >/dev/null 2>&1; then
             installer_package_command update update && installer_package_command add add luci-lua-runtime || status 'DDNSTO: luci-lua-runtime installation failed'
         fi
-        installer_package_command del del app-meta-ddnsto luci-i18n-ddnsto-zh-cn luci-app-ddnsto ddnsto || true
         for package in "$main_package" "$ui_package" "$language_package"; do installer_package_command add add --allow-untrusted "$package_cache/$package" || return $?; done
     fi
-    installer_exec_native "$ZSETUP_BIN" run -- ddnsto -v || return $?
-    deprecated_config=0
-    if [ -n "$TOKEN" ]; then
-        installer_exec_native "$ZSETUP_BIN" run -- uci set "ddnsto.@ddnsto[0].token=$TOKEN" || return $?
-        installer_exec_native "$ZSETUP_BIN" run -- uci set 'ddnsto.@ddnsto[0].enabled=1' || return $?
-        installer_exec_native "$ZSETUP_BIN" run -- uci commit ddnsto || return $?
-        installer_exec_native "$ZSETUP_BIN" run -- "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" restart || return $?
-    else
-        status 'DDNSTO: get a token at https://www.ddnsto.com and configure it in LuCI'
-    fi
-    if [ "$VERIFY_STATUS" = 1 ]; then
-        installer_exec_native "$ZSETUP_BIN" run -- pgrep -x ddnstod >/dev/null || { ddnsto_error 'DDNSTO process not found'; return 1; }
-        installer_exec_native "$ZSETUP_BIN" run -- ddnsto -w || return $?
-    fi
-    status 'DDNSTO installation completed; refresh LuCI if its menu is missing'
+
+    installer_exec_native "$ZSETUP_BIN" run -- "${DDNSTO_OPENWRT_BIN_PATH:-/usr/sbin/ddnstod}" -v || return $?
 }
 
 ddnsto_linux_metadata() {
     case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
     [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
-    if [ -z "$TOKEN" ]; then
+    if [ -z "$TOKEN" ] && [ "${ACTION:-install}" != update ]; then
         if [ -t 0 ]; then
             printf 'DDNSTO token: ' >&2
             IFS= read -r TOKEN
@@ -169,11 +121,16 @@ ddnsto_linux_metadata() {
             ddnsto_error 'Linux needs --token TOKEN for noninteractive installation'; return 2
         fi
     fi
-    [ -n "$TOKEN" ] || { ddnsto_error 'empty token'; return 2; }
-    version_num=${DDNSTO_VERSION:-4.2.3}
+    [ -n "$TOKEN" ] || [ "${ACTION:-install}" = update ] || { ddnsto_error 'empty token'; return 2; }
+    version_num=${DDNSTO_VERSION:-4.2.8}
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid DDNSTO_VERSION'; return 2 ;; esac
     status "[2/4] Checking DDNSTO standard $version_num ($arch)..."
     archive_name="ddnsto-standard-$version_num.tar.gz"
+    if [ "$version_num" = 4.2.8 ]; then
+        digest=$(ddnsto_pinned_sha "linux-binary/$archive_name") || return $?
+        return 0
+    fi
+    # Explicit historical DDNSTO_VERSION keeps the upstream metadata contract.
     ddnsto_download linux-binary/SHA256SUMS "$transaction_dir/sums" '' 1 || return $?
     digest=$(ddnsto_checksum "$transaction_dir/sums" "$archive_name") || return $?
 }
@@ -201,27 +158,44 @@ ddnsto_linux() {
 }
 
 ddnsto_install() {
-    : "${ZSETUP_BIN:?zsetup is required}" "${ZSETUP_SOURCE_BASES:?source group is required}"
     ddnsto_parse_args "$@" || return $?
+    if [ "$PLAN_ONLY" = 1 ]; then ddnsto_plan; return $?; fi
+    : "${ZSETUP_BIN:?zsetup is required}"
     os=${ZSETUP_OS:-$("$ZSETUP_BIN" context get os)}
     package_manager=${ZSETUP_PACKAGE_MANAGER:-$("$ZSETUP_BIN" context get package_manager)}
     arch=${ZSETUP_ARCH:-$("$ZSETUP_BIN" context get arch)}
-    case "$os:$package_manager" in
-        openwrt:opkg|openwrt:apk) business_platform=openwrt ;;
-        ubuntu:apt|debian:apt|centos:yum|centos:dnf|rhel:yum|rhel:dnf|linux:*) business_platform=linux ;;
-        *) ddnsto_error "unsupported platform: $os/$package_manager"; return 2 ;;
+    ddnsto_detect_platform || return $?
+    ddnsto_validate_platform_options || return $?
+    [ "$REQUESTED_METHOD" != docker ] || { ddnsto_error 'Docker requires the public entry'; return 2; }
+    case "$detected_platform" in linux|openwrt) business_platform=$detected_platform ;; *) ddnsto_error 'native installation unavailable for this device'; return 2 ;; esac
+    case "$ACTION" in
+        status|start|stop|restart|repair|configure|uninstall) ddnsto_managed_action; return $? ;;
     esac
+    : "${ZSETUP_SOURCE_BASES:?source group is required}"
     INSTALLER_REMOTE_APP=ddnsto
     if [ "$business_platform" = linux ]; then
         [ -z "${DDNSTO_BIN_PATH:-}" ] || { ddnsto_error 'DDNSTO_BIN_PATH is retired; use --installer-prefix for the protected installation root'; return 2; }
+        [ ! -e "${DDNSTO_DOCKER_STATE_DIR:-/etc/ddnsto-docker}" ] && [ ! -L "${DDNSTO_DOCKER_STATE_DIR:-/etc/ddnsto-docker}" ] || { ddnsto_error 'Docker state conflicts with native installation'; return 2; }
+        if [ "$ACTION" = update ]; then ddnsto_managed_owned || return $?; fi
         ip_uid=$("$ZSETUP_BIN" storage / get effective_uid) || return 12
         if [ "$ip_uid" != 0 ]; then installer_privilege_install ddnsto "$@"; return $?; fi
         installer_service_prepare ddnsto || return $?
+        if [ "$ACTION" = install ] && { [ -n "$SERVICE_OLD" ] || [ "$SERVICE_HAD_UNIT" = 1 ]; }; then
+            ddnsto_error 'already installed; use update to preserve identity or configure to change Token'
+            return 2
+        fi
+        if [ "$ACTION" = update ]; then
+            [ -n "$SERVICE_OLD" ] && [ "$SERVICE_HAD_UNIT" = 1 ] && [ "$SERVICE_HAD_CONFIG" = 1 ] || { ddnsto_error 'update requires a complete managed installation'; return 2; }
+        fi
         ddnsto_linux || return $?
         installer_transaction_finish
         return $?
     fi
+    case "$ACTION" in install|update) ;; *) return 2 ;; esac
+    ddnsto_openwrt_preflight || return $?
     installer_package_prepare ddnsto || return $?
+    # Recheck installed/config state under the machine lease before downloads.
+    ddnsto_openwrt_preflight || return $?
     INSTALLER_PACKAGE_CLEANUP=ddnsto_package_restore
     ddnsto_openwrt || return $?
     PACKAGE_PHASE=complete

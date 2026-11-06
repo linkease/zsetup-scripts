@@ -666,6 +666,11 @@ installer_service_prepare() {
     fi
     installer_transaction_begin || return $?
     INSTALLER_CLEANUP_HOOK=installer_service_cleanup
+    # Optional app-wide lease: acquired before destination snapshots and held
+    # through recovery. The hook may extend cleanup, never replace rollback.
+    if command -v "${SERVICE_APP}_service_lock" >/dev/null 2>&1; then
+        "${SERVICE_APP}_service_lock" || return $?
+    fi
     if ! mkdir "$INSTALLER_PREFIX/.service-lock" 2>/dev/null; then
         printf 'Installer: active or interrupted destination transaction at %s/.service-lock\n' "$INSTALLER_PREFIX" >&2; return 2
     fi
@@ -931,6 +936,11 @@ installer_service_activate() {
     # not accepted merely because its registration command returned zero.
     sleep 1
     installer_service_manager is-active || return $?
+    # Optional business health runs inside the transaction, before aliases,
+    # previous-pointer changes, the commit point, or old-version pruning.
+    if command -v "${SERVICE_APP}_service_health" >/dev/null 2>&1; then
+        "${SERVICE_APP}_service_health" || return $?
+    fi
     installer_service_alias || return $?
     if [ -n "$SERVICE_OLD" ] && [ "$SERVICE_OLD" != "versions/$SERVICE_VERSION" ]; then
         ln -s "$SERVICE_OLD" "$INSTALLER_PREFIX/.previous.$$" || return 12
@@ -1375,7 +1385,14 @@ installer_privilege_install() {
         ddnsto)
             installer_service_cached "$version_num" "$digest" || return $?
             [ "$SERVICE_CACHED" = 1 ] || installer_download "linux-binary/$archive_name" "$transaction_dir/$archive_name" "$digest" || return $?
-            set -- --token "$TOKEN"
+            # Older adapters retain their original token-only protocol.
+            if command -v ddnsto_privilege_args >/dev/null 2>&1; then
+                ddnsto_privilege_args || return $?
+                set -- --action "$DDNSTO_ROOT_ACTION"
+                [ -z "$DDNSTO_ROOT_TOKEN" ] || set -- "$@" --token "$DDNSTO_ROOT_TOKEN"
+            else
+                set -- --token "$TOKEN"
+            fi
             ;;
         linkease)
             installer_service_cached "$version_num" "$le_archive_sha:$le_mount_sha" || return $?
@@ -1962,6 +1979,9 @@ installer_service_prepare() {
     fi
     installer_transaction_begin || return $?
     INSTALLER_CLEANUP_HOOK=installer_service_cleanup
+    if command -v "${SERVICE_APP}_service_lock" >/dev/null 2>&1; then
+        "${SERVICE_APP}_service_lock" || return $?
+    fi
     if ! mkdir "$INSTALLER_PREFIX/.service-lock" 2>/dev/null; then
         printf 'Installer: active or interrupted destination transaction at %s/.service-lock\n' "$INSTALLER_PREFIX" >&2; return 2
     fi
@@ -2196,6 +2216,9 @@ installer_service_activate() {
     installer_service_manager is-active || return $?
     sleep 1
     installer_service_manager is-active || return $?
+    if command -v "${SERVICE_APP}_service_health" >/dev/null 2>&1; then
+        "${SERVICE_APP}_service_health" || return $?
+    fi
     installer_service_alias || return $?
     if [ -n "$SERVICE_OLD" ] && [ "$SERVICE_OLD" != "versions/$SERVICE_VERSION" ]; then
         ln -s "$SERVICE_OLD" "$INSTALLER_PREFIX/.previous.$$" || return 12

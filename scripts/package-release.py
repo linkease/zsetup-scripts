@@ -18,6 +18,18 @@ ROOT = Path(__file__).resolve().parents[1]
 DDNSTO = runpy.run_path(str(ROOT / "ddnsto/release.py"))
 
 
+def copy_desktop_candidates(binary, include=False):
+    if not include:
+        return
+    catalog = json.loads((ROOT / 'catalog.json').read_text())
+    versions = {Path(r['path']).parts[1] for r in catalog['installers'] if r['application'] == 'ddnsto'}
+    if len(versions) != 1:
+        raise ValueError('DDNSTO needs one candidate version')
+    directory = binary / 'ddnsto' / ('desktop-candidate-' + versions.pop())
+    for name in ('install.ps1', 'install-macos.sh'):
+        copy_immutable(ROOT / 'ddnsto' / name, directory / name)
+
+
 def git_commit(root):
     return subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
 
@@ -32,6 +44,7 @@ def main():
     parser.add_argument("--zsetup-release", type=Path, help="canonical Rust package; default ZSETUP_ROOT/dist/release")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/release")
     parser.add_argument("--require-clean", action="store_true", help="require committed scripts and zsetup sources; server verification remains a separate release step")
+    parser.add_argument('--include-desktop-candidates', action='store_true', help='stage desktop candidates without activating aliases')
     args = parser.parse_args()
     zroot = args.zsetup_root.resolve()
     output = args.output.resolve()
@@ -80,7 +93,8 @@ def main():
             parts = file.relative_to(previous_binary).parts
             if len(parts) != 3 or not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", parts[1]) or parts[1] in {".", "..", "stable", "latest"}:
                 continue
-            if (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] in {"install.sh", f"{parts[0]}-install.sh", f"{parts[0]}-install.ps1"}):
+            desktop_history = parts[0] == 'ddnsto' and parts[1].startswith('desktop-candidate-') and parts[2] in {'install.ps1', 'install-macos.sh'}
+            if desktop_history or (parts[0] == "zsetup" and parts[2] in native_names) or (parts[0] in applications and parts[2] in {"install.sh", f"{parts[0]}-install.sh", f"{parts[0]}-install.ps1"}):
                 copy_immutable(file, binary.joinpath(*parts))
         # Refuse replacing any previously staged immutable executable or installer.
         for file in sorted(release.iterdir()):
@@ -103,10 +117,8 @@ def main():
             installer = ROOT / scripts.pop()
             shutil.copy2(installer, binary / app / installer.name)
             shutil.copy2(installer, binary / app / "install.sh")  # Existing public URL.
-        # Native desktop entrypoints are public business installers, but are
-        # not zsetup POSIX catalog entries and therefore are copied explicitly.
-        for relative in ("install.ps1", "install-macos.sh"):
-            copy_immutable(ROOT / "ddnsto" / relative, binary / "ddnsto" / relative)
+        # Candidate inclusion never activates desktop aliases or catalog rows.
+        copy_desktop_candidates(binary, args.include_desktop_candidates)
         DDNSTO["copy_compat_installers"](ROOT / "ddnsto/ddnsto-install.sh", binary / "ddnsto")
         subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(package), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
         if is_rust:

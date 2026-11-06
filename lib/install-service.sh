@@ -79,6 +79,11 @@ installer_service_prepare() {
     fi
     installer_transaction_begin || return $?
     INSTALLER_CLEANUP_HOOK=installer_service_cleanup
+    # Optional app-wide lease: acquired before destination snapshots and held
+    # through recovery. The hook may extend cleanup, never replace rollback.
+    if command -v "${SERVICE_APP}_service_lock" >/dev/null 2>&1; then
+        "${SERVICE_APP}_service_lock" || return $?
+    fi
     if ! mkdir "$INSTALLER_PREFIX/.service-lock" 2>/dev/null; then
         printf 'Installer: active or interrupted destination transaction at %s/.service-lock\n' "$INSTALLER_PREFIX" >&2; return 2
     fi
@@ -344,6 +349,11 @@ installer_service_activate() {
     # not accepted merely because its registration command returned zero.
     sleep 1
     installer_service_manager is-active || return $?
+    # Optional business health runs inside the transaction, before aliases,
+    # previous-pointer changes, the commit point, or old-version pruning.
+    if command -v "${SERVICE_APP}_service_health" >/dev/null 2>&1; then
+        "${SERVICE_APP}_service_health" || return $?
+    fi
     installer_service_alias || return $?
     if [ -n "$SERVICE_OLD" ] && [ "$SERVICE_OLD" != "versions/$SERVICE_VERSION" ]; then
         ln -s "$SERVICE_OLD" "$INSTALLER_PREFIX/.previous.$$" || return 12

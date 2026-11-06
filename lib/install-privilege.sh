@@ -213,7 +213,14 @@ installer_privilege_install() {
         ddnsto)
             installer_service_cached "$version_num" "$digest" || return $?
             [ "$SERVICE_CACHED" = 1 ] || installer_download "linux-binary/$archive_name" "$transaction_dir/$archive_name" "$digest" || return $?
-            set -- --token "$TOKEN"
+            # Older adapters retain their original token-only protocol.
+            if command -v ddnsto_privilege_args >/dev/null 2>&1; then
+                ddnsto_privilege_args || return $?
+                set -- --action "$DDNSTO_ROOT_ACTION"
+                [ -z "$DDNSTO_ROOT_TOKEN" ] || set -- "$@" --token "$DDNSTO_ROOT_TOKEN"
+            else
+                set -- --token "$TOKEN"
+            fi
             ;;
         linkease)
             installer_service_cached "$version_num" "$le_archive_sha:$le_mount_sha" || return $?

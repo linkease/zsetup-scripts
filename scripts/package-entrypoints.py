@@ -33,11 +33,12 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.ddnsto-entries-', dir=output.parent) as tmp:
         staging = Path(tmp) / 'candidate'
-        for name in ('install.sh', 'install.ps1'):
+        for name in ('ddnsto-install.sh', 'install.sh', 'install.ps1'):
             for directory in (Path('ddnsto'), version_dir):
                 target = staging / 'binary' / directory / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(ROOT / 'ddnsto' / name, target)
+                source = 'ddnsto-install.sh' if name == 'install.sh' else name
+                shutil.copy2(ROOT / 'ddnsto' / source, target)
         # Audit metadata travels with the candidate, never fetched as executable
         # policy at runtime. Each public entry remains standalone.
         shutil.copy2(ROOT / 'ddnsto/install-rules.json', staging / 'binary' / version_dir / 'install-rules.json')

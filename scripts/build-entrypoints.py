@@ -39,8 +39,22 @@ def main():
             common += helper("install-launcher.sh")
         if app in {"ks-cli", "kspeeder"}:
             common += (ROOT / "kspeeder/lib/binary.sh").read_text().rstrip() + "\n\n"
+        business = (folder / "business.sh").read_text().rstrip() + "\n\n"
+        if app == 'ddnsto':
+            business = ((folder / 'managed-cli.sh').read_text().rstrip() + '\n\n'
+                        + (folder / 'managed-service.sh').read_text().rstrip() + '\n\n'
+                        + business)
+            # One shell entry on Linux/NAS/macOS; no sibling source fetch.
+            common = ('#!/bin/sh\nif [ "$(uname -s)" = Darwin ]; then\n(\n'
+                      + (folder / 'install-macos.sh').read_text().rstrip()
+                      + '\n)\nexit "$?"\nfi\n\n' + common
+                      + (folder / 'bootstrap-policy.sh').read_text() + '\n')
+            for name in ('product-pins.sh', 'docker-probe.sh', 'docker-lifecycle.sh',
+                         'method-selection.sh', 'synology-download.sh', 'extra-platforms.sh',
+                         'openwrt-lifecycle.sh', 'openwrt-adapter.sh'):
+                business += (folder / name).read_text().rstrip() + '\n\n'
         content = common + "\n# Business logic: maintained in " + str(folder.relative_to(ROOT)) + "/business.sh\n"
-        content += (folder / "business.sh").read_text().rstrip() + "\n\n"
+        content += business
         # Emit the same maintained sources for the root phase. A running
         # one-key sh -c entry need not be a file and never downloads itself.
         if app in {"ddnsto", "linkease"}:
@@ -49,19 +63,26 @@ def main():
             # single-argument limit without requiring a second script fetch.
             program = 'set -eu\nstatus() { printf \'%s\\n\' "$*" >&2; }\n'
             program += foundation + dispatch + helper("install-service.sh")
-            program += (folder / "business.sh").read_text() + f'\ninstaller_dispatch {app} "$@"\n'
+            program += business + f'\ninstaller_dispatch {app} "$@"\n'
             program = "\n".join(line for line in program.splitlines() if line.strip() and not line.lstrip().startswith("#")) + "\n"
             delimiter = "ZSETUP_PRIVATE_ROOT_PROGRAM"
             assert delimiter not in program
+            if len(program.encode()) > 1048576:
+                raise ValueError(f"{app} exceeds verified privileged-program copy budget")
             content += f"installer_privileged_program() {{\ncat <<'{delimiter}'\n{program}{delimiter}\n}}\n"
-        content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n    bootstrap_zsetup\n"
+        content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n"
+        content += "    ddnsto_bootstrap_zsetup || return $?\n" if app == 'ddnsto' else "    bootstrap_zsetup\n"
         content += "    status \"      zsetup $RESCUE_VERSION is ready\"\n    ZSETUP_BIN=$ACTIVE_ZSETUP\n"
         content += "    ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}\n"
         content += "    ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}\n"
         content += "    export ZSETUP_BIN ZSETUP_ARCH ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK\n"
         content += f"    installer_dispatch {app} \"$@\"\n}}\n\n"
         content += (folder / "main.sh").read_text()
-        if len(content.encode()) >= 131072:
+        # DDNSTO's multi-platform entry is executed as a verified local file,
+        # never as a single shell argument. Other apps retain their sh -c ABI.
+        if app == 'ddnsto' and len(content.encode()) > 1048576:
+            raise ValueError('ddnsto exceeds standalone file budget')
+        if app != 'ddnsto' and len(content.encode()) >= 131072:
             raise ValueError(f"{app} exceeds Linux sh -c single-argument budget")
         output = folder / f"{app}-install.sh"
         if args.check:

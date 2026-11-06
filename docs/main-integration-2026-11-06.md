@@ -11,6 +11,20 @@
 
 ## 已执行检查
 
+### 脚本适配进展（2026-11-06，未提交工作区）
+
+- 用户明确要求不修改 `zsetup-rust`：本次只改本仓库脚本、生成器、打包工具与测试。原生源码不再作为脚本适配的前置阻塞。
+- 使用官方已发布的 Linux x86_64 zsetup 0.5.0，SHA256 为 `9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617`，与官方 SHA256SUMS 和脚本 pin 一致。没有重新编译原生程序。
+- 新增 `sh scripts/check.sh --native-bin /absolute/path/to/zsetup`，用于复用发布程序执行运行时回归；不替代 aggregate 原生发布包验证。完整 suite 尚未全部通过。
+- 唯一生成入口保持 `ddnsto/ddnsto-install.sh`，`install.sh` 只在打包时生成兼容副本。DDNSTO 候选路径更新为 0.2.2；大入口必须下载到文件后执行，不能放入 `sh -c` 单个参数。未上传候选。
+- 已接入 Linux 受保护安装、保留配置更新、离线状态与生命周期；重复 Linux install 明确拒绝，提示 update/configure，不隐式重写 Token。Docker/Synology 已有单独适配入口，仍不代表真机验收。
+- 已通过：生成一致性、standalone/desktop 打包、24 项 CLI（含真实发布 native）、17 项 bootstrap（无跳过）、32 项 Docker 行为、15 项 Synology 下载、56 项 macOS 行为；storage/bounds/transaction 和隔离容器权限桥接通过。18 项 Linux 生命周期隔离测试由实现子任务验证通过，使用发布 native 和模拟 systemctl，不是实际产品/systemd 验收。
+- OpenWrt 已补接独立 procd 生命周期和共享包事务下的 update；在用户指定 iStoreOS/opkg/x86_64 设备完成保留配置升级、启停、重启、repair 和禁用状态升级。详情见 [OpenWrt 真机验证](verification/2026-11-06-ddnsto-openwrt.md)。APK/其他架构及真机卸载仍未验证。
+- 仍阻止合入 main：交互式 Docker 选择未重新接通；其余旧 cross-platform 测试和 publication checker 尚待适配；共享 helper 导致其他应用生成字节变化，需要检查不可变版本边界。不得删除失败测试来宣称通过。
+- 本地 main 未移动，未推送、部署；用户确认前禁止推送 origin/main。
+
+### 迁移检查点的历史失败
+
 - `git diff --check origin/main...HEAD` 通过。
 - `python3 -B scripts/build-entrypoints.py --check` 失败：DDNSTO 生成入口超过 Linux 单参数 131072 字节限制。
 - `python3 -B ddnsto/tests/cross_platform_installer_test.py` 失败于第一个 operation-lock suite：5 项失败，主线 business 尚未接入旧分支的 `ddnsto_with_operation_lock`。不能通过直接添加第二套事务锁来掩盖模型冲突。
@@ -29,14 +43,17 @@
 9. 处理入口长度限制：减少生成重复或采用安全的下载文件执行。不能简单删除长度门禁而继续宣传 sh -c 可用。
 10. 保留主线 storage/privilege/service/package 测试，将测试分支的行为断言改用主线模型。不得删除失败测试或把未验证状态当通过。
 
-## 验证依赖缺口
+## 原生验证边界（已修正）
+
+脚本兼容性使用上述官方发布程序验证，不要求获取或修改原生源码。
+本节后续路径仅用于未来**原生 aggregate 发布包**验证，不是本次脚本开发的阻塞，也不授权修改原生实现。
 
 仓库记录的权威源码路径
 `/projects/workspace-linkease-ubuntu/linkease-vpn/linkease-tunnel/zsetup-rust`
 及 `/projects/workspace-linkease-ubuntu/toolchains/` 在当前机器上不存在，PATH 中也没有 zsetup。
 已检查 workspace、repos、worktrees 等目录，尚未找到可验证的源码/发布包组合；不能断言其他位置绝对不存在。
 
-需要实际 `ZSETUP_RUST_ROOT` 和对应 `RUST_RELEASE_PACKAGE`，包含：
+如果另行执行原生 aggregate 发布包检查，才需要实际 `ZSETUP_RUST_ROOT` 和对应 `RUST_RELEASE_PACKAGE`，包含：
 
 ```text
 ZSETUP_RUST_ROOT/Cargo.toml
@@ -46,6 +63,6 @@ RUST_RELEASE_PACKAGE/release-manifest.json
 RUST_RELEASE_PACKAGE/immutable/zsetup/<version>/zsetup-linux-x86_64
 ```
 
-还需阅读该源码仓库的产品原则、配置、生命周期和统一发布文档，遵守本仓库 AGENTS 的前置要求。未定位前，不猜测或修改原生协议。
+不猜测或修改原生协议；兼容性以发布二进制的帮助、版本和隔离行为测试为证据。
 
-随后执行 `sh scripts/check.sh ZSETUP_RUST_ROOT RUST_RELEASE_PACKAGE`，并补跑未包含在 check.sh 中的真实隔离 sudo/systemd suite。桌面与 NAS fixture 成功不等于真机验收。
+原生 aggregate 检查仍保留 `sh scripts/check.sh ZSETUP_RUST_ROOT RUST_RELEASE_PACKAGE`；脚本适配改用 `--native-bin` 模式和独立测试。桌面与 NAS fixture 成功不等于真机验收。
