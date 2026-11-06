@@ -8,8 +8,8 @@ try {
     if (-not $env:ZSETUP_BIN -or -not [IO.Path]::IsPathRooted($env:ZSETUP_BIN)) {
         throw 'scoop: trusted absolute ZSETUP_BIN is required'
     }
-    $code = Invoke-ScoopBusiness -InstallerArguments $script:ScoopEntryArguments
-    exit $code
+    Invoke-ScoopBusiness -InstallerArguments $script:ScoopEntryArguments
+    exit 0
 } catch {
     [Console]::Error.WriteLine($_.Exception.Message)
     exit 17
