@@ -13,8 +13,8 @@ function Assert-True([bool]$Condition, [string]$Message) {
 }
 
 $profile = Join-Path $TestRoot 'profile'
-$root = Join-Path $TestRoot 'installed scoop'
-$cache = Join-Path $TestRoot 'cache unicode'
+$root = Join-Path $profile 'installed scoop'
+$cache = Join-Path $profile 'cache unicode'
 New-Item -ItemType Directory -Path $profile -Force | Out-Null
 $env:USERPROFILE = $profile
 $env:ZSETUP_BIN = $Zsetup
@@ -37,8 +37,8 @@ function Set-ScoopUserPath([string]$Value) { $script:FixtureUserPath = $Value }
 
 $configPath = Join-Path $profile '.config\scoop\config.json'
 foreach ($fault in @('after-stage', 'after-root-swap', 'after-config', 'after-path')) {
-    $faultRoot = Join-Path $TestRoot ("fault " + $fault)
-    $faultCache = Join-Path $TestRoot ("fault-cache " + $fault)
+    $faultRoot = Join-Path $profile ("fault " + $fault)
+    $faultCache = Join-Path $profile ("fault-cache " + $fault)
     $script:FixtureUserPath = 'C:\fixture-bin'
     $env:ZSETUP_SCOOP_FAIL_AFTER = $fault
     $failed = $false
@@ -68,7 +68,7 @@ $second = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Js
 Assert-True ($second.status -eq 'passed' -and $second.idempotent -eq $true) 'repeat install was not idempotent'
 Assert-True ($script:FixtureUserPath.Split(';')[0] -eq (Join-Path $root 'shims')) 'repeat install duplicated or reordered PATH'
 
-$unowned = Join-Path $TestRoot 'unowned scoop'
+$unowned = Join-Path $profile 'unowned scoop'
 New-Item -ItemType Directory -Path $unowned -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $unowned 'foreign.txt') -Value 'foreign'
 $unownedRejected = $false
