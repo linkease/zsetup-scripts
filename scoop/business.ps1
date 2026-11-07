@@ -240,7 +240,10 @@ function Commit-ScoopTransaction([string]$Root, [string]$Cache, [string]$ConfigP
         if ($rootExisted) { Move-Item -LiteralPath $Root -Destination $backup -ErrorAction Stop }
         Move-Item -LiteralPath $Stage -Destination $Root -ErrorAction Stop; $swapped = $true
         foreach ($junction in @($Junctions)) {
-            New-Item -ItemType Junction -Path (Join-Path $Root $junction.path) -Target (Join-Path $Root $junction.target) -ErrorAction Stop | Out-Null
+            $createdJunction = New-Item -ItemType Junction -Path (Join-Path $Root $junction.path) -Target (Join-Path $Root $junction.target) -ErrorAction Stop
+            if ($junction.read_only) {
+                $createdJunction.Attributes = $createdJunction.Attributes -bor [IO.FileAttributes]::ReadOnly
+            }
         }
         Test-ScoopFault 'after-root-swap'; Set-ScoopConfig $ConfigPath $Root $Cache; Test-ScoopFault 'after-config'; Add-ScoopUserPath (Join-Path $Root 'shims'); Test-ScoopFault 'after-path'; Test-ScoopInstalled $Root $Work
     } catch {
@@ -299,7 +302,11 @@ function Copy-ScoopOwnedTree([string]$Root, [string]$Stage) {
                     if (-not $parent -or $parent -eq $probe) { throw 'scoop: persisted junction target escaped the owned root' }
                     $probe = $parent
                 }
-                $junctions += [pscustomobject]@{path=$relative;target=$targetRelative}
+                $junctions += [pscustomobject]@{
+                    path=$relative
+                    target=$targetRelative
+                    read_only=[bool]($item.Attributes -band [IO.FileAttributes]::ReadOnly)
+                }
                 continue
             }
             if ($item.PSIsContainer) {
