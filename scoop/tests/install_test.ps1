@@ -113,6 +113,21 @@ $upgradedJunction = Get-Item -LiteralPath $persistJunction -Force
 Assert-True ($upgradedJunction.LinkType -eq 'Junction') 'upgrade did not preserve the persisted junction type'
 Assert-True (@($upgradedJunction.Target).Count -eq 1 -and [IO.Path]::GetFullPath([string]$upgradedJunction.Target[0]) -eq [IO.Path]::GetFullPath((Split-Path -Parent $persistMarker))) 'upgrade changed the persisted junction target'
 Assert-True ((Get-Content -LiteralPath (Join-Path $persistJunction 'keep.txt') -Raw) -eq 'keep-persist') 'upgrade changed persisted data'
+
+$outside = Join-Path $profile 'outside junction target'
+$outsideMarker = Join-Path $outside 'keep.txt'
+$outsideJunction = Join-Path $root 'apps\fixture\1.0.0\outside'
+$securityStage = Join-Path $profile 'security stage'
+New-Item -ItemType Directory -Path $outside, $securityStage -Force | Out-Null
+[IO.File]::WriteAllText($outsideMarker, 'outside-keep', $script:ScoopUtf8)
+New-Item -ItemType Junction -Path $outsideJunction -Target $outside | Out-Null
+$outsideRejected = $false
+try { Copy-ScoopOwnedTree $root $securityStage | Out-Null } catch { $outsideRejected = $_.Exception.Message -match 'outside the owned root' }
+if (Test-Path -LiteralPath $outsideJunction) { [IO.Directory]::Delete($outsideJunction) }
+Remove-Item -LiteralPath $securityStage -Recurse -Force -ErrorAction SilentlyContinue
+Assert-True $outsideRejected 'upgrade copy accepted a junction outside the owned root'
+Assert-True ((Get-Content -LiteralPath $outsideMarker -Raw) -eq 'outside-keep') 'rejected junction changed outside data'
+
 $third = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Json
 Assert-True ($third.status -eq 'passed' -and $third.idempotent -eq $true) 'upgraded 0.1.1 install was not idempotent'
 
