@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "windows-apps-0.1.0",
+  "config_version": "windows-apps-0.1.1",
   "installers": [
     {
       "application": "scoop",
@@ -8,7 +8,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "scoop/scoop-install.ps1",
-      "path": "scoop/0.1.0/scoop-install.ps1",
+      "path": "scoop/0.1.1/scoop-install.ps1",
       "background": false
     }
   ]

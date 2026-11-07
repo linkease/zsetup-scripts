@@ -1,3 +1,4 @@
+$script:ScoopInstallerVersion = '0.1.1'
 $script:ScoopRuntimeId = '0.7.16-08aea475819b8037977684c7fbbde2ae40bb1b96-windows-amd64'
 $script:ScoopRuntimeSize = 38021762
 $script:ScoopRuntimeSha256 = '66fa51769556b8d52289f354d3e43952338814b6ef357b04868f829fc1c5c4dc'
@@ -172,7 +173,7 @@ function Expand-VerifiedScoopArchive([string]$Archive, [string]$Destination, [st
 
 function Write-ScoopOwnedReceipt([string]$Root, [string]$Transport) {
     Write-ScoopJson (Join-Path $Root $script:ScoopReceiptName) ([ordered]@{
-        schema_version = 1; owner = 'linkease-zsetup'; installer_version = '0.1.0'; runtime_bundle_id = $script:ScoopRuntimeId; runtime_bundle_sha256 = $script:ScoopRuntimeSha256
+        schema_version = 1; owner = 'linkease-zsetup'; installer_version = $script:ScoopInstallerVersion; runtime_bundle_id = $script:ScoopRuntimeId; runtime_bundle_sha256 = $script:ScoopRuntimeSha256
         core_commit = $script:ScoopCoreCommit; core_sha256 = $script:ScoopCoreSha256; main_commit = $script:ScoopMainCommit; main_sha256 = $script:ScoopMainSha256; transport = $Transport
     })
 }
@@ -181,7 +182,7 @@ function Test-ScoopOwnedCurrent([string]$Root) {
     $path = Join-Path $Root $script:ScoopReceiptName
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
     try { $receipt = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { return $false }
-    return $receipt.owner -ceq 'linkease-zsetup' -and $receipt.installer_version -ceq '0.1.0' -and $receipt.runtime_bundle_id -ceq $script:ScoopRuntimeId -and $receipt.core_commit -ceq $script:ScoopCoreCommit -and $receipt.main_commit -ceq $script:ScoopMainCommit -and (Test-Path -LiteralPath (Join-Path $Root 'apps\scoop\current\bin\scoop.ps1') -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $Root 'buckets\main\bucket\7zip.json') -PathType Leaf)
+    return $receipt.owner -ceq 'linkease-zsetup' -and $receipt.installer_version -ceq $script:ScoopInstallerVersion -and $receipt.runtime_bundle_id -ceq $script:ScoopRuntimeId -and $receipt.core_commit -ceq $script:ScoopCoreCommit -and $receipt.main_commit -ceq $script:ScoopMainCommit -and (Test-Path -LiteralPath (Join-Path $Root 'apps\scoop\current\bin\scoop.ps1') -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $Root 'buckets\main\bucket\7zip.json') -PathType Leaf)
 }
 
 function Write-ScoopShims([string]$Root) {
