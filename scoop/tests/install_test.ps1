@@ -89,6 +89,8 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $persistMarker) -Force | 
 [IO.File]::WriteAllText($bucketMarker, 'keep-bucket', $script:ScoopUtf8)
 [IO.File]::WriteAllText($persistMarker, 'keep-persist', $script:ScoopUtf8)
 New-Item -ItemType Junction -Path $persistJunction -Target (Split-Path -Parent $persistMarker) | Out-Null
+$persistJunctionItem = Get-Item -LiteralPath $persistJunction -Force
+$persistJunctionItem.Attributes = $persistJunctionItem.Attributes -bor [IO.FileAttributes]::ReadOnly
 $env:ZSETUP_SCOOP_FAIL_AFTER = 'after-root-swap'
 $upgradeFailed = $false
 try { Invoke-ScoopBusiness -InstallerArguments $arguments | Out-Null } catch {
