@@ -81,18 +81,27 @@ $oldReceipt.installer_version = '0.1.0'
 Write-ScoopJson $receiptPath $oldReceipt
 $appMarker = Join-Path $root 'apps\fixture\1.0.0\keep.txt'
 $bucketMarker = Join-Path $root 'buckets\fixture\keep.txt'
+$persistMarker = Join-Path $root 'persist\fixture\state\keep.txt'
+$persistJunction = Join-Path $root 'apps\fixture\1.0.0\state'
 New-Item -ItemType Directory -Path (Split-Path -Parent $appMarker), (Split-Path -Parent $bucketMarker) -Force | Out-Null
+New-Item -ItemType Directory -Path (Split-Path -Parent $persistMarker) -Force | Out-Null
 [IO.File]::WriteAllText($appMarker, 'keep-app', $script:ScoopUtf8)
 [IO.File]::WriteAllText($bucketMarker, 'keep-bucket', $script:ScoopUtf8)
+[IO.File]::WriteAllText($persistMarker, 'keep-persist', $script:ScoopUtf8)
+New-Item -ItemType Junction -Path $persistJunction -Target (Split-Path -Parent $persistMarker) | Out-Null
 $env:ZSETUP_SCOOP_FAIL_AFTER = 'after-root-swap'
 $upgradeFailed = $false
-try { Invoke-ScoopBusiness -InstallerArguments $arguments | Out-Null } catch { $upgradeFailed = $_.Exception.Message -match 'fault injection' }
+try { Invoke-ScoopBusiness -InstallerArguments $arguments | Out-Null } catch {
+    $upgradeFailed = $_.Exception.Message -match 'fault injection'
+    if (-not $upgradeFailed) { throw }
+}
 Remove-Item Env:ZSETUP_SCOOP_FAIL_AFTER -ErrorAction SilentlyContinue
 Assert-True $upgradeFailed '0.1.0 upgrade fault was not triggered'
 $rolledBackReceipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
 Assert-True ($rolledBackReceipt.installer_version -eq '0.1.0') 'failed upgrade did not restore the 0.1.0 receipt'
 Assert-True ((Get-Content -LiteralPath $appMarker -Raw) -eq 'keep-app') 'failed upgrade changed an installed app'
 Assert-True ((Get-Content -LiteralPath $bucketMarker -Raw) -eq 'keep-bucket') 'failed upgrade changed an unrelated bucket'
+Assert-True ((Get-Content -LiteralPath (Join-Path $persistJunction 'keep.txt') -Raw) -eq 'keep-persist') 'failed upgrade changed a persisted junction'
 
 $upgrade = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Json
 Assert-True ($upgrade.status -eq 'passed' -and $upgrade.idempotent -eq $false) '0.1.0 to 0.1.1 upgrade did not transact'
@@ -100,6 +109,10 @@ $upgradedReceipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
 Assert-True ($upgradedReceipt.installer_version -eq '0.1.1') 'upgrade receipt did not become 0.1.1'
 Assert-True ((Get-Content -LiteralPath $appMarker -Raw) -eq 'keep-app') 'upgrade changed an installed app'
 Assert-True ((Get-Content -LiteralPath $bucketMarker -Raw) -eq 'keep-bucket') 'upgrade changed an unrelated bucket'
+$upgradedJunction = Get-Item -LiteralPath $persistJunction -Force
+Assert-True ($upgradedJunction.LinkType -eq 'Junction') 'upgrade did not preserve the persisted junction type'
+Assert-True (@($upgradedJunction.Target).Count -eq 1 -and [IO.Path]::GetFullPath([string]$upgradedJunction.Target[0]) -eq [IO.Path]::GetFullPath((Split-Path -Parent $persistMarker))) 'upgrade changed the persisted junction target'
+Assert-True ((Get-Content -LiteralPath (Join-Path $persistJunction 'keep.txt') -Raw) -eq 'keep-persist') 'upgrade changed persisted data'
 $third = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Json
 Assert-True ($third.status -eq 'passed' -and $third.idempotent -eq $true) 'upgraded 0.1.1 install was not idempotent'
 
