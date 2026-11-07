@@ -198,13 +198,14 @@ class WindowsAppRelease(unittest.TestCase):
         entry = self.output / "pointers/scoop/scoop-install.ps1"
         entry.write_text("tampered")
         self.transaction("stage", server, False)
-        self.assertFalse((server / "scoop").exists())
+        self.assertFalse((server / "scoop/0.1.1").exists())
+        self.assertEqual((server / "scoop/scoop-install.ps1").read_bytes(), self.old_scoop)
         shutil.rmtree(self.output)
         self.run_plan()
         self.transaction("stage", server)
         (server / "zsetup/config-windows.json").write_text("publisher drift")
         self.transaction("activate", server, False)
-        self.assertFalse((server / "scoop/scoop-install.ps1").exists())
+        self.assertEqual((server / "scoop/scoop-install.ps1").read_bytes(), self.old_scoop)
         self.assertEqual((server / "zsetup/config-windows.json").read_text(), "publisher drift")
 
     def test_existing_output_is_never_overwritten(self):
