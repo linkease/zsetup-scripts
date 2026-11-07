@@ -113,6 +113,7 @@ Assert-True ((Get-Content -LiteralPath $appMarker -Raw) -eq 'keep-app') 'upgrade
 Assert-True ((Get-Content -LiteralPath $bucketMarker -Raw) -eq 'keep-bucket') 'upgrade changed an unrelated bucket'
 $upgradedJunction = Get-Item -LiteralPath $persistJunction -Force
 Assert-True ($upgradedJunction.LinkType -eq 'Junction') 'upgrade did not preserve the persisted junction type'
+Assert-True ([bool]($upgradedJunction.Attributes -band [IO.FileAttributes]::ReadOnly)) 'upgrade did not preserve the persisted junction attributes'
 Assert-True (@($upgradedJunction.Target).Count -eq 1 -and [IO.Path]::GetFullPath([string]$upgradedJunction.Target[0]) -eq [IO.Path]::GetFullPath((Split-Path -Parent $persistMarker))) 'upgrade changed the persisted junction target'
 Assert-True ((Get-Content -LiteralPath (Join-Path $persistJunction 'keep.txt') -Raw) -eq 'keep-persist') 'upgrade changed persisted data'
 
