@@ -218,7 +218,7 @@ function Test-ScoopInstalled([string]$Root, [string]$Work) {
     if ($process.ExitCode -ne 0 -or $output -notmatch 'Current Scoop version:') { throw "scoop: installed scoop --version failed: $errorOutput" }
 }
 
-function Commit-ScoopTransaction([string]$Root, [string]$Cache, [string]$ConfigPath, [string]$Stage, [string]$Transport, [string]$Work) {
+function Commit-ScoopTransaction([string]$Root, [string]$Cache, [string]$ConfigPath, [string]$Stage, [object[]]$Junctions, [string]$Transport, [string]$Work) {
     $rootExisted = Test-Path -LiteralPath $Root; $backup = $Root + '.linkease-backup-' + [Guid]::NewGuid().ToString('N')
     $configExisted = Test-Path -LiteralPath $ConfigPath -PathType Leaf; $configBytes = if ($configExisted) { [IO.File]::ReadAllBytes($ConfigPath) } else { $null }
     $oldPath = Get-ScoopUserPath; $swapped = $false
@@ -226,6 +226,9 @@ function Commit-ScoopTransaction([string]$Root, [string]$Cache, [string]$ConfigP
         Test-ScoopFault 'after-stage'
         if ($rootExisted) { Move-Item -LiteralPath $Root -Destination $backup -ErrorAction Stop }
         Move-Item -LiteralPath $Stage -Destination $Root -ErrorAction Stop; $swapped = $true
+        foreach ($junction in @($Junctions)) {
+            New-Item -ItemType Junction -Path (Join-Path $Root $junction.path) -Target (Join-Path $Root $junction.target) -ErrorAction Stop | Out-Null
+        }
         Test-ScoopFault 'after-root-swap'; Set-ScoopConfig $ConfigPath $Root $Cache; Test-ScoopFault 'after-config'; Add-ScoopUserPath (Join-Path $Root 'shims'); Test-ScoopFault 'after-path'; Test-ScoopInstalled $Root $Work
         if ($rootExisted) { Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction Stop }
     } catch {
@@ -240,8 +243,60 @@ function Commit-ScoopTransaction([string]$Root, [string]$Cache, [string]$ConfigP
     }
 }
 
+function Copy-ScoopOwnedTree([string]$Root, [string]$Stage) {
+    $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+    $rootPrefix = $rootFull + '\'
+    $queue = New-Object Collections.Queue
+    $queue.Enqueue([pscustomobject]@{source=$rootFull;destination=$Stage})
+    $junctions = @()
+    while ($queue.Count -gt 0) {
+        $directory = $queue.Dequeue()
+        foreach ($item in @(Get-ChildItem -LiteralPath $directory.source -Force -ErrorAction Stop)) {
+            $relative = $item.FullName.Substring($rootPrefix.Length)
+            $destination = Join-Path $Stage $relative
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                $targets = @($item.Target)
+                if (-not $item.PSIsContainer -or $item.LinkType -cne 'Junction' -or $targets.Count -ne 1) {
+                    throw 'scoop: existing root contains an unsupported reparse point'
+                }
+                $targetFull = [IO.Path]::GetFullPath([string]$targets[0]).TrimEnd('\')
+                if (-not $targetFull.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw 'scoop: existing root contains a junction outside the owned root'
+                }
+                $targetRelative = $targetFull.Substring($rootPrefix.Length)
+                $sourceParts = @($relative.Split([char]92)); $targetParts = @($targetRelative.Split([char]92))
+                if ($sourceParts.Count -lt 4 -or $targetParts.Count -lt 3 -or
+                    $sourceParts[0] -ine 'apps' -or $targetParts[0] -ine 'persist' -or
+                    $sourceParts[1] -ine $targetParts[1]) {
+                    throw 'scoop: existing root contains a junction outside the Scoop persist layout'
+                }
+                $probe = $targetFull
+                while ($probe -ine $rootFull) {
+                    $targetItem = Get-Item -LiteralPath $probe -Force -ErrorAction Stop
+                    if (-not $targetItem.PSIsContainer -or $targetItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                        throw 'scoop: persisted junction target contains a reparse point'
+                    }
+                    $parent = Split-Path -Parent $probe
+                    if (-not $parent -or $parent -eq $probe) { throw 'scoop: persisted junction target escaped the owned root' }
+                    $probe = $parent
+                }
+                $junctions += [pscustomobject]@{path=$relative;target=$targetRelative}
+                continue
+            }
+            if ($item.PSIsContainer) {
+                New-Item -ItemType Directory -Path $destination -Force -ErrorAction Stop | Out-Null
+                $queue.Enqueue([pscustomobject]@{source=$item.FullName;destination=$destination})
+            } else {
+                Copy-Item -LiteralPath $item.FullName -Destination $destination -Force -ErrorAction Stop
+            }
+        }
+    }
+    return @($junctions)
+}
+
 function New-ScoopStage([string]$Root, [string]$Work, $Archives) {
     $stage = Join-Path $Work 'install-root'
+    $junctions = @()
     if (Test-Path -LiteralPath $Root) {
         $receipt = Join-Path $Root $script:ScoopReceiptName
         if (-not (Test-Path -LiteralPath $receipt -PathType Leaf)) {
@@ -249,16 +304,19 @@ function New-ScoopStage([string]$Root, [string]$Work, $Archives) {
         } else {
             $owned = Get-Content -LiteralPath $receipt -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
             if ($owned.owner -cne 'linkease-zsetup') { throw 'scoop: unowned installation root refused' }
-            Get-ChildItem -LiteralPath $Root -Recurse -Force | ForEach-Object { if ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'scoop: existing root contains a reparse point' } }
-            Copy-Item -LiteralPath $Root -Destination $stage -Recurse -Force -ErrorAction Stop
+            New-Item -ItemType Directory -Path $stage -Force | Out-Null
+            $junctions = @(Copy-ScoopOwnedTree $Root $stage)
         }
     }
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
     foreach ($relative in @('apps\scoop\current', 'buckets\main', 'shims')) { Remove-Item -LiteralPath (Join-Path $stage $relative) -Recurse -Force -ErrorAction SilentlyContinue }
+    $junctions = @($junctions | Where-Object {
+        $_.path -notmatch '^(?i:apps\\scoop\\current|buckets\\main|shims)(?:\\|$)'
+    })
     Expand-VerifiedScoopArchive $Archives.Core (Join-Path $stage 'apps\scoop\current') ("Scoop-" + $script:ScoopCoreCommit) $script:ScoopCoreSize $script:ScoopCoreSha256
     Expand-VerifiedScoopArchive $Archives.Main (Join-Path $stage 'buckets\main') ("Main-" + $script:ScoopMainCommit) $script:ScoopMainSize $script:ScoopMainSha256
     Write-ScoopShims $stage; Write-ScoopOwnedReceipt $stage $Archives.Transport
-    return $stage
+    return [pscustomobject]@{path=$stage;junctions=@($junctions)}
 }
 
 function Get-ScoopInstallOptions([string[]]$Arguments) {
@@ -302,7 +360,7 @@ function Invoke-ScoopBusiness {
     try {
         if ($options.Bundle) { $archives = Expand-VerifiedSealedBundle $bundle $work }
         else { $runtimeZip = Join-Path $work 'runtime-bundle.zip'; Invoke-ZsetupRuntimeDownload $runtimeZip; $runtime = Expand-VerifiedRuntimeBundle $runtimeZip (Join-Path $work 'runtime'); $archives = Invoke-AcceleratedBootstrap $runtime $work }
-        $stage = New-ScoopStage $root $work $archives; Commit-ScoopTransaction $root $cache $configPath $stage $archives.Transport $work
+        $stage = New-ScoopStage $root $work $archives; Commit-ScoopTransaction $root $cache $configPath $stage.path $stage.junctions $archives.Transport $work
         return [ordered]@{ schema_version = 1; status = 'passed'; operation = 'scoop-install'; idempotent = $false; transport = $archives.Transport; root = $root; cache = $cache; runtime_bundle_id = $script:ScoopRuntimeId; core_commit = $script:ScoopCoreCommit; main_commit = $script:ScoopMainCommit } | ConvertTo-Json -Compress
     } finally { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
 }
