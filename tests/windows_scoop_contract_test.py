@@ -8,18 +8,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WindowsScoopContract(unittest.TestCase):
-    def test_catalog_promotes_a_new_immutable_010_entry(self):
+    def test_catalog_promotes_a_new_immutable_011_entry(self):
         catalog = json.loads((ROOT / "catalog-windows.json").read_text())
-        self.assertEqual(catalog["config_version"], "windows-apps-0.1.0")
+        self.assertEqual(catalog["config_version"], "windows-apps-0.1.1")
         self.assertEqual(len(catalog["installers"]), 1)
         record = catalog["installers"][0]
         self.assertEqual(record["application"], "scoop")
         self.assertEqual(record["os"], "windows")
         self.assertEqual(record["arch"], "x86_64")
-        self.assertEqual(record["path"], "scoop/0.1.0/scoop-install.ps1")
+        self.assertEqual(record["path"], "scoop/0.1.1/scoop-install.ps1")
 
     def test_business_source_pins_and_uses_the_verified_bootstrap_chain(self):
         source = (ROOT / "scoop/business.ps1").read_text(encoding="utf-8")
+        self.assertIn("$script:ScoopInstallerVersion = '0.1.1'", source)
         for value in (
             "0.7.16-08aea475819b8037977684c7fbbde2ae40bb1b96-windows-amd64",
             "66fa51769556b8d52289f354d3e43952338814b6ef357b04868f829fc1c5c4dc",

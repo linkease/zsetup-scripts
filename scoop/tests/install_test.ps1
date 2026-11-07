@@ -73,6 +73,36 @@ $second = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Js
 Assert-True ($second.status -eq 'passed' -and $second.idempotent -eq $true) 'repeat install was not idempotent'
 Assert-True ($script:FixtureUserPath.Split(';')[0] -eq (Join-Path $root 'shims')) 'repeat install duplicated or reordered PATH'
 
+# A managed 0.1.0 receipt must enter the transaction, preserve unrelated Scoop
+# state, roll back exactly on failure, then become an idempotent 0.1.1 install.
+$receiptPath = Join-Path $root '.linkease-scoop-receipt.json'
+$oldReceipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+$oldReceipt.installer_version = '0.1.0'
+Write-ScoopJson $receiptPath $oldReceipt
+$appMarker = Join-Path $root 'apps\fixture\1.0.0\keep.txt'
+$bucketMarker = Join-Path $root 'buckets\fixture\keep.txt'
+New-Item -ItemType Directory -Path (Split-Path -Parent $appMarker), (Split-Path -Parent $bucketMarker) -Force | Out-Null
+[IO.File]::WriteAllText($appMarker, 'keep-app', $script:ScoopUtf8)
+[IO.File]::WriteAllText($bucketMarker, 'keep-bucket', $script:ScoopUtf8)
+$env:ZSETUP_SCOOP_FAIL_AFTER = 'after-root-swap'
+$upgradeFailed = $false
+try { Invoke-ScoopBusiness -InstallerArguments $arguments | Out-Null } catch { $upgradeFailed = $_.Exception.Message -match 'fault injection' }
+Remove-Item Env:ZSETUP_SCOOP_FAIL_AFTER -ErrorAction SilentlyContinue
+Assert-True $upgradeFailed '0.1.0 upgrade fault was not triggered'
+$rolledBackReceipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+Assert-True ($rolledBackReceipt.installer_version -eq '0.1.0') 'failed upgrade did not restore the 0.1.0 receipt'
+Assert-True ((Get-Content -LiteralPath $appMarker -Raw) -eq 'keep-app') 'failed upgrade changed an installed app'
+Assert-True ((Get-Content -LiteralPath $bucketMarker -Raw) -eq 'keep-bucket') 'failed upgrade changed an unrelated bucket'
+
+$upgrade = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Json
+Assert-True ($upgrade.status -eq 'passed' -and $upgrade.idempotent -eq $false) '0.1.0 to 0.1.1 upgrade did not transact'
+$upgradedReceipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+Assert-True ($upgradedReceipt.installer_version -eq '0.1.1') 'upgrade receipt did not become 0.1.1'
+Assert-True ((Get-Content -LiteralPath $appMarker -Raw) -eq 'keep-app') 'upgrade changed an installed app'
+Assert-True ((Get-Content -LiteralPath $bucketMarker -Raw) -eq 'keep-bucket') 'upgrade changed an unrelated bucket'
+$third = (Invoke-ScoopBusiness -InstallerArguments $arguments) | ConvertFrom-Json
+Assert-True ($third.status -eq 'passed' -and $third.idempotent -eq $true) 'upgraded 0.1.1 install was not idempotent'
+
 $unowned = Join-Path $profile 'unowned scoop'
 New-Item -ItemType Directory -Path $unowned -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $unowned 'foreign.txt') -Value 'foreign'
@@ -89,6 +119,7 @@ Assert-True ((Get-Content -LiteralPath (Join-Path $unowned 'foreign.txt') -Raw).
     elevated_rejected_before_write = $true
     sealed_install = $first
     repeat_install = $second
+    upgrade_install = $upgrade
     rollback_faults = @('after-stage', 'after-root-swap', 'after-config', 'after-path')
     unowned_rejected = $true
     root = $root

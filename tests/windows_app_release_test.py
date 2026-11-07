@@ -33,6 +33,7 @@ class WindowsAppRelease(unittest.TestCase):
         self.core_exe.write_bytes(b"MZ" + b"canonical Windows core fixture" * 8)
         self.stable = self.root / "stable-windows"
         self.stable.write_text("0.4.0\n", encoding="ascii")
+        self.old_scoop = b"# immutable Scoop installer 0.1.0 fixture\n"
         self.config = {
             "schema_version": 1,
             "config_version": "zsetup-windows-0.4.0",
@@ -52,6 +53,11 @@ class WindowsAppRelease(unittest.TestCase):
                 "application": "existing", "os": "windows", "package_manager": "*", "arch": "x86_64",
                 "source_group": "release", "path": "existing/1.0.0/existing-install.ps1",
                 "sha256": "11" * 32, "size": 10, "background": False, "min_version": "0.4.0",
+            }, {
+                "application": "scoop", "os": "windows", "package_manager": "*", "arch": "x86_64",
+                "source_group": "release", "path": "scoop/0.1.0/scoop-install.ps1",
+                "sha256": hashlib.sha256(self.old_scoop).hexdigest(), "size": len(self.old_scoop),
+                "background": False, "min_version": "0.4.0",
             }],
         }
         self.live = self.root / "config-windows.json"
@@ -103,7 +109,7 @@ class WindowsAppRelease(unittest.TestCase):
         self.assertEqual(scoop[0]["sha256"], hashlib.sha256(entry.read_bytes()).hexdigest())
         destinations = {item["destination"] for item in manifest["files"]}
         self.assertEqual(destinations, {
-            "scoop/0.1.0/scoop-install.ps1", "scoop/scoop-install.ps1",
+            "scoop/0.1.1/scoop-install.ps1", "scoop/scoop-install.ps1",
             "zsetup/config-windows.json",
         })
         self.assertFalse((review / "pointers/zsetup/stable-windows").exists())
@@ -152,10 +158,13 @@ class WindowsAppRelease(unittest.TestCase):
         server = self.root / "server/binary"
         (server / "zsetup").mkdir(parents=True)
         (server / "existing").mkdir()
+        (server / "scoop/0.1.0").mkdir(parents=True)
         (server / "zsetup/config-windows.json").write_bytes(self.live.read_bytes())
         (server / "zsetup/stable-windows").write_bytes(self.stable.read_bytes())
         (server / "zsetup/zsetup-windows-i686.exe").write_bytes(self.core_exe.read_bytes())
         (server / "existing/existing-install.ps1").write_text("do not change\n")
+        (server / "scoop/0.1.0/scoop-install.ps1").write_bytes(self.old_scoop)
+        (server / "scoop/scoop-install.ps1").write_bytes(self.old_scoop)
         self.original = {str(path.relative_to(server)): path.read_bytes() for path in server.rglob("*") if path.is_file()}
         return server
 
@@ -179,8 +188,9 @@ class WindowsAppRelease(unittest.TestCase):
         self.transaction("rollback", server)
         for name, data in self.original.items():
             self.assertEqual((server / name).read_bytes(), data, name)
-        self.assertFalse((server / "scoop/scoop-install.ps1").exists())
-        self.assertTrue((server / "scoop/0.1.0/scoop-install.ps1").is_file())
+        self.assertEqual((server / "scoop/scoop-install.ps1").read_bytes(), self.old_scoop)
+        self.assertEqual((server / "scoop/0.1.0/scoop-install.ps1").read_bytes(), self.old_scoop)
+        self.assertTrue((server / "scoop/0.1.1/scoop-install.ps1").is_file())
 
     def test_tamper_conflict_and_drift_do_not_partially_activate(self):
         self.run_plan()
