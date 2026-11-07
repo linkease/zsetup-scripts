@@ -218,6 +218,19 @@ function Test-ScoopInstalled([string]$Root, [string]$Work) {
     if ($process.ExitCode -ne 0 -or $output -notmatch 'Current Scoop version:') { throw "scoop: installed scoop --version failed: $errorOutput" }
 }
 
+function Remove-ScoopTreeJunctions([string]$Tree, [object[]]$Junctions) {
+    foreach ($junction in @($Junctions)) {
+        $path = Join-Path $Tree $junction.path
+        $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        if (-not $item.PSIsContainer -or $item.LinkType -cne 'Junction' -or
+            -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "scoop: expected transaction junction is missing: $($junction.path)"
+        }
+        $item.Attributes = [IO.FileAttributes]([int]$item.Attributes -band (-bnot [int][IO.FileAttributes]::ReadOnly))
+        [IO.Directory]::Delete($path)
+    }
+}
+
 function Commit-ScoopTransaction([string]$Root, [string]$Cache, [string]$ConfigPath, [string]$Stage, [object[]]$Junctions, [string]$Transport, [string]$Work) {
     $rootExisted = Test-Path -LiteralPath $Root; $backup = $Root + '.linkease-backup-' + [Guid]::NewGuid().ToString('N')
     $configExisted = Test-Path -LiteralPath $ConfigPath -PathType Leaf; $configBytes = if ($configExisted) { [IO.File]::ReadAllBytes($ConfigPath) } else { $null }
@@ -230,16 +243,22 @@ function Commit-ScoopTransaction([string]$Root, [string]$Cache, [string]$ConfigP
             New-Item -ItemType Junction -Path (Join-Path $Root $junction.path) -Target (Join-Path $Root $junction.target) -ErrorAction Stop | Out-Null
         }
         Test-ScoopFault 'after-root-swap'; Set-ScoopConfig $ConfigPath $Root $Cache; Test-ScoopFault 'after-config'; Add-ScoopUserPath (Join-Path $Root 'shims'); Test-ScoopFault 'after-path'; Test-ScoopInstalled $Root $Work
-        if ($rootExisted) { Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction Stop }
     } catch {
         $failure = $_
         try {
-            if ($swapped -and (Test-Path -LiteralPath $Root)) { Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction Stop }
+            if ($swapped -and (Test-Path -LiteralPath $Root)) {
+                Remove-ScoopTreeJunctions $Root $Junctions
+                Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction Stop
+            }
             if ($rootExisted -and (Test-Path -LiteralPath $backup)) { Move-Item -LiteralPath $backup -Destination $Root -ErrorAction Stop }
             if ($configExisted) { New-Item -ItemType Directory -Path (Split-Path -Parent $ConfigPath) -Force | Out-Null; [IO.File]::WriteAllBytes($ConfigPath, $configBytes) } else { Remove-Item -LiteralPath $ConfigPath -Force -ErrorAction SilentlyContinue }
             Set-ScoopUserPath $oldPath
         } catch { throw "scoop: rollback failed after: $($failure.Exception.Message); rollback: $($_.Exception.Message)" }
         throw $failure
+    }
+    if ($rootExisted) {
+        Remove-ScoopTreeJunctions $backup $Junctions
+        Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction Stop
     }
 }
 
