@@ -90,6 +90,7 @@ class JqInstallerTests(unittest.TestCase):
         actual=subprocess.check_output([str(binary),'-nc','{unicode:"中文",regex:("abc"|test("^a"))}'],text=True)
         self.assertEqual(json.loads(actual),{'unicode':'中文','regex':True})
         self.assertEqual(self.install().returncode,0)
+        self.assertEqual((self.home/'.local/lib/linkease/jq/current').read_text().strip(),'1.8.2')
 
     def test_explicit_command_path_keeps_binary_and_entry_on_selected_data_volume(self):
         self.fixture()
@@ -110,7 +111,6 @@ class JqInstallerTests(unittest.TestCase):
         result = self.install('--installer-prefix', str(self.work / 'data-jq'), '--installer-command', str(command))
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(command.read_text(), 'foreign bytes')
-        self.assertEqual((self.home/'.local/lib/linkease/jq/current').read_text().strip(),'1.8.2')
 
     def test_explicit_prepared_artifact_is_verified_by_native_core_before_activation(self):
         self.fixture()
