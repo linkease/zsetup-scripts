@@ -41,3 +41,10 @@ artifact.path/sha256/platform/verifyArgs/expectedOutput。计划仅哈希候选�
 原子替换用户选定数据目录内的命令和 current.json；失败保持旧命令。
 不同摘要不能复用同一版本。卸载前完整校验归属和摘要，保留用户文件与小型
 版本归属回执，使同摘要重装仍可验证；不覆盖外来 prefix、命令或符号链接。
+
+
+原生包卸载使用 `intent: "remove"` 和明确的包管理器计划。计划绑定原生已安装
+版本；执行仅调用该管理器的 remove/uninstall，再查询确认该包已不在该管理器中。
+已不存在的包返回 native-package-already-absent，不会安装仓库候选。移除不使用
+purge、强制依赖删除或额外 autoremove；配置/用户数据仍受原生包及其 hooks 策略
+约束，不宣称移除了其他来源的同名程序。需要保护的数据应在本次操作计划中备份。

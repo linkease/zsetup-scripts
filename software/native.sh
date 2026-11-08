@@ -78,3 +78,17 @@ task_native_install() {
     esac
     [ "$code" = 0 ] || task_stop failed provider-install-failed "$code"
 }
+
+task_native_remove() {
+    local manager=$1 code=0
+    case "$manager" in
+        apt) DEBIAN_FRONTEND=noninteractive apt-get -o APT::Get::AutomaticRemove=false remove -y -- "$TASK_SOFTWARE" >&2 || code=$? ;;
+        opkg) opkg remove "$TASK_SOFTWARE" >&2 || code=$? ;;
+        apk) apk del -- "$TASK_SOFTWARE" >&2 || code=$? ;;
+        dnf) dnf -y --noautoremove remove -- "$TASK_SOFTWARE" >&2 || code=$? ;;
+        yum) yum -y --setopt=clean_requirements_on_remove=0 remove -- "$TASK_SOFTWARE" >&2 || code=$? ;;
+        brew) HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 brew uninstall --formula "$TASK_SOFTWARE" >&2 || code=$? ;;
+        *) task_stop blocked unsupported-native-provider 0 ;;
+    esac
+    [ "$code" = 0 ] || task_stop failed provider-remove-failed "$code"
+}

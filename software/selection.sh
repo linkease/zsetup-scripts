@@ -48,7 +48,7 @@ task_owner_artifact() {
 }
 task_make_plan() {
     local requested method manager candidate observed base prefix command artifact='null' storage='null' effects='[]' body input intent
-    local backup='null' combined='null' saved
+    local backup='null' combined='null' saved no_storage=false
     input=$(task_request_digest)
     intent=$("$task_jq" -r '.intent//"install"' <<< "$TASK_REQUEST_JSON")
     case "$intent" in install|remove) ;; *) task_stop invalid invalid-intent 2 ;; esac
@@ -57,6 +57,12 @@ task_make_plan() {
     case "$method" in auto|existing|owner|native-package|container|artifact) ;; *) task_stop invalid invalid-installation-method 2 ;; esac
     if [ "$method" = container ]; then task_container_plan;return;fi
     if [ "$method" = artifact ]; then task_artifact_plan;return;fi
+    if [ "$intent" = remove ];then
+        case "$method" in
+            existing) task_stop blocked program-removal-owner-required 0 ;;
+            auto) method=native-package ;;
+        esac
+    fi
     "$task_jq" -e '(.features//[])|all(.[];.=="jq-regex" or .=="json" or .=="unicode" or .=="bash")' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0
     case "$TASK_SOFTWARE" in
         jq) "$task_jq" -e '(.features//[])|all(.[];.=="jq-regex" or .=="json" or .=="unicode")' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0 ;;
@@ -73,16 +79,25 @@ task_make_plan() {
         if [ "$method" != owner ]; then
             task_native_query
             candidate=$("$task_jq" -r .candidateVersion <<< "$TASK_NATIVE")
-            if task_version_matches "$requested" "$candidate"; then method=native-package; fi
+            if [ "$intent" != remove ] && task_version_matches "$requested" "$candidate"; then method=native-package; fi
         fi
         if [ "$method" = native-package ]; then
-            [ -n "${candidate:-}" ] && task_version_matches "$requested" "$candidate" || task_stop needs-ai no-compatible-native-candidate 0 "$TASK_NATIVE"
             manager=$("$task_jq" -r .manager <<< "$TASK_NATIVE")
-            [ -n "$manager" ] || task_stop needs-ai no-installation-rule 0
-            [ "$("$task_jq" -r 'has("storage")' <<< "$TASK_REQUEST_JSON")" = true ] || task_stop needs-ai native-package-storage-budget-required 0 "$TASK_NATIVE"
-            effects='["native-package-operation","native-package-hooks"]'
+            [ -n "$manager" ] || task_stop needs-ai native-package-manager-required 0 "$TASK_NATIVE"
+            if [ "$intent" = remove ];then
+                candidate=$("$task_jq" -r .installedVersion <<< "$TASK_NATIVE")
+                if [ -n "$candidate" ];then task_version_matches "$requested" "$candidate" || task_stop blocked native-installed-version-mismatch 0 "$TASK_NATIVE"
+                else no_storage=true;fi
+                effects='["native-package-removal","native-package-hooks"]'
+            else
+                [ -n "${candidate:-}" ] && task_version_matches "$requested" "$candidate" || task_stop needs-ai no-compatible-native-candidate 0 "$TASK_NATIVE"
+                effects='["native-package-operation","native-package-hooks"]'
+            fi
+            if [ "$no_storage" != true ];then
+                [ "$("$task_jq" -r 'has("storage")' <<< "$TASK_REQUEST_JSON")" = true ] || task_stop needs-ai native-package-storage-budget-required 0 "$TASK_NATIVE"
+            else effects='[]';fi
             TASK_REQUEST_JSON=$("$task_jq" -c '.method="native-package"' <<< "$TASK_REQUEST_JSON")
-            body=$("$task_jq" -cn --arg method "$method" --arg version "$candidate" --arg manager "$manager" '{method:$method,version:$version,manager:$manager}')
+            body=$("$task_jq" -cn --arg method "$method" --arg version "$candidate" --arg manager "$manager" --argjson absent "$no_storage" '{method:$method,version:$version,manager:$manager,packageAlreadyAbsent:$absent,dataPolicy:"native-manager-policy; no-force-or-explicit-autoremove"}')
         elif [ "$TASK_SOFTWARE" = jq ]; then
             task_owner_artifact
             candidate=$("$task_jq" -r .version <<< "$TASK_ARTIFACT")
@@ -102,10 +117,9 @@ task_make_plan() {
             body=$("$task_jq" -cn --arg method "$method" --arg version "$candidate" --arg prefix "$prefix" --arg command "$command" --argjson artifact "$artifact" '{method:$method,version:$version,owner:"jq",prefix:$prefix,command:$command,artifact:$artifact}')
         else task_stop needs-ai no-installation-rule 0; fi
         # The storage module accepts the same normalized, in-memory request.
-        task_storage_plan
-        storage=$TASK_STORAGE_PLAN
+        if [ "$no_storage" != true ];then task_storage_plan;storage=$TASK_STORAGE_PLAN;fi
     fi
-    if [ "$method" != existing ] && [ "$("$task_jq" -r '.backupRequired//false' <<< "$TASK_REQUEST_JSON")" = true ]; then
+    if [ "$method" != existing ] && [ "$no_storage" != true ] && [ "$("$task_jq" -r '.backupRequired//false' <<< "$TASK_REQUEST_JSON")" = true ]; then
         task_backup_plan;backup=$TASK_BACKUP_PLAN
         saved=$TASK_REQUEST_JSON;task_backup_add_budget;task_storage_plan;combined=$TASK_STORAGE_PLAN;TASK_REQUEST_JSON=$saved
     fi
@@ -130,6 +144,9 @@ task_apply_plan() {
         [ "$("$task_jq" -r .satisfies <<< "$TASK_OBSERVED")" = true ] || task_stop blocked existing-installation-not-suitable 0
         task_result success reused 0 "$TASK_OBSERVED"; return
     fi
+    if [ "$method" = native-package ] && [ "$("$task_jq" -r .intent <<< "$expected")" = remove ] && [ "$("$task_jq" -r .packageAlreadyAbsent <<< "$expected")" = true ];then
+        task_result success native-package-already-absent 0 '{"packageAbsent":true,"otherProgramCopies":"not-checked"}';return
+    fi
     if [ "$("$task_jq" -c .backupPlan <<< "$expected")" != null ]; then
         saved=$TASK_REQUEST_JSON;task_backup_add_budget
         task_storage_check "$("$task_jq" -c .combinedStoragePlan <<< "$expected")";TASK_REQUEST_JSON=$saved
@@ -138,6 +155,13 @@ task_apply_plan() {
     task_storage_check "$("$task_jq" -c .storagePlan <<< "$expected")"
     if [ "$method" = container ]; then task_container_apply "$expected";return;fi
     if [ "$method" = artifact ]; then task_artifact_apply "$expected";return;fi
+    if [ "$method" = native-package ] && [ "$("$task_jq" -r .intent <<< "$expected")" = remove ];then
+        TASK_EFFECTS='["native-package-removal-attempt","native-package-hooks"]'
+        task_native_remove "$("$task_jq" -r .manager <<< "$expected")"
+        task_native_query
+        [ -z "$("$task_jq" -r .installedVersion <<< "$TASK_NATIVE")" ] || task_stop failed native-removal-verification-failed 11 "$TASK_NATIVE"
+        task_result success removed 0 "$("$task_jq" -c '.+{packageAbsent:true,otherProgramCopies:"not-checked",dataPolicy:"native-manager-policy; no-force-or-explicit-autoremove"}' <<< "$TASK_NATIVE")" "$TASK_EFFECTS";return
+    fi
     if [ "$method" = owner ]; then
         zsetup=${ZSETUP_BIN:-${KAI_ZSETUP_BIN:-$(type -P zsetup || true)}}
         [ -n "$zsetup" ] || { [ ! -x "$HOME/.local/bin/zsetup" ] || zsetup=$HOME/.local/bin/zsetup; }
