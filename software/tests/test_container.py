@@ -24,6 +24,8 @@ elif args[0]=='info':
  print(json.dumps({'ID':'fixture-daemon','Name':open('/proc/sys/kernel/hostname').read().strip(),'DockerRootDir':os.environ['SIM_DATA'],'Architecture':'x86_64','OSType':'linux'}))
 elif args[:2]==['container','inspect']:
  print('Error: No such container',file=sys.stderr);sys.exit(1)
+elif args[:2]==['image','inspect']:
+ print('Error: No such image',file=sys.stderr);sys.exit(1)
 elif args[0]=='ps':print('')
 else:
  open(os.environ['SIM_MUTATIONS'],'a').write(' '.join(args)+'\n');sys.exit(7)
