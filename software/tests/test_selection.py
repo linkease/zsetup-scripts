@@ -76,6 +76,36 @@ class Selection(unittest.TestCase):
         self.assertEqual(body['reason'], 'provider-query-failed')
         self.assertEqual(body['nativeExitCode'], 7)
 
+    def test_features_are_checked_for_the_selected_software(self):
+        self.request['features'] = ['jq-regex']
+        r, body = self.call('plan')
+        self.assertEqual(r.returncode, 20)
+        self.assertEqual(body['reason'], 'unknown-functional-requirement')
+
+    def test_native_search_returns_bounded_source_qualified_candidates(self):
+        fake = self.root / 'bin'
+        fake.mkdir()
+        executable = fake / 'apt-cache'
+        executable.write_text('#!/bin/sh\nprintf "bash - GNU shell\\nbash-doc - shell documentation\\n"\n')
+        executable.chmod(0o755)
+        r, body = self.call('search', {'PATH': str(fake)+os.pathsep+os.environ['PATH']})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(body['details']['candidates'][0]['id'], 'apt:bash')
+        self.assertLessEqual(len(body['details']['candidates']), 20)
+
+    def test_owner_failure_retains_native_code_without_source_fallback(self):
+        self.request.update({'software': 'jq', 'method': 'owner', 'version': '1.8.2', 'prefixBase': str(self.root)})
+        r, body = self.call('plan')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.request['plan'] = body['details']
+        core = self.root / 'zsetup'
+        core.write_text('#!/bin/sh\nprintf "integrity failure\\n" >&2\nexit 11\n')
+        core.chmod(0o755)
+        r, body = self.call('apply', {'ZSETUP_BIN': str(core)})
+        self.assertEqual(r.returncode, 22)
+        self.assertEqual(body['nativeExitCode'], 11)
+        self.assertEqual(body['reason'], 'owner-install-failed')
+
 
 if __name__ == '__main__':
     unittest.main()
