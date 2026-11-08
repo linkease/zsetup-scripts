@@ -100,7 +100,7 @@ task_artifact_apply() {
             cp "$prefix/versions/$version/program" "$stage" || task_stop failed artifact-stage-failed "$?"
             TASK_ARTIFACT_PREPARATION=owned-version-cache
         elif [ -n "${KAI_RELEASE_ARTIFACT_CACHE:-}" ];then
-            [ -f "$KAI_RELEASE_ARTIFACT_CACHE" ] && [ ! -L "$KAI_RELEASE_ARTIFACT_CACHE" ] && [ "$(wc -c < "$KAI_RELEASE_ARTIFACT_CACHE")" = "$size" ] && [ "$(task_digest "$KAI_RELEASE_ARTIFACT_CACHE")" = "$sha" ] || task_stop blocked release-cache-integrity 11
+            [ -f "$KAI_RELEASE_ARTIFACT_CACHE" ] && [ ! -L "$KAI_RELEASE_ARTIFACT_CACHE" ] && [ "$(wc -c < "$KAI_RELEASE_ARTIFACT_CACHE" | tr -d "[:space:]")" = "$size" ] && [ "$(task_digest "$KAI_RELEASE_ARTIFACT_CACHE")" = "$sha" ] || task_stop blocked release-cache-integrity 11
             cp "$KAI_RELEASE_ARTIFACT_CACHE" "$stage" || task_stop failed artifact-stage-failed "$?"
             TASK_ARTIFACT_PREPARATION=selected-verified-cache
         else
