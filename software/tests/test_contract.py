@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -11,6 +12,32 @@ ENTRY = ROOT / 'software/task.sh'
 
 
 class SoftwareContract(unittest.TestCase):
+    def test_native_windows_json_stream_keeps_literal_line_endings(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            real_jq = shutil.which('jq')
+            native = root / 'native-jq'
+            native.write_text(
+                '#!/usr/bin/env python3\nimport subprocess,sys\n'
+                "args=sys.argv[1:];binary='--binary' in args\n"
+                "args=[arg for arg in args if arg!='--binary']\n"
+                f"p=subprocess.run([{real_jq!r}]+args,input=sys.stdin.buffer.read(),capture_output=True)\n"
+                "sys.stdout.buffer.write(p.stdout if binary else p.stdout.replace(b'\\n',b'\\r\\n'))\n"
+                "sys.stderr.buffer.write(p.stderr);sys.exit(p.returncode)\n"
+            )
+            native.chmod(0o755)
+            uname = root / 'uname'
+            uname.write_text('#!/bin/sh\nprintf "MINGW64_NT-10.0\\n"\n')
+            uname.chmod(0o755)
+            result = subprocess.run(
+                ['bash', '-c', '. "$1"; task_json -nr \'["first","second"][]\'',
+                 'stream', str(ROOT / 'software/protocol.sh')],
+                env={**os.environ, 'PATH': str(root) + os.pathsep + os.environ['PATH'],
+                     'ZSETUP_TASK_JQ': str(native)}, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, b'first\nsecond\n')
+
     def call(self, operation, request, target='test-target'):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
