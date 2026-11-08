@@ -38,6 +38,12 @@ class LocalArtifact(unittest.TestCase):
         self.req.pop('intent');r,b=self.planapply();self.assertEqual(r.returncode,0,r.stderr+r.stdout)
         self.assertEqual((directory/'user.note').read_text(),'keep')
 
+    def test_existing_external_command_directory_is_not_followed(self):
+        r,b=self.planapply();self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        prefix=self.base/'built-example';(prefix/'commands').rename(self.base/'external-commands');(prefix/'commands').symlink_to(self.base/'external-commands',target_is_directory=True)
+        self.req.pop('plan',None);r,b=self.call();self.assertEqual(r.returncode,21,r.stderr+r.stdout);self.assertEqual(b['reason'],'artifact-prefix-unowned')
+        self.assertTrue((self.base/'external-commands/built-example').exists())
+
     def test_wrong_platform_is_explicit_handoff(self):
         self.req['artifact']['platform']='windows-amd64';r,b=self.call();self.assertEqual(r.returncode,20,r.stderr+r.stdout);self.assertEqual(b['reason'],'artifact-platform-mismatch')
 
