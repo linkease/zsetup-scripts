@@ -93,6 +93,20 @@ class Selection(unittest.TestCase):
         self.assertEqual(body['details']['candidates'][0]['id'], 'apt:bash')
         self.assertLessEqual(len(body['details']['candidates']), 20)
 
+    def test_structured_program_version_preserves_prerelease_identity(self):
+        fake=self.root/'bin';fake.mkdir();tool=fake/'linkspace'
+        tool.write_text('#!/bin/sh\nprintf '{\n  "schemaVersion":1,\n  "version":"0.2.0-sim.3"\n}\n'\n');tool.chmod(0o755)
+        self.request.update(software='linkspace',version='0.2.0-sim.3')
+        r,body=self.call('plan',{'PATH':str(fake)+os.pathsep+os.environ['PATH']})
+        self.assertEqual(r.returncode,0,r.stderr+r.stdout);self.assertEqual(body['details']['method'],'existing');self.assertEqual(body['details']['observed']['version'],'0.2.0-sim.3')
+
+    def test_existing_program_error_is_not_an_absent_installation(self):
+        fake=self.root/'bin';fake.mkdir();tool=fake/'ks-cli'
+        tool.write_text('#!/bin/sh\necho "0.8.5"\nexit 7\n');tool.chmod(0o755)
+        self.request.update(software='ks-cli')
+        r,body=self.call('plan',{'PATH':str(fake)+os.pathsep+os.environ['PATH']})
+        self.assertEqual(r.returncode,22,r.stderr+r.stdout);self.assertEqual(body['reason'],'existing-program-query-failed');self.assertEqual(body['nativeExitCode'],7)
+
     def test_owner_failure_retains_native_code_without_source_fallback(self):
         self.request.update({'software': 'jq', 'method': 'owner', 'version': '1.8.2', 'prefixBase': str(self.root)})
         r, body = self.call('plan')
