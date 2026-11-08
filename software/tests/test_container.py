@@ -28,7 +28,7 @@ elif args[:2]==['image','inspect']:
  print('Error: No such image',file=sys.stderr);sys.exit(1)
 elif args[0]=='ps':print('')
 else:
- open(os.environ['SIM_MUTATIONS'],'a').write(' '.join(args)+'\n');sys.exit(7)
+ open(os.environ['SIM_MUTATIONS'],'a').write(' '.join(args)+'\\n');sys.exit(7)
 """)
         docker.chmod(0o755)
         self.request={'software':'nginx-static','targetId':'container-test','method':'container','container':{'image':IMAGE,'baseDir':str(self.base),'dataBytes':1048576,'start':True}}
