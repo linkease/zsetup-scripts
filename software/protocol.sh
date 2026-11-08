@@ -5,6 +5,13 @@ if [ -z "$task_jq" ] || ! "$task_jq" -ne '"abc"|test("^a")' >/dev/null 2>&1; the
     printf '%s\n' '{"protocol":"software-task/v1","schemaVersion":1,"operation":null,"targetId":null,"software":null,"status":"blocked","reason":"missing-full-jq","nativeExitCode":127,"effects":[],"details":{}}'
     exit 21
 fi
+task_jq_binary=$task_jq
+task_json() {
+    # Native jq must receive JSON string arguments literally. MSYS otherwise
+    # rewrites --arg /d/path into a Windows path inside the JSON document.
+    MSYS2_ARG_CONV_EXCL='*' "$task_jq_binary" "$@"
+}
+task_jq=task_json
 TASK_OPERATION=${1:-}; TASK_SOFTWARE=; TASK_TARGET=${ZSETUP_TASK_TARGET_ID:-local}
 task_result() {
     "$task_jq" -cn --arg operation "$TASK_OPERATION" --arg target "$TASK_TARGET" \
@@ -14,16 +21,17 @@ task_result() {
 }
 task_stop() {
     task_status=$1; task_reason=$2; task_native=$3; task_details=${4:-\{\}}
-    task_result "$task_status" "$task_reason" "$task_native" "$task_details"
+    task_result "$task_status" "$task_reason" "$task_native" "$task_details" "${5:-${TASK_EFFECTS:-[]}}"
     case "$task_status" in needs-ai) exit 20 ;; blocked) exit 21 ;; failed) exit 22 ;; *) exit 2 ;; esac
 }
 task_request() {
     TASK_REQUEST=${1:-}
     [ -f "$TASK_REQUEST" ] && [ ! -L "$TASK_REQUEST" ] || task_stop invalid invalid-request-file 2
     [ "$(wc -c < "$TASK_REQUEST")" -le 65536 ] || task_stop invalid request-too-large 2
-    "$task_jq" -e 'type=="object" and (.software|type=="string" and test("^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,127}$")) and (.targetId|type=="string" and test("^[a-zA-Z0-9][a-zA-Z0-9._:+-]{0,127}$")) and ((.version//"")|type=="string" and length<=128) and ((.features//[])|type=="array" and all(.[];type=="string"))' "$TASK_REQUEST" >/dev/null 2>&1 || task_stop invalid invalid-request 2
-    TASK_SOFTWARE=$("$task_jq" -r .software "$TASK_REQUEST")
-    task_expected=$("$task_jq" -r .targetId "$TASK_REQUEST")
+    "$task_jq" -e 'type=="object" and (.software|type=="string" and test("^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,127}$")) and (.targetId|type=="string" and test("^[a-zA-Z0-9][a-zA-Z0-9._:+-]{0,127}$")) and ((.version//"")|type=="string" and length<=128) and ((.features//[])|type=="array" and all(.[];type=="string"))' < "$TASK_REQUEST" >/dev/null 2>&1 || task_stop invalid invalid-request 2
+    TASK_SOFTWARE=$("$task_jq" -r .software < "$TASK_REQUEST")
+    TASK_REQUEST_JSON=$(cat "$TASK_REQUEST")
+    task_expected=$("$task_jq" -r .targetId < "$TASK_REQUEST")
     [ "$task_expected" = "$TASK_TARGET" ] || task_stop blocked target-mismatch 0
 }
 task_digest() {
@@ -37,5 +45,5 @@ task_hash_input() {
     else return 127; fi
 }
 task_request_digest() {
-    "$task_jq" -cS 'del(.storagePlan,.plan)' "$TASK_REQUEST" | task_hash_input
+    "$task_jq" -cS 'del(.storagePlan,.plan)' <<< "$TASK_REQUEST_JSON" | task_hash_input
 }

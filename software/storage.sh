@@ -44,7 +44,7 @@ task_storage_fact() {
             # Native packages cannot be relocated to a portable prefix. An
             # explicit system-root budget remains separate from data volumes.
             [ "$path" = / ] && [ "$role" = system-package ] && \
-                [ "$("$task_jq" -r '.method//""' "$TASK_REQUEST")" = native-package ] || return 19
+                [ "$("$task_jq" -r '.method//""' <<< "$TASK_REQUEST_JSON")" = native-package ] || return 19
             persistence=system-root ;;
         *) return 19 ;;
     esac
@@ -55,11 +55,11 @@ task_storage_fact() {
 }
 task_storage_plan() {
     local observations='[]' count index=0 item path bytes facts code reserve required
-    "$task_jq" -e '.storage|type=="object" and (.paths|type=="array" and length>0 and length<=32 and all(.[];(.path|type=="string" and length>0 and length<=4096) and (.role|type=="string") and (.bytes|type=="number" and floor==. and .>=0 and .<=1000000000000000) and ((.inodes//0)|type=="number" and floor==. and .>=0))) and ((.reserveBytes//8388608)|type=="number" and floor==. and .>=0 and .<=1000000000000000)' "$TASK_REQUEST" >/dev/null 2>&1 || task_stop invalid invalid-storage-budget 2
-    count=$("$task_jq" '.storage.paths|length' "$TASK_REQUEST")
-    reserve=$("$task_jq" '.storage.reserveBytes//8388608' "$TASK_REQUEST")
+    "$task_jq" -e '.storage|type=="object" and (.paths|type=="array" and length>0 and length<=32 and all(.[];(.path|type=="string" and length>0 and length<=4096) and (.role|type=="string") and (.bytes|type=="number" and floor==. and .>=0 and .<=1000000000000000) and ((.inodes//0)|type=="number" and floor==. and .>=0))) and ((.reserveBytes//8388608)|type=="number" and floor==. and .>=0 and .<=1000000000000000)' <<< "$TASK_REQUEST_JSON" >/dev/null 2>&1 || task_stop invalid invalid-storage-budget 2
+    count=$("$task_jq" '.storage.paths|length' <<< "$TASK_REQUEST_JSON")
+    reserve=$("$task_jq" '.storage.reserveBytes//8388608' <<< "$TASK_REQUEST_JSON")
     while [ "$index" -lt "$count" ]; do
-        item=$("$task_jq" -c ".storage.paths[$index]" "$TASK_REQUEST")
+        item=$("$task_jq" -c ".storage.paths[$index]" <<< "$TASK_REQUEST_JSON")
         path=$("$task_jq" -r .path <<< "$item")
         facts=$(task_storage_fact "$path" "$("$task_jq" -r .role <<< "$item")"); code=$?
         case "$code" in 0) ;; 19) task_stop blocked unverified-persistent-storage "$code" ;; *) task_stop blocked unsafe-storage-path "$code" ;; esac
@@ -73,7 +73,7 @@ task_storage_plan() {
 }
 task_storage_check() {
     local expected old_identity actual_identity
-    expected=$("$task_jq" -c '.storagePlan//null' "$TASK_REQUEST")
+    expected=${1:-$("$task_jq" -c '.storagePlan//null' <<< "$TASK_REQUEST_JSON")}
     [ "$expected" != null ] || task_stop blocked missing-storage-plan 0
     [ "$("$task_jq" -r .requestDigest <<< "$expected")" = "$(task_request_digest)" ] && \
         [ "$("$task_jq" -r .ownerDigest <<< "$expected")" = "$(task_digest "$task_root/storage.sh")" ] || task_stop blocked storage-plan-changed 0

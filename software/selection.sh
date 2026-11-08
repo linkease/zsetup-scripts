@@ -1,0 +1,155 @@
+task_owner_digest() {
+    local file
+    for file in "$task_root"/*.sh "$task_root/../jq/jq-install.sh" "$task_root/../jq/artifacts.lock.json"; do
+        [ -f "$file" ] && [ ! -L "$file" ] || return 2
+        task_digest "$file" || return $?
+    done | task_hash_input
+}
+task_version_matches() {
+    local wanted=$1 actual=$2 core
+    [ -n "$actual" ] || return 1
+    [ -z "$wanted" ] && return 0
+    [ "$wanted" = "$actual" ] && return 0
+    core=$("$task_jq" -rn --arg value "$actual" '$value|sub("^[0-9]+:";"")|capture("(?<v>[0-9]+\\.[0-9]+(?:\\.[0-9]+)?)").v' 2>/dev/null) || return 1
+    [ "$wanted" = "$core" ]
+}
+task_observe() {
+    local executable=${1:-} raw= version= installed=false valid=false binary=$TASK_SOFTWARE
+    [ "$TASK_SOFTWARE" != ripgrep ] || binary=rg
+    [ "$TASK_SOFTWARE" != fastnet ] || binary=FastNet
+    case "$TASK_SOFTWARE" in bash|jq|ripgrep|git|curl|ks-cli|fastnet|linkspace) ;;
+        *) TASK_OBSERVED='{"installed":false,"satisfies":false,"functionalValidation":"not-run"}'; return ;;
+    esac
+    [ -n "$executable" ] || executable=$(type -P "$binary" || true)
+    if [ -n "$executable" ] && [ -f "$executable" ]; then
+        case "$TASK_SOFTWARE" in ks-cli|fastnet|linkspace) set -- version ;; *) set -- --version ;; esac
+        raw=$("$executable" "$@" 2>/dev/null | head -n 1)
+        version=$("$task_jq" -rn --arg value "$raw" 'try ($value|capture("(?<v>[0-9]+\\.[0-9]+(?:\\.[0-9]+)?)").v) catch ""')
+        [ -z "$version" ] || installed=true
+        if [ "$installed" = true ] && task_version_matches "$("$task_jq" -r '.version//""' <<< "$TASK_REQUEST_JSON")" "$version"; then
+            valid=true
+            case "$TASK_SOFTWARE" in
+                jq) "$executable" -ne '("abc"|test("^a")) and (("abc"|sub("^a";"x"))=="xbc") and (({s:"中文"}|tojson|fromjson|.s)=="中文")' >/dev/null 2>&1 || valid=false ;;
+                bash) "$executable" -c '[[ abc == a* ]] && v=中文 && test "${v}" = 中文' || valid=false ;;
+            esac
+        fi
+    fi
+    TASK_OBSERVED=$("$task_jq" -cn --arg path "$executable" --arg version "$version" --arg raw "$raw" --argjson installed "$installed" --argjson valid "$valid" '{installed:$installed,executable:$path,version:$version,observedVersion:$raw,satisfies:$valid,functionalValidation:(if $valid then "passed" else "not-run" end),manager:"existing"}')
+}
+task_owner_artifact() {
+    local raw key value artifact= digest= size= url= version= code
+    raw=$(ZSETUP_INSTALLER_MODE=1 sh "$task_root/../jq/jq-install.sh" --plan); code=$?
+    [ "$code" = 0 ] || task_stop blocked owner-plan-failed "$code"
+    while IFS='=' read -r key value; do
+        case "$key" in artifact) artifact=$value ;; sha256) digest=$value ;; size) size=$value ;; url) url=$value ;; version) version=$value ;; esac
+    done <<< "$raw"
+    [ -n "$artifact" ] && [ -n "$digest" ] && [ -n "$size" ] && [ -n "$url" ] || task_stop failed invalid-owner-plan 11
+    TASK_ARTIFACT=$("$task_jq" -cn --arg name "$artifact" --arg sha "$digest" --arg url "$url" --arg version "$version" --argjson size "$size" '{name:$name,sha256:$sha,url:$url,size:$size,version:$version}')
+}
+task_make_plan() {
+    local requested method manager candidate observed base prefix command artifact='null' storage='null' effects='[]' body input intent
+    input=$(task_request_digest)
+    intent=$("$task_jq" -r '.intent//"install"' <<< "$TASK_REQUEST_JSON")
+    case "$intent" in install|remove) ;; *) task_stop invalid invalid-intent 2 ;; esac
+    requested=$("$task_jq" -r '.version//""' <<< "$TASK_REQUEST_JSON")
+    method=${1:-$("$task_jq" -r '.method//"auto"' <<< "$TASK_REQUEST_JSON")}
+    case "$method" in auto|existing|owner|native-package) ;; *) task_stop invalid invalid-installation-method 2 ;; esac
+    "$task_jq" -e '(.features//[])|all(.[];.=="jq-regex" or .=="json" or .=="unicode" or .=="bash")' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0
+    case "$TASK_SOFTWARE" in
+        jq) "$task_jq" -e '(.features//[])|all(.[];.=="jq-regex" or .=="json" or .=="unicode")' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0 ;;
+        bash) "$task_jq" -e '(.features//[])|all(.[];.=="bash" or .=="unicode")' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0 ;;
+        *) "$task_jq" -e '(.features//[])|length==0' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0 ;;
+    esac
+    task_observe
+    observed=$TASK_OBSERVED
+    if { [ "$method" = auto ] || [ "$method" = existing ]; } && [ "$("$task_jq" -r .satisfies <<< "$observed")" = true ]; then
+        method=existing
+        body=$("$task_jq" -cn --arg method "$method" --argjson observed "$observed" '{method:$method,observed:$observed}')
+    else
+        if [ "$method" = existing ]; then task_stop blocked existing-installation-not-suitable 0 "$observed"; fi
+        if [ "$method" != owner ]; then
+            task_native_query
+            candidate=$("$task_jq" -r .candidateVersion <<< "$TASK_NATIVE")
+            if task_version_matches "$requested" "$candidate"; then method=native-package; fi
+        fi
+        if [ "$method" = native-package ]; then
+            [ -n "${candidate:-}" ] && task_version_matches "$requested" "$candidate" || task_stop needs-ai no-compatible-native-candidate 0 "$TASK_NATIVE"
+            manager=$("$task_jq" -r .manager <<< "$TASK_NATIVE")
+            [ -n "$manager" ] || task_stop needs-ai no-installation-rule 0
+            [ "$("$task_jq" -r 'has("storage")' <<< "$TASK_REQUEST_JSON")" = true ] || task_stop needs-ai native-package-storage-budget-required 0 "$TASK_NATIVE"
+            effects='["native-package-operation","native-package-hooks"]'
+            TASK_REQUEST_JSON=$("$task_jq" -c '.method="native-package"' <<< "$TASK_REQUEST_JSON")
+            body=$("$task_jq" -cn --arg method "$method" --arg version "$candidate" --arg manager "$manager" '{method:$method,version:$version,manager:$manager}')
+        elif [ "$TASK_SOFTWARE" = jq ]; then
+            task_owner_artifact
+            candidate=$("$task_jq" -r .version <<< "$TASK_ARTIFACT")
+            task_version_matches "$requested" "$candidate" || task_stop needs-ai no-compatible-owner-version 0 "$TASK_ARTIFACT"
+            method=owner; artifact=$TASK_ARTIFACT
+            base=$("$task_jq" -r '.prefixBase//""' <<< "$TASK_REQUEST_JSON")
+            [ -n "$base" ] && [ -d "$base" ] || task_stop needs-ai persistent-installation-location-required 0
+            prefix=${base%/}/jq; command=$prefix/commands/jq
+            case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) command=$command.exe ;; esac
+            # Account for archive/staging, version retention and exposed command.
+            TASK_REQUEST_JSON=$("$task_jq" -c --arg base "$base" --argjson size "$("$task_jq" .size <<< "$artifact")" '.storage={reserveBytes:8388608,paths:[{role:"download-and-stage",path:$base,bytes:($size*2),inodes:8},{role:"program-old-new-command",path:$base,bytes:($size*3),inodes:12}]}' <<< "$TASK_REQUEST_JSON")
+            if [ "$intent" = remove ]; then
+                TASK_REQUEST_JSON=$("$task_jq" -c --arg base "$base" '.storage={reserveBytes:65536,paths:[{role:"remove-metadata",path:$base,bytes:65536,inodes:4}]}' <<< "$TASK_REQUEST_JSON")
+            fi
+            case "$(uname -s)" in Linux) ;; *) TASK_REQUEST_JSON=$("$task_jq" -c '.storage.paths|=map(.inodes=0)' <<< "$TASK_REQUEST_JSON") ;; esac
+            effects='["managed-program-files"]'
+            body=$("$task_jq" -cn --arg method "$method" --arg version "$candidate" --arg prefix "$prefix" --arg command "$command" --argjson artifact "$artifact" '{method:$method,version:$version,owner:"jq",prefix:$prefix,command:$command,artifact:$artifact}')
+        else task_stop needs-ai no-installation-rule 0; fi
+        # The storage module accepts the same normalized, in-memory request.
+        task_storage_plan
+        storage=$TASK_STORAGE_PLAN
+    fi
+    TASK_PLAN=$("$task_jq" -c --arg intent "$intent" --arg input "$input" --arg request "$(task_request_digest)" --arg owner "$(task_owner_digest)" --argjson storage "$storage" --argjson effects "$effects" '.+{intent:$intent,inputDigest:$input,requestDigest:$request,ownerDigest:$owner,storagePlan:$storage,effects:$effects}' <<< "$body")
+    TASK_PLAN=$("$task_jq" -c --arg digest "$("$task_jq" -cS . <<< "$TASK_PLAN" | task_hash_input)" '.+{planDigest:$digest}' <<< "$TASK_PLAN")
+}
+task_apply_plan() {
+    local expected method digest expected_request owner details code=0 zsetup prefix command
+    expected=$("$task_jq" -c '.plan//null' <<< "$TASK_REQUEST_JSON")
+    [ "$expected" != null ] || task_stop blocked missing-plan 0
+    [ "$("$task_jq" -r .inputDigest <<< "$expected")" = "$(task_request_digest)" ] || task_stop blocked plan-changed 0
+    digest=$("$task_jq" -cS 'del(.planDigest)' <<< "$expected" | task_hash_input)
+    [ "$digest" = "$("$task_jq" -r .planDigest <<< "$expected")" ] || task_stop blocked plan-changed 0
+    method=$("$task_jq" -r .method <<< "$expected")
+    task_make_plan "$method"
+    [ "$("$task_jq" -r .requestDigest <<< "$expected")" = "$(task_request_digest)" ] && \
+        [ "$("$task_jq" -r .ownerDigest <<< "$expected")" = "$(task_owner_digest)" ] || task_stop blocked plan-changed 0
+    # Source, version and paths must still resolve to the reviewed choice.
+    [ "$("$task_jq" -cS 'del(.planDigest,.storagePlan)' <<< "$expected")" = "$("$task_jq" -cS 'del(.planDigest,.storagePlan)' <<< "$TASK_PLAN")" ] || task_stop blocked plan-changed 0
+    if [ "$method" = existing ]; then
+        task_observe
+        [ "$("$task_jq" -r .satisfies <<< "$TASK_OBSERVED")" = true ] || task_stop blocked existing-installation-not-suitable 0
+        task_result success reused 0 "$TASK_OBSERVED"; return
+    fi
+    task_storage_check "$("$task_jq" -c .storagePlan <<< "$expected")"
+    if [ "$method" = owner ]; then
+        zsetup=${ZSETUP_BIN:-${KAI_ZSETUP_BIN:-$(type -P zsetup || true)}}
+        [ -n "$zsetup" ] || { [ ! -x "$HOME/.local/bin/zsetup" ] || zsetup=$HOME/.local/bin/zsetup; }
+        [ -n "$zsetup" ] && [ -x "$zsetup" ] || task_stop blocked missing-zsetup 127
+        prefix=$("$task_jq" -r .prefix <<< "$expected"); command=$("$task_jq" -r .command <<< "$expected")
+        set -- --installer-prefix "$prefix" --installer-command "$command"
+        [ "$("$task_jq" -r .intent <<< "$expected")" != remove ] || set -- "$@" --remove
+        TASK_EFFECTS='["managed-installation-attempt"]'
+        ZSETUP_BIN="$zsetup" ZSETUP_INSTALLER_MODE=1 "$zsetup" run -- sh "$task_root/../jq/jq-install.sh" "$@" >&2 || code=$?
+        [ "$code" = 0 ] || task_stop failed owner-install-failed "$code"
+        if [ "$("$task_jq" -r .intent <<< "$expected")" = remove ]; then
+            [ ! -e "$command" ] && [ ! -L "$command" ] || task_stop failed removal-verification-failed 11
+            task_result success removed 0 '{"preserved":["config","data","foreign-files"]}' '["managed-program-files"]'; return
+        fi
+        task_observe "$command"
+    else
+        TASK_EFFECTS='["native-package-attempt","native-package-hooks"]'
+        task_native_install "$("$task_jq" -r .manager <<< "$expected")" "$("$task_jq" -r .version <<< "$expected")"
+        task_native_query
+        [ "$("$task_jq" -r .installedVersion <<< "$TASK_NATIVE")" = "$("$task_jq" -r .version <<< "$expected")" ] || task_stop failed installed-package-version-mismatch 11 "$TASK_NATIVE"
+        task_observe
+        if [ "$("$task_jq" -r .installed <<< "$TASK_OBSERVED")" != true ]; then
+            task_stop needs-ai installed-functional-check-required 0 "$TASK_NATIVE"
+        fi
+    fi
+    [ "$("$task_jq" -r .satisfies <<< "$TASK_OBSERVED")" = true ] || task_stop failed functional-verification-failed 11 "$TASK_OBSERVED"
+    details=$("$task_jq" -cn --argjson observed "$TASK_OBSERVED" --argjson plan "$expected" '$observed+{installation:{method:$plan.method,version:$plan.version,owner:$plan.owner,planDigest:$plan.planDigest}}')
+    task_result success installed 0 "$details" "$("$task_jq" -c .effects <<< "$expected")"
+}
