@@ -30,6 +30,14 @@ class LocalArtifact(unittest.TestCase):
         r,b=self.planapply();self.assertEqual(r.returncode,0,r.stderr+r.stdout);command=Path(b['details']['command']);before=command.read_bytes();self.source.write_text('#!/bin/sh\nexit 9\n');self.req['artifact']['sha256']=hashlib.sha256(self.source.read_bytes()).hexdigest();self.req['version']='2.0.0';r,b=self.planapply();self.assertEqual(r.returncode,22,r.stderr+r.stdout);self.assertEqual(b['nativeExitCode'],9);self.assertEqual(command.read_bytes(),before)
     def test_foreign_prefix_is_preserved(self):
         prefix=self.base/'built-example';prefix.mkdir();(prefix/'foreign').write_text('mine');r,b=self.call();self.assertEqual(r.returncode,21,r.stderr+r.stdout);self.assertEqual(b['reason'],'artifact-prefix-unowned');self.assertEqual((prefix/'foreign').read_text(),'mine')
+    def test_remove_preserves_version_foreign_file_and_allows_same_binary_reinstall(self):
+        r,b=self.planapply();self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        directory=self.base/'built-example/versions/1.0.0';(directory/'user.note').write_text('keep')
+        self.req['intent']='remove';r,b=self.planapply('remove');self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        self.assertFalse((directory/'program').exists());self.assertEqual((directory/'user.note').read_text(),'keep')
+        self.req.pop('intent');r,b=self.planapply();self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        self.assertEqual((directory/'user.note').read_text(),'keep')
+
     def test_wrong_platform_is_explicit_handoff(self):
         self.req['artifact']['platform']='windows-amd64';r,b=self.call();self.assertEqual(r.returncode,20,r.stderr+r.stdout);self.assertEqual(b['reason'],'artifact-platform-mismatch')
 
