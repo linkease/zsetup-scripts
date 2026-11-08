@@ -31,6 +31,11 @@ fi
 tunnel_root=$(CDPATH= cd -- "$zroot/.." && pwd)
 native_bin="$native_dir/zsetup-linux-x86_64"
 fi
+mkdir -p "$root/dist"
+software_test_tmp=$(mktemp -d "$root/dist/software-tests.XXXXXX")
+ZSETUP_TEST_NATIVE="$native_bin" TMPDIR="$software_test_tmp" python3 -B -m unittest discover -s "$root/software/tests"
+rmdir "$software_test_tmp"
+for software_script in "$root"/software/*.sh; do bash -n "$software_script"; done
 python3 -B "$root/tests/module_layout_test.py"
 if [ "$native_only" = 0 ] && [ -f "$zroot/Cargo.toml" ]; then
     python3 -B "$root/tests/app_release_test.py" "$zroot" "$native_bin"

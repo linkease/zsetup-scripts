@@ -14,6 +14,7 @@ esac
 . "$task_root/native.sh"
 . "$task_root/selection.sh"
 . "$task_root/backup.sh"
+. "$task_root/container.sh"
 case "$TASK_OPERATION" in
     backup-plan) task_backup_plan; task_result success backup-planned 0 "$TASK_BACKUP_PLAN" ;;
     backup-run) task_backup_run "$("$task_jq" -c '.backupPlan//empty' <<< "$TASK_REQUEST_JSON")"; task_result success backed-up 0 "$TASK_BACKUP_RECEIPT" "$TASK_EFFECTS" ;;
