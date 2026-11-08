@@ -90,6 +90,26 @@ class JqInstallerTests(unittest.TestCase):
         actual=subprocess.check_output([str(binary),'-nc','{unicode:"中文",regex:("abc"|test("^a"))}'],text=True)
         self.assertEqual(json.loads(actual),{'unicode':'中文','regex':True})
         self.assertEqual(self.install().returncode,0)
+
+    def test_explicit_command_path_keeps_binary_and_entry_on_selected_data_volume(self):
+        self.fixture()
+        prefix = self.work / 'data' / 'jq'
+        command = self.work / 'data' / 'commands' / 'jq'
+        result = self.install('--installer-prefix', str(prefix), '--installer-command', str(command))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(command.is_file())
+        self.assertFalse((self.home / '.local/bin/jq').exists())
+        self.assertIn('command=' + str(command), result.stdout)
+        self.assertEqual(self.install('--installer-prefix', str(prefix), '--installer-command', str(command), '--remove').returncode, 0)
+        self.assertFalse(command.exists())
+
+    def test_explicit_foreign_command_is_preserved(self):
+        self.fixture()
+        command = self.work / 'foreign-jq'
+        command.write_text('foreign bytes')
+        result = self.install('--installer-prefix', str(self.work / 'data-jq'), '--installer-command', str(command))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(command.read_text(), 'foreign bytes')
         self.assertEqual((self.home/'.local/lib/linkease/jq/current').read_text().strip(),'1.8.2')
 
     def test_explicit_prepared_artifact_is_verified_by_native_core_before_activation(self):
