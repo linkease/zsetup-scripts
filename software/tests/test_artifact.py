@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -43,6 +44,18 @@ class LocalArtifact(unittest.TestCase):
         prefix=self.base/'built-example';(prefix/'commands').rename(self.base/'external-commands');(prefix/'commands').symlink_to(self.base/'external-commands',target_is_directory=True)
         self.req.pop('plan',None);r,b=self.call();self.assertEqual(r.returncode,21,r.stderr+r.stdout);self.assertEqual(b['reason'],'artifact-prefix-unowned')
         self.assertTrue((self.base/'external-commands/built-example').exists())
+
+    def test_owned_query_reads_receipt_and_verify_runs_the_declared_self_test(self):
+        marker=self.base/'self-test-ran'
+        self.source.write_text('#!/bin/sh\ntouch '+shlex.quote(str(marker))+'\nprintf "compiled self test ready\\n"\n')
+        self.req['artifact']['sha256']=hashlib.sha256(self.source.read_bytes()).hexdigest()
+        r,b=self.planapply();self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        marker.unlink()
+        r,b=self.call('query');self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        self.assertTrue(b['details']['installed']);self.assertEqual(b['details']['functionalValidation'],'not-run')
+        self.assertFalse(marker.exists(),'query executed the installed application')
+        r,b=self.call('verify');self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        self.assertEqual(b['details']['functionalValidation'],'passed');self.assertTrue(marker.exists())
 
     def test_wrong_platform_is_explicit_handoff(self):
         self.req['artifact']['platform']='windows-amd64';r,b=self.call();self.assertEqual(r.returncode,20,r.stderr+r.stdout);self.assertEqual(b['reason'],'artifact-platform-mismatch')
