@@ -23,4 +23,3 @@ LinkEase-owned receipt makes repeat installs idempotent and permits later
 managed upgrades while preserving unrelated installed applications. The entry
 does not change zsetup core, `stable-windows`, Machine PATH, services, system or
 Git proxy settings, and the release tooling does not publish public pointers.
-

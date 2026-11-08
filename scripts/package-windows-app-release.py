@@ -181,4 +181,3 @@ if __name__ == "__main__":
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print("Windows app release: " + str(error), file=sys.stderr)
         sys.exit(1)
-
