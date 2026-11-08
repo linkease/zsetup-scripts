@@ -172,6 +172,10 @@ class JqInstallerTests(unittest.TestCase):
         self.assertFalse(command.exists());self.assertFalse((prefix/'versions').exists())
         self.assertEqual(keep.read_text(),'keep')
         self.assertEqual(self.install('--remove').returncode,0)
+        reinstall=self.install()
+        self.assertEqual(reinstall.returncode,0,reinstall.stderr)
+        self.assertEqual(keep.read_text(),'keep')
+        self.assertTrue(command.exists())
 
     def test_windows_executable_layout_is_exercised_offline(self):
         self.fixture('windows')
