@@ -31,3 +31,11 @@ task_digest() {
     elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -d ' ' -f 1
     else return 127; fi
 }
+task_hash_input() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d ' ' -f 1
+    elif command -v shasum >/dev/null 2>&1; then shasum -a 256 | cut -d ' ' -f 1
+    else return 127; fi
+}
+task_request_digest() {
+    "$task_jq" -cS 'del(.storagePlan,.plan)' "$TASK_REQUEST" | task_hash_input
+}

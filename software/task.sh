@@ -4,8 +4,13 @@ set -u
 set -o pipefail
 task_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$task_root/protocol.sh"
-case "$TASK_OPERATION" in query|plan|apply|verify|remove) ;; *) task_stop invalid unknown-operation 2 ;; esac
+case "$TASK_OPERATION" in query|plan|apply|verify|remove|storage-plan|storage-check) ;; *) task_stop invalid unknown-operation 2 ;; esac
 task_request "${2:-}"
+. "$task_root/storage.sh"
+case "$TASK_OPERATION" in
+    storage-plan) task_storage_plan; task_result success storage-planned 0 "$TASK_STORAGE_PLAN"; exit 0 ;;
+    storage-check) task_storage_check; task_result success storage-verified 0 "$TASK_STORAGE_PLAN"; exit 0 ;;
+esac
 case "$TASK_SOFTWARE" in bash|jq) ;; *) task_stop needs-ai no-installation-rule 0 ;; esac
 task_executable=$(type -P "$TASK_SOFTWARE" || true)
 if [ -n "$task_executable" ]; then
