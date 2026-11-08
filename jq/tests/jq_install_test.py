@@ -92,6 +92,33 @@ class JqInstallerTests(unittest.TestCase):
         self.assertEqual(self.install().returncode,0)
         self.assertEqual((self.home/'.local/lib/linkease/jq/current').read_text().strip(),'1.8.2')
 
+    def test_explicit_prepared_artifact_is_verified_by_native_core_before_activation(self):
+        self.fixture()
+        cache = self.work / 'prepared-jq'
+        cache.write_bytes(Handler.body)
+        self.env['JQ_ARTIFACT_CACHE'] = str(cache)
+        # A fresh native request would receive corrupted bytes. Only reuse of
+        # the exact locked prepared artifact can produce a working installation.
+        Handler.body = b'X' * len(Handler.body)
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        binary = self.home / '.local/bin/jq'
+        self.assertEqual(subprocess.check_output([str(binary), '--version'], text=True).strip(), 'jq-1.8.2')
+        self.assertEqual(cache.read_bytes()[:9], b'#!/bin/sh')
+
+    def test_changed_or_symlink_prepared_artifact_never_activates(self):
+        self.fixture()
+        cache = self.work / 'prepared-jq'
+        cache.write_bytes(b'X' * len(Handler.body))
+        self.env['JQ_ARTIFACT_CACHE'] = str(cache)
+        Handler.body = cache.read_bytes()
+        self.assertEqual(self.install().returncode, 11)
+        self.assertFalse((self.home / '.local/bin/jq').exists())
+        cache.unlink()
+        cache.symlink_to(self.work / 'lock.json')
+        self.assertEqual(self.install().returncode, 2)
+        self.assertFalse((self.home / '.local/bin/jq').exists())
+
     def test_foreign_command_and_corrupted_download_are_preserved(self):
         self.fixture()
         command=self.home/'.local/bin/jq';command.parent.mkdir(parents=True);command.write_text('foreign')
