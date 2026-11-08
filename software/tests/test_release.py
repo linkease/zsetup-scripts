@@ -7,11 +7,14 @@ import platform
 import shutil
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tests'))
+from tls_fixture import generate_certificate
 
 
 @unittest.skipUnless(os.environ.get('ZSETUP_TEST_NATIVE'), 'requires explicit verified native zsetup')
@@ -26,12 +29,9 @@ class ReleaseOwner(unittest.TestCase):
             shutil.copytree(ROOT / folder, self.owner / folder, ignore=shutil.ignore_patterns('tests', '__pycache__'))
         self.base = self.root / 'apps'
         self.base.mkdir()
-        cert = self.root / 'cert.pem'
-        key = self.root / 'key.pem'
-        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256',
-                        '-nodes', '-days', '1', '-keyout', str(key), '-out', str(cert),
-                        '-subj', '/CN=localhost', '-addext', 'subjectAltName=IP:127.0.0.1'],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        generate_certificate(self.root)
+        cert = self.root / 'server.crt'
+        key = self.root / 'server.key'
         self.payload = b'#!/bin/sh\ntest "$1" = --self-test || exit 9\nprintf "release-ready\\n"\n#' + b'x' * 512 + b'\n'
         self.body = self.payload
         self.hits = 0
@@ -62,7 +62,7 @@ class ReleaseOwner(unittest.TestCase):
         self.request = {'software': 'sim-release-app', 'targetId': 'release-test',
                         'method': 'release', 'version': '1.0.0', 'prefixBase': str(self.base)}
         self.env = {**os.environ, 'ZSETUP_TASK_TARGET_ID': 'release-test',
-                    'ZSETUP_BIN': os.environ['ZSETUP_TEST_NATIVE'], 'ZSETUP_CA_FILE': str(cert)}
+                    'ZSETUP_BIN': os.environ['ZSETUP_TEST_NATIVE'], 'ZSETUP_CA_FILE': str(self.root / 'ca.crt')}
 
     def stop_server(self):
         self.server.shutdown()
