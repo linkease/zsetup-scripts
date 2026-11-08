@@ -1,5 +1,13 @@
 # jq managed installer candidate 0.1.0
 
+An explicitly prepared artifact can be supplied as `JQ_ARTIFACT_CACHE=/absolute/file`.
+The owner copies a regular, non-symlink cache into its private transaction stage;
+native zsetup still validates the original locked SHA256 and size. A valid cache
+works without downloading the product again. An invalid cache follows native
+zsetup's ordinary verified-download fallback and is never activated as-is.
+Existing owned versions take precedence. This option does not install a cache
+into system paths, change trust settings, or register a service.
+
 The owner installer downloads official jq 1.8.2 executables using native zsetup
 SHA256/size verification. `artifacts.lock.json` records official release asset
 metadata from https://github.com/jqlang/jq/releases/tag/jq-1.8.2. The build never
