@@ -107,6 +107,22 @@ class Selection(unittest.TestCase):
         r,body=self.call('plan',{'PATH':str(fake)+os.pathsep+os.environ['PATH']})
         self.assertEqual(r.returncode,22,r.stderr+r.stdout);self.assertEqual(body['reason'],'existing-program-query-failed');self.assertEqual(body['nativeExitCode'],7)
 
+    def test_prerelease_program_is_not_reused_for_an_exact_stable_version(self):
+        fake=self.root/'bin';fake.mkdir();tool=fake/'linkspace'
+        tool.write_text("#!/bin/sh\ncat <<'JSON'\n"+json.dumps({'schemaVersion':1,'version':'0.2.0-sim.3'},indent=2)+"\nJSON\n");tool.chmod(0o755)
+        self.request.update(software='linkspace',version='0.2.0',method='existing')
+        r,body=self.call('plan',{'PATH':str(fake)+os.pathsep+os.environ['PATH']})
+        self.assertEqual(r.returncode,21,r.stderr+r.stdout)
+        self.assertEqual(body['reason'],'existing-installation-not-suitable')
+
+    def test_native_prerelease_candidate_does_not_satisfy_exact_stable_version(self):
+        fake=self.root/'bin';fake.mkdir();tool=fake/'apt-cache'
+        tool.write_text('#!/bin/sh\nprintf "Installed: (none)\\nCandidate: 1.8.2~rc1-1\\n"\n');tool.chmod(0o755)
+        self.request.update(software='jq',version='1.8.2',method='native-package')
+        r,body=self.call('plan',{'PATH':str(fake)+os.pathsep+os.environ['PATH']})
+        self.assertEqual(r.returncode,20,r.stderr+r.stdout)
+        self.assertEqual(body['reason'],'no-compatible-native-candidate')
+
     def test_owner_failure_retains_native_code_without_source_fallback(self):
         self.request.update({'software': 'jq', 'method': 'owner', 'version': '1.8.2', 'prefixBase': str(self.root)})
         r, body = self.call('plan')
