@@ -48,6 +48,7 @@ task_owner_artifact() {
 }
 task_make_plan() {
     local requested method manager candidate observed base prefix command artifact='null' storage='null' effects='[]' body input intent
+    local backup='null' combined='null' saved
     input=$(task_request_digest)
     intent=$("$task_jq" -r '.intent//"install"' <<< "$TASK_REQUEST_JSON")
     case "$intent" in install|remove) ;; *) task_stop invalid invalid-intent 2 ;; esac
@@ -102,11 +103,15 @@ task_make_plan() {
         task_storage_plan
         storage=$TASK_STORAGE_PLAN
     fi
-    TASK_PLAN=$("$task_jq" -c --arg intent "$intent" --arg input "$input" --arg request "$(task_request_digest)" --arg owner "$(task_owner_digest)" --argjson storage "$storage" --argjson effects "$effects" '.+{intent:$intent,inputDigest:$input,requestDigest:$request,ownerDigest:$owner,storagePlan:$storage,effects:$effects}' <<< "$body")
+    if [ "$method" != existing ] && [ "$("$task_jq" -r '.backupRequired//false' <<< "$TASK_REQUEST_JSON")" = true ]; then
+        task_backup_plan;backup=$TASK_BACKUP_PLAN
+        saved=$TASK_REQUEST_JSON;task_backup_add_budget;task_storage_plan;combined=$TASK_STORAGE_PLAN;TASK_REQUEST_JSON=$saved
+    fi
+    TASK_PLAN=$("$task_jq" -c --arg intent "$intent" --arg input "$input" --arg request "$(task_request_digest)" --arg owner "$(task_owner_digest)" --argjson storage "$storage" --argjson backup "$backup" --argjson combined "$combined" --argjson effects "$effects" '.+{intent:$intent,inputDigest:$input,requestDigest:$request,ownerDigest:$owner,storagePlan:$storage,backupPlan:$backup,combinedStoragePlan:$combined,effects:$effects}' <<< "$body")
     TASK_PLAN=$("$task_jq" -c --arg digest "$("$task_jq" -cS . <<< "$TASK_PLAN" | task_hash_input)" '.+{planDigest:$digest}' <<< "$TASK_PLAN")
 }
 task_apply_plan() {
-    local expected method digest expected_request owner details code=0 zsetup prefix command
+    local expected method digest expected_request owner details code=0 zsetup prefix command saved backup='null'
     expected=$("$task_jq" -c '.plan//null' <<< "$TASK_REQUEST_JSON")
     [ "$expected" != null ] || task_stop blocked missing-plan 0
     [ "$("$task_jq" -r .inputDigest <<< "$expected")" = "$(task_request_digest)" ] || task_stop blocked plan-changed 0
@@ -117,11 +122,16 @@ task_apply_plan() {
     [ "$("$task_jq" -r .requestDigest <<< "$expected")" = "$(task_request_digest)" ] && \
         [ "$("$task_jq" -r .ownerDigest <<< "$expected")" = "$(task_owner_digest)" ] || task_stop blocked plan-changed 0
     # Source, version and paths must still resolve to the reviewed choice.
-    [ "$("$task_jq" -cS 'del(.planDigest,.storagePlan)' <<< "$expected")" = "$("$task_jq" -cS 'del(.planDigest,.storagePlan)' <<< "$TASK_PLAN")" ] || task_stop blocked plan-changed 0
+    [ "$("$task_jq" -cS 'walk(if type=="object" then del(.planDigest,.storagePlan,.combinedStoragePlan) else . end)' <<< "$expected")" = "$("$task_jq" -cS 'walk(if type=="object" then del(.planDigest,.storagePlan,.combinedStoragePlan) else . end)' <<< "$TASK_PLAN")" ] || task_stop blocked plan-changed 0
     if [ "$method" = existing ]; then
         task_observe
         [ "$("$task_jq" -r .satisfies <<< "$TASK_OBSERVED")" = true ] || task_stop blocked existing-installation-not-suitable 0
         task_result success reused 0 "$TASK_OBSERVED"; return
+    fi
+    if [ "$("$task_jq" -c .backupPlan <<< "$expected")" != null ]; then
+        saved=$TASK_REQUEST_JSON;task_backup_add_budget
+        task_storage_check "$("$task_jq" -c .combinedStoragePlan <<< "$expected")";TASK_REQUEST_JSON=$saved
+        task_backup_run "$("$task_jq" -c .backupPlan <<< "$expected")";backup=$TASK_BACKUP_RECEIPT
     fi
     task_storage_check "$("$task_jq" -c .storagePlan <<< "$expected")"
     if [ "$method" = owner ]; then
@@ -150,6 +160,6 @@ task_apply_plan() {
         fi
     fi
     [ "$("$task_jq" -r .satisfies <<< "$TASK_OBSERVED")" = true ] || task_stop failed functional-verification-failed 11 "$TASK_OBSERVED"
-    details=$("$task_jq" -cn --argjson observed "$TASK_OBSERVED" --argjson plan "$expected" '$observed+{installation:{method:$plan.method,version:$plan.version,owner:$plan.owner,planDigest:$plan.planDigest}}')
+    details=$("$task_jq" -cn --argjson observed "$TASK_OBSERVED" --argjson plan "$expected" --argjson backup "$backup" '$observed+{installation:{method:$plan.method,version:$plan.version,owner:$plan.owner,planDigest:$plan.planDigest},backup:$backup}')
     task_result success installed 0 "$details" "$("$task_jq" -c .effects <<< "$expected")"
 }
