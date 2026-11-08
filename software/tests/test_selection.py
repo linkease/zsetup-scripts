@@ -95,7 +95,7 @@ class Selection(unittest.TestCase):
 
     def test_structured_program_version_preserves_prerelease_identity(self):
         fake=self.root/'bin';fake.mkdir();tool=fake/'linkspace'
-        tool.write_text('#!/bin/sh\nprintf '{\n  "schemaVersion":1,\n  "version":"0.2.0-sim.3"\n}\n'\n');tool.chmod(0o755)
+        tool.write_text("#!/bin/sh\ncat <<'JSON'\n"+json.dumps({'schemaVersion':1,'version':'0.2.0-sim.3'},indent=2)+"\nJSON\n");tool.chmod(0o755)
         self.request.update(software='linkspace',version='0.2.0-sim.3')
         r,body=self.call('plan',{'PATH':str(fake)+os.pathsep+os.environ['PATH']})
         self.assertEqual(r.returncode,0,r.stderr+r.stdout);self.assertEqual(body['details']['method'],'existing');self.assertEqual(body['details']['observed']['version'],'0.2.0-sim.3')
