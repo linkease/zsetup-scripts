@@ -61,6 +61,23 @@ else:
     def test_start_requires_explicit_request(self):
         self.request['container']['start']=False;r,b=self.call();self.assertEqual(r.returncode,21);self.assertEqual(b['reason'],'container-start-not-selected');self.assertFalse(self.mutations.exists())
 
+    def test_failed_bounded_image_pull_preserves_exit_and_releases_lock(self):
+        native=os.environ.get('ZSETUP_TEST_NATIVE')
+        if not native:self.skipTest('explicit real zsetup binary required for process-bound capture')
+        self.env['ZSETUP_BIN']=native
+        r,b=self.call();self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        self.request['plan']=b['details'];app=Path(b['details']['appDir'])
+        r,b=self.call('apply');self.assertEqual(r.returncode,22,r.stderr+r.stdout)
+        self.assertEqual(b['reason'],'container-image-pull-failed');self.assertEqual(b['nativeExitCode'],7)
+        self.assertFalse(app.exists());self.assertFalse(Path(str(app)+'.lock').exists())
+
+    def test_missing_bounded_download_tool_does_not_start_pull(self):
+        self.env['ZSETUP_BIN']='/nonexistent/native'
+        r,b=self.call();self.assertEqual(r.returncode,0,r.stderr+r.stdout);self.request['plan']=b['details'];app=Path(b['details']['appDir'])
+        r,b=self.call('apply');self.assertEqual(r.returncode,21,r.stderr+r.stdout)
+        self.assertEqual(b['reason'],'bounded-container-download-needs-zsetup');self.assertFalse(app.exists());self.assertFalse(self.mutations.exists())
+        self.assertFalse(Path(str(app)+'.lock').exists())
+
     def test_apply_without_reviewed_plan_never_calls_docker_mutation(self):
         r,b=self.call('apply');self.assertEqual(r.returncode,21);self.assertEqual(b['reason'],'missing-plan');self.assertFalse(self.mutations.exists())
 
