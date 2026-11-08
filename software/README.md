@@ -48,3 +48,18 @@ artifact.path/sha256/platform/verifyArgs/expectedOutput。计划仅哈希候选�
 已不存在的包返回 native-package-already-absent，不会安装仓库候选。移除不使用
 purge、强制依赖删除或额外 autoremove；配置/用户数据仍受原生包及其 hooks 策略
 约束，不宣称移除了其他来源的同名程序。需要保护的数据应在本次操作计划中备份。
+
+`method: "native-package"` 的 query 读取包注册与仓库候选，不执行程序，
+功能状态为 not-run。install 优先复用符合版本的已注册包，不隐式升级；无法
+识别其业务自检时返回 installed-functional-check-required，交给 AI 验证。
+要求升级时应明确选择新的精确版本。verify 同时核验原生注册和已有功能规则。
+
+`method: "release"` 使用应用目录维护的固定发布配方；当前 Linkspace
+0.2.0-sim.3 提供四个平台的 backup-file-level。它是 Kai 工具命名空间的
+显式候选，未改变全局 Linkspace stable 或旧 0.1.0 安装器。
+`software/build-release-lock.py --check` 核验生成锁与应用源一致。
+使用 version、prefixBase；可选 features。计划固定 HTTPS URL、摘要、大小、
+平台和自检参数，复用 artifact 的归属/原子激活/卸载协议。下载由 zsetup
+完成并校验；可复用明确的已验证缓存，回执区分缓存与真实下载，不伪称网络通过。
+query 校验归属和程序摘要但不执行应用；verify 执行已记录的精确自检。
+移除保留数据/配置，重新安装仍可核验原版本归属。

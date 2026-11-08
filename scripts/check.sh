@@ -31,6 +31,7 @@ fi
 tunnel_root=$(CDPATH= cd -- "$zroot/.." && pwd)
 native_bin="$native_dir/zsetup-linux-x86_64"
 fi
+python3 -B "$root/software/build-release-lock.py" --check
 mkdir -p "$root/dist"
 software_test_tmp=$(mktemp -d "$root/dist/software-tests.XXXXXX")
 ZSETUP_TEST_NATIVE="$native_bin" TMPDIR="$software_test_tmp" python3 -B -m unittest discover -s "$root/software/tests"
