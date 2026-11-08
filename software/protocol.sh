@@ -6,10 +6,14 @@ if [ -z "$task_jq" ] || ! "$task_jq" -ne '"abc"|test("^a")' >/dev/null 2>&1; the
     exit 21
 fi
 task_jq_binary=$task_jq
+task_jq_native_windows=0
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) task_jq_native_windows=1 ;; esac
 task_json() {
     # Native jq must receive JSON string arguments literally. MSYS otherwise
     # rewrites --arg /d/path into a Windows path inside the JSON document.
-    MSYS2_ARG_CONV_EXCL='*' "$task_jq_binary" "$@"
+    if [ "$task_jq_native_windows" = 1 ];then
+        MSYS2_ARG_CONV_EXCL='*' "$task_jq_binary" --binary "$@"
+    else MSYS2_ARG_CONV_EXCL='*' "$task_jq_binary" "$@";fi
 }
 task_jq=task_json
 TASK_OPERATION=${1:-}; TASK_SOFTWARE=; TASK_TARGET=${ZSETUP_TASK_TARGET_ID:-local}

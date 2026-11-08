@@ -32,3 +32,12 @@ Docker 负责 OCI 摘要校验。计划只读；执行须传入原 `details` 为
 `ZSETUP_TEST_NATIVE=/absolute/verified/zsetup`，执行
 `python3 -m unittest discover -s software/tests`；容器进程测试使用真实
 zsetup 控制私有假 Docker 子进程。原生 Docker 生命周期证据由消费者保存。
+
+
+本地构建产物使用 `method: "artifact"`，明确 software、version、prefixBase 和
+artifact.path/sha256/platform/verifyArgs/expectedOutput。计划仅哈希候选文件，
+不猜来源或执行产物；apply 在私有暂存区再次校验，并按明确参数执行自检。
+目标传输负责整个前台进程树的截止时间和取消。自检通过后才写不可变版本，
+原子替换用户选定数据目录内的命令和 current.json；失败保持旧命令。
+不同摘要不能复用同一版本。卸载前完整校验归属和摘要，保留用户文件与小型
+版本归属回执，使同摘要重装仍可验证；不覆盖外来 prefix、命令或符号链接。

@@ -54,8 +54,9 @@ task_make_plan() {
     case "$intent" in install|remove) ;; *) task_stop invalid invalid-intent 2 ;; esac
     requested=$("$task_jq" -r '.version//""' <<< "$TASK_REQUEST_JSON")
     method=${1:-$("$task_jq" -r '.method//"auto"' <<< "$TASK_REQUEST_JSON")}
-    case "$method" in auto|existing|owner|native-package|container) ;; *) task_stop invalid invalid-installation-method 2 ;; esac
+    case "$method" in auto|existing|owner|native-package|container|artifact) ;; *) task_stop invalid invalid-installation-method 2 ;; esac
     if [ "$method" = container ]; then task_container_plan;return;fi
+    if [ "$method" = artifact ]; then task_artifact_plan;return;fi
     "$task_jq" -e '(.features//[])|all(.[];.=="jq-regex" or .=="json" or .=="unicode" or .=="bash")' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0
     case "$TASK_SOFTWARE" in
         jq) "$task_jq" -e '(.features//[])|all(.[];.=="jq-regex" or .=="json" or .=="unicode")' <<< "$TASK_REQUEST_JSON" >/dev/null || task_stop needs-ai unknown-functional-requirement 0 ;;
@@ -136,6 +137,7 @@ task_apply_plan() {
     fi
     task_storage_check "$("$task_jq" -c .storagePlan <<< "$expected")"
     if [ "$method" = container ]; then task_container_apply "$expected";return;fi
+    if [ "$method" = artifact ]; then task_artifact_apply "$expected";return;fi
     if [ "$method" = owner ]; then
         zsetup=${ZSETUP_BIN:-${KAI_ZSETUP_BIN:-$(type -P zsetup || true)}}
         [ -n "$zsetup" ] || { [ ! -x "$HOME/.local/bin/zsetup" ] || zsetup=$HOME/.local/bin/zsetup; }
