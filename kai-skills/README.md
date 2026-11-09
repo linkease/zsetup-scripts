@@ -29,6 +29,23 @@ application. It deliberately does not export `KAI_SKILLS_REQUESTED_RELEASE`:
 Product Configuration is the current-channel pointer and the immutable
 Business Installer remains the release trust boundary.
 
+The normal user selects only one skill or `all`:
+
+```sh
+curl -fsSL https://fw.koolcenter.com/binary/kai/kai-skills/setup.sh | \
+  sh -s -- kai-software
+curl -fsSL https://fw.koolcenter.com/binary/kai/kai-skills/setup.sh | \
+  sh -s -- all
+```
+
+The first form expands to `--skill kai-software`. The second reads the local
+OS identity and expands Ubuntu to `--system ubuntu`, or iStoreOS/OpenWrt to
+`--system istoreos`. Both rely on the Business Installer defaults of Codex,
+user scope and `~/.agents/skills`; users do not need to choose those concepts.
+No arguments and `--help` return before the zsetup bootstrap. Existing
+`--skill`/`--system`, `--consumer`, `--scope` and `--target-skills` arguments
+remain available as the advanced recovery interface.
+
 It can be generated independently for a mutable-channel-only rollout:
 
 ```sh
