@@ -37,7 +37,7 @@ for record in catalog["installers"]:
     app = record["application"]
     if app == "kai-skills":
         assert record["script"] == "kai-skills/kai-skills-install.sh"
-        assert record["path"] == "kai/kai-skills/installers/1.2.4/kai-skills-install.sh"
+        assert record["path"] == "kai/kai-skills/installers/1.2.5/kai-skills-install.sh"
         continue
     directory = f"kspeeder/{app}" if app in {"ks-cli", "kspeeder"} else app
     extension = 'ps1' if app == 'jq' and record['os'] == 'windows' else 'sh'

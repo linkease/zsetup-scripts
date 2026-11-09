@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Embed the one maintained bootstrap into standalone public business entries."""
 import argparse
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -109,12 +110,23 @@ def main():
     if set(windows_catalog) != {"schema_version", "config_version", "installers"} or windows_catalog["schema_version"] != 1:
         raise ValueError("invalid Windows installer catalog")
     windows_apps = {entry["application"] for entry in windows_catalog["installers"]}
-    if windows_apps != {"scoop"}:
+    if windows_apps != {"scoop", "kai-skills"}:
         raise ValueError("unsupported Windows generated-entry set")
     subprocess.run([
         "python3", "-B", str(ROOT / "scoop/build.py"),
         *(["--check"] if args.check else []),
     ], check=True)
+    kai_build_spec = importlib.util.spec_from_file_location(
+        "kai_skills_build", ROOT / "kai-skills/build.py")
+    kai_build = importlib.util.module_from_spec(kai_build_spec)
+    kai_build_spec.loader.exec_module(kai_build)
+    windows_installer = ROOT / "kai-skills/kai-skills-install.ps1"
+    windows_channel = ROOT / "kai-skills/setup.ps1"
+    maintained = (ROOT / "kai-skills/business.ps1").read_text(encoding="utf-8")
+    if not windows_installer.is_file() or not windows_installer.read_text(encoding="utf-8").endswith(maintained):
+        raise ValueError("stale generated Windows kai-skills installer")
+    if not windows_channel.is_file() or windows_channel.read_text(encoding="utf-8") != kai_build.windows_channel_entrypoint():
+        raise ValueError("stale generated Windows kai-skills channel")
 
     # Owner-provided offline removal resource; no bootstrap or network access.
     output = ROOT / "scripts/remove-managed.sh"

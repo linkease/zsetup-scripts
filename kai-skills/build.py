@@ -10,6 +10,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent
 BOOTSTRAP = ROOT.parent / "lib/bootstrap.sh"
+WINDOWS_BOOTSTRAP = ROOT.parent / "lib/bootstrap.ps1"
 
 
 def sha(path):
@@ -148,6 +149,52 @@ def channel_entrypoint():
     )
 
 
+def windows_channel_entrypoint():
+    bootstrap = WINDOWS_BOOTSTRAP.read_text(encoding="utf-8").rstrip()
+    return (
+        "param(\n"
+        "    [Parameter(Position=0)][string]$Selection,\n"
+        "    [Parameter(ValueFromRemainingArguments=$true)][string[]]$InstallerArguments\n"
+        ")\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        "$utf8 = [Text.UTF8Encoding]::new($false)\n"
+        "[Console]::InputEncoding = $utf8\n[Console]::OutputEncoding = $utf8\n$OutputEncoding = $utf8\n\n"
+        "function Show-KaiSkillsUsage {\n"
+        "    Write-Output 'Install one skill:'\n"
+        "    Write-Output \"  & ([scriptblock]::Create((irm 'https://fw.koolcenter.com/binary/kai/kai-skills/setup.ps1'))) kai-software\"\n"
+        "    Write-Output 'Install all Windows skills: replace kai-software with all'\n"
+        "    Write-Output 'Default destination: $HOME\\.agents\\skills'\n"
+        "}\n"
+        "if (-not $Selection) { Show-KaiSkillsUsage; throw 'kai-skills: choose a skill or all' }\n"
+        "if ($Selection -in @('-h', '--help')) { Show-KaiSkillsUsage; return }\n"
+        "$business = @()\n"
+        "if ($Selection -ceq 'all') { $business += @('--system', 'windows') }\n"
+        "elseif ($Selection.StartsWith('-')) { $business += $Selection }\n"
+        "elseif ($Selection -cmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') { $business += @('--skill', $Selection) }\n"
+        "else { throw 'kai-skills: invalid skill id' }\n"
+        "$business += @($InstallerArguments)\n"
+        "if (-not $env:ZSETUP_ROOT) {\n"
+        "    $data = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { $HOME }\n"
+        "    if (-not $data) { throw 'kai-skills: cannot resolve a durable zsetup directory' }\n"
+        "    $env:ZSETUP_ROOT = Join-Path $data 'zsetup'\n"
+        "}\n\n"
+        + bootstrap + "\n\n"
+        "$active = Get-ZsetupBootstrap\n"
+        "& $active install kai-skills --foreground -- @business\n"
+        "exit $LASTEXITCODE\n"
+    )
+
+
+def windows_installer(manifest_path, version):
+    return (
+        f"$script:KaiSkillsRelease = '{version}'\n"
+        f"$script:KaiSkillsManifestPath = 'releases/{version}/release-manifest.json'\n"
+        f"$script:KaiSkillsManifestSha256 = '{sha(manifest_path)}'\n"
+        f"$script:KaiSkillsManifestSize = {manifest_path.stat().st_size}\n\n"
+        + (ROOT / "business.ps1").read_text(encoding="utf-8")
+    )
+
+
 def entrypoint_files(manifest):
     files = {"install.sh": entrypoint(manifest["version"])}
     for artifact in manifest["artifacts"]:
@@ -205,18 +252,25 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--entrypoints-dir", type=Path)
     parser.add_argument("--channel-entrypoint", type=Path)
+    parser.add_argument("--windows-output", type=Path)
+    parser.add_argument("--windows-channel-entrypoint", type=Path)
     parser.add_argument("--channel-only", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     channel = channel_entrypoint()
+    windows_channel = windows_channel_entrypoint()
     if args.channel_only:
-        if args.channel_entrypoint is None or args.release is not None or args.output is not None \
-                or args.entrypoints_dir is not None:
-            parser.error("--channel-only requires only --channel-entrypoint")
-        write_file(args.channel_entrypoint, channel, args.check)
+        if (args.channel_entrypoint is None and args.windows_channel_entrypoint is None) or \
+                args.release is not None or args.output is not None or args.entrypoints_dir is not None \
+                or args.windows_output is not None:
+            parser.error("--channel-only requires at least one channel entrypoint")
+        if args.channel_entrypoint is not None:
+            write_file(args.channel_entrypoint, channel, args.check)
+        if args.windows_channel_entrypoint is not None:
+            write_file(args.windows_channel_entrypoint, windows_channel, args.check)
         return
-    if args.release is None or args.output is None:
-        parser.error("--release and --output are required unless --channel-only is used")
+    if args.release is None or (args.output is None and args.windows_output is None):
+        parser.error("--release and at least one installer output are required unless --channel-only is used")
     manifest_path = args.release.resolve() / "release-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if (manifest.get("schemaVersion"), manifest.get("distribution"),
@@ -234,31 +288,30 @@ def main():
         f"KAI_SKILLS_MANIFEST_SIZE='{manifest_path.stat().st_size}'\n\n"
     )
     content = prefix + (ROOT / "business.sh").read_text(encoding="utf-8")
+    windows_content = windows_installer(manifest_path, version)
     entries = entrypoint_files(manifest)
     if args.check:
-        if not args.output.is_file() or args.output.read_text(encoding="utf-8") != content:
+        if args.output is not None and (not args.output.is_file() or args.output.read_text(encoding="utf-8") != content):
             raise SystemExit("stale generated kai-skills installer")
+        if args.windows_output is not None and (not args.windows_output.is_file() or args.windows_output.read_text(encoding="utf-8") != windows_content):
+            raise SystemExit("stale generated Windows kai-skills installer")
         if args.entrypoints_dir is not None:
             write_entrypoints(args.entrypoints_dir, entries, True)
         if args.channel_entrypoint is not None:
             write_file(args.channel_entrypoint, channel, True)
+        if args.windows_channel_entrypoint is not None:
+            write_file(args.windows_channel_entrypoint, windows_channel, True)
         return
-    if args.output.exists() or args.output.is_symlink():
-        raise SystemExit("output must be a new file")
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=args.output.parent,
-                                     prefix=".kai-skills-installer-", delete=False) as stream:
-        stream.write(content)
-        temporary = Path(stream.name)
-    try:
-        temporary.chmod(0o755)
-        temporary.replace(args.output)
-    finally:
-        temporary.unlink(missing_ok=True)
+    if args.output is not None:
+        write_file(args.output, content, False)
+    if args.windows_output is not None:
+        write_file(args.windows_output, windows_content, False)
     if args.entrypoints_dir is not None:
         write_entrypoints(args.entrypoints_dir, entries, False)
     if args.channel_entrypoint is not None:
         write_file(args.channel_entrypoint, channel, False)
+    if args.windows_channel_entrypoint is not None:
+        write_file(args.windows_channel_entrypoint, windows_channel, False)
 
 
 if __name__ == "__main__":

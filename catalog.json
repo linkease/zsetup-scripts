@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "scripts-0.3.0",
+  "config_version": "scripts-0.3.1",
   "installers": [
     {
       "application": "kai-skills",
@@ -8,7 +8,7 @@
       "package_manager": "*",
       "arch": "*",
       "script": "kai-skills/kai-skills-install.sh",
-      "path": "kai/kai-skills/installers/1.2.4/kai-skills-install.sh",
+      "path": "kai/kai-skills/installers/1.2.5/kai-skills-install.sh",
       "background": false
     },
     {
@@ -17,7 +17,7 @@
       "package_manager": "*",
       "arch": "*",
       "script": "kai-skills/kai-skills-install.sh",
-      "path": "kai/kai-skills/installers/1.2.4/kai-skills-install.sh",
+      "path": "kai/kai-skills/installers/1.2.5/kai-skills-install.sh",
       "background": false
     },
     {

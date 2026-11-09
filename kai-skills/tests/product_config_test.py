@@ -34,13 +34,13 @@ native_version = subprocess.run(
     [str(NATIVE), "--version"], check=True, text=True, capture_output=True
 ).stdout.strip().removeprefix("zsetup ")
 version, records = generator.catalog_installers(ROOT / "catalog.json", native_version)
-assert version == "scripts-0.3.0"
+assert version == "scripts-0.3.1"
 kai = [record for record in records if record["application"] == "kai-skills"]
 assert len(kai) == 2
 assert {(record["os"], record["package_manager"], record["arch"])
         for record in kai} == {("ubuntu", "*", "*"), ("openwrt", "*", "*")}
 assert {record["path"] for record in kai} == {
-    "kai/kai-skills/installers/1.2.4/kai-skills-install.sh"
+    "kai/kai-skills/installers/1.2.5/kai-skills-install.sh"
 }
 assert all(record["min_version"] == native_version and not record["background"] for record in kai)
 installer = ROOT / "kai-skills/kai-skills-install.sh"

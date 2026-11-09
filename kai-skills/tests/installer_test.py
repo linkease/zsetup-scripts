@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-installer-") as name:
     assert len(entries) == 1 + len(manifest["artifacts"])
     assert entries[0] == "install.sh"
     assert "skills/kai-software.sh" in entries
-    assert entries[-2:] == ["systems/istoreos.sh", "systems/ubuntu.sh"]
+    assert entries[-3:] == ["systems/istoreos.sh", "systems/ubuntu.sh", "systems/windows.sh"]
     for entry in entries:
         run(["sh", "-n", str(entrypoints / entry)])
 

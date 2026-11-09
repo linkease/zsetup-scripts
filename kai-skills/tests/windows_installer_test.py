@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-windows-") as name:
     fixed_source = fixed.read_text(encoding="utf-8")
     channel_source = channel.read_text(encoding="utf-8")
     digest = hashlib.sha256((release / "release-manifest.json").read_bytes()).hexdigest()
-    for value in ("KAI_SKILLS_RELEASE = '1.2.5'", digest,
+    for value in ("KaiSkillsRelease = '1.2.5'", digest,
                   "archive extract", "install.ps1", "--max-files"):
         assert value in fixed_source, value
     for value in ("Get-ZsetupBootstrap", "install kai-skills", "kai-software", "all",
