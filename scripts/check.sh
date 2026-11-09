@@ -38,6 +38,18 @@ ZSETUP_TEST_NATIVE="$native_bin" TMPDIR="$software_test_tmp" python3 -B -m unitt
 rmdir "$software_test_tmp"
 for software_script in "$root"/software/*.sh; do bash -n "$software_script"; done
 python3 -B "$root/tests/module_layout_test.py"
+python3 -B "$root/tests/publication_test.py"
+python3 -B "$root/tests/ddnsto_offline_native_test.py"
+python3 -B "$root/tests/ddnsto_autoinstall_test.py"
+python3 -B "$root/tests/ddnsto_auto_openwrt_test.py"
+python3 -B "$root/tests/ddnsto_auto_synology_test.py"
+python3 -B "$root/tests/ddnsto_recommendation_test.py"
+DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/ddnsto/tests/bootstrap_policy_test.py"
+DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/ddnsto/tests/wget_bootstrap_test.py"
+python3 -B "$root/ddnsto/tests/macos_default_test.py"
+python3 -B "$root/ddnsto/tests/macos_diagnostics_test.py"
+DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/tests/ddnsto_managed_cli_test.py"
+python3 -B "$root/ddnsto/tests/operation_lock_test.py"
 if [ "$native_only" = 0 ] && [ -f "$zroot/Cargo.toml" ]; then
     python3 -B "$root/tests/app_release_test.py" "$zroot" "$native_bin"
     python3 -B "$root/tests/windows_app_release_test.py" "$zroot" "$native_bin"

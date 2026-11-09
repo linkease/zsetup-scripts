@@ -4,6 +4,13 @@
 # bootstrap call site. The shared function remains intact; no alias is needed.
 # Desktop entrypoints retain their separate 0.3.0 / 0.4.0 policies.
 
+# dl.istoreos.com redirects native downloads (verified 2026-11-09). The
+# bootstrap deliberately never follows redirects. Use direct HTTPS mirrors
+# only here; preserve shared bootstrap and native product source selection.
+if [ -z "${ZSETUP_BOOTSTRAP_BASES:-}" ]; then
+    BOOTSTRAP_BASES='https://fw.koolcenter.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary'
+fi
+
 fetch_bootstrap_metadata() {
     # Deliberately ignore remote stable and SHA256SUMS, including fixture files.
     # Pins verified against HTTPS fw.koolcenter.com/binary/zsetup/0.5.0/SHA256SUMS.
@@ -25,33 +32,112 @@ confirm_insecure_http() {
     exit 1
 }
 
+# Kept identical in the three standalone DDNSTO bootstrap sources; tested together.
+# Only installer/native bootstrap uses this transport. Products use zsetup.
+ddnsto_https_fetch() (
+    case "$1" in https://*) ;; *) return 42 ;; esac
+    url=$1 destination=$2 limit=$3
+    ulimit -c 0 || return 42
+    # POSIX shells use 512-byte blocks (some shells use 1024). Bound body AND
+    # response diagnostics; final byte count is exact even for chunked bodies.
+    ulimit -f "$(((limit + 511) / 512 + 128))" || return 42
+    code=0 status=
+    if command -v curl >/dev/null 2>&1; then
+        status=$(curl -q --silent --proto '=https' --proto-redir '=https' \
+            --connect-timeout 5 --max-time 20 --max-filesize "$limit" \
+            --output "$destination" --write-out '%{http_code}' "$url" 2>/dev/null) || code=$?
+        case "$code" in 0) ;; 6|7|28) return 41 ;; *) return 42 ;; esac
+        case "$status" in 404|500|502|503|504) return 41 ;; esac
+    else
+        # --no-config must cover system wgetrc, ~/.wgetrc AND WGETRC. A plain
+        # -e check_certificate=on cannot neutralize input/output/redirect config.
+        version=$(LC_ALL=C wget --no-config --version 2>/dev/null) || version=
+        case "$version" in
+            'GNU Wget '*)
+                case "$version" in *+https*) ;; *) version= ;; esac ;;
+            *) version= ;;
+        esac
+        if [ -z "$version" ]; then
+            printf '%s\n' 'DDNSTO: TLS certificate validation requires curl or GNU Wget with HTTPS and --no-config; BusyBox/uclient wget is unsupported' >&2
+            return 42
+        fi
+        log="$destination.wget-response"
+        pid= timer=
+        finish_fetch() {
+            [ -z "$pid" ] || { kill "$pid" 2>/dev/null || :; wait "$pid" 2>/dev/null || :; }
+            [ -z "$timer" ] || { kill "$timer" 2>/dev/null || :; wait "$timer" 2>/dev/null || :; }
+            rm -f "$log"
+        }
+        trap finish_fetch EXIT
+        trap 'exit 42' HUP INT TERM
+        LC_ALL=C wget --no-config --execute=check_certificate=on \
+            --https-only --max-redirect=0 --tries=1 --timeout=5 \
+            --no-netrc --no-hsts --no-verbose --server-response \
+            -O "$destination" "$url" 2>"$log" &
+        pid=$!
+        # Wget's timeout is an idle timeout, not a total deadline. Reap both
+        # watchdog and sleeper on success, failure, and signal.
+        (
+            sleeper=
+            trap '[ -z "$sleeper" ] || { kill "$sleeper" 2>/dev/null; wait "$sleeper" 2>/dev/null; }; exit 0' HUP INT TERM
+            sleep 20 & sleeper=$!
+            wait "$sleeper" || exit 0
+            kill "$pid" 2>/dev/null || :
+        ) </dev/null >/dev/null 2>&1 &
+        timer=$!
+        wait "$pid" || code=$?
+        pid=
+        kill "$timer" 2>/dev/null || :
+        wait "$timer" 2>/dev/null || :
+        timer=
+        # C-locale TLS diagnostics only veto fallback; HTTP status is parsed
+        # structurally. Never expose response headers/URLs. GNU
+        # --server-response emits indented HTTP status lines; headers cannot
+        # masquerade as status lines without an HTTP/ prefix.
+        set -f
+        tls_error=0
+        while IFS= read -r line; do
+            # Exit 5 already rejects certificate errors below. Exit 4 also
+            # covers handshake failures: recognize only GNU's nonindented
+            # diagnostics, never TLS words in response headers or URLs.
+            if [ "$code" = 4 ]; then
+                case "$line" in
+                    'Unable to establish SSL connection.'*|'GnuTLS: '*|'OpenSSL: '*) tls_error=1 ;;
+                esac
+            fi
+            set -- $line
+            case "${1:-}" in HTTP/*) status=${2:-} ;; esac
+        done < "$log"
+        [ "$tls_error" = 0 ] || return 42
+        case "$code" in 0|8)
+            case "$status" in 404|500|502|503|504) return 41 ;; esac ;;
+        esac
+        case "$status" in ''|200) ;; *) return 42 ;; esac
+        case "$code" in 0) ;; 4|143) return 41 ;; *) return 42 ;; esac
+    fi
+    [ "$status" = 200 ] || return 42
+    [ -f "$destination" ] && [ "$(wc -c < "$destination")" -le "$limit" ] || return 42
+)
+
 bootstrap_fetch_from_base() (
     # DDNSTO-only transport policy; retain the shared mirror/download lifecycle
     # and URL construction. A valid pin does not authorize HTTP transport.
-    [ "$1" = https ] || return 1
-    url=$(bootstrap_url "$1" "$2" "$3") || return 1
-    if command -v curl >/dev/null 2>&1; then
-        rm -f "$4" || return 1
-        # -q must be first: a user curlrc must not inject extra transfer URLs.
-        if curl -q -fsSL --proto '=https' --proto-redir '=https' \
-            --connect-timeout 10 --max-time 30 -o "$4" "$url"; then
-            return 0
-        fi
-    fi
-    if command -v wget >/dev/null 2>&1; then
-        # BusyBox/uclient-fetch variants have different redirect controls. Only
-        # GNU Wget's explicit zero-redirect mode is accepted; no auto downgrade.
-        wget_version=$(wget --version 2>/dev/null) || wget_version=
-        case "$wget_version" in
-            'GNU Wget '*)
-                rm -f "$4" || return 1
-                wget -q -T 10 --max-redirect=0 -O "$4" "$url"
-                return $? ;;
-        esac
-    fi
-    printf '%s\n' 'DDNSTO: HTTPS bootstrap needs curl with protocol restrictions or GNU Wget with redirects disabled' >&2
-    return 1
+    [ "$1" = https ] || return 42
+    case "$2" in https://*) ;; *) return 42 ;; esac
+    url=$(bootstrap_url "$1" "$2" "$3") || return 42
+    rm -f "$4" || return 42
+    ddnsto_https_fetch "$url" "$4" 16777216
 )
+
+# Override only DDNSTO's mirror loop: security failures never try another source.
+bootstrap_fetch() {
+    for fetch_base in $BOOTSTRAP_BASES; do
+        fetch_code=0
+        bootstrap_fetch_from_base "$1" "$fetch_base" "$2" "$3" || fetch_code=$?
+        case "$fetch_code" in 0) return 0 ;; 41) ;; *) return "$fetch_code" ;; esac
+    done
+    return 41
+}
 
 ddnsto_bootstrap_safe_ancestors() (
     # Validate before creating anything. Symlink components, dot components,

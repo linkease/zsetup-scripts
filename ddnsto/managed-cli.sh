@@ -1,13 +1,15 @@
 ddnsto_usage() {
-    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
+    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
+        '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
+        '群晖 DSM 7 支持自动安装/升级/启动，需管理员 sudo；其他 NAS/Docker 暂不支持默认自动安装。以下选项用于高级操作。' \
         '--plan: read-only local preflight; no downloads, token, or service changes.' \
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
-        'Synology: verified package download, then manual installation in DSM.' \
+        'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
         'Docker: explicit selection only; no automatic native/container migration.' \
         'Linux: protected systemd install/update and owned-service lifecycle.' \
         'OpenWrt: package install/update and offline procd lifecycle; update preserves UCI identity and enabled state.' \
         'Shared options precede business options: --installer-prefix PATH --installer-work-dir PATH --installer-scope system.' \
-        'OpenWrt: token optional; automatic Lite selection below 900 MB.' \
+        'Explicit install on OpenWrt: token optional; automatic Lite selection below 900 MB.' \
         'Linux x86_64/aarch64: --token required without an interactive terminal.'
 }
 
@@ -19,7 +21,7 @@ ddnsto_parse_args() {
     REQUESTED_PLATFORM=auto
     REQUESTED_METHOD=auto
     PLAN_ONLY=0
-    ACTION=install
+    ACTION=ensure
     OUTPUT_DIR=
     DEVICE_NAME=
     NETWORK=
@@ -52,7 +54,7 @@ ddnsto_parse_args() {
     fi
     case "$FORCE_VERSION" in ''|lite|standard) ;; *) ddnsto_error 'version must be lite or standard'; return 2 ;; esac
     case "$ACTION" in
-        install|update) ;;
+        ensure|install|update) ;;
         download)
             [ -z "$TOKEN$TOKEN_FILE$FORCE_VERSION" ] && [ "$VERIFY_STATUS" = 0 ] || {
                 ddnsto_error 'download does not accept credentials or installation options'; return 2;
@@ -130,7 +132,7 @@ ddnsto_detect_platform() {
 
 ddnsto_validate_action_options() {
     case "$ACTION" in
-        install|update|download) return 0 ;;
+        ensure|install|update|download) return 0 ;;
         *) [ -z "$FORCE_VERSION${OUTPUT_DIR:-}" ] && [ "$VERIFY_STATUS" = 0 ] || {
             ddnsto_error 'selected service action does not accept installation options'; return 2;
         } ;;

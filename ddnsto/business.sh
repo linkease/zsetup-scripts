@@ -173,6 +173,27 @@ ddnsto_install() {
     esac
     : "${ZSETUP_SOURCE_BASES:?source group is required}"
     INSTALLER_REMOTE_APP=ddnsto
+    if [ "$ACTION" = ensure ]; then
+        ddnsto_ensure_preflight || return $?
+        DDNSTO_ENSURE_ACTIVE=1
+        ENSURE_TOKEN=$TOKEN
+        ip_uid=$("$ZSETUP_BIN" storage / get effective_uid) || return 12
+        if [ "$ip_uid" != 0 ]; then
+            if [ "$business_platform" = linux ]; then
+                ddnsto_ensure_authorize || return $?
+                installer_privilege_install ddnsto "$@" || return $?
+                # The protected root program returns zero only after its own
+                # local stability check; it never writes our user-owned log.
+                ddnsto_flow_note installed
+                ddnsto_flow_note started
+                return 0
+            fi
+            ddnsto_flow_error E_PERMISSION '管理路由器服务需要 root 权限' '请以 root 登录设备后粘贴同一条命令'; return 2
+        fi
+        if [ "$business_platform" = linux ]; then ddnsto_ensure_linux
+        else ddnsto_ensure_openwrt; fi
+        return $?
+    fi
     if [ "$business_platform" = linux ]; then
         [ -z "${DDNSTO_BIN_PATH:-}" ] || { ddnsto_error 'DDNSTO_BIN_PATH is retired; use --installer-prefix for the protected installation root'; return 2; }
         [ ! -e "${DDNSTO_DOCKER_STATE_DIR:-/etc/ddnsto-docker}" ] && [ ! -L "${DDNSTO_DOCKER_STATE_DIR:-/etc/ddnsto-docker}" ] || { ddnsto_error 'Docker state conflicts with native installation'; return 2; }

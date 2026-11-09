@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only preflight of public installer/index/checksum metadata, not canary."""
+"""Read-only entry/index and opt-in pinned-product byte audit; never a canary."""
 import argparse
 import hashlib
 import json
@@ -25,7 +25,22 @@ def parse_sums(data):
     return sums
 
 
-def audit(base, fetch=None, mode='indexed'):
+def remote_product(url):
+    """Stream bounded artifacts into a hash, never retain or execute products."""
+    digest = hashlib.sha256()
+    size = 0
+    with urlopen(url, timeout=30) as response:
+        if urlsplit(response.url).scheme != 'https':
+            raise ValueError('non-HTTPS redirect')
+        while chunk := response.read(1024 * 1024):
+            size += len(chunk)
+            if size > 128 * 1024 * 1024:
+                raise ValueError('product exceeds size bound')
+            digest.update(chunk)
+    return digest.hexdigest(), size
+
+
+def audit(base, fetch=None, mode='indexed', verify_products=False, fetch_product=None):
     if mode not in {'direct', 'indexed'}:
         raise ValueError('unknown publication mode')
     def remote(path):
@@ -49,16 +64,17 @@ def audit(base, fetch=None, mode='indexed'):
             checks.append({'path': path, 'ok': False, 'error': str(exc)})
             return None
 
-    installer = (ROOT / 'ddnsto/install.sh').read_bytes()
+    installer = (ROOT / 'ddnsto/ddnsto-install.sh').read_bytes()
     digest = hashlib.sha256(installer).hexdigest()
 
     def verify_entry(data):
         if data != installer:
             raise ValueError('public entry does not match this checkout')
 
-    check('ddnsto/install.sh', verify_entry)
     catalog = json.loads((ROOT / 'catalog.json').read_text())
     expected = [r for r in catalog['installers'] if r['application'] == 'ddnsto']
+    if not expected:
+        raise ValueError('catalog has no DDNSTO platform records')
 
     def verify_config(data):
         config = json.loads(data)
@@ -70,52 +86,65 @@ def audit(base, fetch=None, mode='indexed'):
 
     if mode == 'indexed':
         check('zsetup/config.json', verify_config)
-    for path in sorted({r['path'] for r in expected}):
-        check(path, verify_entry)
-    if mode == 'direct':
-        windows = (ROOT / 'ddnsto/install.ps1').read_bytes()
-        def verify_windows(data):
-            if data != windows:
-                raise ValueError('PowerShell entry does not match this checkout')
-        check('ddnsto/install.ps1', verify_windows)
-        for path in sorted({str(Path(r['path']).with_name('install.ps1')) for r in expected}):
-            check(path, verify_windows)
+    windows = (ROOT / 'ddnsto/install.ps1').read_bytes()
+    def verify_windows(data):
+        if data != windows:
+            raise ValueError('PowerShell entry does not match this checkout')
+    directories = {'ddnsto'} | {str(Path(r['path']).parent) for r in expected}
+    for directory in sorted(directories):
+        for name in ('ddnsto-install.sh', 'install.sh'):
+            check(directory + '/' + name, verify_entry)
+        check(directory + '/install.ps1', verify_windows)
+    entrypoints_ready = all(c['ok'] for c in checks)
 
-    def version(data):
-        value = data.decode().strip()
-        if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._+-]+)?', value):
-            raise ValueError('invalid version pointer')
-        return value
-
-    def require_sums(names):
-        def validate(data):
-            sums = parse_sums(data)
-            if not set(names) <= sums.keys():
-                raise ValueError('missing product checksum entries')
-        return validate
-
-    check('ddnsto/linux-binary/SHA256SUMS', require_sums(['ddnsto-standard-4.2.3.tar.gz']))
-    for variant, pointer in [('standard', 'VERSION'), ('lite', 'VERSION_LITE')]:
-        data = check('ddnsto/openwrt/' + pointer, version)
-        if data is None:
-            continue
-        for ext, suffix in [('ipk', ''), ('apk', '-apk')]:
-            names = [f'ddnsto_{arch}.{ext}' for arch in ('x86_64', 'aarch64', 'arm', 'mipsel')]
-            names += [f'luci-app-ddnsto.{ext}', f'luci-i18n-ddnsto-zh-cn.{ext}']
-            check(f'ddnsto/openwrt/{variant}{suffix}/{version(data)}/SHA256SUMS', require_sums(names))
-    return {'base': base, 'mode': mode, 'publication_inputs_ready': all(c['ok'] for c in checks),
-            'device_canary': 'not_checked', 'product_bytes': 'not_downloaded', 'checks': checks}
+    # This reviewed manifest covers native archives, OpenWrt packages and SPKs;
+    # Docker registry images and real platform lifecycle acceptance are separate.
+    product_state = 'not_downloaded'
+    if verify_products:
+        manifest = json.loads((ROOT / 'docs/ddnsto-artifacts-2026-11-03.json').read_text())
+        products = [r for r in manifest['files']
+                    if not r['source_path'].endswith(('VERSION', 'VERSION_LITE'))]
+        if not products:
+            raise ValueError('empty product manifest')
+        # Fail closed if the evidence snapshot has fallen behind maintained
+        # product pins. A historically valid download is not the current input.
+        owners = {'linux-binary': 'product-pins.sh', 'openwrt': 'product-pins.sh',
+                  'macOS': 'install-macos.sh', 'windows': 'install.ps1',
+                  'synology': 'synology-download.sh'}
+        sources = {name: (ROOT / 'ddnsto' / name).read_text() for name in set(owners.values())}
+        fetch_product = fetch_product or (lambda path: remote_product(base.rstrip('/') + '/' + path))
+        product_state = 'verified'
+        for record in products:
+            path = 'ddnsto/' + record['source_path']
+            try:
+                owner = owners[record['source_path'].split('/')[0]]
+                if record['sha256'] not in sources[owner]:
+                    raise ValueError('reviewed product manifest differs from current installer pins')
+                digest_size = fetch_product(path)
+                if digest_size != (record['sha256'], record['size']):
+                    raise ValueError('product SHA256/size differs from reviewed manifest')
+                checks.append({'path': path, 'ok': True})
+            except Exception as exc:
+                product_state = 'failed'
+                checks.append({'path': path, 'ok': False, 'error': str(exc)})
+    return {'base': base, 'mode': mode, 'entrypoints_ready': entrypoints_ready,
+            'publication_inputs_ready': entrypoints_ready and product_state == 'verified',
+            'device_canary': 'not_checked', 'product_bytes': product_state,
+            'product_manifest': 'docs/ddnsto-artifacts-2026-11-03.json',
+            'checks': checks}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', default='https://fw.koolcenter.com/binary')
     parser.add_argument('--mode', choices=['direct', 'indexed'], default='indexed')
+    parser.add_argument('--verify-products', action='store_true',
+                        help='stream all reviewed product archives and verify SHA256/size (no installation)')
     args = parser.parse_args()
     parsed = urlsplit(args.base)
     if parsed.scheme != 'https' or not parsed.netloc or parsed.username or parsed.query or parsed.fragment:
         parser.error('base must be an HTTPS URL without credentials/query/fragment')
-    result = audit(args.base, mode=args.mode)
+    result = audit(args.base, mode=args.mode, verify_products=args.verify_products)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     raise SystemExit(0 if result['publication_inputs_ready'] else 1)
 

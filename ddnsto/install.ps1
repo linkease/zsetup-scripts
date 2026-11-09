@@ -1,7 +1,7 @@
-# Engineering candidate. Automatic zsetup bootstrap; native canary pending.
+﻿# Engineering candidate. Automatic zsetup bootstrap; native canary pending.
 param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
       [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
-      [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'install')
+      [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure')
 $ErrorActionPreference = 'Stop'
 $script:DDNSTOTaskName = 'DDNSTO'
 
@@ -11,16 +11,152 @@ function Get-DDNSTOHostArchitecture {
     return $env:PROCESSOR_ARCHITECTURE
 }
 
+function Stop-DDNSTOError($Code, $Reason, $State, $Next) {
+    $error = New-Object InvalidOperationException("DDNSTO：$Reason；状态：$State；下一步：$Next；错误码：$Code")
+    $error.Data['DDNSTOCode'] = [int]$Code
+    throw $error
+}
+
+function Get-DDNSTODiagnosticBase {
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'Windows required' }
+    # Known-folder API, independent of Token, InstallDir and caller-supplied paths.
+    return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+}
+
+function Initialize-DDNSTODiagnosticNative {
+    if ('DDNSTO.PrivateDiagnosticDirectory' -as [type]) { return }
+    # CreateDirectoryW fails on collisions and installs the protected DACL at
+    # creation. Never create a public directory and tighten its ACL afterwards.
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+namespace DDNSTO {
+    public static class PrivateDiagnosticDirectory {
+        [StructLayout(LayoutKind.Sequential)]
+        struct SecurityAttributes {
+            public int Length;
+            public IntPtr Descriptor;
+            public int InheritHandle;
+        }
+        [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+        static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
+        [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+        static extern bool CreateDirectoryW(string path, ref SecurityAttributes attributes);
+        [DllImport("kernel32.dll")]
+        static extern IntPtr LocalFree(IntPtr pointer);
+        public static void Create(string path, string sid) {
+            IntPtr descriptor;
+            uint size;
+            string sddl = "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;" + sid + ")";
+            if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, out descriptor, out size))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            try {
+                var attributes = new SecurityAttributes();
+                attributes.Length = Marshal.SizeOf(typeof(SecurityAttributes));
+                attributes.Descriptor = descriptor;
+                if (!CreateDirectoryW(path, ref attributes))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+            } finally { LocalFree(descriptor); }
+        }
+    }
+}
+'@ -ErrorAction Stop
+}
+
+function New-DDNSTOPrivateDiagnosticDirectory($Path) {
+    Initialize-DDNSTODiagnosticNative
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    try { [DDNSTO.PrivateDiagnosticDirectory]::Create($Path, $identity.User.Value) }
+    finally { $identity.Dispose() }
+}
+
+function New-DDNSTODiagnostic {
+    $stream = $null
+    try {
+        $base = Get-DDNSTODiagnosticBase
+        if (-not [IO.Path]::IsPathRooted($base)) { throw 'absolute diagnostic base required' }
+        $ancestor = [IO.Path]::GetFullPath($base)
+        while ($ancestor) {
+            $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop
+            if (-not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'unsafe diagnostic base' }
+            $ancestor = [IO.Path]::GetDirectoryName($ancestor)
+        }
+        $directory = Join-Path $base ('DDNSTO-install-' + [guid]::NewGuid().ToString('N'))
+        New-DDNSTOPrivateDiagnosticDirectory $directory
+        Assert-DDNSTOSafePaths $directory
+        $path = Join-Path $directory 'events.jsonl'
+        $stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        return [pscustomobject]@{ Stream=$stream; Path=$path; Healthy=$true; Count=0 }
+    } catch {
+        if ($stream) { try { $stream.Dispose() } catch { } }
+        # Do not delete or reuse a path on failure; it may belong to another run.
+        return $null
+    }
+}
+
+function Write-DDNSTODiagnosticEvent($Event, [int]$Code = 0) {
+    $log = $script:DDNSTODiagnostic
+    if (-not $log -or -not $log.Healthy) { return }
+    # Strict vocabulary and bounded records: no exceptions, arguments, paths,
+    # configuration, process output or credentials are accepted as event data.
+    if ($Event -cnotin @('started','preflight','download','version','stability','rollback','succeeded','failed') -or
+        $Code -notin @(0,1,2,3,4,5,6) -or $log.Count -ge 32) { return }
+    try {
+        $record = [ordered]@{ time=[DateTime]::UtcNow.ToString('o'); event=$Event; code=$Code } | ConvertTo-Json -Compress
+        $bytes = [Text.Encoding]::UTF8.GetBytes($record + "`n")
+        $log.Stream.Write($bytes, 0, $bytes.Length)
+        $log.Stream.Flush()
+        $log.Count++
+    } catch { $log.Healthy = $false }
+}
+
+function Get-DDNSTODiagnosticPointer {
+    $log = $script:DDNSTODiagnostic
+    if (-not $log) { return '诊断日志不可用：未能安全创建私有日志，请保留错误码' }
+    if (-not $log.Healthy) { return "诊断日志：$($log.Path)（写入失败，记录可能不完整）" }
+    return "诊断日志：$($log.Path)"
+}
+
 function Invoke-DDNSTOEntry {
     param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
           [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
-          [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'install')
-    if ($Action -notin @('install', 'update', 'status', 'start', 'stop', 'restart', 'repair', 'uninstall', 'configure')) { throw 'DDNSTO: unknown action' }
+          [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure')
+    $previousLog = $script:DDNSTODiagnostic
+    $script:DDNSTODiagnostic = $null
+    try {
+        # Preview remains read-only, including failure paths.
+        if (-not $Plan) { $script:DDNSTODiagnostic = New-DDNSTODiagnostic }
+        Write-DDNSTODiagnosticEvent 'started'
+        Write-DDNSTODiagnosticEvent 'preflight'
+        Invoke-DDNSTOEntryCore @PSBoundParameters
+        Write-DDNSTODiagnosticEvent 'succeeded'
+        if (-not $Plan -and $script:DDNSTODiagnostic) { Write-Host (Get-DDNSTODiagnosticPointer) }
+    }
+    catch {
+        $code = 2
+        $message = 'DDNSTO：参数、权限或安装归属检查失败；状态：未确认本地运行状态；下一步：检查参数和目录，使用管理员 PowerShell 重试；已有安装可用 -Action status 检查；错误码：2'
+        if ($_.Exception.Data.Contains('DDNSTOCode')) { $code = [int]$_.Exception.Data['DDNSTOCode']; $message = $_.Exception.Message }
+        Write-DDNSTODiagnosticEvent 'failed' $code
+        $failure = New-Object InvalidOperationException($message + '；' + (Get-DDNSTODiagnosticPointer))
+        $failure.Data['DDNSTOCode'] = $code
+        throw $failure
+    } finally {
+        if ($script:DDNSTODiagnostic) { try { $script:DDNSTODiagnostic.Stream.Dispose() } catch { } }
+        $script:DDNSTODiagnostic = $previousLog
+    }
+}
+
+function Invoke-DDNSTOEntryCore {
+    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
+          [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
+          [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure')
+    if ($Action -notin @('ensure', 'install', 'update', 'status', 'start', 'stop', 'restart', 'repair', 'uninstall', 'configure')) { throw 'DDNSTO: unknown action' }
     if ($Platform -notin @('auto', 'windows')) { throw 'DDNSTO: platform mismatch: this entry requires windows' }
     if ($Method -eq 'docker') { throw 'DDNSTO: Docker installer is not available for Windows' }
     if ($Method -notin @('auto', 'native')) { throw 'DDNSTO: unknown installation method' }
     if ($Plan) {
-        if ($Action -ne 'install') { throw 'DDNSTO: -Plan requires the install action' }
+        if ($Action -notin @('ensure', 'install')) { throw 'DDNSTO: -Plan requires ensure or install' }
         if ($Token -or $TokenFile) { throw 'DDNSTO: -Plan does not accept credentials' }
         if ($Version -ne '4.2.8') { throw 'DDNSTO: no pinned artifact for requested version' }
         if ((Get-DDNSTOHostArchitecture) -ne 'AMD64') { throw 'DDNSTO: unsupported architecture; requires Windows x64' }
@@ -86,7 +222,7 @@ function Invoke-DDNSTOLifecycle {
     param([string]$InstallDir, [string]$Action, [string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8')
     Assert-DDNSTOPlatform
     if ($Action -notin @('uninstall', 'reinstall', 'configure')) { throw 'DDNSTO: unknown lifecycle action' }
-    if ($Action -ne 'configure' -and ($Token -or $TokenFile)) { throw 'DDNSTO: this action preserves credentials' }
+    if ($Action -eq 'uninstall' -and ($Token -or $TokenFile)) { throw 'DDNSTO: this action preserves credentials' }
     if ($Action -eq 'reinstall' -and $Version -ne '4.2.8') { throw 'DDNSTO: no pinned artifact for requested version' }
     $state = Get-DDNSTOManagedState $InstallDir
     if ($state -eq 'recovery-required') { throw 'DDNSTO: manual recovery from retained backup required' }
@@ -111,6 +247,7 @@ function Invoke-DDNSTOLifecycle {
     $changed = $false; $keepBackup = $false; $oldTask = $null; $oldXml = ''; $wasRunning = $false
     try {
         if ((Get-DDNSTOManagedState $InstallDir) -ne $state) { throw 'DDNSTO: installation changed; retry' }
+        if ($Action -eq 'reinstall') { Assert-DDNSTOSameToken $config $Token }
         if ($state -eq 'installed') {
             $oldTask = Assert-DDNSTOManagedTask $InstallDir -AllowMissingTask:($Action -eq 'uninstall')
         }
@@ -153,7 +290,7 @@ function Invoke-DDNSTOLifecycle {
                 Copy-Item -LiteralPath $candidate -Destination $binary
                 Register-DDNSTOTask $binary $config $InstallDir
                 Start-DDNSTOTask
-                Confirm-DDNSTORunning
+                Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
                 [IO.File]::WriteAllText($marker, 'ddnsto-windows-v1')
             }
             'configure' {
@@ -161,7 +298,7 @@ function Invoke-DDNSTOLifecycle {
                 # Re-register to enable a previously disabled task; XML is saved for rollback.
                 Register-DDNSTOTask $binary $config $InstallDir
                 Start-DDNSTOTask
-                Confirm-DDNSTORunning
+                Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
             }
         }
         $changed = $false
@@ -174,7 +311,7 @@ function Invoke-DDNSTOLifecycle {
                     Copy-Item -LiteralPath (Join-Path $work 'old.yaml') -Destination $config -Force
                     if ($oldTask) {
                         Restore-DDNSTOTask $oldXml
-                        if ($wasRunning) { Start-DDNSTOTask; Confirm-DDNSTORunning }
+                        if ($wasRunning) { Start-DDNSTOTask; Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe') }
                     } else { Remove-DDNSTOTask }
                 } else {
                     Remove-DDNSTOTask
@@ -185,7 +322,7 @@ function Invoke-DDNSTOLifecycle {
             } catch {
                 $keepBackup = $true
                 try { [IO.File]::WriteAllText($marker, 'ddnsto-windows-v1:recovery-required') } catch { }
-                Write-Warning "DDNSTO: recovery incomplete; inspect task state and backup at $work"
+                Write-Warning 'DDNSTO：回滚失败；状态：恢复资料已保留；下一步：检查安装目录中的 .lifecycle-* 备份与计划任务，人工恢复；错误码：6'
             }
         }
         throw "DDNSTO: $Action failed; check local state before retrying"
@@ -198,7 +335,8 @@ function Invoke-DDNSTOLifecycle {
         }
     }
     if ($Action -eq 'uninstall') { return 'operation=uninstall installation=retained local_service=not-installed configuration=retained identity=retained cloud_status=unverified' }
-    return "operation=$Action installation=installed local_service=running cloud_status=unverified"
+    $message = if ($Action -eq 'reinstall') { '重新安装并启动成功' } else { '配置更新并启动成功' }
+    return "DDNSTO：$message；operation=$Action installation=installed local_service=running cloud_status=unverified"
 }
 
 function Assert-DDNSTOManagedTask($InstallDir, [switch]$AllowMissingTask) {
@@ -253,7 +391,7 @@ function Invoke-DDNSTORepair {
         Register-DDNSTOTask (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe') (Join-Path $InstallDir 'ddnsto.yaml') $InstallDir
         $null = Assert-DDNSTOManagedTask $InstallDir
         Start-DDNSTOTask
-        Confirm-DDNSTORunning
+        Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
         $changed = $false
     } catch {
         if ($changed) {
@@ -261,14 +399,14 @@ function Invoke-DDNSTORepair {
                 if (Get-DDNSTOTask) { Stop-DDNSTOTask }
                 if ($oldTask) {
                     Restore-DDNSTOTask $oldXml
-                    if ($wasRunning) { Start-DDNSTOTask; Confirm-DDNSTORunning }
+                    if ($wasRunning) { Start-DDNSTOTask; Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe') }
                 } else {
                     Remove-DDNSTOTask
                     if (Get-DDNSTOTask) { throw 'DDNSTO: newly created task could not be removed' }
                 }
             } catch {
                 $keepBackup = $true
-                Write-Warning "DDNSTO: repair recovery incomplete; inspect task state and backup at $work"
+                Write-Warning 'DDNSTO：修复回滚失败；状态：恢复资料已保留；下一步：检查安装目录中的 .repair-* 备份与计划任务，人工恢复；错误码：6'
             }
         }
         throw 'DDNSTO: repair failed; client configuration was not rewritten; check task state before retrying'
@@ -280,7 +418,7 @@ function Invoke-DDNSTORepair {
             Remove-Item -LiteralPath $lockPath -Force
         }
     }
-    return 'operation=repair local_service=running cloud_status=unverified'
+    return 'DDNSTO：修复并启动成功；operation=repair local_service=running cloud_status=unverified'
 }
 
 function Invoke-DDNSTOManageService {
@@ -306,7 +444,7 @@ function Invoke-DDNSTOManageService {
                 Enable-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName | Out-Null
                 if ($Action -eq 'restart') { Stop-DDNSTOTask }
                 Start-DDNSTOTask
-                Confirm-DDNSTORunning
+                Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
             }
             $task = Assert-DDNSTOManagedTask $InstallDir
         } finally {
@@ -322,6 +460,10 @@ function Invoke-DDNSTOManageService {
         default { throw 'DDNSTO: unknown scheduled task state' }
     }
     if ($Action -eq 'stop' -and $state -ne 'stopped') { throw 'DDNSTO: task did not stop' }
+    if ($Action -eq 'status' -and $state -eq 'running') {
+        Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
+    }
+    if ($Action -in @('start', 'restart')) { return "DDNSTO：启动成功；local_service=$state cloud_status=unverified" }
     return "local_service=$state cloud_status=unverified"
 }
 
@@ -331,7 +473,8 @@ function Assert-DDNSTOPlatform {
     if ($arch -ne 'AMD64') { throw 'DDNSTO: this candidate requires Windows x64' }
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        throw 'DDNSTO: run PowerShell as Administrator'
+        # Do not relaunch user-writable scripts as SYSTEM/admin or weaken execution policy.
+        Stop-DDNSTOError 2 '需要管理员权限，无法安全自动提权' '未修改安装' '右键以管理员身份打开 PowerShell，按现有执行策略重新运行原命令'
     }
     foreach ($name in @('Get-ScheduledTask', 'Register-ScheduledTask', 'Export-ScheduledTask', 'icacls.exe')) {
         Get-Command $name -ErrorAction Stop | Out-Null
@@ -378,6 +521,7 @@ function Get-DDNSTOZsetup($Work) {
     return $native
 }
 function Receive-DDNSTOCandidate($Work, $Version) {
+    Write-DDNSTODiagnosticEvent 'download'
     $zsetup = Get-DDNSTOZsetup $Work
     $archive = Join-Path $Work 'client.zip'
     & $zsetup download -o $archive --sha256 5b09cf2be048e1592668b8b5fed922206849b35f9fe6469122b0460aeee64688 "https://fw.koolcenter.com/binary/ddnsto/windows/ddnsto_windows_cli_$Version.zip" | Out-Null
@@ -411,38 +555,121 @@ function Register-DDNSTOTask($Binary, $Config, $Directory) {
 }
 function Restore-DDNSTOTask($Xml) { Register-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName -Xml $Xml -Force | Out-Null }
 function Start-DDNSTOTask { Start-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName }
-function Confirm-DDNSTORunning {
-    for ($i = 0; $i -lt 3; $i++) {
-        Start-Sleep -Seconds 1
-        if ((Get-DDNSTOTask).State -ne 'Running') { throw 'DDNSTO: task did not remain running' }
+function Confirm-DDNSTORunning($Binary) {
+    Write-DDNSTODiagnosticEvent 'stability'
+    # Caller supplies the managed executable path, never a path inferred from a
+    # potentially unrelated process. Do not collect command lines or client logs.
+    $previous = $null
+    try {
+        if (-not [IO.Path]::IsPathRooted($Binary)) { throw 'missing trusted path' }
+        for ($i = 0; $i -lt 4; $i++) {
+            Start-Sleep -Seconds 1
+            $task = Get-DDNSTOTask
+            if ($task.State -ne 'Running' -or @($task.Actions).Count -ne 1 -or
+                -not [string]::Equals($task.Actions[0].Execute, $Binary, [StringComparison]::OrdinalIgnoreCase)) { throw 'task mismatch' }
+            $processes = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'ddnsto_cli.x86_64.exe'" -Property ProcessId,CreationDate,ExecutablePath -ErrorAction Stop |
+                Where-Object { [string]::Equals($_.ExecutablePath, $Binary, [StringComparison]::OrdinalIgnoreCase) })
+            if ($processes.Count -ne 1 -or -not $processes[0].CreationDate -or $processes[0].ProcessId -le 0) { throw 'unknown process' }
+            $current = '{0}:{1}' -f $processes[0].ProcessId, ([datetime]$processes[0].CreationDate).ToUniversalTime().Ticks
+            if ($null -ne $previous -and $current -cne $previous) { throw 'process restarted' }
+            $previous = $current
+        }
+    } catch {
+        Stop-DDNSTOError 5 '本地进程稳定性检查失败' '未确认稳定运行' '检查计划任务与客户端权限，排查进程退出或重启后重试'
     }
 }
-function Test-DDNSTOInteractive { return -not [Console]::IsInputRedirected }
-function Read-DDNSTOToken {
-    if (-not (Test-DDNSTOInteractive)) { throw 'DDNSTO: token required; use an interactive terminal or -TokenFile FILE' }
-    return Read-Host 'DDNSTO token (visible; paste from console)'
+function Assert-DDNSTOSameToken($Config, $Token) {
+    # Deliberately accept only a flat scalar mapping. YAML aliases, quoted keys,
+    # documents and multiline values need manual review, never a guessed owner.
+    $seen = @{}
+    $stored = $null
+    foreach ($line in [IO.File]::ReadAllLines($Config)) {
+        if ($line -match '^\s*(#.*)?$') { continue }
+        if ($line -cnotmatch "^([A-Za-z][A-Za-z0-9_]*):[ ]+(.*)$") {
+            Stop-DDNSTOError 3 '无法确认配置归属' '原安装保留' '人工检查配置格式与账号'
+        }
+        $key = $Matches[1]; $value = $Matches[2]
+        if ($seen.ContainsKey($key) -or $value -notmatch "^(?:'(?:[^'\r\n]|'')*'|[A-Za-z0-9_./\\:-]+)[ ]*(?:#.*)?$") {
+            Stop-DDNSTOError 3 '配置存在重复字段或不支持的 YAML' '原安装保留' '人工检查配置格式与账号'
+        }
+        $seen[$key] = $true
+        if ($key -ceq 'userToken' -and $value -cmatch "^'((?:[^'\r\n]|'')*)'[ ]*(?:#.*)?$") {
+            $stored = $Matches[1].Replace("''", "'")
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($stored) -or -not [string]::Equals($stored, $Token, [StringComparison]::Ordinal)) {
+        Stop-DDNSTOError 3 'Token 不同或账号归属未知' '原安装保留' '核对原账号 Token；换号请明确使用 -Action configure'
+    }
+}
+
+function Get-DDNSTOClientVersion($Path) {
+    Write-DDNSTODiagnosticEvent 'version'
+    # -v exits before normal client startup/config loading. Bound the local probe.
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = $Path; $info.Arguments = '-v'
+    $info.UseShellExecute = $false; $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $process = New-Object Diagnostics.Process
+    $process.StartInfo = $info
+    try {
+        $null = $process.Start()
+        # Fixed-size concurrent pipe reads: cap each stream at 4 KiB, including
+        # stderr (discarded). The deadline also covers EOF from inherited pipes.
+        $streams = @($process.StandardOutput.BaseStream, $process.StandardError.BaseStream)
+        $buffers = @((New-Object byte[] 512), (New-Object byte[] 512))
+        $reads = @($streams[0].ReadAsync($buffers[0], 0, 512), $streams[1].ReadAsync($buffers[1], 0, 512))
+        $counts = @(0, 0); $ended = @($false, $false)
+        $output = New-Object IO.MemoryStream
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        try {
+            while (-not ($ended[0] -and $ended[1] -and $process.HasExited)) {
+                if ($clock.ElapsedMilliseconds -ge 5000) { throw 'version timeout' }
+                for ($streamIndex = 0; $streamIndex -lt 2; $streamIndex++) {
+                    if ($ended[$streamIndex] -or -not $reads[$streamIndex].IsCompleted) { continue }
+                    $count = $reads[$streamIndex].GetAwaiter().GetResult()
+                    if ($count -eq 0) { $ended[$streamIndex] = $true; continue }
+                    $counts[$streamIndex] += $count
+                    if ($counts[$streamIndex] -gt 4096) { throw 'version output limit' }
+                    if ($streamIndex -eq 0) { $output.Write($buffers[0], 0, $count) }
+                    $reads[$streamIndex] = $streams[$streamIndex].ReadAsync($buffers[$streamIndex], 0, 512)
+                }
+                Start-Sleep -Milliseconds 10
+            }
+            $text = [Text.Encoding]::UTF8.GetString($output.ToArray()).Trim()
+        } finally { $output.Dispose() }
+        if ($process.ExitCode -ne 0 -or $text -cnotmatch '^\d+\.\d+\.\d+$') { throw 'unknown version' }
+        return $text
+    } catch {
+        Stop-DDNSTOError 4 '无法确认已安装版本' '原安装保留，禁止降级' '检查客户端版本后重试'
+    } finally {
+        try { if (-not $process.HasExited) { $process.Kill() } } catch { }
+        $process.Dispose()
+    }
 }
 function Invoke-DDNSTOInstall {
-    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8', [string]$InstallDir, [string]$Action = 'install')
-    if ($Action -notin @('install', 'update')) { throw 'DDNSTO: unknown action' }
+    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8', [string]$InstallDir, [string]$Action = 'ensure')
+    if ($Action -notin @('ensure', 'install', 'update')) { throw 'DDNSTO: unknown action' }
     if ($Action -eq 'update' -and ($Token -or $TokenFile)) { throw 'DDNSTO: update preserves existing Token; do not supply credentials' }
     Assert-DDNSTOPlatform
     if ($Version -ne '4.2.8') { throw 'DDNSTO: no pinned artifact for requested version' }
     if (-not [IO.Path]::IsPathRooted($InstallDir)) { throw 'DDNSTO: installation path must be absolute' }
     Assert-DDNSTOSafePaths $InstallDir
+    if ($TokenFile) {
+        if ($Token) { Stop-DDNSTOError 2 'Token 与 TokenFile 不能同时传入' '未修改安装' '仅保留一个凭据参数' }
+        try { $Token = [IO.File]::ReadAllText($TokenFile) -replace '\r?\n$', '' }
+        catch { Stop-DDNSTOError 2 '无法读取 Token 文件' '未修改安装' '检查文件权限与路径' }
+    }
+    if (($Action -in @('ensure', 'install') -and [string]::IsNullOrWhiteSpace($Token)) -or $Token -match '[\x00-\x1f\x7f]') {
+        Stop-DDNSTOError 2 '需要非空单行 Token' '未修改安装' '通过 -Token 或 -TokenFile 传入凭据'
+    }
     if (Test-Path -LiteralPath (Join-Path $InstallDir '.installer-windows-v1')) {
         if ((Get-DDNSTOManagedState $InstallDir) -eq 'retained') {
-            if ($Action -ne 'install') { throw 'DDNSTO: retained configuration requires -Action install' }
-            return Invoke-DDNSTOLifecycle -InstallDir $InstallDir -Action reinstall -Token $Token -TokenFile $TokenFile -Version $Version
+            if ($Action -notin @('ensure', 'install')) { throw 'DDNSTO: retained configuration requires ensure or install' }
+            Assert-DDNSTOSameToken (Join-Path $InstallDir 'ddnsto.yaml') $Token
+            return Invoke-DDNSTOLifecycle -InstallDir $InstallDir -Action reinstall -Token $Token -Version $Version
         }
         $null = Assert-DDNSTOManagedTask $InstallDir
     }
-    if ($TokenFile) {
-        if ($Token) { throw 'DDNSTO: choose Token or TokenFile' }
-        $Token = [IO.File]::ReadAllText($TokenFile)
-        $Token = $Token -replace '\r?\n$', ''
-    }
-    if ($Token.Contains("`r") -or $Token.Contains("`n")) { throw 'DDNSTO: token must be one line' }
     $binary = Join-Path $InstallDir 'ddnsto_cli.x86_64.exe'
     $config = Join-Path $InstallDir 'ddnsto.yaml'
     $marker = Join-Path $InstallDir '.installer-windows-v1'
@@ -462,28 +689,11 @@ function Invoke-DDNSTOInstall {
     }
     if ($Action -eq 'update' -and -not $hadOld) { throw 'DDNSTO: no existing installation; install first' }
     if ($hadOld -and $Action -eq 'install') {
-        if ($Token -or $TokenFile) { throw 'DDNSTO: existing installation preserves Token; use -Action update without credentials' }
-        $choice = '0'
-        if (Test-DDNSTOInteractive) {
-            Write-Host 'Existing DDNSTO installation. 0) Exit (default) 1) Update 2) Status 3) Start 4) Stop 5) Restart 6) Repair 7) Change Token 8) Uninstall (retain configuration and identity)'
-            $choice = Read-Host 'Choose [0]'
-        }
-        if ($choice -eq '' -or $choice -eq '0') {
-            return @('operation=none installation=existing cloud_status=unverified', 'No changes made. Use -Action update to update explicitly.')
-        }
-        $actions = @{'2'='status'; '3'='start'; '4'='stop'; '5'='restart'; '6'='repair'; '7'='configure'; '8'='uninstall'}
-        if ($actions.ContainsKey($choice)) {
-            if ($choice -eq '7') { return Invoke-DDNSTOEntry -InstallDir $InstallDir -Action configure -Token (Read-DDNSTOToken) }
-            return Invoke-DDNSTOEntry -InstallDir $InstallDir -Action $actions[$choice]
-        }
-        if ($choice -ne '1') { throw 'DDNSTO: invalid action; no changes made' }
-        $Action = 'update'
+        Stop-DDNSTOError 3 '已有安装，显式 install 不覆盖' '原安装保留' '省略 -Action 并传入原账号 Token 自动处理，或使用 -Action update'
     }
-    if (-not $hadOld -and -not $Token -and -not $TokenFile) { $Token = Read-DDNSTOToken }
-    if ($Token.Contains("`r") -or $Token.Contains("`n")) { throw 'DDNSTO: token must be one line' }
     $tokenLine = "userToken: '" + $Token.Replace("'", "''") + "'"
     if ($hadOld) {
-        if ($Token -and -not ([IO.File]::ReadAllLines($config) -ccontains $tokenLine)) { throw 'DDNSTO: existing token differs; edit configuration explicitly before reinstalling' }
+        if ($Action -eq 'ensure') { Assert-DDNSTOSameToken $config $Token }
     } elseif ([string]::IsNullOrWhiteSpace($Token)) { throw 'DDNSTO: token is required on first installation' }
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     $lockPath = Join-Path $InstallDir '.install-lock'
@@ -502,7 +712,22 @@ function Invoke-DDNSTOInstall {
         if ($hadOld) {
             $null = Assert-DDNSTOManagedTask $InstallDir
             if (-not (Test-Path -LiteralPath $binary -PathType Leaf) -or -not (Test-Path -LiteralPath $config -PathType Leaf)) { throw 'DDNSTO: incomplete previous installation' }
-            if ($Token -and -not ([IO.File]::ReadAllLines($config) -ccontains $tokenLine)) { throw 'DDNSTO: existing token differs' }
+            if ($Action -eq 'ensure') { Assert-DDNSTOSameToken $config $Token }
+            $installedVersion = Get-DDNSTOClientVersion $binary
+            if ($installedVersion -notmatch '^\d+\.\d+\.\d+$') {
+                Stop-DDNSTOError 4 '无法确认已安装版本' '原安装保留，禁止降级' '检查客户端版本后重试'
+            }
+            if ([version]$installedVersion -ge [version]$Version) {
+                $alreadyRunning = $currentTask.State -eq 'Running'
+                # A running instance may coexist with a disabled startup task.
+                Enable-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName | Out-Null
+                if (-not $alreadyRunning) {
+                    Start-DDNSTOTask
+                }
+                Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
+                $message = if ($alreadyRunning) { '已稳定运行' } else { '启动成功' }
+                return "DDNSTO：$message；版本 $installedVersion；local_service=running cloud_status=unverified"
+            }
         } elseif ((Test-Path -LiteralPath $binary) -or (Test-Path -LiteralPath $config)) { throw 'DDNSTO: installation changed; retry' }
         $wasRunning = $hadOld -and $currentTask.State -eq 'Running'
         New-Item -ItemType Directory -Path $work | Out-Null
@@ -522,11 +747,11 @@ function Invoke-DDNSTOInstall {
         }
         Register-DDNSTOTask $binary $config $InstallDir
         Start-DDNSTOTask
-        Confirm-DDNSTORunning
+        Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
         [IO.File]::WriteAllText($marker, 'ddnsto-windows-v1')
         $changed = $false
-        Write-Output "DDNSTO $Version local_service=running cloud_status=unverified"
-        Write-Output 'Confirm device online in the DDNSTO console: https://www.ddnsto.com/'
+        $message = if ($hadOld) { '升级并启动成功' } else { '安装成功，已启动' }
+        Write-Output "DDNSTO：$message；版本 $Version；local_service=running cloud_status=unverified"
     } catch {
         if ($changed) {
             try {
@@ -535,7 +760,7 @@ function Invoke-DDNSTOInstall {
                     Copy-Item -LiteralPath (Join-Path $work 'old.exe') -Destination $binary -Force
                     Copy-Item -LiteralPath (Join-Path $work 'old.yaml') -Destination $config -Force
                     Restore-DDNSTOTask $oldXml
-                    if ($wasRunning) { Start-DDNSTOTask; Confirm-DDNSTORunning }
+                    if ($wasRunning) { Start-DDNSTOTask; Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe') }
                 } else {
                     Remove-DDNSTOTask
                     foreach ($file in @($binary, $config, $marker)) {
@@ -544,10 +769,12 @@ function Invoke-DDNSTOInstall {
                 }
             } catch {
                 $keepBackup = $true
-                Write-Warning "DDNSTO: recovery incomplete; backup retained at $work"
+                try { [IO.File]::WriteAllText($marker, 'ddnsto-windows-v1:recovery-required') } catch { }
+                Write-Warning 'DDNSTO：回滚失败；状态：恢复资料已保留；下一步：检查安装目录中的 .transaction-* 备份与计划任务，人工恢复；错误码：6'
             }
         }
-        throw 'DDNSTO: installation failed; check download, permissions and task state before retrying'
+        if ($_.Exception.Data.Contains('DDNSTOCode')) { throw }
+        Stop-DDNSTOError 5 '安装或本地启动检查失败' '未确认稳定运行' '检查下载、权限及计划任务；使用 -Action status 查看状态'
     } finally {
         $lock.Dispose()
         Remove-Item -LiteralPath $lockPath -Force
@@ -555,5 +782,13 @@ function Invoke-DDNSTOInstall {
     }
 }
 if ($MyInvocation.InvocationName -ne '.') {
-    Invoke-DDNSTOEntry -Token $Token -TokenFile $TokenFile -Version $Version -InstallDir $InstallDir -Platform $Platform -Method $Method -Plan:$Plan -Action $Action
+    try {
+        Invoke-DDNSTOEntry -Token $Token -TokenFile $TokenFile -Version $Version -InstallDir $InstallDir -Platform $Platform -Method $Method -Plan:$Plan -Action $Action
+        exit 0
+    } catch {
+        [Console]::Error.WriteLine($_.Exception.Message)
+        $code = [int]$_.Exception.Data['DDNSTOCode']
+        if ($code -le 0) { $code = 1 }
+        exit $code
+    }
 }

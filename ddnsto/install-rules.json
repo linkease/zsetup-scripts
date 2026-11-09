@@ -5,6 +5,25 @@
   "candidate": true,
   "production_ready": false,
   "cloud_online_verified": false,
+  "default_workflow": {
+    "action": "ensure",
+    "interactive_choices": false,
+    "required_input": "account-token",
+    "success": "local-service-stable-running-only",
+    "cloud_online_check": false,
+    "same_or_newer_version": "enable-and-start-without-downgrade",
+    "different_or_unknown_account": "fail-closed",
+    "platform_requirements": {
+      "linux": ["systemd", "protected-installation-receipts", "jq-for-existing-account-check"],
+      "openwrt": ["opkg-or-apk", "uci", "ubus", "jsonfilter"],
+      "macos": ["logged-in-user-launchd-domain"],
+      "synology": ["DSM-7", "administrator-sudo", "synopkg", "jq-1.5-or-newer", "protected-package-config", "ARM64-only-DS220j-compatibility-canary"],
+      "windows": ["administrator", "windows-x64"]
+    },
+    "unsupported_platforms": ["qnap", "unraid"],
+    "unsupported_methods": ["docker"],
+    "native_device_acceptance": "pending"
+  },
   "scope": "Declarative direct-entry capabilities; no core source or global catalog required. Executor availability is subject to local preflight, not production acceptance.",
   "unsupported_platforms": ["qnap", "unraid"],
   "unsupported_methods": [],
@@ -63,14 +82,20 @@
       "native_canary_verified": false
     },
     "synology": {
-      "architectures": ["x86_64", "armv7"],
-      "unsupported_architectures": ["aarch64"],
+      "default_action": "ensure",
+      "automatic_dsm_majors": [7],
+      "automatic_installation_acceptance": "DS220j-DSM7.1-fresh-install-upgrade-and-start-verified; other-models-unverified",
+      "fresh_install_requirements": ["synowebapi", "default-install-volume", "no-existing-package-or-retained-config", "SHA256-verified-third-party-SPK"],
+      "arm64_compatibility_models": ["DS220j"],
+      "architectures": ["x86_64", "armv7", "aarch64"],
+      "architecture_constraints": {"aarch64": "DSM7 DS220j only; ARM32 SPK compatibility"},
       "dsm_minimum_builds": {"6": 5940, "7": 41890},
       "method": "download",
-      "executors": ["spk-download-manual-handoff"],
+      "executors": ["dsm7-package-api-fresh-install", "synopkg-existing-package", "spk-download-manual-handoff"],
       "client_versions": {"spk": "4.2.8-7"},
-      "actions": ["download", "install"],
+      "actions": ["ensure", "download", "install"],
       "action_results": {
+        "ensure": {"exit_code": 0, "local_service_started": true, "cloud_online_checked": false},
         "download": {"exit_code": 0, "installation_performed": false, "manual_handoff_required": true},
         "install": {"exit_code": 20, "installation_performed": false, "manual_handoff_required": true}
       },

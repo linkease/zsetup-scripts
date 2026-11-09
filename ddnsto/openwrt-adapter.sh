@@ -23,6 +23,9 @@ ddnsto_openwrt_preflight() {
     DDNSTO_OW_RETAINED=0
     if [ "${ACTION:-install}" = update ]; then
         ddnsto_openwrt_protected || return 2
+        if command -v ddnsto_ensure_ow_locked >/dev/null 2>&1; then
+            ddnsto_ensure_ow_locked || return $?
+        fi
         return 0
     fi
     ow_packages=$(ddnsto_ow_packages) || return 2

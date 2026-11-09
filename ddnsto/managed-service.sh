@@ -1,21 +1,21 @@
 # DDNSTO actions use the shared protected service coordinator, never flat paths.
 ddnsto_managed_native() {
-    if [ -z "${ZSETUP_BIN:-}" ]; then ZSETUP_BIN=$(command -v zsetup) || ZSETUP_BIN=; fi
-    [ -n "$ZSETUP_BIN" ] && [ -x "$ZSETUP_BIN" ] || {
-        ddnsto_error 'offline management requires an already available zsetup >=0.5.0'; return 2;
-    }
-    managed_native_version=$("$ZSETUP_BIN" --version) || return 2
-    case "$managed_native_version" in
-        'zsetup 0.'*)
-            managed_native_minor=${managed_native_version#zsetup 0.}; managed_native_minor=${managed_native_minor%%.*}
-            case "$managed_native_minor" in ''|*[!0-9]*) return 2 ;; esac
-            [ "$managed_native_minor" -ge 5 ] || { ddnsto_error 'offline management requires zsetup >=0.5.0'; return 2; } ;;
-        *) ddnsto_error 'unrecognized offline zsetup version'; return 2 ;;
-    esac
+    # Offline operations must use the same reviewed bytes as installation.
+    # This reads compiled-in pins only: no bootstrap, download or cache writes.
+    bootstrap_arch || return 2
+    fetch_bootstrap_metadata https '' '' || return 2
+    if [ -n "${ZSETUP_BIN:-}" ]; then
+        if is_expected_zsetup "$ZSETUP_BIN"; then return 0; fi
+    elif find_existing_zsetup; then
+        ZSETUP_BIN=$ACTIVE_ZSETUP
+        return 0
+    fi
+    ddnsto_error 'offline management requires the verified pinned zsetup in the installer cache, PATH or ZSETUP_BIN; restore it using the installer before retrying'
+    return 2
 }
 
 ddnsto_privilege_args() {
-    case "${ACTION:-install}" in install|update) ;; *) return 2 ;; esac
+    case "${ACTION:-install}" in ensure|install|update) ;; *) return 2 ;; esac
     DDNSTO_ROOT_ACTION=${ACTION:-install}
     DDNSTO_ROOT_TOKEN=$TOKEN
     [ "$DDNSTO_ROOT_ACTION" != update ] || [ -z "$TOKEN" ]
@@ -31,6 +31,9 @@ ddnsto_managed_rewrite_unit() {
 # Only the reviewed 4.2.8 client defines this local health protocol. Historical
 # explicit version overrides retain the upstream systemd health checks.
 ddnsto_service_health() {
+    if [ "${DDNSTO_ENSURE_ACTIVE:-0}" = 1 ]; then
+        ddnsto_ensure_linux_running || return 13
+    fi
     [ "${version_num:-}" = 4.2.8 ] || return 0
     managed_health_attempt=0
     while [ "$managed_health_attempt" -lt 5 ]; do
@@ -131,6 +134,9 @@ ddnsto_service_lock() {
         ddnsto_managed_effective || {
             ddnsto_error 'effective systemd service is not exclusively owned'; return 2;
         }
+    fi
+    if command -v ddnsto_ensure_linux_locked >/dev/null 2>&1; then
+        ddnsto_ensure_linux_locked || return $?
     fi
 }
 

@@ -58,7 +58,8 @@ def main():
                       + (folder / 'bootstrap-policy.sh').read_text() + '\n')
             for name in ('product-pins.sh', 'docker-probe.sh', 'docker-lifecycle.sh',
                          'method-selection.sh', 'synology-download.sh', 'extra-platforms.sh',
-                         'openwrt-lifecycle.sh', 'openwrt-adapter.sh'):
+                         'openwrt-lifecycle.sh', 'openwrt-adapter.sh',
+                         'auto-install.sh', 'auto-linux.sh', 'auto-openwrt.sh', 'auto-synology.sh', 'auto-synology-fresh.sh'):
                 business += (folder / name).read_text().rstrip() + '\n\n'
         content = common + "\n# Business logic: maintained in " + str(folder.relative_to(ROOT)) + "/business.sh\n"
         content += business
@@ -78,7 +79,12 @@ def main():
                 raise ValueError(f"{app} exceeds verified privileged-program copy budget")
             content += f"installer_privileged_program() {{\ncat <<'{delimiter}'\n{program}{delimiter}\n}}\n"
         content += "\nbootstrap_and_run() {\n    status \"[1/4] Checking zsetup...\"\n"
-        content += "    ddnsto_bootstrap_zsetup || return $?\n" if app == 'ddnsto' else "    bootstrap_zsetup\n"
+        content += '''    ddnsto_bootstrap_zsetup || {
+        bootstrap_rc=$?
+        ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载、校验或缓存检查失败，尚未安装客户端' '请检查 HTTPS 下载连通性、系统时间、SHA-256 工具及私有缓存权限；不要删除客户端配置' || :
+        return "$bootstrap_rc"
+    }
+''' if app == 'ddnsto' else "    bootstrap_zsetup\n"
         content += "    status \"      zsetup $RESCUE_VERSION is ready\"\n    ZSETUP_BIN=$ACTIVE_ZSETUP\n"
         content += "    ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}\n"
         content += "    ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}\n"

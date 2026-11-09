@@ -1,5 +1,9 @@
 # DDNSTO
 
+群晖自动安装、升级和启动已发布至测试站 `/i`：DSM 7 原生 SPK，管理员 sudo 授权，保留配置且不降级。DS220j / DSM 7.1 已验证空白新装、4.2.7-7 升级到 4.2.8-7、停止后启动及重复执行。新装通过 DSM 本机套件中心 API 传递 Token，安装至默认卷；接受已校验摘要的 DDNSTO 第三方包，不改全局信任策略。发现卸载残留或账号不同会拒绝覆盖。其他机型及 DSM 6 尚未完成真机验收。ARM64 仅开放已验证的 DS220j ARM32 兼容路径，不代表全部 ARM64 群晖。正式环境未更新，详见 [群晖验证记录](../docs/verification/2026-11-09-synology-auto.md)。
+
+> 当前测试候选为 0.2.4，默认动作已改为无菜单的 `ensure`，客户端固定 4.2.8。请以 [默认流程说明与验收记录](../docs/verification/2026-11-09-ddnsto-autoinstall.md) 和 `install-rules.json` 为准。下面保留的是历史入口说明，其中版本、可选 Token、在线检查和动态 VERSION 描述不适用于新的默认流程。测试站部署不代表正式入口已更新。
+
 Linux/OpenWrt 的统一入口为 `ddnsto-install.sh`，由本目录 `business.sh`、`main.sh` 和共享 `../lib/bootstrap.sh` 生成；普通执行和 `zsetup install ddnsto` 使用同一业务实现。Windows 和 macOS 使用同目录的原生入口 `install.ps1` 与 `install-macos.sh`，安装已发布的 DDNSTO CLI 归档并注册平台服务。Linux/OpenWrt 入口依赖 zsetup >=0.2.4，不调用 awk/sed。
 
 发布后用户入口：
