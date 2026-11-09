@@ -11,8 +11,9 @@ class WindowsScoopContract(unittest.TestCase):
     def test_catalog_promotes_a_new_immutable_011_entry(self):
         catalog = json.loads((ROOT / "catalog-windows.json").read_text())
         self.assertEqual(catalog["config_version"], "windows-apps-0.1.1")
-        self.assertEqual(len(catalog["installers"]), 1)
-        record = catalog["installers"][0]
+        self.assertEqual(len(catalog["installers"]), 2)
+        record = next(item for item in catalog["installers"]
+                      if item["application"] == "scoop")
         self.assertEqual(record["application"], "scoop")
         self.assertEqual(record["os"], "windows")
         self.assertEqual(record["arch"], "x86_64")
