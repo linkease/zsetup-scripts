@@ -1,7 +1,25 @@
 {
   "schema_version": 1,
-  "config_version": "scripts-0.2.2",
+  "config_version": "scripts-0.3.0",
   "installers": [
+    {
+      "application": "kai-skills",
+      "os": "ubuntu",
+      "package_manager": "*",
+      "arch": "*",
+      "script": "kai-skills/kai-skills-install.sh",
+      "path": "kai/kai-skills/installers/1.2.4/kai-skills-install.sh",
+      "background": false
+    },
+    {
+      "application": "kai-skills",
+      "os": "openwrt",
+      "package_manager": "*",
+      "arch": "*",
+      "script": "kai-skills/kai-skills-install.sh",
+      "path": "kai/kai-skills/installers/1.2.4/kai-skills-install.sh",
+      "background": false
+    },
     {
       "application": "fastnet",
       "os": "*",

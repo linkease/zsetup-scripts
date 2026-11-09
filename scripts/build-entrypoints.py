@@ -25,6 +25,12 @@ def main():
         if app == 'jq':
             subprocess.run(['python3', '-B', str(ROOT/'jq/build.py'), *(['--check'] if args.check else [])], check=True)
             continue
+        if app == 'kai-skills':
+            sources = {entry["script"] for entry in catalog["installers"] if entry["application"] == app}
+            if sources != {"kai-skills/kai-skills-install.sh"}:
+                raise ValueError("kai-skills requires one release-bound installer")
+            subprocess.run(["sh", "-n", str(ROOT / sources.pop())], check=True)
+            continue
         sources = {entry["script"] for entry in catalog["installers"] if entry["application"] == app}
         if len(sources) != 1:
             raise ValueError(f"{app} must have one canonical entry")
