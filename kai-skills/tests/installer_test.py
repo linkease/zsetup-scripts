@@ -132,7 +132,8 @@ esac
 
     # The public channel has no release in its URL or bytes.  With no zsetup in
     # PATH it obtains the current core once, stores it below the user data
-    # directory, and forwards either --skill or --system unchanged.
+    # directory, and offers a short skill/all interface while retaining the
+    # complete installer arguments as an advanced fallback.
     bootstrap = work / "bootstrap-source"
     (bootstrap / "zsetup/0.6.4").mkdir(parents=True)
     bootstrap_bin = bootstrap / "zsetup/0.6.4/zsetup-linux-x86_64"
@@ -171,10 +172,54 @@ esac
         "BOOTSTRAP_SOURCE": str(bootstrap),
         "BOOTSTRAP_INSTALL_LOG": str(bootstrap_log),
     }
-    run(["sh", str(channel), "--skill", "kai-software", "--consumer", "codex",
-         "--scope", "user"], env=channel_env)
-    assert bootstrap_log.read_text().strip() == (
-        "install kai-skills --foreground -- --skill kai-software --consumer codex --scope user"
+
+    help_result = run(["sh", str(channel), "--help"], env=channel_env)
+    assert "sh -s -- SKILL_ID" in help_result.stdout
+    assert "sh -s -- all" in help_result.stdout
+    assert "~/.agents/skills" in help_result.stdout
+    assert not bootstrap_log.exists(), "help bootstrapped zsetup"
+
+    missing = subprocess.run(["sh", str(channel)], env=channel_env,
+                             capture_output=True, text=True)
+    assert missing.returncode == 2
+    assert "choose a skill or all" in missing.stderr
+    assert not bootstrap_log.exists(), "missing selection bootstrapped zsetup"
+
+    run(["sh", str(channel), "kai-software"], env=channel_env)
+    assert bootstrap_log.read_text().splitlines() == [
+        "install kai-skills --foreground -- --skill kai-software"
+    ]
+
+    ubuntu_release = work / "ubuntu-os-release"
+    ubuntu_release.write_text('NAME="Ubuntu"\nID=ubuntu\nID_LIKE=debian\n')
+    run(["sh", str(channel), "all"],
+        env={**channel_env, "KAI_SKILLS_OS_RELEASE_FILE": str(ubuntu_release)})
+    assert bootstrap_log.read_text().splitlines()[-1] == (
+        "install kai-skills --foreground -- --system ubuntu"
+    )
+
+    openwrt_release = work / "openwrt-os-release"
+    openwrt_release.write_text('NAME="iStoreOS"\nID="openwrt"\n')
+    run(["sh", str(channel), "all", "--dry-run"],
+        env={**channel_env, "KAI_SKILLS_OS_RELEASE_FILE": str(openwrt_release)})
+    assert bootstrap_log.read_text().splitlines()[-1] == (
+        "install kai-skills --foreground -- --system istoreos --dry-run"
+    )
+
+    unknown_release = work / "unknown-os-release"
+    unknown_release.write_text("NAME=Unknown\nID=unknown\n")
+    unknown = subprocess.run(["sh", str(channel), "all"],
+                             env={**channel_env,
+                                  "KAI_SKILLS_OS_RELEASE_FILE": str(unknown_release)},
+                             capture_output=True, text=True)
+    assert unknown.returncode == 2
+    assert "--system ubuntu" in unknown.stderr
+    assert len(bootstrap_log.read_text().splitlines()) == 3
+
+    run(["sh", str(channel), "--skill", "kai-software", "--consumer", "claude",
+         "--scope", "project"], env=channel_env)
+    assert bootstrap_log.read_text().splitlines()[-1] == (
+        "install kai-skills --foreground -- --skill kai-software --consumer claude --scope project"
     )
     durable = channel_home / ".local/share/zsetup/rescue/0.6.4/zsetup"
     assert durable.is_file() and os.access(durable, os.X_OK)
