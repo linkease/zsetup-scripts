@@ -1,0 +1,340 @@
+{
+    "fatal":  null,
+    "os_version":  "10.0.26200",
+    "passed":  true,
+    "bundle":  {
+                   "target":  "i686-pc-windows-gnu",
+                   "native_execution":  false,
+                   "native_acceptance":  "pending; compile/staging only, not M5 pass",
+                   "remaining_native_scope":  "TLS/DoH/UDP/Race/cache/version/reexec/cancellation faults and M6 real business canary remain separate gates",
+                   "product_commit":  "3e520a395f74cee63cab72ff85b18c872be9ea5b",
+                   "runtime_commit":  "1643c03c60eb24ec984915d72872b7c171c04211",
+                   "tests":  [
+                                 {
+                                     "name":  "product-capture_lifecycle",
+                                     "file":  "product-capture_lifecycle.exe"
+                                 },
+                                 {
+                                     "name":  "product-checksum_protocol",
+                                     "file":  "product-checksum_protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-release_identity",
+                                     "file":  "product-release_identity.exe"
+                                 },
+                                 {
+                                     "name":  "product-macos_facts",
+                                     "file":  "product-macos_facts.exe"
+                                 },
+                                 {
+                                     "name":  "product-paths",
+                                     "file":  "product-paths.exe"
+                                 },
+                                 {
+                                     "name":  "product-archive_protocol",
+                                     "file":  "product-archive_protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-windows_install_execution",
+                                     "file":  "product-windows_install_execution.exe"
+                                 },
+                                 {
+                                     "name":  "product-context_facts",
+                                     "file":  "product-context_facts.exe"
+                                 },
+                                 {
+                                     "name":  "product-capture_protocol",
+                                     "file":  "product-capture_protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-legacy_protocol",
+                                     "file":  "product-legacy_protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-local_protocol",
+                                     "file":  "product-local_protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-protocol",
+                                     "file":  "product-protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-storage_protocol",
+                                     "file":  "product-storage_protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-installer_cancel",
+                                     "file":  "product-installer_cancel.exe"
+                                 },
+                                 {
+                                     "name":  "product-config_protocol",
+                                     "file":  "product-config_protocol.exe"
+                                 },
+                                 {
+                                     "name":  "product-windows_facts",
+                                     "file":  "product-windows_facts.exe"
+                                 },
+                                 {
+                                     "name":  "runtime-fs_storage_windows",
+                                     "file":  "runtime-fs_storage_windows.exe"
+                                 },
+                                 {
+                                     "name":  "runtime-fs_native_transfer",
+                                     "file":  "runtime-fs_native_transfer.exe"
+                                 },
+                                 {
+                                     "name":  "runtime-windows_process_owner",
+                                     "file":  "runtime-windows_process_owner.exe"
+                                 },
+                                 {
+                                     "name":  "runtime-fs_bounded",
+                                     "file":  "runtime-fs_bounded.exe"
+                                 }
+                             ],
+                   "artifacts":  [
+                                     {
+                                         "file":  "zsetup.exe",
+                                         "size":  1879040,
+                                         "sha256":  "07d99ebcaae8739e95d92a510891dd729f7f9da52f898bb19a4360fe6f01ac06"
+                                     },
+                                     {
+                                         "file":  "product-capture_lifecycle.exe",
+                                         "size":  2916803,
+                                         "sha256":  "06e5197df39e0929eddfa191c35d81726fe73007d6852a59f0424a30c195f53b"
+                                     },
+                                     {
+                                         "file":  "product-checksum_protocol.exe",
+                                         "size":  2916803,
+                                         "sha256":  "735dc6eb55fb4fa732e08ef1a170311532ce9bd4fa7b7c57b79091486a299211"
+                                     },
+                                     {
+                                         "file":  "product-release_identity.exe",
+                                         "size":  3080950,
+                                         "sha256":  "074b2bec368aa240a0772ab85f3e0ee7a7d141744861d655274f965c16b1f21f"
+                                     },
+                                     {
+                                         "file":  "product-macos_facts.exe",
+                                         "size":  71868355,
+                                         "sha256":  "57d3c74aee214beb3dce48e09709951ec480bffb2d3798c1feb26e4eecb42c74"
+                                     },
+                                     {
+                                         "file":  "product-paths.exe",
+                                         "size":  71968878,
+                                         "sha256":  "1ec1f20e1214b0454dd964e21fbb6b37141a4e38e7c8ed4dec170795b45cfa53"
+                                     },
+                                     {
+                                         "file":  "product-archive_protocol.exe",
+                                         "size":  72095056,
+                                         "sha256":  "8d9f68494d1f263f6adc4802ad9b7067a9c1134e0fe5f14eb5a7f8090495a166"
+                                     },
+                                     {
+                                         "file":  "product-windows_install_execution.exe",
+                                         "size":  72107145,
+                                         "sha256":  "ec885c8ef7248f85bbf76376065dba495195bd27d8132d28548fe05088a87a0a"
+                                     },
+                                     {
+                                         "file":  "product-context_facts.exe",
+                                         "size":  71921541,
+                                         "sha256":  "582793518ee2fbcb4e9671794c61d9c0ddc1af68c58af31878329fd52c800c28"
+                                     },
+                                     {
+                                         "file":  "product-capture_protocol.exe",
+                                         "size":  2916802,
+                                         "sha256":  "b94197574b5f4552a3a5854b3e7b5f24fd490383f3088122ad83d55e764a39e4"
+                                     },
+                                     {
+                                         "file":  "product-legacy_protocol.exe",
+                                         "size":  5201688,
+                                         "sha256":  "87ef2fb9b2e916704cf91d41772cd21b74520ddaf36505f1e8aa2af37d508149"
+                                     },
+                                     {
+                                         "file":  "product-local_protocol.exe",
+                                         "size":  72069855,
+                                         "sha256":  "dd78e896e2845a9ba09669b2683236a19bc252e16afd41797ecefa5592e59c5f"
+                                     },
+                                     {
+                                         "file":  "product-protocol.exe",
+                                         "size":  72305798,
+                                         "sha256":  "f64bda9c0ce733446ae864093fafe5754befd5bca6d3e19ae80ba6ef6e03f542"
+                                     },
+                                     {
+                                         "file":  "product-storage_protocol.exe",
+                                         "size":  3127001,
+                                         "sha256":  "d9d52b34c5b88e24d446bd338b1587c861d6b548d2e339b84020d0608def36a8"
+                                     },
+                                     {
+                                         "file":  "product-installer_cancel.exe",
+                                         "size":  2916802,
+                                         "sha256":  "8a6b5b5eb5c2445b8a9aed0a2a41b1907222086052190a91c3d2a9f42a0cdc29"
+                                     },
+                                     {
+                                         "file":  "product-config_protocol.exe",
+                                         "size":  72138652,
+                                         "sha256":  "bf8160f82de69cb16b1243f5724583546ecda7b21df8297fdf0cb4751972bd97"
+                                     },
+                                     {
+                                         "file":  "product-windows_facts.exe",
+                                         "size":  71918248,
+                                         "sha256":  "f0779a9616ac5e751ac82a9d94f4c38818d6db337b35be3367501443c171253e"
+                                     },
+                                     {
+                                         "file":  "runtime-fs_storage_windows.exe",
+                                         "size":  49735630,
+                                         "sha256":  "e0e91df2c14d3d2b806a631aaabc7a43145c1b52bd75f94336010003ed562499"
+                                     },
+                                     {
+                                         "file":  "runtime-fs_native_transfer.exe",
+                                         "size":  50528176,
+                                         "sha256":  "06bbdd1c63fde6ee5b005bf09437b22d77d55781bda1269b188b6cd925685927"
+                                     },
+                                     {
+                                         "file":  "runtime-windows_process_owner.exe",
+                                         "size":  50372110,
+                                         "sha256":  "7ab77247ff43f82720ce924df27e23419df03d1a90fcc785707a5ca28fc836e4"
+                                     },
+                                     {
+                                         "file":  "runtime-fs_bounded.exe",
+                                         "size":  50547486,
+                                         "sha256":  "5095eca9ff0839f75dc4da862aacdd5e2e31cb4f35e5cff3a39b733cdfedfb61"
+                                     },
+                                     {
+                                         "file":  "windows-native-tests.ps1",
+                                         "size":  3994,
+                                         "sha256":  "00bf56d542034297a9c0e150d4f5fd23bbda54e3cc18d767c0a16e4fe31f4b5c"
+                                     }
+                                 ]
+               },
+    "created_utc":  "2026-11-09T09:51:20.9985118Z",
+    "scope":  "win32 on Windows10/11 x64 WOW64, PS5.1; isolated core/metadata/installer/job tests only",
+    "powershell":  "5.1.26100.9711",
+    "native_execution":  true,
+    "native_arch":  "x86_64",
+    "cases":  [
+                  {
+                      "passed":  true,
+                      "case":  "native-context",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-capture_lifecycle",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-checksum_protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-release_identity",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-macos_facts",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-paths",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-archive_protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-windows_install_execution",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-context_facts",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-capture_protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-legacy_protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-local_protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-storage_protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-installer_cancel",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-config_protocol",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "product-windows_facts",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "runtime-fs_storage_windows",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "runtime-fs_native_transfer",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "runtime-windows_process_owner",
+                      "timeout":  false,
+                      "exit_code":  0
+                  },
+                  {
+                      "passed":  true,
+                      "case":  "runtime-fs_bounded",
+                      "timeout":  false,
+                      "exit_code":  0
+                  }
+              ]
+}
