@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         catalog_record = next(r for r in json.loads((ROOT / "catalog.json").read_text())["installers"] if r["application"] == app)
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
-        expected_version = "0.2.2" if app == 'ddnsto' else "0.1.0" if app in {"ks-cli", "kspeeder", "jq"} else "0.1.1" if app == "linkspace" else "0.1.9"
+        expected_version = "0.2.4" if app == 'ddnsto' else "0.1.0" if app in {"ks-cli", "kspeeder", "jq"} else "0.1.1" if app == "linkspace" else "0.1.9"
         assert record["path"] == f"{app}/{expected_version}/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()

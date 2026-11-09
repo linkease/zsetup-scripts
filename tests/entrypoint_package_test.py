@@ -26,17 +26,17 @@ class EntrypointPackage(unittest.TestCase):
             files = {r['path']: r for r in manifest['files']}
             for name in ('ddnsto-install.sh', 'install.sh', 'install.ps1'):
                 alias = 'binary/ddnsto/' + name
-                immutable = 'binary/ddnsto/0.2.2/' + name
+                immutable = 'binary/ddnsto/0.2.4/' + name
                 self.assertTrue((output / immutable).is_file(), immutable)
                 source = 'ddnsto-install.sh' if name == 'install.sh' else name
                 self.assertEqual((output / alias).read_bytes(), (ROOT / 'ddnsto' / source).read_bytes())
                 self.assertEqual((output / immutable).read_bytes(), (output / alias).read_bytes())
                 self.assertEqual(files[alias]['sha256'], hashlib.sha256((output / alias).read_bytes()).hexdigest())
             self.assertFalse((output / 'binary/zsetup').exists())
-            rules = output / 'binary/ddnsto/0.2.2/install-rules.json'
+            rules = output / 'binary/ddnsto/0.2.4/install-rules.json'
             self.assertTrue(rules.is_file(), 'missing auditable candidate rules')
             self.assertEqual(rules.read_bytes(), (ROOT / 'ddnsto/install-rules.json').read_bytes())
-            self.assertIn('binary/ddnsto/0.2.2/install-rules.json', files)
+            self.assertIn('binary/ddnsto/0.2.4/install-rules.json', files)
             before = (output / 'entrypoints-manifest.json').read_bytes()
             repeated = subprocess.run(command, text=True, capture_output=True)
             self.assertNotEqual(repeated.returncode, 0)

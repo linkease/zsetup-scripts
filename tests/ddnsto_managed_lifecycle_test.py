@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +19,7 @@ FIXTURE = Path('/ddnsto-lifecycle-sandbox')
 NATIVE = os.environ.get('DDNSTO_TEST_NATIVE', '/fixture/zsetup')
 ENABLED = os.environ.get('DDNSTO_LIFECYCLE_SANDBOX') == '1' and FIXTURE.is_dir()
 
-SYSTEMCTL = r'''#!/usr/bin/python3
+SYSTEMCTL = '#!' + sys.executable + '\n' + r'''
 import json, os, sys
 from pathlib import Path
 p = Path('/ddnsto-lifecycle-sandbox/state.json')
@@ -31,6 +32,7 @@ if op == 'show':
     defaults = dict(FragmentPath=unit if Path(unit).is_file() else '',
         LoadState='loaded' if Path(unit).is_file() else 'not-found',
         ActiveState=s['active'], UnitFileState=s['enabled'], NeedDaemonReload='no',
+        MainPID='4242' if s['active'] == 'active' else '0',
         ExecStart='{ path=/bin/sh ; argv[]=/bin/sh ' + wrapper + ' ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }' if Path(unit).is_file() else '')
     print(s.get('properties', {}).get(prop, defaults.get(prop, '')))
     sys.exit(0)

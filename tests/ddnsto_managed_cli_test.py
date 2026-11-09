@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def shell(body, *args):
-    sources = ['lib/install-storage.sh', 'lib/install-bounds.sh',
+    sources = ['lib/bootstrap.sh', 'ddnsto/bootstrap-policy.sh',
+               'lib/install-storage.sh', 'lib/install-bounds.sh',
                'lib/install-transaction.sh', 'lib/install-service.sh',
                'ddnsto/product-pins.sh', 'ddnsto/docker-probe.sh',
                'ddnsto/business.sh']
@@ -65,6 +66,11 @@ ddnsto_register
         result = shell('ACTION=update; TOKEN=; ddnsto_privilege_args; printf "action=%s token=%s" "$DDNSTO_ROOT_ACTION" "$DDNSTO_ROOT_TOKEN"')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'action=update token=')
+
+    def test_bridge_preserves_default_ensure_and_account(self):
+        result = shell('ACTION=ensure; TOKEN=account; ddnsto_privilege_args; printf "%s:%s" "$DDNSTO_ROOT_ACTION" "$DDNSTO_ROOT_TOKEN"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'ensure:account')
 
     def test_update_registration_never_sets_token(self):
         result = shell('''ACTION=update; TOKEN=; SERVICE_HAD_UNIT=1; SERVICE_CONFIG_TOUCHED=1
@@ -191,14 +197,14 @@ ddnsto_managed_health_probe
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                        'ZSETUP_INSTALLER_MODE=1; ZSETUP_OS=openwrt; ZSETUP_PACKAGE_MANAGER=opkg; ZSETUP_ARCH=mipsel\n'
                        'ddnsto_install() { printf "platform=%s" "$detected_platform"; }; . "' + str(ROOT / 'ddnsto/main.sh') + '"',
-                       '--platform', 'openwrt', '--force-version', 'lite')
+                       '--action', 'install', '--platform', 'openwrt', '--force-version', 'lite')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'platform=openwrt')
 
     def test_docker_write_uses_separate_locked_adapter(self):
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                        'ddnsto_docker_locked() { printf DOCKER; };\n'
-                       '. "' + str(ROOT / 'ddnsto/main.sh') + '"', '--method', 'docker')
+                       '. "' + str(ROOT / 'ddnsto/main.sh') + '"', '--action', 'install', '--method', 'docker')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'DOCKER')
 

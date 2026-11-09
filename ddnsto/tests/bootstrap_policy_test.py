@@ -44,7 +44,8 @@ class BootstrapEmbeddingTest(unittest.TestCase):
         self.assertLess(ddnsto.index(common), ddnsto.index(policy))
         self.assertLess(ddnsto.index(policy), ddnsto.index(business))
         wrapper = ddnsto.split('\nbootstrap_and_run() {', 1)[1].split('\n}', 1)[0]
-        self.assertIn('    ddnsto_bootstrap_zsetup || return $?\n', wrapper)
+        self.assertIn('    ddnsto_bootstrap_zsetup || {', wrapper)
+        self.assertIn('ddnsto_flow_error E_BOOTSTRAP', wrapper)
         self.assertNotIn('\n    bootstrap_zsetup\n', wrapper)
         for name in ('docker-probe.sh', 'product-pins.sh', 'synology-download.sh'):
             self.assertIn((ROOT / 'ddnsto' / name).read_text().rstrip(), ddnsto)
@@ -83,6 +84,29 @@ class BootstrapPolicyTest(unittest.TestCase):
         path.write_text('#!/bin/sh\ntouch "$MARKER"\necho "zsetup 0.5.0"\n')
         path.chmod(0o700)
         return path
+
+    def test_default_bootstrap_uses_direct_https_mirrors_without_changing_product_sources(self):
+        self.env.pop('ZSETUP_BOOTSTRAP_BASES')
+        result = self.run_shell('printf "%s\\n%s\\n" "$BOOTSTRAP_BASES" "$DIRECT_PRIMARY_BASES"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        bootstrap, products = result.stdout.splitlines()
+        self.assertEqual(bootstrap, 'https://fw.koolcenter.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary')
+        self.assertIn('https://dl.istoreos.com/binary', products)
+
+    def test_generated_wrapper_reports_bootstrap_failure_without_raw_output(self):
+        entry = (ROOT / 'ddnsto/ddnsto-install.sh').read_text()
+        wrapper = 'bootstrap_and_run() {' + entry.split('\nbootstrap_and_run() {', 1)[1].split('\n}', 1)[0] + '\n}\n'
+        flow = self.root / 'flow'
+        flow.mkdir()
+        script = f'. "{ROOT / "ddnsto/auto-install.sh"}"\n' + wrapper + '''
+status() { :; }
+ddnsto_bootstrap_zsetup() { return 1; }
+bootstrap_and_run
+'''
+        result = subprocess.run(['sh', '-c', script], env=self.env | {'DDNSTO_FLOW_DIR': str(flow)}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('E_BOOTSTRAP', result.stderr)
+        self.assertIn('error=E_BOOTSTRAP', (flow / 'events.log').read_text())
 
     def test_metadata_is_local_fixed_and_rejects_unknown_arch(self):
         for arch, digest in PINS.items():
@@ -352,8 +376,16 @@ class BootstrapPolicyTest(unittest.TestCase):
             # GNU Wget remains a usable fallback for direct HTTPS responses;
             # the restriction is not implemented by disabling every download.
             self.env['ZSETUP_ROOT'] = str(self.root / 'wget-cache')
+            # A failing installed curl is not permission to bypass its TLS
+            # failure. Exercise actual curl absence, with real GNU Wget.
+            tools = self.root / 'wget-only-bin'
+            tools.mkdir()
+            for name in ('sh', 'uname', 'od', 'stat', 'id', 'mkdir', 'rmdir',
+                         'rm', 'mv', 'chmod', 'sha256sum', 'wc', 'sleep', 'wget'):
+                (tools / name).symlink_to(shutil.which(name))
+            self.env['PATH'] = str(tools)
             result = self.run_shell('ddnsto_bootstrap_zsetup; "$ACTIVE_ZSETUP" --version',
-                'curl() { return 127; }; wget() { command wget --ca-certificate "$CURL_CA_BUNDLE" "$@"; }',
+                'wget() { command wget --ca-certificate "$CURL_CA_BUNDLE" "$@"; }',
                 real_network=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), 'zsetup 0.5.0')

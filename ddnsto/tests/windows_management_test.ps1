@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
 function Assert($Ok, $Message) { if (-not $Ok) { throw $Message } }
 function Assert-DDNSTOPlatform {}
@@ -9,7 +9,7 @@ function Disable-ScheduledTask { $script:enabled = $false }
 function Enable-ScheduledTask { $script:enabled = $true }
 function Stop-DDNSTOTask { $script:task.State = 'Ready' }
 function Start-DDNSTOTask { $script:task.State = 'Running' }
-function Confirm-DDNSTORunning { Assert ($script:task.State -eq 'Running') 'not running' }
+function Confirm-DDNSTORunning { $script:confirmed++; Assert ($script:task.State -eq 'Running') 'not running' }
 $root = Join-Path ([IO.Path]::GetTempPath()) ('ddnsto-manage-' + [Guid]::NewGuid())
 New-Item -ItemType Directory -Path $root | Out-Null
 try {
@@ -23,8 +23,11 @@ try {
         WorkingDirectory = $root
     }) }
     $script:enabled = $true
+    $script:confirmed = 0
     foreach ($action in @('status', 'stop', 'start', 'restart')) {
         $result = Invoke-DDNSTOEntry -Action $action -InstallDir $root
+        if ($action -eq 'status') { Assert ($script:confirmed -eq 1) 'status claimed running without process stability check' }
+        if ($action -in @('start','restart')) { Assert ($result -match '启动成功') 'manual start needs Chinese success' }
         Assert (($result -join "`n") -match 'cloud_status=unverified') 'missing independent cloud status'
         Assert ($script:enabled -eq ($action -ne 'stop')) 'wrong startup state'
         Assert (([IO.File]::ReadAllText((Join-Path $root 'ddnsto.yaml'))) -eq 'unchanged') 'changed config'

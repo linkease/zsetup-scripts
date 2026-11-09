@@ -1,8 +1,9 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
 function Assert($Ok, $Message) { if (-not $Ok) { throw $Message } }
 function Fails($Body) { $failed = $false; try { & $Body | Out-Null } catch { $failed = $true }; Assert $failed 'expected refusal/failure' }
 function Assert-DDNSTOPlatform {}
+function Get-DDNSTOClientVersion($Path) { return '4.2.7' }
 function Protect-DDNSTODirectory($Path) {}
 function Read-DDNSTOToken { throw 'unexpected prompt' }
 function Get-DDNSTOTask { return $script:task }
@@ -55,21 +56,22 @@ try {
         Fails { Invoke-DDNSTOEntry -Action $action -InstallDir $root }
     }
     [IO.File]::WriteAllText((Join-Path $root '.install-lock'), 'retained-lock')
-    Fails { Invoke-DDNSTOEntry -Action install -InstallDir $root }
+    Fails { Invoke-DDNSTOEntry -Action install -Token old-secret -InstallDir $root }
     Assert ([IO.File]::ReadAllText((Join-Path $root '.install-lock')) -ceq 'retained-lock') 'reinstall removed foreign lock'
     Remove-Item -LiteralPath (Join-Path $root '.install-lock') -Force
     Fails { Invoke-DDNSTOEntry -Action install -Token secret -InstallDir $root }
     $script:downloadFail = $true
-    Fails { Invoke-DDNSTOEntry -Action install -InstallDir $root }
+    Fails { Invoke-DDNSTOEntry -Action install -Token old-secret -InstallDir $root }
     $script:downloadFail = $false
     $script:registerFail = $true
-    Fails { Invoke-DDNSTOEntry -Action install -InstallDir $root }
+    Fails { Invoke-DDNSTOEntry -Action install -Token old-secret -InstallDir $root }
     Assert ($null -eq $script:task -and -not (Test-Path $binary)) 'registration failure left task/binary'
     $script:startFail = $true
-    Fails { Invoke-DDNSTOEntry -Action install -InstallDir $root }
+    Fails { Invoke-DDNSTOEntry -Action install -Token old-secret -InstallDir $root }
     Assert ($null -eq $script:task -and -not (Test-Path $binary)) 'failed reinstall left task/binary'
     Assert ([IO.File]::ReadAllText($marker) -ceq 'ddnsto-windows-v1:retained') 'failed reinstall lost retained state'
-    Invoke-DDNSTOEntry -Action install -InstallDir $root | Out-Null
+    $result=Invoke-DDNSTOEntry -Action install -Token old-secret -InstallDir $root
+    Assert ($result -match '安装.*成功') 'reinstall success needs Chinese summary'
     Assert ($script:task.State -eq 'Running') 'reinstall not running'
     Assert ([IO.File]::ReadAllText($cfg) -ceq $original) 'reinstall rewrote configuration'
     $script:stopFail = $true
@@ -141,7 +143,7 @@ try {
     # Missing task can still be explicitly uninstalled, then reinstalled.
     $script:task = $null
     Invoke-DDNSTOEntry -Action uninstall -InstallDir $root | Out-Null
-    Invoke-DDNSTOEntry -Action install -InstallDir $root | Out-Null
+    Invoke-DDNSTOEntry -Token file-secret -InstallDir $root | Out-Null
     New-Item -ItemType SymbolicLink -Path $identity -Target $cfg | Out-Null
     Fails { Invoke-DDNSTOEntry -Action uninstall -InstallDir $root }
     Remove-Item -LiteralPath $identity -Force

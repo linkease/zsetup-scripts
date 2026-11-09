@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Execute the installer with isolated native-download/launchd boundaries."""
 import os
+import hashlib
 from pathlib import Path
 import plistlib
 import pty
@@ -33,6 +34,24 @@ class MacInstaller(unittest.TestCase):
         self.tool('uname', 'echo "${TEST_OS:-Darwin}"\n')
         # uname -m needs its architecture; all other native platform probes are isolated.
         self.tool('uname', '[ "$1" != -m ] || { echo "${TEST_ARCH:-arm64}"; exit; }; echo "${TEST_OS:-Darwin}"\n')
+        self.tool('id', 'echo "${TEST_UID:-501}"\n')
+        self.tool('stat', '''
+if [ "$1" = -f ]; then
+ shift 2
+ owner=$(/usr/bin/stat -c %u "$1")
+ [ "$owner" != "$(/usr/bin/id -u)" ] || owner=501
+ printf '%s %s\\n' "$owner" "$(/usr/bin/stat -c %a "$1")"
+else
+ exec /usr/bin/stat "$@"
+fi
+''')
+        self.tool('sleep', '''
+printf 'observation\\n' >> "$TEST_ROOT/observations"
+if [ "${UNSTABLE:-0}" = 1 ]; then
+ n=$(wc -l < "$TEST_ROOT/observations")
+ printf '%s\\n' "$n" > "$TEST_ROOT/pid"
+fi
+''')
         self.tool('zsetup', '''
 [ "$1" != --version ] || { echo 'zsetup 0.3.0'; exit; }
 printf 'download\n' >> "$TEST_ROOT/download.log"
@@ -64,8 +83,10 @@ enable)
  rm -f "$TEST_ROOT/disabled" ;;
 disable) touch "$TEST_ROOT/disabled" ;;
 print)
+ [ "$2" != gui/501 ] || exit 0
  [ -f "$TEST_ROOT/running" ] || exit 1
- echo 'pid = 123'
+ echo 'state = running'
+ printf 'pid = %s\n' "$(cat "$TEST_ROOT/pid" 2>/dev/null || echo 123)"
  printf 'path = %s/com.ddnsto.client.plist\n' "$DDNSTO_LAUNCH_AGENTS_DIR"
  printf 'program = %s/ddnsto\n' "${FOREIGN_PROGRAM:-$DDNSTO_INSTALL_DIR}"
  printf '%s/ddnsto.yaml\n' "$DDNSTO_CONFIG_DIR" ;;
@@ -93,6 +114,12 @@ esac
     def run_script(self, args=('--token', 'test-token'), **env):
         return subprocess.run(['sh', str(SCRIPT), *args], env=self.env | env,
                               capture_output=True, text=True, timeout=20)
+
+    def receipt(self, version='4.2.8'):
+        digest = hashlib.sha256((self.install / 'ddnsto').read_bytes()).hexdigest()
+        path = self.config / '.installer-macos-version'
+        path.write_text(f'{version} {digest}\n')
+        path.chmod(0o600)
 
     def run_menu(self, choice, token=None, **env):
         pid, terminal = pty.fork()
@@ -127,27 +154,26 @@ esac
             _, status = os.waitpid(pid, 0)
         return os.waitstatus_to_exitcode(status), output.decode()
 
-    def test_menu_lists_all_actions_and_default_is_noop(self):
+    def test_terminal_without_token_fails_without_menu(self):
         self.assertEqual(self.run_script().returncode, 0)
         before = (self.root / 'service.log').read_bytes()
         for choice in ('', '0', 'invalid'):
             with self.subTest(choice=choice):
                 code, output = self.run_menu(choice)
-                self.assertEqual(code, 2 if choice == 'invalid' else 0, output)
-                for item in ('2) Status', '3) Start', '4) Stop', '5) Restart',
-                             '6) Repair', '7) Change Token', '8) Uninstall'):
-                    self.assertIn(item, output)
+                self.assertEqual(code, 2, output)
+                self.assertNotIn('Choose', output)
                 self.assertNotIn('DDNSTO token:', output)
                 self.assertEqual((self.root / 'service.log').read_bytes(), before)
 
-    def test_menu_dispatches_management_repair_and_uninstall_offline(self):
+    def test_explicit_management_repair_and_uninstall_offline(self):
         self.assertEqual(self.run_script().returncode, 0)
         cfg = (self.config / 'ddnsto.yaml').read_bytes()
         downloads = (self.root / 'download.log').read_bytes()
-        for choice, running in [('2', True), ('4', False), ('3', True),
-                                ('5', True), ('6', True), ('8', False)]:
+        for choice, running in [('status', True), ('stop', False), ('start', True),
+                                ('restart', True), ('repair', True), ('uninstall', False)]:
             with self.subTest(choice=choice):
-                code, output = self.run_menu(choice, FAIL_DOWNLOAD='1')
+                result = self.run_script(('--action', choice), FAIL_DOWNLOAD='1')
+                code, output = result.returncode, result.stdout + result.stderr
                 self.assertEqual(code, 0, output)
                 self.assertEqual((self.root / 'running').exists(), running)
                 self.assertNotIn('DDNSTO token:', output)
@@ -156,39 +182,46 @@ esac
         self.assertFalse((self.install / 'ddnsto').exists())
         self.assertIn('retained', (self.config / '.installer-macos-v1').read_text())
 
-    def test_menu_update_still_uses_explicit_update_transaction(self):
+    def test_explicit_update_transaction(self):
         self.assertEqual(self.run_script().returncode, 0)
-        code, output = self.run_menu('1')
+        result = self.run_script(('--action', 'update'))
+        code, output = result.returncode, result.stdout + result.stderr
         self.assertEqual(code, 0, output)
         self.assertIn('operation=update', output)
         self.assertEqual((self.root / 'download.log').read_text().count('download'), 2)
 
-    def test_menu_configure_prompts_visible_token_once(self):
+    def test_explicit_configure_never_logs_token(self):
         self.assertEqual(self.run_script().returncode, 0)
         identity = self.config / '.ddnsto_boot.cfg'
         identity.write_text('preserve-identity')
-        code, output = self.run_menu('7', token='menu-visible-token', FAIL_DOWNLOAD='1')
+        result = self.run_script(('--action', 'configure', '--token', 'menu-visible-token'), FAIL_DOWNLOAD='1')
+        code, output = result.returncode, result.stdout + result.stderr
         self.assertEqual(code, 0, output)
-        self.assertEqual(output.count('menu-visible-token'), 1, output)
+        self.assertEqual(output.count('menu-visible-token'), 0, output)
         self.assertIn('operation=configure', output)
         self.assertIn("userToken: 'menu-visible-token'", (self.config / 'ddnsto.yaml').read_text())
         self.assertEqual(identity.read_text(), 'preserve-identity')
 
-    def test_menu_repairs_missing_plist_without_downloading(self):
+    def test_default_repairs_missing_plist_without_downloading(self):
         self.assertEqual(self.run_script().returncode, 0)
         plist = self.agents / 'com.ddnsto.client.plist'
         plist.unlink()
-        code, output = self.run_menu('6', FAIL_DOWNLOAD='1')
+        result = self.run_script(FAIL_DOWNLOAD='1')
+        code, output = result.returncode, result.stdout + result.stderr
         self.assertEqual(code, 0, output)
         self.assertTrue(plist.is_file())
 
-    def test_menu_mutations_respect_existing_lock(self):
+    def test_explicit_mutations_respect_existing_lock(self):
         self.assertEqual(self.run_script().returncode, 0)
         (self.config / '.install-lock').mkdir()
         before = (self.config / 'ddnsto.yaml').read_bytes()
-        for choice in ('3', '4', '5', '6', '7', '8'):
+        for choice in ('start', 'stop', 'restart', 'repair', 'configure', 'uninstall'):
             with self.subTest(choice=choice):
-                code, output = self.run_menu(choice, token='unused-new-token')
+                args = ('--action', choice)
+                if choice == 'configure':
+                    args += ('--token', 'unused-new-token')
+                result = self.run_script(args)
+                code, output = result.returncode, result.stdout + result.stderr
                 self.assertNotEqual(code, 0, output)
                 self.assertTrue((self.config / '.install-lock').is_dir())
                 self.assertTrue((self.root / 'running').exists())
@@ -226,7 +259,7 @@ if [ "$1" = bootout ] && [ -f "$TEST_ROOT/rollback" ]; then exit 9; fi
 ''' + launchctl)
         result = self.run_script(('--action', 'configure', '--token', 'new-token'))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('recovery incomplete', result.stderr)
+        self.assertIn('恢复未完成', result.stderr)
         self.assertTrue((self.root / 'running').exists())
         self.assertIn("userToken: 'new-token'", (self.config / 'ddnsto.yaml').read_text())
         backups = list(self.root.glob('ddnsto.*/old-config'))
@@ -248,13 +281,13 @@ review_source=$1
 shift
 . "$review_source"
 '''
-        result = subprocess.run(['sh', '-c', command, 'fixture', str(SCRIPT)], env=self.env,
+        result = subprocess.run(['sh', '-c', command, 'fixture', str(SCRIPT), '--token', 'test-token'], env=self.env,
                                 capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 143, result.stderr)
         self.assertEqual(marker.read_bytes(), before)
         self.assertFalse((self.install / 'ddnsto').exists())
         self.assertIn('configuration=retained', self.run_script(('--action', 'status')).stdout)
-        self.assertEqual(self.run_script(()).returncode, 0)
+        self.assertEqual(self.run_script().returncode, 0)
 
     def test_install_and_repeat_preserves_config_and_identity(self):
         first = self.run_script()
@@ -264,7 +297,7 @@ shift
         cfg.write_text(content)
         identity = self.config / '.ddnsto_boot.cfg'
         identity.write_text('identity-fixture')
-        repeat = self.run_script(())
+        repeat = self.run_script()
         self.assertEqual(repeat.returncode, 0, repeat.stderr)
         self.assertEqual(cfg.read_text(), content)
         self.assertEqual(identity.read_text(), 'identity-fixture')
@@ -281,10 +314,12 @@ shift
     def test_default_repeat_does_not_download_or_restart(self):
         self.assertEqual(self.run_script().returncode, 0)
         before = (self.root / 'service.log').read_bytes()
-        r = self.run_script((), FAIL_DOWNLOAD='1')
+        r = self.run_script(FAIL_DOWNLOAD='1')
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn('operation=none', r.stdout)
-        self.assertEqual((self.root / 'service.log').read_bytes(), before)
+        self.assertIn('启动成功', r.stdout)
+        calls = (self.root / 'service.log').read_bytes()[len(before):]
+        self.assertNotIn(b'bootout', calls)
+        self.assertNotIn(b'bootstrap', calls)
 
     def test_explicit_update_preserves_config_without_token(self):
         self.assertEqual(self.run_script().returncode, 0)
@@ -296,7 +331,7 @@ shift
     def test_mismatched_platform_does_not_touch_launchd(self):
         r = self.run_script(('--platform', 'linux'))
         self.assertEqual(r.returncode, 2, r.stderr)
-        self.assertIn('platform mismatch', r.stderr)
+        self.assertIn('参数或运行环境不支持', r.stderr)
         self.assertFalse((self.root / 'service.log').exists())
 
     def test_stop_then_start_without_download_preserves_config(self):
@@ -341,6 +376,7 @@ shift
         self.assertEqual(first.returncode, 0, first.stderr)
         binary = self.install / 'ddnsto'
         binary.write_text('old binary')
+        self.receipt('4.2.7')
         cfg = self.config / 'ddnsto.yaml'
         old = cfg.read_bytes()
         failed = self.run_script(('--action', 'update'), FAIL_START='1')
@@ -353,7 +389,7 @@ shift
         result = self.run_script(FAIL_DOWNLOAD='1')
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.install / 'ddnsto').exists())
-        self.assertFalse((self.root / 'service.log').exists())
+        self.assertNotIn('bootstrap', (self.root / 'service.log').read_text())
 
     def test_disabled_reinstall_enables_before_start_and_preserves_identity(self):
         self.assertEqual(self.run_script().returncode, 0)
@@ -386,6 +422,7 @@ shift
         (self.root / 'disabled').touch()
         binary = self.install / 'ddnsto'
         binary.write_text('old binary')
+        self.receipt('4.2.7')
         cfg = self.config / 'ddnsto.yaml'
         old = cfg.read_bytes()
         result = self.run_script(('--action', 'update'), FAIL_START='1')
@@ -410,6 +447,7 @@ shift
         self.assertEqual(self.run_script().returncode, 0)
         binary = self.install / 'ddnsto'
         binary.write_text('old binary')
+        self.receipt('4.2.7')
         (self.root / 'service.log').write_text('')
         result = self.run_script(('--action', 'update'), FAIL_DISABLED_QUERY='1')
         self.assertNotEqual(result.returncode, 0)
@@ -437,6 +475,7 @@ shift
         (self.root / 'disabled').touch()  # disable alone does not unload a job
         binary = self.install / 'ddnsto'
         binary.write_text('old binary')
+        self.receipt('4.2.7')
         (self.root / 'service.log').write_text('')
         result = self.run_script(('--action', 'update'), FAIL_ENABLE='1')
         self.assertEqual(result.returncode, 8, result.stderr)
@@ -471,12 +510,13 @@ shift
         self.tool('curl', '''
 while [ "$#" -gt 0 ]; do
  case "$1" in
-  -o) shift; output=$1 ;;
+  -o|--output) shift; output=$1 ;;
   https://*) printf '%s\\n' "$1" >> "$TEST_ROOT/bootstrap.log" ;;
  esac
  shift
 done
 cp "$TEST_ROOT/native-fixture" "$output"
+printf '200'
 ''')
         # The fixture cannot run Mach-O on Linux; isolate ONLY native-byte hash.
         self.tool('shasum', '''
@@ -498,7 +538,7 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
         self.prepare_cold_bootstrap()
         result = self.run_script(BAD_DIGEST='0' * 64)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('checksum', result.stderr.lower())
+        self.assertIn('校验失败', result.stderr)
         self.assertFalse((self.root / 'payload').exists())
         self.assertFalse((self.install / 'ddnsto').exists())
 
@@ -510,7 +550,7 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
         self.assertIn('/0.3.0/zsetup-macos-x86_64', (self.root / 'bootstrap.log').read_text())
         self.assertTrue((self.install / 'ddnsto').exists())
 
-    def test_first_install_echoes_token_once_without_logging_it_again(self):
+    def test_first_install_requires_supplied_token_without_prompt(self):
         pid, terminal = pty.fork()
         if pid == 0:
             os.execve('/bin/sh', ['sh', str(SCRIPT)], self.env)
@@ -538,16 +578,15 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
         finally:
             os.close(terminal)
             _, status = os.waitpid(pid, 0)
-        self.assertEqual(os.waitstatus_to_exitcode(status), 0, output.decode())
-        self.assertTrue(sent)
-        self.assertEqual(output.count(b'visible-fixture-token'), 1, output.decode())
-        self.assertIn('visible-fixture-token', (self.config / 'ddnsto.yaml').read_text())
+        self.assertEqual(os.waitstatus_to_exitcode(status), 2, output.decode())
+        self.assertFalse(sent)
+        self.assertFalse((self.config / 'ddnsto.yaml').exists())
 
     def test_selected_version_is_explained_as_pinned_not_latest(self):
         result = self.run_script()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('selected client version 4.2.8', result.stderr)
-        self.assertIn('pinned by this installer; latest release not checked', result.stderr)
+        self.assertIn('固定版本 4.2.8', result.stderr)
+        self.assertIn('未查询推荐版本', result.stderr)
 
     def test_first_start_failure_removes_only_owned_files(self):
         self.config.mkdir()
@@ -597,7 +636,7 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
         self.assertIn('configuration=retained', status.stdout)
         rejected = self.run_script(('--token', 'replacement'))
         self.assertNotEqual(rejected.returncode, 0)
-        result = self.run_script(())
+        result = self.run_script()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(cfg.read_bytes(), before)
         self.assertEqual(identity.read_text(), 'identity')
@@ -664,7 +703,7 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
         before = (self.config / 'ddnsto.yaml').read_bytes()
         result = self.run_script(('--action', 'uninstall'))
         self.assertEqual(result.returncode, 0, result.stderr)
-        result = self.run_script((), FAIL_START='1')
+        result = self.run_script(FAIL_START='1')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.config / 'ddnsto.yaml').read_bytes(), before)
         self.assertFalse((self.install / 'ddnsto').exists())

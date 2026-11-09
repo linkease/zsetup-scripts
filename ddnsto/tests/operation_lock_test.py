@@ -9,8 +9,11 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = r'''
 set -eu
-. "$BUSINESS"
+. "$ADAPTER"
 id() { echo 0; }
+# Fixture has no privileged paths. Ancestor policy is tested separately by
+# bootstrap_policy_test.py; exercise the real lease/traps with competing shells.
+ddnsto_bootstrap_safe_ancestors() { [ -d "$1" ] && [ ! -L "$1" ]; }
 action() {
     test -d "$DDNSTO_LOCK_DIR"
     printf 'entered\n'
@@ -19,7 +22,7 @@ action() {
         wait) while :; do sleep 1; done ;;
     esac
 }
-ddnsto_with_operation_lock action
+ddnsto_machine_locked action
 '''
 
 
@@ -28,8 +31,17 @@ class OperationLockTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.lock = self.root / 'installer.lock'
-        self.env = dict(os.environ, BUSINESS=str(ROOT / 'business.sh'),
+        etc = self.root / 'etc'
+        etc.mkdir()
+        self.lock = etc / 'zsetup/install-locks/ddnsto'
+        self.lock.parent.mkdir(parents=True)
+        # Redirect fixed protected paths in this fixture copy only; do not add
+        # production environment overrides that could bypass the global lease.
+        adapter = self.root / 'extra-platforms.sh'
+        source = (ROOT / 'extra-platforms.sh').read_text()
+        self.assertIn('docker_lock=/etc/zsetup/install-locks/ddnsto', source)
+        adapter.write_text(source.replace('/etc', str(etc)))
+        self.env = dict(os.environ, ADAPTER=str(adapter),
                         DDNSTO_LOCK_DIR=str(self.lock), MODE='success')
 
     def run_action(self, **env):

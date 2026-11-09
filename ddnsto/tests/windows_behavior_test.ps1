@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 if (-not (Get-Command Invoke-DDNSTOInstall -ErrorAction SilentlyContinue)) { throw 'missing transactional installer' }
 function Assert($Condition, $Message) { if (-not $Condition) { throw $Message } }
 function Assert-DDNSTOPlatform { }
+function Get-DDNSTOClientVersion($Path) { return '4.2.7' }
 function Protect-DDNSTODirectory($Path) { $script:Protected++ }
 function Read-DDNSTOToken { $script:Prompted = $true; return "test:'token" }
 function Receive-DDNSTOCandidate($Work, $Version) {
@@ -42,8 +43,8 @@ try {
     $script:StartFail = $false
     $script:Stopped = $false
     $script:Prompted = $false
-    Invoke-DDNSTOInstall -InstallDir $root
-    Assert $script:Prompted 'first install must prompt for token'
+    Invoke-DDNSTOInstall -InstallDir $root -Token "test:'token"
+    Assert (-not $script:Prompted) 'first install must not prompt for token'
     $cfg = Join-Path $root 'ddnsto.yaml'
     $binary = Join-Path $root 'ddnsto_cli.x86_64.exe'
     $content = [IO.File]::ReadAllText($cfg) + "routerName: keep-name`n"
@@ -52,9 +53,10 @@ try {
     [IO.File]::WriteAllText($identity, 'keep-identity')
     $script:DownloadFail = $true
     $unchangedTask = $script:TaskXml
-    $defaultRepeat = Invoke-DDNSTOInstall -InstallDir $root
-    Assert (($defaultRepeat -join "`n") -match 'operation=none') 'default repeat must be a no-op'
-    Assert ($script:TaskXml -eq $unchangedTask -and -not $script:Stopped) 'default repeat changed service'
+    $failed = $false
+    try { Invoke-DDNSTOInstall -InstallDir $root -Token "test:'token" } catch { $failed = $true }
+    Assert $failed 'automatic upgrade must report download failure'
+    Assert ($script:TaskXml -eq $unchangedTask -and -not $script:Stopped) 'failed download changed service'
     $script:DownloadFail = $false
     $script:Prompted = $false
     Invoke-DDNSTOInstall -InstallDir $root -Action update

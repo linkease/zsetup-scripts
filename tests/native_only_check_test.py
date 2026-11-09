@@ -35,7 +35,9 @@ class NativeOnlyCheck(unittest.TestCase):
                 env=os.environ | {'PATH': str(root) + ':' + os.environ['PATH'], 'CALL_LOG': str(log)}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = log.read_text()
-            for suite in ('install_bounds_test.py', 'privilege_bridge_test.py', 'ddnsto_test.py', 'linkease_test.py'):
+            for suite in ('install_bounds_test.py', 'privilege_bridge_test.py', 'ddnsto_test.py', 'linkease_test.py',
+                          'publication_test.py', 'ddnsto_offline_native_test.py', 'ddnsto_managed_cli_test.py',
+                          'operation_lock_test.py'):
                 self.assertIn(suite, calls)
             self.assertNotIn('app_release_test.py', calls)
             self.assertNotIn('/tests/package_test.py', calls)

@@ -23,10 +23,11 @@ ddnsto_synology_download
 
 class SynologyDownload(unittest.TestCase):
     def invoke(self, arch='x86_64', major='7', build='41890', action='download',
-               version_text=None, repeat=False, **options):
+               version_text=None, repeat=False, model='', **options):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             version = root / 'VERSION'
+            (root / 'model').write_text(model)
             version.write_text(version_text if version_text is not None else
                                f'majorversion="{major}"\nbuildnumber="{build}"\nevil="$(touch {directory}/executed)"\n')
             env = dict(os.environ, SOURCE=str(ROOT), FIXTURE=directory, ARCH=arch,
@@ -34,6 +35,7 @@ class SynologyDownload(unittest.TestCase):
                        PLAN_ONLY='0', REQUESTED_METHOD='auto', TOKEN='', TOKEN_FILE='',
                        FORCE_VERSION='', VERIFY_STATUS='0', DOWNLOAD_EXIT='0', DOWNLOAD_EMPTY='0')
             env.update(options)
+            env['DDNSTO_DSM_MODEL_FILE'] = str(root / 'model')
             if repeat:
                 previous = subprocess.run(['sh', '-c', HARNESS], text=True, capture_output=True, env=env, cwd=root)
                 self.assertEqual(previous.returncode, 0, previous.stderr)
@@ -68,6 +70,16 @@ class SynologyDownload(unittest.TestCase):
                 self.assertIn('Package Center', r.stdout)
                 self.assertIn('identity', r.stdout)
                 self.assertIn('4.2.8-7', r.stdout)
+
+    def test_verified_ds220j_arm32_compatibility_only(self):
+        result, calls, _ = self.invoke(arch='aarch64', model='DS220j', PLAN_ONLY='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ddnsto_arm-dsm7.spk', result.stdout)
+        self.assertEqual(calls, '')
+        for model in ['DS999', '', 'DS220j-other']:
+            result, calls, _ = self.invoke(arch='aarch64', model=model, PLAN_ONLY='1')
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(calls, '')
 
     def test_pinned_checksums(self):
         expected = {

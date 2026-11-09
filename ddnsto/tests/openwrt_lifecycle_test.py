@@ -491,7 +491,7 @@ fi
         self.assertIn(str(self.config), marker.read_text())
         self.assertIn(str(self.binary), marker.read_text())
         self.assertNotIn('secret', marker.read_text())
-        result = self.invoke_main(RUN_PACKAGES='1')
+        result = self.invoke_main('--action', 'install', RUN_PACKAGES='1')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('EARLY_START', self.calls())
         self.assertEqual(self.config.read_text(), ORIGINAL.replace("enabled '0'", "enabled '1'"))
@@ -538,14 +538,14 @@ fi
             with self.subTest(manager=manager):
                 for path in (self.config, self.binary, self.service): path.unlink(missing_ok=True)
                 (self.root / 'packages').write_text('[]')
-                result = self.invoke_main('--token', 'new-secret', RUN_PACKAGES='1', PACKAGE_MANAGER=manager)
+                result = self.invoke_main('--action', 'install', '--token', 'new-secret', RUN_PACKAGES='1', PACKAGE_MANAGER=manager)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertNotIn('EARLY_START', self.calls())
                 self.assertIn("option token 'new-secret'", self.config.read_text())
 
     def test_missing_files_do_not_authorize_removing_a_registered_external_package(self):
         for path in (self.config, self.binary, self.service): path.unlink()
-        result = self.invoke_main(RUN_PACKAGES='1')
+        result = self.invoke_main('--action', 'install', RUN_PACKAGES='1')
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertNotIn('remove ', self.calls())
         self.assertNotIn('download ', self.calls())
