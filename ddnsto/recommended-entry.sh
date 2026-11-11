@@ -9,7 +9,20 @@ cache_key='@@CACHE_KEY@@'
 fail() { printf 'DDNSTO：%s；状态=推荐入口未执行安装；下一步=%s；code=%s\n' "$1" "$2" "$3" >&2; exit "$3"; }
 case "$(uname -s)" in Linux|Darwin) ;; *) fail '不支持此系统' '使用对应平台入口' 2 ;; esac
 case "$base" in https://*) ;; *) fail '入口尚未打包' '使用已审核的发布入口' 2 ;; esac
-for tool in stat wc cmp mktemp; do
+@@ASUS_STORAGE@@
+asus_entry=0
+if [ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]; then
+    asus_entry=1
+    # Old ASUS ash omits the command builtin. Only -v is used by this entry.
+    if ! type command >/dev/null 2>&1; then
+        command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
+    fi
+    ddnsto_asus_storage || fail '华硕私有存储检查失败' '检查 /jffs 挂载及权限，不要修改系统目录权限' 12
+    required_tools='wc cmp'
+else
+    required_tools='stat wc cmp mktemp'
+fi
+for tool in $required_tools; do
     command -v "$tool" >/dev/null 2>&1 || fail '缺少校验依赖' '安装系统文件校验工具' 2
 done
 if command -v sha256sum >/dev/null 2>&1; then hash_tool=sha256sum
@@ -23,14 +36,16 @@ hash_file() {
         openssl) h=$(openssl dgst -sha256 "$1") || return 1; printf '%s\n' "${h##* }" ;;
     esac
 }
-uid=$(id -u)
+if [ "$asus_entry" = 1 ]; then uid=0; else uid=$(id -u); fi
 stat_fields() {
-    if [ "$(uname -s)" = Darwin ]; then stat -f '%u %Lp %l' "$1"
+    if [ "$asus_entry" = 1 ]; then ddnsto_asus_fields "$1"
+    elif [ "$(uname -s)" = Darwin ]; then stat -f '%u %Lp %l' "$1"
     else stat -c '%u %a %h' "$1"; fi
 }
 # Validate every ancestor before creating anything. Root-owned sticky ancestors
 # (e.g. /tmp) are allowed; cache itself must belong to this user, mode 0700.
 safe_ancestors() (
+    if [ "$asus_entry" = 1 ]; then ddnsto_asus_safe_ancestors "$1/probe"; exit $?; fi
     p=$1
     while :; do
         [ ! -L "$p" ] && [ -d "$p" ] || return 1
@@ -59,7 +74,18 @@ safe_file() {
     set -- $fields
     [ "$1" = "$uid" ] && [ "$3" = 1 ] && [ "$((0$2 & 0077))" = 0 ]
 }
-cache_root=${DDNSTO_RECOMMEND_CACHE:-${HOME:?}/.ddnsto-recommendation}
+if [ "$asus_entry" = 1 ]; then
+    [ -z "${DDNSTO_RECOMMEND_CACHE:-}" ] || fail '华硕入口不接受自定义缓存' '取消 DDNSTO_RECOMMEND_CACHE 后重试' 12
+    cache_root=$ASUS_STATE/recommendation
+elif [ -f /etc/synoinfo.conf ] || [ -d /usr/syno ]; then
+    # DSM homes commonly use Synology ACLs and symlinked shared directories.
+    # Do not weaken ancestor checks or chmod them. A user-owned 0700 cache
+    # beneath the checked root-owned sticky /tmp is safe to reuse. Reboots may
+    # remove it; a cache miss simply requires a fresh verified HTTPS download.
+    cache_root=${DDNSTO_RECOMMEND_CACHE:-/tmp/ddnsto-recommendation-$uid}
+else
+    cache_root=${DDNSTO_RECOMMEND_CACHE:-${HOME:?}/.ddnsto-recommendation}
+fi
 case "$cache_root" in /*) ;; *) fail '缓存路径无效' '使用绝对私有目录' 12 ;; esac
 # Reject ambiguous path components; paths are never interpreted as shell code.
 case "$cache_root/" in *'/../'*|*'/./'*|*'//'*) fail '缓存路径无效' '使用规范私有目录' 12 ;; esac
@@ -72,15 +98,31 @@ if [ ! -e "$cache" ] && [ ! -L "$cache" ]; then mkdir -m 700 "$cache" 2>/dev/nul
 private_dir "$cache" || fail '缓存目录不安全' '检查目录所有者及权限' 12
 mkdir "$cache/lock" 2>/dev/null || fail '推荐缓存被占用' '等待其他安装完成；异常中断后检查 lock' 12
 work=
+entry_child=
 cleanup() {
+    cleanup_rc=$?
+    trap - EXIT
+    trap '' HUP INT TERM
+    # Retain the verified source and cache lock until the installer has joined
+    # its worker/recovery. Only signal our own child, never a global process set.
+    if [ -n "$entry_child" ]; then
+        kill -TERM "$entry_child" 2>/dev/null || :
+        wait "$entry_child" 2>/dev/null || :
+        entry_child=
+    fi
     [ -z "$work" ] || rm -rf -- "$work"
     rmdir "$cache/lock" 2>/dev/null || :
+    exit "$cleanup_rc"
 }
 trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-work=$(mktemp -d "$cache/attempt.XXXXXXXX") || fail '无法创建工作目录' '检查缓存空间' 12
+if [ "$asus_entry" = 1 ]; then
+    work=$(ddnsto_asus_mktemp "$cache") || fail '无法创建工作目录' '检查缓存空间' 12
+else
+    work=$(mktemp -d "$cache/attempt.XXXXXXXX") || fail '无法创建工作目录' '检查缓存空间' 12
+fi
 # A narrow bootstrap transport, not a zsetup replacement. Do not execute a
 # caller-supplied/downloading zsetup just to ask its version. Reject ALL redirects.
 # ulimit bounds even chunked bodies on older curl; max-filesize adds exact limits.
@@ -225,5 +267,12 @@ mv -f "$work/recommended.txt" "$cache/recommended.txt"
 # Preserve exact argv and executor status. No token, manifest or exception dump.
 # Lifecycle success (including stable local service checks) belongs to executor.
 result=0
-sh "$work/install.sh" "$@" || result=$?
+# Async POSIX shells replace fd 0 before applying redirections. Preserve the
+# original via a separate descriptor, then close it in both parent and child.
+exec 3<&0
+sh "$work/install.sh" "$@" <&3 3<&- &
+entry_child=$!
+exec 3<&-
+wait "$entry_child" || result=$?
+entry_child=
 exit "$result"

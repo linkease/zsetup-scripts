@@ -2461,9 +2461,10 @@ ddnsto_bootstrap_zsetup() {
 
 # Business logic: maintained in ddnsto/business.sh
 ddnsto_usage() {
-    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
+    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
         '群晖 DSM 7 支持自动安装/升级/启动，需管理员 sudo；其他 NAS/Docker 暂不支持默认自动安装。以下选项用于高级操作。' \
+        '华硕软件中心自动识别 rogsoft/armsoft/mtksoft/ipq32soft/ipq64soft/qcasoft；安装后在软件中心管理。' \
         '--plan: read-only local preflight; no downloads, token, or service changes.' \
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
         'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
@@ -2507,7 +2508,7 @@ ddnsto_parse_args() {
             *) ddnsto_error 'unknown argument (use --help)'; return 2 ;;
         esac
     done
-    case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
+    case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
     case "$REQUESTED_METHOD" in auto|native|docker) ;; *) ddnsto_error 'unknown installation method'; return 2 ;; esac
     [ "$REQUESTED_METHOD" = docker ] || [ -z "$DEVICE_NAME$NETWORK" ] || { ddnsto_error 'device-name/network require explicit Docker'; return 2; }
     case "$NETWORK" in ''|bridge|host) ;; *) ddnsto_error 'network must be bridge or host'; return 2 ;; esac
@@ -2563,6 +2564,8 @@ ddnsto_appliance_platform() {
         printf '%s\n' qnap
     elif [ -f "$appliance_root/etc/unraid-version" ]; then
         printf '%s\n' unraid
+    elif [ -x "$appliance_root/bin/nvram" ] && { [ -d "$appliance_root/koolshare" ] || [ -f "$appliance_root/www/Advanced_System_Content.asp" ]; }; then
+        printf '%s\n' asus
     fi
 }
 
@@ -2627,6 +2630,11 @@ ddnsto_plan() {
     # local preflight is deliberately labelled, not an installation guarantee.
     ddnsto_local_platform || return $?
     if [ "$detected_platform" = synology ]; then ddnsto_synology_download; return $?; fi
+    if [ "$detected_platform" = asus ]; then
+        ddnsto_asus_facts || return $?
+        printf '%s\n' 'facts_source=local-preflight' 'platform=asus' "channel=$ASUS_CHANNEL" "arch=$ASUS_ARCH" 'client_version=4.2.8' 'native_status=requires-plugin-preflight' 'installation_performed=false'
+        return 0
+    fi
     [ -z "${OUTPUT_DIR:-}" ] && [ "$ACTION" != download ] || { ddnsto_error 'download and output-dir require Synology'; return 2; }
     case "$(uname -m)" in
         x86_64|amd64) arch=x86_64 ;;
@@ -4342,7 +4350,7 @@ ddnsto_ensure_decision() {
 }
 
 ddnsto_ensure_preflight() {
-    case "$detected_platform" in linux|openwrt|synology) ;; *)
+    case "$detected_platform" in linux|openwrt|synology|asus) ;; *)
         ddnsto_flow_error E_PLATFORM '此设备暂不支持自动安装' '请使用该设备的手动安装教程'; return 2 ;;
     esac
     [ -n "$TOKEN" ] && [ "${#TOKEN}" -le 16384 ] || {
@@ -4361,7 +4369,10 @@ ddnsto_ensure_preflight() {
 
 ddnsto_flow_finish() {
     flow_rc=$1
-    trap - EXIT HUP INT TERM
+    trap - EXIT
+    # Once cancellation starts, repeated signals must not interrupt the join
+    # or abandon the platform controller's rollback/lock cleanup.
+    trap '' HUP INT TERM
     if [ -n "${flow_child:-}" ]; then
         kill -TERM "$flow_child" 2>/dev/null || true
         wait "$flow_child" 2>/dev/null || true
@@ -4388,11 +4399,18 @@ ddnsto_flow_finish() {
     exit "$flow_rc"
 }
 
-ddnsto_ensure_entry() (
+# This terminal entry exits via ddnsto_flow_finish. Keep its traps in the public
+# shell, not an implicit function subshell that SIGTERM to the public PID skips.
+ddnsto_ensure_entry() {
     set +x
     umask 077
     # mktemp creates the private destination, never reuse an inherited path.
-    DDNSTO_FLOW_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto-result.XXXXXX") || exit 12
+    if [ "${detected_platform:-}" = asus ]; then
+        ddnsto_asus_storage || { ddnsto_flow_error E_STORAGE '华硕受保护存储不可用' '请检查 /jffs 挂载，不要放宽目录权限'; exit 12; }
+        DDNSTO_FLOW_DIR=$(ddnsto_asus_mktemp "$ASUS_STATE") || exit 12
+    else
+        DDNSTO_FLOW_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto-result.XXXXXX") || exit 12
+    fi
     flow_child=
     trap 'ddnsto_flow_finish $?' EXIT
     trap 'exit 129' HUP
@@ -4405,9 +4423,10 @@ ddnsto_ensure_entry() (
     flow_rc=0; wait "$flow_child" || flow_rc=$?
     flow_child=
     exit "$flow_rc"
-)
+}
 
 ddnsto_ensure_execute() {
+    if [ "$detected_platform" = asus ]; then ddnsto_asus_ensure; return $?; fi
     if [ "$detected_platform" = synology ]; then ddnsto_synology_ensure; return $?; fi
     ZSETUP_INSTALL_SCOPE=${installer_scope:-system}
     ZSETUP_INSTALL_PREFIX=${installer_prefix:-}
@@ -4873,6 +4892,1211 @@ ddnsto_synology_fresh_install() (
         ddnsto_flow_error E_PACKAGE "DSM 套件安装被拒绝（接口错误码 $code）" '请检查套件中心安装记录；不会自动卸载或强制重装'; exit 11;
     }
 )
+
+# Pure channel selection. Inputs are firmware facts, never executable settings.
+# Caller must first establish ASUS firmware + an existing software center.
+# Keep CPU selection separate: each modern archive contains two binaries.
+ddnsto_asus_channel() (
+    model=$1 kernel=$2 architecture=$3 source=$4
+    model_channel= source_channel=
+    case "$kernel" in ''|*[!a-zA-Z0-9._+-]*) return 2 ;; esac
+    release=${kernel%%-*}; release=${release%%+*}
+    case "$release" in ''|*[!0-9.]*|.*|*.|*..*) return 2 ;; esac
+    # Validate every numeric component, without arithmetic on untrusted input.
+    IFS=.; set -- $release; unset IFS
+    [ "$#" -ge 3 ] || return 2
+    for component do
+        case "$component" in 0|[1-9]*) ;; *) return 2 ;; esac
+    done
+    case "$architecture" in armv7l|aarch64) ;; *) return 2 ;; esac
+    case "$model" in
+        TX-AX6000|TUF-AX4200Q|RT-AX57_Go|GS7|ZenWiFi_BT8P|GS7_Air|GS-BE7200X)
+            model_channel=mtksoft ;;
+        ZenWiFi_BD4) model_channel=ipq32soft ;;
+        TUF_6500) model_channel=ipq64soft ;;
+        RT-AX89X) model_channel=qcasoft ;;
+    esac
+    # Only use a source as a classification hint. It is never a download URL.
+    # Do not guess HND from ARM64 or an unfamiliar model alone.
+    case "${source%/}" in
+        '') ;;
+        https://rogsoft.ddnsto.com) source_channel=rogsoft ;;
+        https://armsoft.ddnsto.com) source_channel=armsoft ;;
+        https://mtksoft.ddnsto.com) source_channel=mtksoft ;;
+        https://ipq32soft.ddnsto.com) source_channel=ipq32soft ;;
+        https://ipq64soft.ddnsto.com) source_channel=ipq64soft ;;
+        https://qcasoft.ddnsto.com) source_channel=qcasoft ;;
+        *) return 2 ;;
+    esac
+    if [ -n "$model_channel" ] && [ -n "$source_channel" ]; then
+        [ "$model_channel" = "$source_channel" ] || return 2
+    fi
+    channel=${model_channel:-$source_channel}
+    case "$kernel" in
+        2.6.*)
+            [ "$architecture" = armv7l ] || return 2
+            [ -z "$channel" ] || [ "$channel" = armsoft ] || return 2
+            channel=armsoft ;;
+        4.[1-9]*|5.*|6.*)
+            [ -n "$channel" ] && [ "$channel" != armsoft ] || return 2 ;;
+        *) return 2 ;;
+    esac
+    printf '%s\n' "$channel"
+)
+
+# Reviewed CDN bytes on 2026-11-10. These URLs are mutable, so a changed
+# package must fail verification until a new installer reviews its pin.
+# Output: URL, plugin version, .valid marker, byte size, SHA-256.
+ddnsto_asus_package() (
+    case "$1" in
+        rogsoft) marker=hnd size=8104981 sha=671c1c77d7b867f5019af35e8702be665695e30c107138ae150d045e11df1960 ;;
+        armsoft) marker=arm384 size=3430887 sha=8e0ff71269b8ba8674427896310d99309d97eae92b007d97cb968eb1d880664d ;;
+        mtksoft) marker=mtk size=8105004 sha=8d08921e49bed7bcafed48dc6c6b6795467f77767a97cc8af23f0b463285248a ;;
+        ipq32soft) marker=ipq32 size=8105008 sha=56c0298ec811e51cf93390bbfa2f9489752188320aaf96c43d2b19289ba7580d ;;
+        ipq64soft) marker=ipq64 size=8105008 sha=4cb863a85d5c5dcd00ff8a3f5a09fa90465b59b48e48cdce12163be62b1f10ce ;;
+        qcasoft) marker=qca size=8105006 sha=fa021afaf9424f032ff9e084e76c80fadd7fe74e844060e0d84ac6053db19216 ;;
+        *) return 2 ;;
+    esac
+    printf '%s\n' "https://asusgo.koolcenter.com/$1/ddnsto/ddnsto.tar.gz" 4.2.8 "$marker" "$size" "$sha"
+)
+
+# Source-only ASUS storage helpers. No environment-selected trust roots.
+# Caller must supply a trusted shell/PATH and establish ASUS firmware identity.
+# Public predicates return 0 on success, nonzero on refusal/error. Only uid,
+# fields, hash and mktemp print results; storage sets ASUS_STATE in the caller.
+# Checks are not protection against concurrent root writers or mount changes:
+# callers must serialize transactions. This does not secure legacy /koolshare.
+_ddnsto_asus_status() { cat /proc/self/status; }
+
+# Print effective UID, or fail without output on malformed/duplicate records.
+ddnsto_asus_uid() (
+    status=$(_ddnsto_asus_status) || return 1
+    printf '%s\n' "$status" | LC_ALL=C awk '
+        $1 == "Uid:" {
+            count++
+            if (NF != 5) bad=1
+            for (i=2; i<=5; i++) if ($i !~ /^[0-9]+$/) bad=1
+            uid=$3
+        }
+        END { if (count != 1 || bad) exit 1; print uid }
+    '
+)
+
+ddnsto_asus_has() { [ "$#" = 1 ] && type "$1" >/dev/null 2>&1; }
+
+_ddnsto_asus_ls() { LC_ALL=C ls -nd "$1"; }
+
+# Internal output adds the file type as a fourth field.
+# Restrict names and reject ACL/extra-line output, never eval it.
+_ddnsto_asus_metadata() (
+    [ "$#" = 1 ] || return 1
+    case "$1" in /*) ;; *) return 1 ;; esac
+    case "$1" in *[!a-zA-Z0-9_./-]*|*/|*//*|*/../*|*/..|*/./*|*/.) return 1 ;; esac
+    listing=$(_ddnsto_asus_ls "$1") || return 1
+    printf '%s\n' "$listing" | LC_ALL=C awk '
+        NR == 1 && NF == 9 &&
+        $1 ~ /^[-d][r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]$/ &&
+        $2 ~ /^[1-9][0-9]*$/ && $3 ~ /^[0-9]+$/ &&
+        $4 ~ /^[0-9]+$/ && $5 ~ /^[0-9]+$/ {
+            mode=0
+            for (i=2; i<=10; i++) {
+                c=substr($1,i,1)
+                mode=mode*2 + (c != "-" && c != "S" && c != "T")
+            }
+            if (substr($1,4,1) ~ /[sS]/) mode+=2048
+            if (substr($1,7,1) ~ /[sS]/) mode+=1024
+            if (substr($1,10,1) ~ /[tT]/) mode+=512
+            value=sprintf("%s %o %s %s", $3, mode, $2, substr($1,1,1)); ok=1
+        }
+        END { if (NR != 1 || !ok) exit 1; print value }
+    '
+)
+
+# Equivalent to stat -c "%u %a %h" for supported unambiguous paths.
+ddnsto_asus_fields() (
+    fields=$(_ddnsto_asus_metadata "$@") || return 1
+    set -- $fields
+    printf '%s %s %s\n' "$1" "$2" "$3"
+)
+
+_ddnsto_asus_mounts() { cat /proc/mounts; }
+_ddnsto_asus_mkdir() { mkdir -m 700 "$1"; }
+
+# Bounded ASUS compatibility exception: a live mount cannot be renamed or
+# unlinked by writers of /. Never extend this to ordinary writable ancestors.
+# Trust kernel /proc/mounts, not user-selected paths or source-device symlinks.
+# Approve local block ext2/3/4, MTD jffs2, and UBI ubifs sources only. These
+# records do not prove backing-media durability or protect against privileged
+# mount attackers; six-channel device acceptance remains a separate check.
+ddnsto_asus_anchor() (
+    [ "$(ddnsto_asus_uid)" = 0 ] || return 1
+    mounts=$(_ddnsto_asus_mounts) || return 1
+    printf '%s\n' "$mounts" | LC_ALL=C awk '
+        function approved_source(source, fs) {
+            if (fs == "ext2" || fs == "ext3" || fs == "ext4")
+                return source ~ /^\/dev\/[a-zA-Z0-9_-]+(\/[a-zA-Z0-9_-]+)*$/
+            if (fs == "jffs2")
+                return source ~ /^\/dev\/mtdblock([0-9]+|\/[0-9]+)$/
+            if (fs == "ubifs")
+                return source ~ /^\/dev\/ubi[0-9]+_[0-9]+$/ ||
+                       source ~ /^ubi[0-9]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/
+            return 0
+        }
+        $2 == "/jffs" {
+            count++
+            if (NF != 6 || !approved_source($1,$3)) bad=1
+            n=split($4,opts,","); rw=0
+            for (i=1;i<=n;i++) {
+                if (opts[i] == "rw") rw++
+                if (opts[i] == "ro" || opts[i] == "noexec" || opts[i] == "bind" || opts[i] == "rbind") bad=1
+            }
+            if (rw != 1) bad=1
+        }
+        index($2,"/jffs/") == 1 { bad=1 }
+        END { if (count != 1 || bad) exit 1 }
+    ' || return 1
+    fields=$(_ddnsto_asus_metadata /jffs) || return 1
+    set -- $fields
+    [ "$1" = 0 ] && [ "$4" = d ] || return 1
+    case "$2" in 700|750|755) ;; *) return 1 ;; esac
+)
+
+# Initialize only our own directory; never repair modes of existing objects.
+# On failure ASUS_STATE is empty, even if inherited from the environment.
+ddnsto_asus_storage() {
+    ASUS_STATE=
+    ddnsto_asus_anchor || return 1
+    if ! _ddnsto_asus_metadata /jffs/.ddnsto-installer >/dev/null 2>&1; then
+        (umask 077; _ddnsto_asus_mkdir /jffs/.ddnsto-installer) || return 1
+    fi
+    _ddnsto_asus_private_existing /jffs/.ddnsto-installer || return 1
+    ASUS_STATE=/jffs/.ddnsto-installer
+}
+
+_ddnsto_asus_private_existing() (
+    fields=$(_ddnsto_asus_metadata "$1") || return 1
+    set -- $fields
+    [ "$1" = 0 ] && [ "$2" = 700 ] && [ "$4" = d ]
+)
+
+_ddnsto_asus_descendant() {
+    [ "$#" = 1 ] || return 1
+    case "$1" in /jffs/*) ;; *) return 1 ;; esac
+    case "$1" in *[!a-zA-Z0-9_./-]*|*/|*//*|*/../*|*/..|*/./*|*/.) return 1 ;; esac
+}
+
+# Check parents of PATH (leaf may not exist); stop at the mounted /jffs.
+# The leaf is excluded: to validate directory DIR itself, pass "$DIR/probe".
+# No probe file is opened or created.
+# Walk top-down so metadata lookup never traverses an unverified symlink.
+ddnsto_asus_safe_ancestors() (
+    _ddnsto_asus_descendant "$@" || return 1
+    ddnsto_asus_anchor || return 1
+    rest=${1#/jffs/} parent=/jffs
+    while case "$rest" in */*) true;; *) false;; esac; do
+        parent=$parent/${rest%%/*}; rest=${rest#*/}
+        fields=$(_ddnsto_asus_metadata "$parent") || return 1
+        set -- $fields
+        [ "$1" = 0 ] && [ "$4" = d ] || return 1
+        case "$2" in 7[0145][0145]) ;; *) return 1 ;; esac
+    done
+)
+
+_ddnsto_asus_private_path() {
+    _ddnsto_asus_descendant "$@" || return 1
+    case "$1" in /jffs/.ddnsto-installer|/jffs/.ddnsto-installer/*) ;; *) return 1 ;; esac
+    ddnsto_asus_safe_ancestors "$1" || return 1
+    _ddnsto_asus_private_existing /jffs/.ddnsto-installer
+}
+
+# Idempotent mkdir of one leaf inside initialized state; no mkdir -p/chmod.
+ddnsto_asus_private_dir() (
+    _ddnsto_asus_private_path "$@" || return 1
+    if ! _ddnsto_asus_metadata "$1" >/dev/null 2>&1; then
+        (umask 077; _ddnsto_asus_mkdir "$1") || return 1
+    fi
+    _ddnsto_asus_private_existing "$1"
+)
+
+# Existing regular root-owned single-link file inside private state; readable
+# by root, no group/other writes or special bits. Never opens FIFOs/devices.
+ddnsto_asus_safe_file() (
+    _ddnsto_asus_private_path "$@" || return 1
+    fields=$(_ddnsto_asus_metadata "$1") || return 1
+    set -- $fields
+    [ "$1" = 0 ] && [ "$3" = 1 ] && [ "$4" = - ] || return 1
+    case "$2" in [4567][0145][0145]) ;; *) return 1 ;; esac
+)
+
+_ddnsto_asus_random() { openssl rand -hex 12; }
+
+# Print a fresh 0700 directory. Atomic mkdir claims ownership; an existing
+# name is never reused, removed, or repaired. Eight attempts bound collisions.
+# Caller owns cleanup and transaction locking; this helper acquires no lock.
+ddnsto_asus_mktemp() (
+    _ddnsto_asus_private_path "$@" || return 1
+    _ddnsto_asus_private_existing "$1" || return 1
+    parent=$1 attempt=0
+    umask 077
+    while [ "$attempt" -lt 8 ]; do
+        random=$(_ddnsto_asus_random) || return 1
+        [ "${#random}" = 24 ] || return 1
+        case "$random" in *[!0-9a-f]*) return 1 ;; esac
+        path=$parent/tmp.$random
+        if _ddnsto_asus_mkdir "$path" 2>/dev/null; then
+            _ddnsto_asus_private_existing "$path" || return 1
+            printf '%s\n' "$path"
+            return 0
+        fi
+        attempt=$((attempt + 1))
+    done
+    return 1
+)
+
+_ddnsto_asus_openssl_hash() { openssl dgst -sha256 < "$1"; }
+_ddnsto_asus_sha256_hash() { sha256sum < "$1"; }
+
+# Hash only a checked private-state file. stdin avoids filename-dependent
+# digest output. A present but failing backend is an error, not a fallback.
+ddnsto_asus_hash() (
+    ddnsto_asus_safe_file "$@" || return 1
+    if ddnsto_asus_has openssl; then
+        output=$(_ddnsto_asus_openssl_hash "$1") || return 1
+        backend=openssl
+    elif ddnsto_asus_has sha256sum; then
+        output=$(_ddnsto_asus_sha256_hash "$1") || return 1
+        backend=sha256sum
+    else
+        return 1
+    fi
+    printf '%s\n' "$output" | LC_ALL=C awk -v backend="$backend" '
+        NR == 1 && NF == 2 {
+            if (backend == "openssl" && ($1 == "SHA256(stdin)=" || $1 == "SHA2-256(stdin)=" || $1 == "(stdin)=")) digest=$2
+            if (backend == "sha256sum" && $2 == "-") digest=$1
+        }
+        END {
+            if (NR != 1 || length(digest) != 64 || digest ~ /[^0-9a-fA-F]/) exit 1
+            print tolower(digest)
+        }
+    '
+)
+
+# Controlled ASUS package adapter; source asus-platform.sh before this module.
+# ddnsto_asus_extract ARCHIVE DEST CHANNEL ARCH -> 0 success, nonzero rejection.
+# Caller MUST verify ARCHIVE size + SHA256 against ddnsto_asus_package CHANNEL,
+# keep it immutable through this call, and establish trusted owner state for
+# DEST's parent and all ancestors. A private child of writable /tmp or
+# /koolshare is NOT sufficient. This module does not establish that trust.
+# Success leaves only three private staged files; it never runs package code.
+# OS commands remain shell-function mockable; no stat/id/command dependency.
+# Requires tar (-t/-v/-xO/-z), awk, wc, cmp, mkdir/rmdir, rm, chmod and shell
+# ulimit/type. od is optional: absent od relies on the caller-verified pin;
+# present but failing od is fatal. ARCH is armv7l or aarch64 (armsoft: armv7l).
+# Limits: compressed archive/binary 12 MiB, other members 64 KiB, metadata
+# extraction 64 B, each listing 16 KiB, declared aggregate 26 MiB.
+# Validation covers the complete logical member listing reported by tar, not
+# raw extension headers or bytes tar ignores after its end marker. Exact pins
+# remain mandatory. Output is bounded; decompression CPU time is not bounded
+# here. Caller owns cancellation, trusted storage, and subsequent installation.
+# On failure only this call's fixed staging filenames are removed. An existing
+# DEST is never reused/deleted. SIGKILL or I/O failure may leave private residue;
+# never consume DEST unless the function returned zero.
+_ddnsto_asus_package_tar() { tar "$@"; }
+_ddnsto_asus_package_od() { od "$@"; }
+_ddnsto_asus_package_has_od() { type od >/dev/null 2>&1; }
+
+# Per-file kernel ceiling before opening output, then an exact byte ceiling.
+# POSIX/ash uses 512-byte blocks; shells using 1024-byte blocks can transiently
+# write up to twice the ceiling. No unbounded command substitution or pipeline
+# masks tar failure. gzip/tar stream data; no archive tree is ever materialized.
+_ddnsto_asus_package_capture() (
+    ceiling=$1 output=$2; shift 2
+    (ulimit -c 0 || exit 1
+     ulimit -f "$(((ceiling + 511) / 512))" || exit 1
+     _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    bytes=$(wc -c < "$output") || return 1
+    [ "$bytes" -gt 0 ] && [ "$bytes" -le "$ceiling" ]
+)
+
+_ddnsto_asus_package_member() (
+    member=$1 output=$2 ceiling=$3
+    expected=$(awk -v name="$member" '$6 == name {print $3}' .types) || return 1
+    _ddnsto_asus_package_capture "$ceiling" "$output" -xOzf "$archive" "$member" || return 1
+    [ "$(wc -c < "$output")" -eq "$expected" ]
+)
+
+ddnsto_asus_extract() (
+    [ "$#" = 4 ] || return 2
+    unset IFS # POSIX default splitting, independent of caller overrides.
+    archive=$1 dest=$2 channel=$3 arch=$4
+    # Use the existing platform authority, not a second marker/version table.
+    pins=$(ddnsto_asus_package "$channel") || return 2
+    set -f
+    set -- $pins
+    [ "$#" = 5 ] && [ "$2" = 4.2.8 ] || return 2
+    version=$2 marker=$3
+    case "$channel:$arch" in
+        armsoft:armv7l) binary=ddnsto ;;
+        armsoft:*) return 2 ;;
+        *:armv7l) binary=ddnsto_arm ;;
+        *:aarch64) binary=ddnsto_aarch64 ;;
+        *) return 2 ;;
+    esac
+    # Absolute, unambiguous paths only. Ownership/ancestor permissions are the
+    # caller storage adapter contract; reject symlinks as an extra guard.
+    for path in "$archive" "$dest"; do
+        case "$path" in /*) ;; *) return 2 ;; esac
+        case "$path" in /|*/|*//*|*/./*|*/../*|*/.|*/..|*[!a-zA-Z0-9_./+-]*) return 2 ;; esac
+        while [ "$path" != / ]; do
+            [ ! -L "$path" ] || return 2
+            path=${path%/*}; path=${path:-/}
+        done
+    done
+    [ -f "$archive" ] || return 2
+    bytes=$(wc -c < "$archive") || return 1
+    [ "$bytes" -gt 0 ] && [ "$bytes" -le 12582912 ] || return 1
+    LC_ALL=C; export LC_ALL
+    unset TAR_OPTIONS GZIP
+    umask 077
+    mkdir "$dest" || return 1
+    cd "$dest" || { rmdir "$dest"; return 1; }
+    trap 'rm -f ddnsto Module_ddnsto.asp icon-ddnsto.png .names .types .valid .version; rmdir "$dest"' 0
+    trap 'exit 1' 1 2 3 15
+    _ddnsto_asus_package_capture 16384 .names -tzf "$archive" || return 1
+    _ddnsto_asus_package_capture 16384 .types -tvzf "$archive" || return 1
+    # GNU and BusyBox verbose listings have mode, owner/group, size, date,
+    # time, name. Reject every other grammar rather than guessing a name.
+    LC_ALL=C awk -v channel="$channel" '
+        BEGIN {
+            split("ddnsto/ ddnsto/webs/ ddnsto/res/ ddnsto/bin/ ddnsto/scripts/", dirs, " ")
+            for (i in dirs) want[dirs[i]] = "d"
+            split("webs/Module_ddnsto.asp res/icon-ddnsto.png .valid version install.sh uninstall.sh scripts/ddnsto_config.sh scripts/ddnsto_status.sh", files, " ")
+            for (i in files) want["ddnsto/" files[i]] = "-"
+            if (channel == "armsoft") {
+                want["ddnsto/bin/ddnsto"] = "-"
+                want["ddnsto/res/ddnsto_check.html"] = "-"
+            } else {
+                want["ddnsto/bin/ddnsto_arm"] = "-"
+                want["ddnsto/bin/ddnsto_aarch64"] = "-"
+            }
+        }
+        NR == FNR {
+            if (!($0 in want) || seen[$0]++) bad = 1
+            names[FNR] = $0
+            count++
+            next
+        }
+        {
+            if (NF != 6 || $6 != names[FNR] || substr($1, 1, 1) != want[$6] ||
+                length($1) != 10 || $3 !~ /^[0-9]+$/) bad = 1
+            ceiling = ($6 ~ /^ddnsto\/bin\/ddnsto/) ? 12582912 : 65536
+            if (want[$6] == "d") { if ($3 != 0) bad = 1 }
+            else if ($3 < 1 || $3 > ceiling) bad = 1
+            total += $3
+            types++
+        }
+        END {
+            for (name in want) if (seen[name] != 1) bad = 1
+            if (count != 15 || types != count || total > 27262976) bad = 1
+            exit bad
+        }
+    ' .names .types || return 1
+    _ddnsto_asus_package_member ddnsto/.valid .valid 64 || return 1
+    _ddnsto_asus_package_member ddnsto/version .version 64 || return 1
+    printf '%s\n' "$marker" | cmp -s .valid - || return 1
+    printf '%s\n' "$version" | cmp -s .version - || return 1
+    _ddnsto_asus_package_member "ddnsto/bin/$binary" ddnsto 12582912 || return 1
+    _ddnsto_asus_package_member ddnsto/webs/Module_ddnsto.asp Module_ddnsto.asp 65536 || return 1
+    _ddnsto_asus_package_member ddnsto/res/icon-ddnsto.png icon-ddnsto.png 65536 || return 1
+    if _ddnsto_asus_package_has_od; then
+        header=$(_ddnsto_asus_package_od -An -v -tu1 -N20 ddnsto) || return 1
+        set -- $header
+        [ "$#" = 20 ] || return 1
+        [ "$1 $2 $3 $4 $6 $7" = '127 69 76 70 1 1' ] || return 1
+        class=$5
+        shift 16
+        case "$1 $2" in '2 0'|'3 0') ;; *) return 1 ;; esac
+        case "$arch:$class:$3:$4" in armv7l:1:40:0|aarch64:2:183:0) ;; *) return 1 ;; esac
+    fi
+    chmod 700 ddnsto || return 1
+    rm -f .names .types .valid .version || return 1
+    trap - 0
+)
+
+# Controlled ASUS lifecycle. Source after asus-storage.sh; caller owns the
+# transaction lock and verified payload. Never execute the native plugin scripts.
+# Software-center execution trust is inherited: writable firmware dispatchers
+# can still execute arbitrary code. These bridges do not secure the whole router.
+# All publication uses a same-filesystem source with the EXACT leaf basename,
+# and destination '.' in a pinned physical directory. No mv -T requirement.
+# Never execute original root scripts, even during recovery.
+
+_ddnsto_asus_plugin_files() {
+    printf '%s\n' bin/ddnsto scripts/ddnsto_config.sh scripts/ddnsto_status.sh \
+        scripts/uninstall_ddnsto.sh init.d/S70ddnsto.sh webs/Module_ddnsto.asp res/icon-ddnsto.png
+}
+
+_ddnsto_asus_metadata_keys() {
+    printf '%s\n' ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        softcenter_module_ddnsto_version softcenter_module_ddnsto_install \
+        softcenter_module_ddnsto_name softcenter_module_ddnsto_title \
+        softcenter_module_ddnsto_description
+}
+
+# Called in a subshell. Each operation stays relative to the pinned physical
+# directory; a changed ancestor either fails validation or cannot redirect it.
+_ddnsto_asus_plugin_cd() {
+    case "$1" in bin|scripts|init.d|webs|res) ;; *) return 1 ;; esac
+    cd -P /jffs || return 1
+    [ ! -L .koolshare ] && cd -P .koolshare || return 1
+    [ "$(pwd -P)" = /jffs/.koolshare ] || return 1
+    [ ! -L "$1" ] && cd -P "$1" || return 1
+    [ "$(pwd -P)" = "/jffs/.koolshare/$1" ]
+}
+
+# Destination is always the pinned cwd, never a separately resolved leaf path.
+# mv appends the source basename once; rename replaces a leaf symlink instead
+# of traversing it. Verify firmware semantics in private state before stop.
+_ddnsto_asus_publish() { mv -f "$1" .; }
+
+_ddnsto_asus_probe_mv() (
+    probe="$ASUS_ATTEMPT/mv-probe"
+    mkdir "$probe" "$probe/source" "$probe/dest" "$probe/outside" || return 1
+    printf probe > "$probe/source/leaf"
+    ln -s "$probe/outside" "$probe/dest/leaf" || return 1
+    cd -P "$probe/dest" || return 1
+    _ddnsto_asus_publish "$probe/source/leaf" || return 1
+    [ ! -L leaf ] && [ -f leaf ] && [ "$(cat leaf)" = probe ] || return 1
+    [ ! -e "$probe/outside/leaf" ] || return 1
+    mkdir "$probe/dest/directory" || return 1
+    printf probe > "$probe/source/directory"
+    if _ddnsto_asus_publish "$probe/source/directory" 2>/dev/null; then return 1; fi
+    [ ! -e "$probe/dest/directory/directory" ]
+)
+
+ddnsto_asus_backup_plugin() (
+    umask 077
+    ddnsto_asus_private_dir "$ASUS_ATTEMPT" || return 1
+    mkdir "$ASUS_ATTEMPT/backup" "$ASUS_ATTEMPT/changed" || return 1
+    mkdir "$ASUS_ATTEMPT/backup/files" "$ASUS_ATTEMPT/backup/config" || return 1
+    _ddnsto_asus_probe_mv || return 1
+    for key in $(_ddnsto_asus_metadata_keys); do
+        ddnsto_asus_get "$key" > "$ASUS_ATTEMPT/backup/config/$key" || return 1
+    done
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            if [ -e "$leaf" ] || [ -L "$leaf" ]; then
+                [ -L "$leaf" ] || [ -f "$leaf" ] || exit 1
+                cp -pP "$leaf" "$ASUS_ATTEMPT/backup/files/$leaf" || exit 1
+                [ -L "$ASUS_ATTEMPT/backup/files/$leaf" ] ||
+                    ddnsto_asus_safe_file "$ASUS_ATTEMPT/backup/files/$leaf" || exit 1
+            fi
+        ) || return 1
+    done
+    if [ -L "$ASUS_STATE/current" ]; then
+        previous=$(readlink -f "$ASUS_STATE/current") || return 1
+        case "$previous" in "$ASUS_STATE"/*/runtime) ;; *) return 1 ;; esac
+        ddnsto_asus_safe_file "$previous/ddnsto" &&
+            ddnsto_asus_safe_file "$previous/service.sh" || return 1
+        cp -pP "$ASUS_STATE/current" "$ASUS_ATTEMPT/backup/current" || return 1
+    elif [ -e "$ASUS_STATE/current" ]; then return 1
+    fi
+    # Rollback may run ONLY reviewed bytes. Native originals remain complete in
+    # backup even when they cannot be trusted to execute. Fail before stop if an
+    # enabled legacy binary cannot be matched to this reviewed package.
+    if [ ! -L "$ASUS_ATTEMPT/backup/current" ] &&
+        [ "$(cat "$ASUS_ATTEMPT/backup/config/ddnsto_enable")" = 1 ]; then
+        old="$ASUS_ATTEMPT/backup/files/ddnsto"
+        ddnsto_asus_safe_file "$old" && cmp -s "$old" "$ASUS_ATTEMPT/payload/ddnsto" || {
+            printf '%s\n' 'ASUS: enabled native binary is not reviewed recovery material' >&2
+            return 1
+        }
+    fi
+    # Prepare recovery before the first stop, including failures before install.
+    _ddnsto_asus_prepare_runtime || return 1
+    : > "$ASUS_ATTEMPT/backup/complete"
+)
+
+_ddnsto_asus_runtime() {
+    cat <<'ASUS_RUNTIME'
+#!/bin/sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+unset ENV BASH_ENV CDPATH
+umask 077
+service_binary=/jffs/.ddnsto-installer/current/ddnsto
+
+asus_service_get() { /usr/bin/dbus get "$1"; }
+
+# pidof is only an enumerator. Root ownership, executable and process birth
+# time are checked independently, immediately before each signal/probe.
+asus_service_identity() (
+    case "$1" in ''|*[!0-9]*|0|1) exit 1 ;; esac
+    target=$(readlink "/proc/$1/exe") || exit 1
+    case "$target" in
+        /.koolshare/bin/ddnsto|/jffs/.koolshare/bin/ddnsto)
+            [ "${2:-}" = legacy ] || exit 1 ;;
+        *) wanted=$(readlink -f "$service_binary") || exit 1
+            [ "$target" = "$wanted" ] || exit 1 ;;
+    esac
+    role=$(awk '
+        $1=="Uid:" {u++; if (NF!=5 || $2!=0 || $3!=0 || $4!=0 || $5!=0) bad=1}
+        $1=="PPid:" {p++; parent=$2}
+        END {if (u!=1 || p!=1 || bad || parent !~ /^[0-9]+$/) exit 1; print parent}
+    ' "/proc/$1/status") || exit 1
+    birth=$(sed 's/^.*) //' "/proc/$1/stat" | awk 'NF>=20 && $20 ~ /^[0-9]+$/ {print $20}')
+    [ -n "$birth" ] || exit 1
+    printf '%s:%s:%s\n' "$target" "$role" "$birth"
+)
+
+asus_service_main() {
+    main=
+    for pid in $(pidof ddnsto 2>/dev/null); do
+        ident=$(asus_service_identity "$pid") || return 1
+        case "$ident" in *:1:*)
+            [ -z "$main" ] || return 1
+            main=$pid; main_identity=$ident ;;
+        esac
+    done
+    [ -n "$main" ]
+}
+
+asus_service_running() {
+    asus_service_main || return 1
+    stable_pid=$main stable_identity=$main_identity
+    for probe in 2 3; do
+        sleep 1
+        asus_service_main || return 1
+        [ "$main" = "$stable_pid" ] && [ "$main_identity" = "$stable_identity" ] || return 1
+    done
+}
+
+asus_service_stop() {
+    # Include the legacy executable only for installer migration, never for UI.
+    mains= children=
+    for pid in $(pidof ddnsto 2>/dev/null); do
+        ident=$(asus_service_identity "$pid" "${1:-}") || continue
+        case "$ident" in *:1:*) mains="$mains $pid" ;; *) children="$children $pid" ;; esac
+    done
+    # Stop the supervisor first so it cannot respawn the WebDAV child. Recheck
+    # identity at signal time (children may have become reparented meanwhile).
+    for pid in $mains $children; do
+        ident=$(asus_service_identity "$pid" "${1:-}") || continue
+        [ "$(asus_service_identity "$pid" "${1:-}")" = "$ident" ] || return 1
+        kill -TERM "$pid" 2>/dev/null || {
+            [ "$(asus_service_identity "$pid" "${1:-}")" != "$ident" ] || return 1
+        }
+    done
+    for probe in 1 2 3 4 5; do
+        remaining=0
+        # Unknown or inaccessible ddnsto PIDs are never signalled, but prevent
+        # replacement/startup. Otherwise migration could launch duplicates.
+        for pid in $(pidof ddnsto 2>/dev/null); do remaining=1; done
+        [ "$remaining" = 0 ] && return 0
+        sleep 1
+    done
+    # No broad killall or forced kill. A resistant process blocks replacement.
+    return 1
+}
+
+asus_service_start() {
+    [ "$(asus_service_get ddnsto_enable)" = 1 ] || return 0
+    asus_service_main && return 0
+    [ -z "$(pidof ddnsto 2>/dev/null)" ] || return 1
+    token=$(asus_service_get ddnsto_token) || return 1
+    case "$token" in ''|*[!a-zA-Z0-9_-]*) return 1 ;; esac
+    enabled=$(asus_service_get ddnsto_feat_enabled) || return 1
+    user=$(asus_service_get ddnsto_feat_username) || return 1
+    pass=$(asus_service_get ddnsto_feat_password) || return 1
+    port=$(asus_service_get ddnsto_feat_port) || return 1
+    disk=$(asus_service_get ddnsto_feat_disk_path_selected) || return 1
+    set -- -u "$token" -d
+    if [ "$enabled" = 1 ] && [ -n "$user" ] && [ -n "$pass" ] && [ -n "$port" ]; then
+        case "$port" in *[!0-9]*|'') return 1 ;; esac
+        [ "${#port}" -le 5 ] && [ "$port" -gt 0 ] && [ "$port" -le 65535 ] || return 1
+        set -- "$@" -n "$user" -k "$pass" -p "$port" -s "${disk:-/}"
+    fi
+    "$service_binary" "$@" >/dev/null 2>&1
+}
+
+asus_service_json() {
+    # Escape every control byte representable in shell strings, without eval.
+    LC_ALL=C awk 'BEGIN {printf "\""; for(i=1;i<32;i++) ctrl[sprintf("%c",i)]=i}
+        {if(NR>1) printf "\\n"; for(i=1;i<=length($0);i++) {
+            c=substr($0,i,1)
+            if(c=="\\" || c=="\"") printf "\\%s",c
+            else if(c in ctrl) printf "\\u%04x",ctrl[c]
+            else printf "%s",c
+        }} END {printf "\""}'
+}
+
+asus_service_response() {
+    case "$1" in ''|*[!0-9]*) return 1 ;; esac
+    [ "${#1}" -le 16 ] || return 1
+    curl --noproxy '*' --connect-timeout 2 --max-time 5 -fsS \
+        -H 'Content-Type: application/json' --data-binary "$2" \
+        "http://127.0.0.1:3030/_resp/$1" >/dev/null
+}
+
+asus_service_router_id() (
+    # config.go prints "%s %s\n", VERSION, RouterId for -w and exits before
+    # connecting. identity/routerid.go derives ASUS IDs as 12 lowercase hex
+    # digits. Never run the writable software-center binary or vendor scripts.
+    query=/jffs/.ddnsto-installer/router-query.lock
+    mkdir -m 700 "$query" 2>/dev/null || exit 1
+    child=
+    cleanup_query() {
+        if [ -n "$child" ]; then
+            kill -KILL "$child" 2>/dev/null || :
+            wait "$child" 2>/dev/null || :
+        fi
+        rm -f "$query/output"
+        rmdir "$query" 2>/dev/null || :
+    }
+    trap cleanup_query 0
+    trap 'exit 1' 1 2 3 15
+    # -f is in 512-byte or 1024-byte units across supported shells. Either
+    # cap is <=1 KiB. Reject >128 bytes as well; no output reaches shell eval.
+    (ulimit -c 0 && ulimit -f 1 && exec "$service_binary" -w) > "$query/output" 2>/dev/null &
+    child=$!
+    for probe in 1 2 3; do
+        sleep 1
+        kill -0 "$child" 2>/dev/null || break
+    done
+    # This PID is our directly spawned query, never a daemon discovered by name.
+    if kill -0 "$child" 2>/dev/null; then exit 1; fi
+    wait "$child" 2>/dev/null; result=$?
+    child=
+    [ "$result" = 0 ] || exit 1
+    [ "$(wc -c < "$query/output")" -le 128 ] || exit 1
+    LC_ALL=C awk '
+        NR==1 && NF==2 && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ &&
+            length($2)==12 && $2 ~ /^[0-9a-f]+$/ { id=$2; valid=1 }
+        END { if(NR!=1 || !valid) exit 1; print id }
+    ' "$query/output"
+)
+
+asus_service_plugin_cd() {
+    case "$1" in bin|scripts|init.d|webs|res) ;; *) return 1 ;; esac
+    cd -P /jffs || return 1
+    [ ! -L .koolshare ] && cd -P .koolshare || return 1
+    [ "$(pwd -P)" = /jffs/.koolshare ] || return 1
+    [ ! -L "$1" ] && cd -P "$1" || return 1
+    [ "$(pwd -P)" = "/jffs/.koolshare/$1" ]
+}
+
+asus_service_owned_leaf() {
+    case "$1" in Module_ddnsto.asp|icon-ddnsto.png)
+        [ ! -L "./$1" ] && [ -f "./$1" ] &&
+            cmp -s "./$1" "/jffs/.ddnsto-installer/current/$1" ;;
+        *) [ -L "./$1" ] &&
+            [ "$(readlink "./$1")" = "/jffs/.ddnsto-installer/current/$1" ] ;;
+    esac
+}
+
+asus_service_uninstall() {
+    # Explicit software-center uninstall only. Keep protected runtime and all
+    # original backups; never call a vendor hook or enumerate wildcard paths.
+    owned='bin/ddnsto scripts/ddnsto_config.sh scripts/ddnsto_status.sh scripts/uninstall_ddnsto.sh init.d/S70ddnsto.sh webs/Module_ddnsto.asp res/icon-ddnsto.png'
+    for entry in $owned; do
+        (asus_service_plugin_cd "${entry%/*}" &&
+            asus_service_owned_leaf "${entry##*/}") || {
+            printf '%s\n' 'ASUS: uninstall refused: plugin file ownership changed' >&2
+            return 1
+        }
+    done
+    asus_service_stop || return 1
+    for entry in $owned; do
+        (
+            asus_service_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            asus_service_owned_leaf "$leaf" || exit 1
+            rm -f "./$leaf"
+        ) || return 1
+    done
+    for key in ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        ddnsto_feat_enabled ddnsto_feat_username ddnsto_feat_password \
+        ddnsto_feat_port ddnsto_feat_disk_path_selected \
+        softcenter_module_ddnsto_version softcenter_module_ddnsto_install \
+        softcenter_module_ddnsto_name softcenter_module_ddnsto_title \
+        softcenter_module_ddnsto_description; do
+        /usr/bin/dbus remove "$key" || return 1
+    done
+}
+
+asus_service_status() {
+    request=$1
+    case "$request" in ''|*[!0-9]*) return 1 ;; esac
+    [ "${#request}" -le 16 ] || return 1
+    state=0 feat=0 pidtext=
+    if asus_service_main; then
+        state=1; pidtext=$main
+        for pid in $(pidof ddnsto 2>/dev/null); do
+            ident=$(asus_service_identity "$pid") || continue
+            case "$ident" in *:"$main":*) feat=1 ;; esac
+        done
+    fi
+    version=$(asus_service_get ddnsto_version | asus_service_json) || return 1
+    username=$(asus_service_get ddnsto_feat_username | asus_service_json) || return 1
+    port=$(asus_service_get ddnsto_feat_port | asus_service_json) || return 1
+    router_id=$(asus_service_router_id) || router_id=
+    asus_service_response "$request" "{\"version\":$version,\"status\":$state,\"router_id\":\"$router_id\",\"pid\":\"$pidtext\",\"feat\":{\"status\":\"$feat\",\"username\":$username,\"port\":$port,\"disk_path\":\"/webdav/\"}}"
+}
+
+# UI/autostart shares the installer lock. The trusted installer already owns
+# it and uses explicit internal operations; status is read-only.
+case "${1:-}" in
+    start|stop|config|uninstall)
+        mkdir -m 700 /jffs/.ddnsto-installer/install.lock 2>/dev/null || exit 16
+        trap 'rmdir /jffs/.ddnsto-installer/install.lock 2>/dev/null || :' 0
+        trap 'exit 1' 1 2 3 15 ;;
+esac
+case "${1:-}" in
+    library) ;; # private installer/test source use; performs no action
+    start|installer-start) asus_service_start ;;
+    stop) asus_service_stop ;;
+    migrate-stop) asus_service_stop legacy ;;
+    running) asus_service_running ;;
+    status) asus_service_status "${2:-}" ;;
+    uninstall) asus_service_uninstall ;;
+    config)
+        case "${2:-}" in ''|*[!0-9]*) exit 2 ;; esac
+        [ "${#2}" -le 16 ] || exit 2
+        result=0
+        asus_service_stop && asus_service_start || result=1
+        asus_service_response "$2" "$2" || exit 1
+        exit "$result" ;;
+    *) exit 2 ;;
+esac
+ASUS_RUNTIME
+}
+
+_ddnsto_asus_prepare_runtime() (
+    umask 077
+    mkdir "$ASUS_ATTEMPT/runtime" || return 1
+    ddnsto_asus_safe_file "$ASUS_ATTEMPT/payload/ddnsto" || return 1
+    cp "$ASUS_ATTEMPT/payload/ddnsto" "$ASUS_ATTEMPT/runtime/ddnsto" || return 1
+    chmod 700 "$ASUS_ATTEMPT/runtime/ddnsto" || return 1
+    _ddnsto_asus_runtime > "$ASUS_ATTEMPT/runtime/service.sh" || return 1
+    chmod 700 "$ASUS_ATTEMPT/runtime/service.sh" || return 1
+    pins=$(ddnsto_asus_package "$ASUS_CHANNEL") || return 1
+    printf '%s\n' "$pins" > "$ASUS_ATTEMPT/runtime/source-pin" || return 1
+    digest=$(ddnsto_asus_hash "$ASUS_ATTEMPT/runtime/ddnsto") || return 1
+    printf '%s\n' "$digest" > "$ASUS_ATTEMPT/runtime/binary.sha256" || return 1
+)
+
+# Read-only fast path, called after main's storage preflight and snapshot.
+# No execution or sourcing of an installed hook; no new files or directories.
+ddnsto_asus_reusable() (
+    [ "$(ddnsto_asus_get ddnsto_version)" = 4.2.8 ] || return 1
+    [ -L "$ASUS_STATE/current" ] || return 1
+    runtime=$(readlink -f "$ASUS_STATE/current") || return 1
+    case "$runtime" in "$ASUS_STATE"/*/runtime) ;; *) return 1 ;; esac
+    for name in ddnsto service.sh source-pin binary.sha256 \
+        ddnsto_config.sh ddnsto_status.sh uninstall_ddnsto.sh S70ddnsto.sh \
+        Module_ddnsto.asp icon-ddnsto.png; do
+        ddnsto_asus_safe_file "$runtime/$name" || return 1
+    done
+    [ -x "$runtime/ddnsto" ] || return 1
+    pins=$(ddnsto_asus_package "$ASUS_CHANNEL") || return 1
+    printf '%s\n' "$pins" | cmp -s "$runtime/source-pin" - || return 1
+    digest=$(ddnsto_asus_hash "$runtime/ddnsto") || return 1
+    printf '%s\n' "$digest" | cmp -s "$runtime/binary.sha256" - || return 1
+    _ddnsto_asus_runtime | cmp -s "$runtime/service.sh" - || return 1
+    for kind in config status uninstall init; do
+        case "$kind" in config) leaf=ddnsto_config.sh ;; status) leaf=ddnsto_status.sh ;;
+            uninstall) leaf=uninstall_ddnsto.sh ;; init) leaf=S70ddnsto.sh ;; esac
+        _ddnsto_asus_bridge "$kind" | cmp -s "$runtime/$leaf" - || return 1
+    done
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            case "$leaf" in Module_ddnsto.asp|icon-ddnsto.png)
+                [ ! -L "$leaf" ] && [ -f "$leaf" ] && cmp -s "$leaf" "$runtime/$leaf" ;;
+                *) [ -L "$leaf" ] && [ "$(readlink "$leaf")" = "$ASUS_STATE/current/$leaf" ] ;;
+            esac
+        ) || return 1
+    done
+)
+
+_ddnsto_asus_bridge() {
+    printf '%s\n' '#!/bin/sh' 'PATH=/usr/sbin:/usr/bin:/sbin:/bin' 'export PATH' \
+        'unset ENV BASH_ENV CDPATH'
+    case "$1" in
+        config) printf '%s\n' 'case "${1:-}" in start|stop) action=$1; shift ;; *) action=config ;; esac' \
+            'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh "$action" "$@"' ;;
+        status) printf '%s\n' 'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh status "$@"' ;;
+        uninstall) printf '%s\n' 'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh uninstall' ;;
+        init) printf '%s\n' 'case "${1:-start}" in start|stop) ;; *) exit 2 ;; esac' \
+            'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh "${1:-start}"' ;;
+    esac
+}
+
+ddnsto_asus_install_plugin() (
+    umask 077
+    [ -f "$ASUS_ATTEMPT/backup/complete" ] || return 1
+    ddnsto_asus_safe_file "$ASUS_ATTEMPT/runtime/ddnsto" &&
+        ddnsto_asus_safe_file "$ASUS_ATTEMPT/runtime/service.sh" || return 1
+    for name in Module_ddnsto.asp icon-ddnsto.png; do
+        ddnsto_asus_safe_file "$ASUS_ATTEMPT/payload/$name" || return 1
+        cp "$ASUS_ATTEMPT/payload/$name" "$ASUS_ATTEMPT/runtime/$name" || return 1
+        chmod 644 "$ASUS_ATTEMPT/runtime/$name" || return 1
+    done
+    _ddnsto_asus_bridge config > "$ASUS_ATTEMPT/runtime/ddnsto_config.sh" || return 1
+    _ddnsto_asus_bridge status > "$ASUS_ATTEMPT/runtime/ddnsto_status.sh" || return 1
+    _ddnsto_asus_bridge init > "$ASUS_ATTEMPT/runtime/S70ddnsto.sh" || return 1
+    _ddnsto_asus_bridge uninstall > "$ASUS_ATTEMPT/runtime/uninstall_ddnsto.sh" || return 1
+    chmod 755 "$ASUS_ATTEMPT/runtime/ddnsto_config.sh" \
+        "$ASUS_ATTEMPT/runtime/ddnsto_status.sh" "$ASUS_ATTEMPT/runtime/S70ddnsto.sh" \
+        "$ASUS_ATTEMPT/runtime/uninstall_ddnsto.sh" || return 1
+    mkdir "$ASUS_ATTEMPT/publish" || return 1
+    ln -s "$ASUS_ATTEMPT/runtime" "$ASUS_ATTEMPT/publish/current" || return 1
+    : > "$ASUS_ATTEMPT/changed/current"
+    (cd -P "$ASUS_STATE" && _ddnsto_asus_publish "$ASUS_ATTEMPT/publish/current") || return 1
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            # Static UI files must remain readable by the firmware HTTP user.
+            # Copy them to the anchored destination; protected runtime stays 0700.
+            case "$leaf" in Module_ddnsto.asp|icon-ddnsto.png)
+                cp "$ASUS_ATTEMPT/runtime/$leaf" "$ASUS_ATTEMPT/publish/$leaf" || exit 1
+                chmod 644 "$ASUS_ATTEMPT/publish/$leaf" || exit 1 ;;
+                *) ln -s "$ASUS_STATE/current/$leaf" "$ASUS_ATTEMPT/publish/$leaf" || exit 1 ;;
+            esac
+            : > "$ASUS_ATTEMPT/changed/$leaf"
+            _ddnsto_asus_publish "$ASUS_ATTEMPT/publish/$leaf"
+        ) || return 1
+    done
+    for key in ddnsto_version ddnsto_client_version softcenter_module_ddnsto_version \
+        softcenter_module_ddnsto_install softcenter_module_ddnsto_name \
+        softcenter_module_ddnsto_title softcenter_module_ddnsto_description; do
+        case "$key" in
+            *_version) value=4.2.8 ;; *_install) value=1 ;;
+            *_name) value=ddnsto ;; *_title) value=DDNSTO ;;
+            *_description) value='DDNSTO remote access' ;;
+        esac
+        : > "$ASUS_ATTEMPT/changed/$key"
+        ddnsto_asus_set "$key" "$value" || return 1
+    done
+)
+
+# Always emit a fresh protected runner, including before initial installation.
+_ddnsto_asus_service_call() (
+    umask 077
+    ddnsto_asus_private_dir "$ASUS_ATTEMPT" || return 1
+    runner=$(ddnsto_asus_mktemp "$ASUS_ATTEMPT") || return 1
+    _ddnsto_asus_runtime > "$runner/service.sh" || return 1
+    /bin/sh "$runner/service.sh" "$1"
+)
+ddnsto_asus_stop() { _ddnsto_asus_service_call migrate-stop; }
+ddnsto_asus_start() { _ddnsto_asus_service_call installer-start; }
+ddnsto_asus_running() { _ddnsto_asus_service_call running; }
+
+ddnsto_asus_restore_plugin() (
+    umask 077
+    [ -f "$ASUS_ATTEMPT/backup/complete" ] || return 1
+    ddnsto_asus_stop || return 1
+    restore=$(ddnsto_asus_mktemp "$ASUS_ATTEMPT") || return 1
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            leaf=${entry##*/}
+            [ -f "$ASUS_ATTEMPT/changed/$leaf" ] || exit 0
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            saved="$ASUS_ATTEMPT/backup/files/$leaf"
+            if [ -e "$saved" ] || [ -L "$saved" ]; then
+                cp -pP "$saved" "$restore/$leaf" || exit 1
+                _ddnsto_asus_publish "$restore/$leaf" || exit 1
+            else
+                rm -f "./$leaf" || exit 1
+            fi
+        ) || return 1
+    done
+    recovery_conflict=0
+    for key in $(_ddnsto_asus_metadata_keys); do
+        [ -f "$ASUS_ATTEMPT/changed/$key" ] || continue
+        case "$key" in ddnsto_token|ddnsto_enable)
+            # Main journals the intended literal value BEFORE setting dbus.
+            # Never overwrite account edits made outside our transaction.
+            expected=$(cat "$ASUS_ATTEMPT/changed/$key") || return 1
+            live=$(ddnsto_asus_get "$key") || return 1
+            if [ "$live" != "$expected" ]; then
+                recovery_conflict=1
+                continue
+            fi ;;
+        esac
+        value=$(cat "$ASUS_ATTEMPT/backup/config/$key") || return 1
+        ddnsto_asus_set "$key" "$value" || return 1
+    done
+    if [ -f "$ASUS_ATTEMPT/changed/current" ]; then
+        if [ -L "$ASUS_ATTEMPT/backup/current" ]; then
+            cp -pP "$ASUS_ATTEMPT/backup/current" "$restore/current" || return 1
+            (cd -P "$ASUS_STATE" && _ddnsto_asus_publish "$restore/current") || return 1
+        elif [ "$(cat "$ASUS_ATTEMPT/backup/config/ddnsto_enable")" != 1 ]; then
+            rm -f "$ASUS_STATE/current" || return 1
+        fi
+        # For native rollback the reviewed runtime remains available, while
+        # original plugin files are restored byte-for-byte (never executed).
+    fi
+    if [ "$recovery_conflict" = 1 ]; then
+        printf '%s\n' 'ASUS: recovery refused: concurrent account/enable change; external values preserved' >&2
+        return 1
+    fi
+    if [ "$(cat "$ASUS_ATTEMPT/backup/config/ddnsto_enable")" = 1 ]; then
+        if [ ! -L "$ASUS_STATE/current" ]; then
+            ln -s "$ASUS_ATTEMPT/runtime" "$restore/current" || return 1
+            (cd -P "$ASUS_STATE" && _ddnsto_asus_publish "$restore/current") || return 1
+        fi
+        ddnsto_asus_start && ddnsto_asus_running || return 1
+    fi
+)
+
+# Controlled transaction. OS/package/service boundaries live in ASUS adapters.
+# No vendor install.sh, uninstall.sh, base.sh or dbus export is executed.
+ddnsto_asus_identity() {
+    if [ "$#" = 2 ]; then
+        asus_existing_token=$1 asus_version=$2
+    else
+        asus_existing_token=$(ddnsto_asus_get ddnsto_token) || return 2
+        asus_version=$(ddnsto_asus_get ddnsto_version) || return 2
+    fi
+    [ -z "$asus_existing_token" ] || [ "$asus_existing_token" = "$TOKEN" ] || {
+        ddnsto_flow_error E_ACCOUNT '插件属于其他账号，未执行换绑' '请使用原账号重新复制命令'; return 2;
+    }
+    if [ -n "$asus_version" ]; then
+        asus_order=$(ddnsto_version_order "$asus_version" 4.2.8) || asus_order=unknown
+        case "$asus_order" in -1|0) ;; *)
+            ddnsto_flow_error E_VERSION '插件版本更新或无法识别，未覆盖现有版本' '请使用对应版本安装器；不会降级'; return 2 ;;
+        esac
+        [ -n "$asus_existing_token" ] || {
+            ddnsto_flow_error E_ACCOUNT '已安装插件缺少账号信息，未修改配置' '请先在软件中心检查 Token'; return 2;
+        }
+    fi
+}
+
+ddnsto_asus_checkpoint() {
+    [ -z "${ASUS_CANCEL:-}" ] || [ ! -f "$ASUS_CANCEL" ] || {
+        ddnsto_flow_error E_CANCELLED '安装已取消，正在完成必要恢复' '请等待当前命令结束后检查状态'; return 143;
+    }
+}
+
+ddnsto_asus_snapshot_config() {
+    mkdir "$ASUS_ATTEMPT/config" || return 12
+    for key in ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        ddnsto_feat_enabled ddnsto_feat_username ddnsto_feat_password \
+        ddnsto_feat_port ddnsto_feat_disk_path_selected; do
+        ddnsto_asus_get "$key" > "$ASUS_ATTEMPT/config/$key" || return 12
+    done
+}
+
+ddnsto_asus_config_unchanged() {
+    for key in ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        ddnsto_feat_enabled ddnsto_feat_username ddnsto_feat_password \
+        ddnsto_feat_port ddnsto_feat_disk_path_selected; do
+        ddnsto_asus_get "$key" > "$ASUS_ATTEMPT/compare" || return 12
+        cmp -s "$ASUS_ATTEMPT/config/$key" "$ASUS_ATTEMPT/compare" || return 2
+    done
+}
+
+ddnsto_asus_ensure_locked() (
+    umask 077
+    ddnsto_asus_preflight || exit $?
+    case "$TOKEN" in ''|*[!a-zA-Z0-9_-]*)
+        ddnsto_flow_error E_TOKEN 'Token 格式无效' '请从控制台重新复制'; exit 2 ;;
+    esac
+    ddnsto_asus_busy || { ddnsto_flow_error E_BUSY '软件中心正在安装其他插件' '请等待软件中心任务结束'; exit 16; }
+    ddnsto_asus_identity || exit $?
+    ASUS_ATTEMPT=$(ddnsto_asus_mktemp "$ASUS_STATE") || exit 12
+    # Keep the private evidence/backup on both success and failure. Never clean
+    # arbitrary /tmp/ddnsto* paths; no credentials reach the diagnostic stream.
+    ddnsto_asus_snapshot_config || exit $?
+    ddnsto_asus_identity "$(cat "$ASUS_ATTEMPT/config/ddnsto_token")" "$(cat "$ASUS_ATTEMPT/config/ddnsto_version")" || exit $?
+    ddnsto_asus_checkpoint || exit $?
+    if [ "$asus_version" = 4.2.8 ] && [ "$(cat "$ASUS_ATTEMPT/config/ddnsto_enable")" = 1 ] &&
+        ddnsto_asus_reusable && ddnsto_asus_running; then
+        ddnsto_asus_config_unchanged && ddnsto_asus_checkpoint || exit 2
+        ddnsto_flow_note installed
+        ddnsto_flow_note starting
+        ddnsto_flow_note started
+        exit 0
+    fi
+    ddnsto_asus_fetch "$ASUS_ATTEMPT/package.tar.gz" || {
+        ddnsto_flow_error E_DOWNLOAD '插件下载或校验失败，现有服务未停止' '请检查 HTTPS 下载后重试'; exit 11;
+    }
+    ddnsto_asus_extract "$ASUS_ATTEMPT/package.tar.gz" "$ASUS_ATTEMPT/payload" "$ASUS_CHANNEL" "$ASUS_ARCH" || {
+        ddnsto_flow_error E_PACKAGE '插件包结构或平台标记不符合审核记录' '请联系发布者检查安装包，未执行包内脚本'; exit 11;
+    }
+    ddnsto_asus_checkpoint || exit $?
+    ddnsto_asus_busy && ddnsto_asus_config_unchanged || {
+        ddnsto_flow_error E_CONFIG '下载期间软件中心或配置发生变化' '请稍后重新执行，未覆盖修改'; exit 2;
+    }
+    ddnsto_asus_backup_plugin || {
+        ddnsto_flow_error E_BACKUP '无法安全备份现有插件' '请检查存储和插件文件，未停止服务'; exit 12;
+    }
+    changed=0
+    finish_asus() {
+        result=$?
+        trap - EXIT HUP INT TERM
+        if [ "$result" != 0 ] && [ "$changed" = 1 ]; then
+            if ! ddnsto_asus_restore_plugin; then
+                ddnsto_flow_error E_RECOVERY '安装失败且恢复未完成，已保留私有备份' "请检查 $ASUS_ATTEMPT" || :
+            fi
+        fi
+        exit "$result"
+    }
+    trap finish_asus EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    ddnsto_asus_checkpoint || exit $?
+    ddnsto_flow_note installing
+    changed=1
+    ddnsto_asus_stop || { ddnsto_flow_error E_STOP '未确认旧进程停止，未覆盖文件' '请检查客户端进程'; exit 13; }
+    ddnsto_asus_install_plugin || {
+        ddnsto_flow_error E_PACKAGE '插件文件安装失败，正在尝试恢复' "备份位于 $ASUS_ATTEMPT"; exit 11;
+    }
+    ddnsto_asus_checkpoint || exit $?
+    # Only initialize an empty account. Existing feature settings are untouched.
+    [ "$(ddnsto_asus_get ddnsto_token)" = "$asus_existing_token" ] || {
+        ddnsto_flow_error E_ACCOUNT '安装期间账号发生变化，不覆盖新配置' '请检查软件中心账号后重试'; exit 2;
+    }
+    if [ -z "$asus_existing_token" ]; then
+        printf '%s' "$TOKEN" > "$ASUS_ATTEMPT/changed/ddnsto_token" || exit 12
+        ddnsto_asus_set ddnsto_token "$TOKEN" || exit 12
+    fi
+    printf '1' > "$ASUS_ATTEMPT/changed/ddnsto_enable" || exit 12
+    ddnsto_asus_set ddnsto_enable 1 || exit 12
+    [ "$(ddnsto_asus_get ddnsto_token)" = "$TOKEN" ] || {
+        ddnsto_flow_error E_ACCOUNT '启动前账号发生变化，不覆盖新配置' '请停止并发修改后重试'; exit 2;
+    }
+    ddnsto_flow_note installed
+    ddnsto_flow_note starting
+    ddnsto_asus_start && ddnsto_asus_running || {
+        ddnsto_flow_error E_START '插件安装后未确认稳定启动，正在尝试恢复' "请检查私有备份 $ASUS_ATTEMPT"; exit 13;
+    }
+    ddnsto_asus_checkpoint || exit $?
+    [ "$(ddnsto_asus_get ddnsto_token)" = "$TOKEN" ] || {
+        ddnsto_flow_error E_ACCOUNT '启动期间账号发生变化，不能确认安装成功' '请停止并发修改后检查软件中心配置'; exit 2;
+    }
+    changed=0
+    ddnsto_flow_note started
+)
+
+# ASUS appliance adapter. Never dispatch through the generic Linux installer.
+ddnsto_asus_get() { /usr/bin/dbus get "$1"; }
+ddnsto_asus_set() { /usr/bin/dbus set "$1=$2"; }
+
+ddnsto_asus_busy() {
+    [ -z "$(ddnsto_asus_get softcenter_installing_name)" ] &&
+        [ -z "$(ddnsto_asus_get softcenter_installing_todo)" ]
+}
+
+ddnsto_asus_facts() {
+    [ -x /bin/nvram ] && [ -x /usr/bin/dbus ] && [ -d /koolshare ] || {
+        ddnsto_flow_error E_PLATFORM '需要兼容的华硕软件中心固件' '不会自动刷机或安装软件中心'; return 2;
+    }
+    asus_model=$(/bin/nvram get odmpid)
+    [ -n "$asus_model" ] || asus_model=$(/bin/nvram get productid)
+    ASUS_ARCH=$(uname -m)
+    ASUS_CHANNEL=$(ddnsto_asus_channel "$asus_model" "$(uname -r)" "$ASUS_ARCH" "$(/bin/nvram get sc_url)") || {
+        ddnsto_flow_error E_PLATFORM '无法安全确定华硕插件渠道或处理器兼容性' '请核对软件中心来源和机型'; return 2;
+    }
+}
+
+ddnsto_asus_preflight() {
+    # Do not load plugin-supplied commands or exported shell expressions.
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+    ddnsto_asus_facts || return $?
+    ddnsto_asus_storage || { ddnsto_flow_error E_STORAGE '华硕私有目录不安全或不可写' '请检查 /jffs 挂载及剩余空间'; return 12; }
+    for tool in awk openssl curl tar cmp wc readlink df; do
+        ddnsto_asus_has "$tool" || { ddnsto_flow_error E_DEPENDENCY '固件缺少安装校验工具' "缺少 $tool，请通过软件中心手动安装"; return 2; }
+    done
+    asus_available=$(df -Pk /jffs | awk 'NR==2 { print $4 }')
+    case "$asus_available" in ''|*[!0-9]*) return 12 ;; esac
+    [ "$asus_available" -ge 98304 ] || {
+        ddnsto_flow_error E_SPACE '安装及恢复备份需要至少 96 MiB 可用空间' '请释放 JFFS 空间后重试，不会删除现有插件'; return 12;
+    }
+}
+
+ddnsto_asus_transport() (
+    # Reuse the audited bounded HTTPS transport without changing other shells.
+    if ! type command >/dev/null 2>&1; then
+        command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
+    fi
+    ddnsto_https_fetch "$@"
+)
+
+ddnsto_asus_native() {
+    umask 077
+    case "$ASUS_ARCH" in aarch64) ZSETUP_ARCH=aarch64 ;; armv7l) ZSETUP_ARCH=armv7 ;; *) return 2 ;; esac
+    fetch_bootstrap_metadata || return $?
+    native_cache=$ASUS_STATE/native-$RESCUE_VERSION-$ZSETUP_ARCH
+    ddnsto_asus_private_dir "$native_cache" || return 12
+    ASUS_ZSETUP=$native_cache/zsetup
+    if [ -e "$ASUS_ZSETUP" ] || [ -L "$ASUS_ZSETUP" ]; then
+        ddnsto_asus_safe_file "$ASUS_ZSETUP" && [ -x "$ASUS_ZSETUP" ] &&
+            [ "$(ddnsto_asus_hash "$ASUS_ZSETUP")" = "$EXPECTED_SHA256" ] || return 11
+        return 0
+    fi
+    native_dir=$(ddnsto_asus_mktemp "$native_cache") || return 12
+    native_code=0
+    ddnsto_asus_transport "https://fw.koolcenter.com/binary/zsetup/$RESCUE_VERSION/zsetup-linux-$ZSETUP_ARCH" "$native_dir/zsetup" 16777216 || native_code=11
+    if [ "$native_code" = 0 ]; then
+        [ "$(ddnsto_asus_hash "$native_dir/zsetup")" = "$EXPECTED_SHA256" ] || native_code=11
+    fi
+    if [ "$native_code" = 0 ]; then
+        chmod 700 "$native_dir/zsetup" && (cd "$native_cache" && mv -f "$native_dir/zsetup" .) || native_code=12
+    fi
+    rm -f "$native_dir/zsetup"
+    rmdir "$native_dir" || return 12
+    return "$native_code"
+}
+
+ddnsto_asus_fetch() {
+    package_facts=$(ddnsto_asus_package "$ASUS_CHANNEL") || return 2
+    set -- "$1" $package_facts
+    asus_output=$1 asus_url=$2 asus_size=$5 asus_digest=$6
+    if [ "$ASUS_CHANNEL" = armsoft ]; then
+        # Explicitly approved Linux 2.6 compatibility path. Never unverified
+        # execution or silent fallback after a modern native download fails.
+        ddnsto_asus_transport "$asus_url" "$asus_output" "$asus_size" || return 11
+    else
+        ddnsto_asus_native || return $?
+        "$ASUS_ZSETUP" download -o "$asus_output" --sha256 "$asus_digest" \
+            --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
+    fi
+    [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
+        [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
+}
+
+ddnsto_asus_ensure() {
+    ddnsto_asus_preflight || return $?
+    mkdir -m 700 "$ASUS_STATE/install.lock" 2>/dev/null || {
+        ddnsto_flow_error E_BUSY '另一安装或恢复任务持有华硕安装锁' '请确认任务结束后再处理残留锁'; return 16;
+    }
+    ASUS_CANCEL=$ASUS_STATE/install.lock/cancel
+    asus_cancel_rc=0 asus_worker= asus_worker_rc=0
+    # Cancel at transaction checkpoints, then join recovery. Killing only an
+    # intermediate shell can orphan its installer or release the lock too early.
+    trap 'asus_cancel_rc=129; : > "$ASUS_CANCEL"' HUP
+    trap 'asus_cancel_rc=130; : > "$ASUS_CANCEL"' INT
+    trap 'asus_cancel_rc=143; : > "$ASUS_CANCEL"' TERM
+    ddnsto_asus_ensure_locked &
+    asus_worker=$!
+    while :; do
+        asus_worker_rc=0
+        wait "$asus_worker" || asus_worker_rc=$?
+        kill -0 "$asus_worker" 2>/dev/null || break
+    done
+    trap - HUP INT TERM
+    rm -f "$ASUS_CANCEL"
+    rmdir "$ASUS_STATE/install.lock" || return 16
+    [ "$asus_cancel_rc" = 0 ] || return "$asus_cancel_rc"
+    return "$asus_worker_rc"
+}
 
 installer_privileged_program() {
 cat <<'ZSETUP_PRIVATE_ROOT_PROGRAM'
@@ -5524,9 +6748,10 @@ installer_service_cleanup() {
     fi
 }
 ddnsto_usage() {
-    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
+    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
         '群晖 DSM 7 支持自动安装/升级/启动，需管理员 sudo；其他 NAS/Docker 暂不支持默认自动安装。以下选项用于高级操作。' \
+        '华硕软件中心自动识别 rogsoft/armsoft/mtksoft/ipq32soft/ipq64soft/qcasoft；安装后在软件中心管理。' \
         '--plan: read-only local preflight; no downloads, token, or service changes.' \
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
         'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
@@ -5569,7 +6794,7 @@ ddnsto_parse_args() {
             *) ddnsto_error 'unknown argument (use --help)'; return 2 ;;
         esac
     done
-    case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
+    case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
     case "$REQUESTED_METHOD" in auto|native|docker) ;; *) ddnsto_error 'unknown installation method'; return 2 ;; esac
     [ "$REQUESTED_METHOD" = docker ] || [ -z "$DEVICE_NAME$NETWORK" ] || { ddnsto_error 'device-name/network require explicit Docker'; return 2; }
     case "$NETWORK" in ''|bridge|host) ;; *) ddnsto_error 'network must be bridge or host'; return 2 ;; esac
@@ -5623,6 +6848,8 @@ ddnsto_appliance_platform() {
         printf '%s\n' qnap
     elif [ -f "$appliance_root/etc/unraid-version" ]; then
         printf '%s\n' unraid
+    elif [ -x "$appliance_root/bin/nvram" ] && { [ -d "$appliance_root/koolshare" ] || [ -f "$appliance_root/www/Advanced_System_Content.asp" ]; }; then
+        printf '%s\n' asus
     fi
 }
 ddnsto_detect_platform() {
@@ -5678,6 +6905,11 @@ ddnsto_local_platform() {
 ddnsto_plan() {
     ddnsto_local_platform || return $?
     if [ "$detected_platform" = synology ]; then ddnsto_synology_download; return $?; fi
+    if [ "$detected_platform" = asus ]; then
+        ddnsto_asus_facts || return $?
+        printf '%s\n' 'facts_source=local-preflight' 'platform=asus' "channel=$ASUS_CHANNEL" "arch=$ASUS_ARCH" 'client_version=4.2.8' 'native_status=requires-plugin-preflight' 'installation_performed=false'
+        return 0
+    fi
     [ -z "${OUTPUT_DIR:-}" ] && [ "$ACTION" != download ] || { ddnsto_error 'download and output-dir require Synology'; return 2; }
     case "$(uname -m)" in
         x86_64|amd64) arch=x86_64 ;;
@@ -7176,7 +8408,7 @@ ddnsto_ensure_decision() {
     [ "$ensure_order" != -1 ] || ENSURE_ACTION=update
 }
 ddnsto_ensure_preflight() {
-    case "$detected_platform" in linux|openwrt|synology) ;; *)
+    case "$detected_platform" in linux|openwrt|synology|asus) ;; *)
         ddnsto_flow_error E_PLATFORM '此设备暂不支持自动安装' '请使用该设备的手动安装教程'; return 2 ;;
     esac
     [ -n "$TOKEN" ] && [ "${#TOKEN}" -le 16384 ] || {
@@ -7194,7 +8426,8 @@ ddnsto_ensure_preflight() {
 }
 ddnsto_flow_finish() {
     flow_rc=$1
-    trap - EXIT HUP INT TERM
+    trap - EXIT
+    trap '' HUP INT TERM
     if [ -n "${flow_child:-}" ]; then
         kill -TERM "$flow_child" 2>/dev/null || true
         wait "$flow_child" 2>/dev/null || true
@@ -7220,10 +8453,15 @@ ddnsto_flow_finish() {
     printf '脱敏诊断记录：%s/events.log\n' "$DDNSTO_FLOW_DIR" >&2
     exit "$flow_rc"
 }
-ddnsto_ensure_entry() (
+ddnsto_ensure_entry() {
     set +x
     umask 077
-    DDNSTO_FLOW_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto-result.XXXXXX") || exit 12
+    if [ "${detected_platform:-}" = asus ]; then
+        ddnsto_asus_storage || { ddnsto_flow_error E_STORAGE '华硕受保护存储不可用' '请检查 /jffs 挂载，不要放宽目录权限'; exit 12; }
+        DDNSTO_FLOW_DIR=$(ddnsto_asus_mktemp "$ASUS_STATE") || exit 12
+    else
+        DDNSTO_FLOW_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto-result.XXXXXX") || exit 12
+    fi
     flow_child=
     trap 'ddnsto_flow_finish $?' EXIT
     trap 'exit 129' HUP
@@ -7236,8 +8474,9 @@ ddnsto_ensure_entry() (
     flow_rc=0; wait "$flow_child" || flow_rc=$?
     flow_child=
     exit "$flow_rc"
-)
+}
 ddnsto_ensure_execute() {
+    if [ "$detected_platform" = asus ]; then ddnsto_asus_ensure; return $?; fi
     if [ "$detected_platform" = synology ]; then ddnsto_synology_ensure; return $?; fi
     ZSETUP_INSTALL_SCOPE=${installer_scope:-system}
     ZSETUP_INSTALL_PREFIX=${installer_prefix:-}
@@ -7648,6 +8887,1020 @@ ddnsto_synology_fresh_install() (
         ddnsto_flow_error E_PACKAGE "DSM 套件安装被拒绝（接口错误码 $code）" '请检查套件中心安装记录；不会自动卸载或强制重装'; exit 11;
     }
 )
+ddnsto_asus_channel() (
+    model=$1 kernel=$2 architecture=$3 source=$4
+    model_channel= source_channel=
+    case "$kernel" in ''|*[!a-zA-Z0-9._+-]*) return 2 ;; esac
+    release=${kernel%%-*}; release=${release%%+*}
+    case "$release" in ''|*[!0-9.]*|.*|*.|*..*) return 2 ;; esac
+    IFS=.; set -- $release; unset IFS
+    [ "$#" -ge 3 ] || return 2
+    for component do
+        case "$component" in 0|[1-9]*) ;; *) return 2 ;; esac
+    done
+    case "$architecture" in armv7l|aarch64) ;; *) return 2 ;; esac
+    case "$model" in
+        TX-AX6000|TUF-AX4200Q|RT-AX57_Go|GS7|ZenWiFi_BT8P|GS7_Air|GS-BE7200X)
+            model_channel=mtksoft ;;
+        ZenWiFi_BD4) model_channel=ipq32soft ;;
+        TUF_6500) model_channel=ipq64soft ;;
+        RT-AX89X) model_channel=qcasoft ;;
+    esac
+    case "${source%/}" in
+        '') ;;
+        https://rogsoft.ddnsto.com) source_channel=rogsoft ;;
+        https://armsoft.ddnsto.com) source_channel=armsoft ;;
+        https://mtksoft.ddnsto.com) source_channel=mtksoft ;;
+        https://ipq32soft.ddnsto.com) source_channel=ipq32soft ;;
+        https://ipq64soft.ddnsto.com) source_channel=ipq64soft ;;
+        https://qcasoft.ddnsto.com) source_channel=qcasoft ;;
+        *) return 2 ;;
+    esac
+    if [ -n "$model_channel" ] && [ -n "$source_channel" ]; then
+        [ "$model_channel" = "$source_channel" ] || return 2
+    fi
+    channel=${model_channel:-$source_channel}
+    case "$kernel" in
+        2.6.*)
+            [ "$architecture" = armv7l ] || return 2
+            [ -z "$channel" ] || [ "$channel" = armsoft ] || return 2
+            channel=armsoft ;;
+        4.[1-9]*|5.*|6.*)
+            [ -n "$channel" ] && [ "$channel" != armsoft ] || return 2 ;;
+        *) return 2 ;;
+    esac
+    printf '%s\n' "$channel"
+)
+ddnsto_asus_package() (
+    case "$1" in
+        rogsoft) marker=hnd size=8104981 sha=671c1c77d7b867f5019af35e8702be665695e30c107138ae150d045e11df1960 ;;
+        armsoft) marker=arm384 size=3430887 sha=8e0ff71269b8ba8674427896310d99309d97eae92b007d97cb968eb1d880664d ;;
+        mtksoft) marker=mtk size=8105004 sha=8d08921e49bed7bcafed48dc6c6b6795467f77767a97cc8af23f0b463285248a ;;
+        ipq32soft) marker=ipq32 size=8105008 sha=56c0298ec811e51cf93390bbfa2f9489752188320aaf96c43d2b19289ba7580d ;;
+        ipq64soft) marker=ipq64 size=8105008 sha=4cb863a85d5c5dcd00ff8a3f5a09fa90465b59b48e48cdce12163be62b1f10ce ;;
+        qcasoft) marker=qca size=8105006 sha=fa021afaf9424f032ff9e084e76c80fadd7fe74e844060e0d84ac6053db19216 ;;
+        *) return 2 ;;
+    esac
+    printf '%s\n' "https://asusgo.koolcenter.com/$1/ddnsto/ddnsto.tar.gz" 4.2.8 "$marker" "$size" "$sha"
+)
+_ddnsto_asus_status() { cat /proc/self/status; }
+ddnsto_asus_uid() (
+    status=$(_ddnsto_asus_status) || return 1
+    printf '%s\n' "$status" | LC_ALL=C awk '
+        $1 == "Uid:" {
+            count++
+            if (NF != 5) bad=1
+            for (i=2; i<=5; i++) if ($i !~ /^[0-9]+$/) bad=1
+            uid=$3
+        }
+        END { if (count != 1 || bad) exit 1; print uid }
+    '
+)
+ddnsto_asus_has() { [ "$#" = 1 ] && type "$1" >/dev/null 2>&1; }
+_ddnsto_asus_ls() { LC_ALL=C ls -nd "$1"; }
+_ddnsto_asus_metadata() (
+    [ "$#" = 1 ] || return 1
+    case "$1" in /*) ;; *) return 1 ;; esac
+    case "$1" in *[!a-zA-Z0-9_./-]*|*/|*//*|*/../*|*/..|*/./*|*/.) return 1 ;; esac
+    listing=$(_ddnsto_asus_ls "$1") || return 1
+    printf '%s\n' "$listing" | LC_ALL=C awk '
+        NR == 1 && NF == 9 &&
+        $1 ~ /^[-d][r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]$/ &&
+        $2 ~ /^[1-9][0-9]*$/ && $3 ~ /^[0-9]+$/ &&
+        $4 ~ /^[0-9]+$/ && $5 ~ /^[0-9]+$/ {
+            mode=0
+            for (i=2; i<=10; i++) {
+                c=substr($1,i,1)
+                mode=mode*2 + (c != "-" && c != "S" && c != "T")
+            }
+            if (substr($1,4,1) ~ /[sS]/) mode+=2048
+            if (substr($1,7,1) ~ /[sS]/) mode+=1024
+            if (substr($1,10,1) ~ /[tT]/) mode+=512
+            value=sprintf("%s %o %s %s", $3, mode, $2, substr($1,1,1)); ok=1
+        }
+        END { if (NR != 1 || !ok) exit 1; print value }
+    '
+)
+ddnsto_asus_fields() (
+    fields=$(_ddnsto_asus_metadata "$@") || return 1
+    set -- $fields
+    printf '%s %s %s\n' "$1" "$2" "$3"
+)
+_ddnsto_asus_mounts() { cat /proc/mounts; }
+_ddnsto_asus_mkdir() { mkdir -m 700 "$1"; }
+ddnsto_asus_anchor() (
+    [ "$(ddnsto_asus_uid)" = 0 ] || return 1
+    mounts=$(_ddnsto_asus_mounts) || return 1
+    printf '%s\n' "$mounts" | LC_ALL=C awk '
+        function approved_source(source, fs) {
+            if (fs == "ext2" || fs == "ext3" || fs == "ext4")
+                return source ~ /^\/dev\/[a-zA-Z0-9_-]+(\/[a-zA-Z0-9_-]+)*$/
+            if (fs == "jffs2")
+                return source ~ /^\/dev\/mtdblock([0-9]+|\/[0-9]+)$/
+            if (fs == "ubifs")
+                return source ~ /^\/dev\/ubi[0-9]+_[0-9]+$/ ||
+                       source ~ /^ubi[0-9]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/
+            return 0
+        }
+        $2 == "/jffs" {
+            count++
+            if (NF != 6 || !approved_source($1,$3)) bad=1
+            n=split($4,opts,","); rw=0
+            for (i=1;i<=n;i++) {
+                if (opts[i] == "rw") rw++
+                if (opts[i] == "ro" || opts[i] == "noexec" || opts[i] == "bind" || opts[i] == "rbind") bad=1
+            }
+            if (rw != 1) bad=1
+        }
+        index($2,"/jffs/") == 1 { bad=1 }
+        END { if (count != 1 || bad) exit 1 }
+    ' || return 1
+    fields=$(_ddnsto_asus_metadata /jffs) || return 1
+    set -- $fields
+    [ "$1" = 0 ] && [ "$4" = d ] || return 1
+    case "$2" in 700|750|755) ;; *) return 1 ;; esac
+)
+ddnsto_asus_storage() {
+    ASUS_STATE=
+    ddnsto_asus_anchor || return 1
+    if ! _ddnsto_asus_metadata /jffs/.ddnsto-installer >/dev/null 2>&1; then
+        (umask 077; _ddnsto_asus_mkdir /jffs/.ddnsto-installer) || return 1
+    fi
+    _ddnsto_asus_private_existing /jffs/.ddnsto-installer || return 1
+    ASUS_STATE=/jffs/.ddnsto-installer
+}
+_ddnsto_asus_private_existing() (
+    fields=$(_ddnsto_asus_metadata "$1") || return 1
+    set -- $fields
+    [ "$1" = 0 ] && [ "$2" = 700 ] && [ "$4" = d ]
+)
+_ddnsto_asus_descendant() {
+    [ "$#" = 1 ] || return 1
+    case "$1" in /jffs/*) ;; *) return 1 ;; esac
+    case "$1" in *[!a-zA-Z0-9_./-]*|*/|*//*|*/../*|*/..|*/./*|*/.) return 1 ;; esac
+}
+ddnsto_asus_safe_ancestors() (
+    _ddnsto_asus_descendant "$@" || return 1
+    ddnsto_asus_anchor || return 1
+    rest=${1#/jffs/} parent=/jffs
+    while case "$rest" in */*) true;; *) false;; esac; do
+        parent=$parent/${rest%%/*}; rest=${rest#*/}
+        fields=$(_ddnsto_asus_metadata "$parent") || return 1
+        set -- $fields
+        [ "$1" = 0 ] && [ "$4" = d ] || return 1
+        case "$2" in 7[0145][0145]) ;; *) return 1 ;; esac
+    done
+)
+_ddnsto_asus_private_path() {
+    _ddnsto_asus_descendant "$@" || return 1
+    case "$1" in /jffs/.ddnsto-installer|/jffs/.ddnsto-installer/*) ;; *) return 1 ;; esac
+    ddnsto_asus_safe_ancestors "$1" || return 1
+    _ddnsto_asus_private_existing /jffs/.ddnsto-installer
+}
+ddnsto_asus_private_dir() (
+    _ddnsto_asus_private_path "$@" || return 1
+    if ! _ddnsto_asus_metadata "$1" >/dev/null 2>&1; then
+        (umask 077; _ddnsto_asus_mkdir "$1") || return 1
+    fi
+    _ddnsto_asus_private_existing "$1"
+)
+ddnsto_asus_safe_file() (
+    _ddnsto_asus_private_path "$@" || return 1
+    fields=$(_ddnsto_asus_metadata "$1") || return 1
+    set -- $fields
+    [ "$1" = 0 ] && [ "$3" = 1 ] && [ "$4" = - ] || return 1
+    case "$2" in [4567][0145][0145]) ;; *) return 1 ;; esac
+)
+_ddnsto_asus_random() { openssl rand -hex 12; }
+ddnsto_asus_mktemp() (
+    _ddnsto_asus_private_path "$@" || return 1
+    _ddnsto_asus_private_existing "$1" || return 1
+    parent=$1 attempt=0
+    umask 077
+    while [ "$attempt" -lt 8 ]; do
+        random=$(_ddnsto_asus_random) || return 1
+        [ "${#random}" = 24 ] || return 1
+        case "$random" in *[!0-9a-f]*) return 1 ;; esac
+        path=$parent/tmp.$random
+        if _ddnsto_asus_mkdir "$path" 2>/dev/null; then
+            _ddnsto_asus_private_existing "$path" || return 1
+            printf '%s\n' "$path"
+            return 0
+        fi
+        attempt=$((attempt + 1))
+    done
+    return 1
+)
+_ddnsto_asus_openssl_hash() { openssl dgst -sha256 < "$1"; }
+_ddnsto_asus_sha256_hash() { sha256sum < "$1"; }
+ddnsto_asus_hash() (
+    ddnsto_asus_safe_file "$@" || return 1
+    if ddnsto_asus_has openssl; then
+        output=$(_ddnsto_asus_openssl_hash "$1") || return 1
+        backend=openssl
+    elif ddnsto_asus_has sha256sum; then
+        output=$(_ddnsto_asus_sha256_hash "$1") || return 1
+        backend=sha256sum
+    else
+        return 1
+    fi
+    printf '%s\n' "$output" | LC_ALL=C awk -v backend="$backend" '
+        NR == 1 && NF == 2 {
+            if (backend == "openssl" && ($1 == "SHA256(stdin)=" || $1 == "SHA2-256(stdin)=" || $1 == "(stdin)=")) digest=$2
+            if (backend == "sha256sum" && $2 == "-") digest=$1
+        }
+        END {
+            if (NR != 1 || length(digest) != 64 || digest ~ /[^0-9a-fA-F]/) exit 1
+            print tolower(digest)
+        }
+    '
+)
+_ddnsto_asus_package_tar() { tar "$@"; }
+_ddnsto_asus_package_od() { od "$@"; }
+_ddnsto_asus_package_has_od() { type od >/dev/null 2>&1; }
+_ddnsto_asus_package_capture() (
+    ceiling=$1 output=$2; shift 2
+    (ulimit -c 0 || exit 1
+     ulimit -f "$(((ceiling + 511) / 512))" || exit 1
+     _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    bytes=$(wc -c < "$output") || return 1
+    [ "$bytes" -gt 0 ] && [ "$bytes" -le "$ceiling" ]
+)
+_ddnsto_asus_package_member() (
+    member=$1 output=$2 ceiling=$3
+    expected=$(awk -v name="$member" '$6 == name {print $3}' .types) || return 1
+    _ddnsto_asus_package_capture "$ceiling" "$output" -xOzf "$archive" "$member" || return 1
+    [ "$(wc -c < "$output")" -eq "$expected" ]
+)
+ddnsto_asus_extract() (
+    [ "$#" = 4 ] || return 2
+    unset IFS # POSIX default splitting, independent of caller overrides.
+    archive=$1 dest=$2 channel=$3 arch=$4
+    pins=$(ddnsto_asus_package "$channel") || return 2
+    set -f
+    set -- $pins
+    [ "$#" = 5 ] && [ "$2" = 4.2.8 ] || return 2
+    version=$2 marker=$3
+    case "$channel:$arch" in
+        armsoft:armv7l) binary=ddnsto ;;
+        armsoft:*) return 2 ;;
+        *:armv7l) binary=ddnsto_arm ;;
+        *:aarch64) binary=ddnsto_aarch64 ;;
+        *) return 2 ;;
+    esac
+    for path in "$archive" "$dest"; do
+        case "$path" in /*) ;; *) return 2 ;; esac
+        case "$path" in /|*/|*//*|*/./*|*/../*|*/.|*/..|*[!a-zA-Z0-9_./+-]*) return 2 ;; esac
+        while [ "$path" != / ]; do
+            [ ! -L "$path" ] || return 2
+            path=${path%/*}; path=${path:-/}
+        done
+    done
+    [ -f "$archive" ] || return 2
+    bytes=$(wc -c < "$archive") || return 1
+    [ "$bytes" -gt 0 ] && [ "$bytes" -le 12582912 ] || return 1
+    LC_ALL=C; export LC_ALL
+    unset TAR_OPTIONS GZIP
+    umask 077
+    mkdir "$dest" || return 1
+    cd "$dest" || { rmdir "$dest"; return 1; }
+    trap 'rm -f ddnsto Module_ddnsto.asp icon-ddnsto.png .names .types .valid .version; rmdir "$dest"' 0
+    trap 'exit 1' 1 2 3 15
+    _ddnsto_asus_package_capture 16384 .names -tzf "$archive" || return 1
+    _ddnsto_asus_package_capture 16384 .types -tvzf "$archive" || return 1
+    LC_ALL=C awk -v channel="$channel" '
+        BEGIN {
+            split("ddnsto/ ddnsto/webs/ ddnsto/res/ ddnsto/bin/ ddnsto/scripts/", dirs, " ")
+            for (i in dirs) want[dirs[i]] = "d"
+            split("webs/Module_ddnsto.asp res/icon-ddnsto.png .valid version install.sh uninstall.sh scripts/ddnsto_config.sh scripts/ddnsto_status.sh", files, " ")
+            for (i in files) want["ddnsto/" files[i]] = "-"
+            if (channel == "armsoft") {
+                want["ddnsto/bin/ddnsto"] = "-"
+                want["ddnsto/res/ddnsto_check.html"] = "-"
+            } else {
+                want["ddnsto/bin/ddnsto_arm"] = "-"
+                want["ddnsto/bin/ddnsto_aarch64"] = "-"
+            }
+        }
+        NR == FNR {
+            if (!($0 in want) || seen[$0]++) bad = 1
+            names[FNR] = $0
+            count++
+            next
+        }
+        {
+            if (NF != 6 || $6 != names[FNR] || substr($1, 1, 1) != want[$6] ||
+                length($1) != 10 || $3 !~ /^[0-9]+$/) bad = 1
+            ceiling = ($6 ~ /^ddnsto\/bin\/ddnsto/) ? 12582912 : 65536
+            if (want[$6] == "d") { if ($3 != 0) bad = 1 }
+            else if ($3 < 1 || $3 > ceiling) bad = 1
+            total += $3
+            types++
+        }
+        END {
+            for (name in want) if (seen[name] != 1) bad = 1
+            if (count != 15 || types != count || total > 27262976) bad = 1
+            exit bad
+        }
+    ' .names .types || return 1
+    _ddnsto_asus_package_member ddnsto/.valid .valid 64 || return 1
+    _ddnsto_asus_package_member ddnsto/version .version 64 || return 1
+    printf '%s\n' "$marker" | cmp -s .valid - || return 1
+    printf '%s\n' "$version" | cmp -s .version - || return 1
+    _ddnsto_asus_package_member "ddnsto/bin/$binary" ddnsto 12582912 || return 1
+    _ddnsto_asus_package_member ddnsto/webs/Module_ddnsto.asp Module_ddnsto.asp 65536 || return 1
+    _ddnsto_asus_package_member ddnsto/res/icon-ddnsto.png icon-ddnsto.png 65536 || return 1
+    if _ddnsto_asus_package_has_od; then
+        header=$(_ddnsto_asus_package_od -An -v -tu1 -N20 ddnsto) || return 1
+        set -- $header
+        [ "$#" = 20 ] || return 1
+        [ "$1 $2 $3 $4 $6 $7" = '127 69 76 70 1 1' ] || return 1
+        class=$5
+        shift 16
+        case "$1 $2" in '2 0'|'3 0') ;; *) return 1 ;; esac
+        case "$arch:$class:$3:$4" in armv7l:1:40:0|aarch64:2:183:0) ;; *) return 1 ;; esac
+    fi
+    chmod 700 ddnsto || return 1
+    rm -f .names .types .valid .version || return 1
+    trap - 0
+)
+_ddnsto_asus_plugin_files() {
+    printf '%s\n' bin/ddnsto scripts/ddnsto_config.sh scripts/ddnsto_status.sh \
+        scripts/uninstall_ddnsto.sh init.d/S70ddnsto.sh webs/Module_ddnsto.asp res/icon-ddnsto.png
+}
+_ddnsto_asus_metadata_keys() {
+    printf '%s\n' ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        softcenter_module_ddnsto_version softcenter_module_ddnsto_install \
+        softcenter_module_ddnsto_name softcenter_module_ddnsto_title \
+        softcenter_module_ddnsto_description
+}
+_ddnsto_asus_plugin_cd() {
+    case "$1" in bin|scripts|init.d|webs|res) ;; *) return 1 ;; esac
+    cd -P /jffs || return 1
+    [ ! -L .koolshare ] && cd -P .koolshare || return 1
+    [ "$(pwd -P)" = /jffs/.koolshare ] || return 1
+    [ ! -L "$1" ] && cd -P "$1" || return 1
+    [ "$(pwd -P)" = "/jffs/.koolshare/$1" ]
+}
+_ddnsto_asus_publish() { mv -f "$1" .; }
+_ddnsto_asus_probe_mv() (
+    probe="$ASUS_ATTEMPT/mv-probe"
+    mkdir "$probe" "$probe/source" "$probe/dest" "$probe/outside" || return 1
+    printf probe > "$probe/source/leaf"
+    ln -s "$probe/outside" "$probe/dest/leaf" || return 1
+    cd -P "$probe/dest" || return 1
+    _ddnsto_asus_publish "$probe/source/leaf" || return 1
+    [ ! -L leaf ] && [ -f leaf ] && [ "$(cat leaf)" = probe ] || return 1
+    [ ! -e "$probe/outside/leaf" ] || return 1
+    mkdir "$probe/dest/directory" || return 1
+    printf probe > "$probe/source/directory"
+    if _ddnsto_asus_publish "$probe/source/directory" 2>/dev/null; then return 1; fi
+    [ ! -e "$probe/dest/directory/directory" ]
+)
+ddnsto_asus_backup_plugin() (
+    umask 077
+    ddnsto_asus_private_dir "$ASUS_ATTEMPT" || return 1
+    mkdir "$ASUS_ATTEMPT/backup" "$ASUS_ATTEMPT/changed" || return 1
+    mkdir "$ASUS_ATTEMPT/backup/files" "$ASUS_ATTEMPT/backup/config" || return 1
+    _ddnsto_asus_probe_mv || return 1
+    for key in $(_ddnsto_asus_metadata_keys); do
+        ddnsto_asus_get "$key" > "$ASUS_ATTEMPT/backup/config/$key" || return 1
+    done
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            if [ -e "$leaf" ] || [ -L "$leaf" ]; then
+                [ -L "$leaf" ] || [ -f "$leaf" ] || exit 1
+                cp -pP "$leaf" "$ASUS_ATTEMPT/backup/files/$leaf" || exit 1
+                [ -L "$ASUS_ATTEMPT/backup/files/$leaf" ] ||
+                    ddnsto_asus_safe_file "$ASUS_ATTEMPT/backup/files/$leaf" || exit 1
+            fi
+        ) || return 1
+    done
+    if [ -L "$ASUS_STATE/current" ]; then
+        previous=$(readlink -f "$ASUS_STATE/current") || return 1
+        case "$previous" in "$ASUS_STATE"/*/runtime) ;; *) return 1 ;; esac
+        ddnsto_asus_safe_file "$previous/ddnsto" &&
+            ddnsto_asus_safe_file "$previous/service.sh" || return 1
+        cp -pP "$ASUS_STATE/current" "$ASUS_ATTEMPT/backup/current" || return 1
+    elif [ -e "$ASUS_STATE/current" ]; then return 1
+    fi
+    if [ ! -L "$ASUS_ATTEMPT/backup/current" ] &&
+        [ "$(cat "$ASUS_ATTEMPT/backup/config/ddnsto_enable")" = 1 ]; then
+        old="$ASUS_ATTEMPT/backup/files/ddnsto"
+        ddnsto_asus_safe_file "$old" && cmp -s "$old" "$ASUS_ATTEMPT/payload/ddnsto" || {
+            printf '%s\n' 'ASUS: enabled native binary is not reviewed recovery material' >&2
+            return 1
+        }
+    fi
+    _ddnsto_asus_prepare_runtime || return 1
+    : > "$ASUS_ATTEMPT/backup/complete"
+)
+_ddnsto_asus_runtime() {
+    cat <<'ASUS_RUNTIME'
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+unset ENV BASH_ENV CDPATH
+umask 077
+service_binary=/jffs/.ddnsto-installer/current/ddnsto
+asus_service_get() { /usr/bin/dbus get "$1"; }
+asus_service_identity() (
+    case "$1" in ''|*[!0-9]*|0|1) exit 1 ;; esac
+    target=$(readlink "/proc/$1/exe") || exit 1
+    case "$target" in
+        /.koolshare/bin/ddnsto|/jffs/.koolshare/bin/ddnsto)
+            [ "${2:-}" = legacy ] || exit 1 ;;
+        *) wanted=$(readlink -f "$service_binary") || exit 1
+            [ "$target" = "$wanted" ] || exit 1 ;;
+    esac
+    role=$(awk '
+        $1=="Uid:" {u++; if (NF!=5 || $2!=0 || $3!=0 || $4!=0 || $5!=0) bad=1}
+        $1=="PPid:" {p++; parent=$2}
+        END {if (u!=1 || p!=1 || bad || parent !~ /^[0-9]+$/) exit 1; print parent}
+    ' "/proc/$1/status") || exit 1
+    birth=$(sed 's/^.*) //' "/proc/$1/stat" | awk 'NF>=20 && $20 ~ /^[0-9]+$/ {print $20}')
+    [ -n "$birth" ] || exit 1
+    printf '%s:%s:%s\n' "$target" "$role" "$birth"
+)
+asus_service_main() {
+    main=
+    for pid in $(pidof ddnsto 2>/dev/null); do
+        ident=$(asus_service_identity "$pid") || return 1
+        case "$ident" in *:1:*)
+            [ -z "$main" ] || return 1
+            main=$pid; main_identity=$ident ;;
+        esac
+    done
+    [ -n "$main" ]
+}
+asus_service_running() {
+    asus_service_main || return 1
+    stable_pid=$main stable_identity=$main_identity
+    for probe in 2 3; do
+        sleep 1
+        asus_service_main || return 1
+        [ "$main" = "$stable_pid" ] && [ "$main_identity" = "$stable_identity" ] || return 1
+    done
+}
+asus_service_stop() {
+    mains= children=
+    for pid in $(pidof ddnsto 2>/dev/null); do
+        ident=$(asus_service_identity "$pid" "${1:-}") || continue
+        case "$ident" in *:1:*) mains="$mains $pid" ;; *) children="$children $pid" ;; esac
+    done
+    for pid in $mains $children; do
+        ident=$(asus_service_identity "$pid" "${1:-}") || continue
+        [ "$(asus_service_identity "$pid" "${1:-}")" = "$ident" ] || return 1
+        kill -TERM "$pid" 2>/dev/null || {
+            [ "$(asus_service_identity "$pid" "${1:-}")" != "$ident" ] || return 1
+        }
+    done
+    for probe in 1 2 3 4 5; do
+        remaining=0
+        for pid in $(pidof ddnsto 2>/dev/null); do remaining=1; done
+        [ "$remaining" = 0 ] && return 0
+        sleep 1
+    done
+    return 1
+}
+asus_service_start() {
+    [ "$(asus_service_get ddnsto_enable)" = 1 ] || return 0
+    asus_service_main && return 0
+    [ -z "$(pidof ddnsto 2>/dev/null)" ] || return 1
+    token=$(asus_service_get ddnsto_token) || return 1
+    case "$token" in ''|*[!a-zA-Z0-9_-]*) return 1 ;; esac
+    enabled=$(asus_service_get ddnsto_feat_enabled) || return 1
+    user=$(asus_service_get ddnsto_feat_username) || return 1
+    pass=$(asus_service_get ddnsto_feat_password) || return 1
+    port=$(asus_service_get ddnsto_feat_port) || return 1
+    disk=$(asus_service_get ddnsto_feat_disk_path_selected) || return 1
+    set -- -u "$token" -d
+    if [ "$enabled" = 1 ] && [ -n "$user" ] && [ -n "$pass" ] && [ -n "$port" ]; then
+        case "$port" in *[!0-9]*|'') return 1 ;; esac
+        [ "${#port}" -le 5 ] && [ "$port" -gt 0 ] && [ "$port" -le 65535 ] || return 1
+        set -- "$@" -n "$user" -k "$pass" -p "$port" -s "${disk:-/}"
+    fi
+    "$service_binary" "$@" >/dev/null 2>&1
+}
+asus_service_json() {
+    LC_ALL=C awk 'BEGIN {printf "\""; for(i=1;i<32;i++) ctrl[sprintf("%c",i)]=i}
+        {if(NR>1) printf "\\n"; for(i=1;i<=length($0);i++) {
+            c=substr($0,i,1)
+            if(c=="\\" || c=="\"") printf "\\%s",c
+            else if(c in ctrl) printf "\\u%04x",ctrl[c]
+            else printf "%s",c
+        }} END {printf "\""}'
+}
+asus_service_response() {
+    case "$1" in ''|*[!0-9]*) return 1 ;; esac
+    [ "${#1}" -le 16 ] || return 1
+    curl --noproxy '*' --connect-timeout 2 --max-time 5 -fsS \
+        -H 'Content-Type: application/json' --data-binary "$2" \
+        "http://127.0.0.1:3030/_resp/$1" >/dev/null
+}
+asus_service_router_id() (
+    query=/jffs/.ddnsto-installer/router-query.lock
+    mkdir -m 700 "$query" 2>/dev/null || exit 1
+    child=
+    cleanup_query() {
+        if [ -n "$child" ]; then
+            kill -KILL "$child" 2>/dev/null || :
+            wait "$child" 2>/dev/null || :
+        fi
+        rm -f "$query/output"
+        rmdir "$query" 2>/dev/null || :
+    }
+    trap cleanup_query 0
+    trap 'exit 1' 1 2 3 15
+    (ulimit -c 0 && ulimit -f 1 && exec "$service_binary" -w) > "$query/output" 2>/dev/null &
+    child=$!
+    for probe in 1 2 3; do
+        sleep 1
+        kill -0 "$child" 2>/dev/null || break
+    done
+    if kill -0 "$child" 2>/dev/null; then exit 1; fi
+    wait "$child" 2>/dev/null; result=$?
+    child=
+    [ "$result" = 0 ] || exit 1
+    [ "$(wc -c < "$query/output")" -le 128 ] || exit 1
+    LC_ALL=C awk '
+        NR==1 && NF==2 && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ &&
+            length($2)==12 && $2 ~ /^[0-9a-f]+$/ { id=$2; valid=1 }
+        END { if(NR!=1 || !valid) exit 1; print id }
+    ' "$query/output"
+)
+asus_service_plugin_cd() {
+    case "$1" in bin|scripts|init.d|webs|res) ;; *) return 1 ;; esac
+    cd -P /jffs || return 1
+    [ ! -L .koolshare ] && cd -P .koolshare || return 1
+    [ "$(pwd -P)" = /jffs/.koolshare ] || return 1
+    [ ! -L "$1" ] && cd -P "$1" || return 1
+    [ "$(pwd -P)" = "/jffs/.koolshare/$1" ]
+}
+asus_service_owned_leaf() {
+    case "$1" in Module_ddnsto.asp|icon-ddnsto.png)
+        [ ! -L "./$1" ] && [ -f "./$1" ] &&
+            cmp -s "./$1" "/jffs/.ddnsto-installer/current/$1" ;;
+        *) [ -L "./$1" ] &&
+            [ "$(readlink "./$1")" = "/jffs/.ddnsto-installer/current/$1" ] ;;
+    esac
+}
+asus_service_uninstall() {
+    owned='bin/ddnsto scripts/ddnsto_config.sh scripts/ddnsto_status.sh scripts/uninstall_ddnsto.sh init.d/S70ddnsto.sh webs/Module_ddnsto.asp res/icon-ddnsto.png'
+    for entry in $owned; do
+        (asus_service_plugin_cd "${entry%/*}" &&
+            asus_service_owned_leaf "${entry##*/}") || {
+            printf '%s\n' 'ASUS: uninstall refused: plugin file ownership changed' >&2
+            return 1
+        }
+    done
+    asus_service_stop || return 1
+    for entry in $owned; do
+        (
+            asus_service_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            asus_service_owned_leaf "$leaf" || exit 1
+            rm -f "./$leaf"
+        ) || return 1
+    done
+    for key in ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        ddnsto_feat_enabled ddnsto_feat_username ddnsto_feat_password \
+        ddnsto_feat_port ddnsto_feat_disk_path_selected \
+        softcenter_module_ddnsto_version softcenter_module_ddnsto_install \
+        softcenter_module_ddnsto_name softcenter_module_ddnsto_title \
+        softcenter_module_ddnsto_description; do
+        /usr/bin/dbus remove "$key" || return 1
+    done
+}
+asus_service_status() {
+    request=$1
+    case "$request" in ''|*[!0-9]*) return 1 ;; esac
+    [ "${#request}" -le 16 ] || return 1
+    state=0 feat=0 pidtext=
+    if asus_service_main; then
+        state=1; pidtext=$main
+        for pid in $(pidof ddnsto 2>/dev/null); do
+            ident=$(asus_service_identity "$pid") || continue
+            case "$ident" in *:"$main":*) feat=1 ;; esac
+        done
+    fi
+    version=$(asus_service_get ddnsto_version | asus_service_json) || return 1
+    username=$(asus_service_get ddnsto_feat_username | asus_service_json) || return 1
+    port=$(asus_service_get ddnsto_feat_port | asus_service_json) || return 1
+    router_id=$(asus_service_router_id) || router_id=
+    asus_service_response "$request" "{\"version\":$version,\"status\":$state,\"router_id\":\"$router_id\",\"pid\":\"$pidtext\",\"feat\":{\"status\":\"$feat\",\"username\":$username,\"port\":$port,\"disk_path\":\"/webdav/\"}}"
+}
+case "${1:-}" in
+    start|stop|config|uninstall)
+        mkdir -m 700 /jffs/.ddnsto-installer/install.lock 2>/dev/null || exit 16
+        trap 'rmdir /jffs/.ddnsto-installer/install.lock 2>/dev/null || :' 0
+        trap 'exit 1' 1 2 3 15 ;;
+esac
+case "${1:-}" in
+    library) ;; # private installer/test source use; performs no action
+    start|installer-start) asus_service_start ;;
+    stop) asus_service_stop ;;
+    migrate-stop) asus_service_stop legacy ;;
+    running) asus_service_running ;;
+    status) asus_service_status "${2:-}" ;;
+    uninstall) asus_service_uninstall ;;
+    config)
+        case "${2:-}" in ''|*[!0-9]*) exit 2 ;; esac
+        [ "${#2}" -le 16 ] || exit 2
+        result=0
+        asus_service_stop && asus_service_start || result=1
+        asus_service_response "$2" "$2" || exit 1
+        exit "$result" ;;
+    *) exit 2 ;;
+esac
+ASUS_RUNTIME
+}
+_ddnsto_asus_prepare_runtime() (
+    umask 077
+    mkdir "$ASUS_ATTEMPT/runtime" || return 1
+    ddnsto_asus_safe_file "$ASUS_ATTEMPT/payload/ddnsto" || return 1
+    cp "$ASUS_ATTEMPT/payload/ddnsto" "$ASUS_ATTEMPT/runtime/ddnsto" || return 1
+    chmod 700 "$ASUS_ATTEMPT/runtime/ddnsto" || return 1
+    _ddnsto_asus_runtime > "$ASUS_ATTEMPT/runtime/service.sh" || return 1
+    chmod 700 "$ASUS_ATTEMPT/runtime/service.sh" || return 1
+    pins=$(ddnsto_asus_package "$ASUS_CHANNEL") || return 1
+    printf '%s\n' "$pins" > "$ASUS_ATTEMPT/runtime/source-pin" || return 1
+    digest=$(ddnsto_asus_hash "$ASUS_ATTEMPT/runtime/ddnsto") || return 1
+    printf '%s\n' "$digest" > "$ASUS_ATTEMPT/runtime/binary.sha256" || return 1
+)
+ddnsto_asus_reusable() (
+    [ "$(ddnsto_asus_get ddnsto_version)" = 4.2.8 ] || return 1
+    [ -L "$ASUS_STATE/current" ] || return 1
+    runtime=$(readlink -f "$ASUS_STATE/current") || return 1
+    case "$runtime" in "$ASUS_STATE"/*/runtime) ;; *) return 1 ;; esac
+    for name in ddnsto service.sh source-pin binary.sha256 \
+        ddnsto_config.sh ddnsto_status.sh uninstall_ddnsto.sh S70ddnsto.sh \
+        Module_ddnsto.asp icon-ddnsto.png; do
+        ddnsto_asus_safe_file "$runtime/$name" || return 1
+    done
+    [ -x "$runtime/ddnsto" ] || return 1
+    pins=$(ddnsto_asus_package "$ASUS_CHANNEL") || return 1
+    printf '%s\n' "$pins" | cmp -s "$runtime/source-pin" - || return 1
+    digest=$(ddnsto_asus_hash "$runtime/ddnsto") || return 1
+    printf '%s\n' "$digest" | cmp -s "$runtime/binary.sha256" - || return 1
+    _ddnsto_asus_runtime | cmp -s "$runtime/service.sh" - || return 1
+    for kind in config status uninstall init; do
+        case "$kind" in config) leaf=ddnsto_config.sh ;; status) leaf=ddnsto_status.sh ;;
+            uninstall) leaf=uninstall_ddnsto.sh ;; init) leaf=S70ddnsto.sh ;; esac
+        _ddnsto_asus_bridge "$kind" | cmp -s "$runtime/$leaf" - || return 1
+    done
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            case "$leaf" in Module_ddnsto.asp|icon-ddnsto.png)
+                [ ! -L "$leaf" ] && [ -f "$leaf" ] && cmp -s "$leaf" "$runtime/$leaf" ;;
+                *) [ -L "$leaf" ] && [ "$(readlink "$leaf")" = "$ASUS_STATE/current/$leaf" ] ;;
+            esac
+        ) || return 1
+    done
+)
+_ddnsto_asus_bridge() {
+    printf '%s\n' '#!/bin/sh' 'PATH=/usr/sbin:/usr/bin:/sbin:/bin' 'export PATH' \
+        'unset ENV BASH_ENV CDPATH'
+    case "$1" in
+        config) printf '%s\n' 'case "${1:-}" in start|stop) action=$1; shift ;; *) action=config ;; esac' \
+            'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh "$action" "$@"' ;;
+        status) printf '%s\n' 'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh status "$@"' ;;
+        uninstall) printf '%s\n' 'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh uninstall' ;;
+        init) printf '%s\n' 'case "${1:-start}" in start|stop) ;; *) exit 2 ;; esac' \
+            'exec /bin/sh /jffs/.ddnsto-installer/current/service.sh "${1:-start}"' ;;
+    esac
+}
+ddnsto_asus_install_plugin() (
+    umask 077
+    [ -f "$ASUS_ATTEMPT/backup/complete" ] || return 1
+    ddnsto_asus_safe_file "$ASUS_ATTEMPT/runtime/ddnsto" &&
+        ddnsto_asus_safe_file "$ASUS_ATTEMPT/runtime/service.sh" || return 1
+    for name in Module_ddnsto.asp icon-ddnsto.png; do
+        ddnsto_asus_safe_file "$ASUS_ATTEMPT/payload/$name" || return 1
+        cp "$ASUS_ATTEMPT/payload/$name" "$ASUS_ATTEMPT/runtime/$name" || return 1
+        chmod 644 "$ASUS_ATTEMPT/runtime/$name" || return 1
+    done
+    _ddnsto_asus_bridge config > "$ASUS_ATTEMPT/runtime/ddnsto_config.sh" || return 1
+    _ddnsto_asus_bridge status > "$ASUS_ATTEMPT/runtime/ddnsto_status.sh" || return 1
+    _ddnsto_asus_bridge init > "$ASUS_ATTEMPT/runtime/S70ddnsto.sh" || return 1
+    _ddnsto_asus_bridge uninstall > "$ASUS_ATTEMPT/runtime/uninstall_ddnsto.sh" || return 1
+    chmod 755 "$ASUS_ATTEMPT/runtime/ddnsto_config.sh" \
+        "$ASUS_ATTEMPT/runtime/ddnsto_status.sh" "$ASUS_ATTEMPT/runtime/S70ddnsto.sh" \
+        "$ASUS_ATTEMPT/runtime/uninstall_ddnsto.sh" || return 1
+    mkdir "$ASUS_ATTEMPT/publish" || return 1
+    ln -s "$ASUS_ATTEMPT/runtime" "$ASUS_ATTEMPT/publish/current" || return 1
+    : > "$ASUS_ATTEMPT/changed/current"
+    (cd -P "$ASUS_STATE" && _ddnsto_asus_publish "$ASUS_ATTEMPT/publish/current") || return 1
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            leaf=${entry##*/}
+            case "$leaf" in Module_ddnsto.asp|icon-ddnsto.png)
+                cp "$ASUS_ATTEMPT/runtime/$leaf" "$ASUS_ATTEMPT/publish/$leaf" || exit 1
+                chmod 644 "$ASUS_ATTEMPT/publish/$leaf" || exit 1 ;;
+                *) ln -s "$ASUS_STATE/current/$leaf" "$ASUS_ATTEMPT/publish/$leaf" || exit 1 ;;
+            esac
+            : > "$ASUS_ATTEMPT/changed/$leaf"
+            _ddnsto_asus_publish "$ASUS_ATTEMPT/publish/$leaf"
+        ) || return 1
+    done
+    for key in ddnsto_version ddnsto_client_version softcenter_module_ddnsto_version \
+        softcenter_module_ddnsto_install softcenter_module_ddnsto_name \
+        softcenter_module_ddnsto_title softcenter_module_ddnsto_description; do
+        case "$key" in
+            *_version) value=4.2.8 ;; *_install) value=1 ;;
+            *_name) value=ddnsto ;; *_title) value=DDNSTO ;;
+            *_description) value='DDNSTO remote access' ;;
+        esac
+        : > "$ASUS_ATTEMPT/changed/$key"
+        ddnsto_asus_set "$key" "$value" || return 1
+    done
+)
+_ddnsto_asus_service_call() (
+    umask 077
+    ddnsto_asus_private_dir "$ASUS_ATTEMPT" || return 1
+    runner=$(ddnsto_asus_mktemp "$ASUS_ATTEMPT") || return 1
+    _ddnsto_asus_runtime > "$runner/service.sh" || return 1
+    /bin/sh "$runner/service.sh" "$1"
+)
+ddnsto_asus_stop() { _ddnsto_asus_service_call migrate-stop; }
+ddnsto_asus_start() { _ddnsto_asus_service_call installer-start; }
+ddnsto_asus_running() { _ddnsto_asus_service_call running; }
+ddnsto_asus_restore_plugin() (
+    umask 077
+    [ -f "$ASUS_ATTEMPT/backup/complete" ] || return 1
+    ddnsto_asus_stop || return 1
+    restore=$(ddnsto_asus_mktemp "$ASUS_ATTEMPT") || return 1
+    for entry in $(_ddnsto_asus_plugin_files); do
+        (
+            leaf=${entry##*/}
+            [ -f "$ASUS_ATTEMPT/changed/$leaf" ] || exit 0
+            _ddnsto_asus_plugin_cd "${entry%/*}" || exit 1
+            saved="$ASUS_ATTEMPT/backup/files/$leaf"
+            if [ -e "$saved" ] || [ -L "$saved" ]; then
+                cp -pP "$saved" "$restore/$leaf" || exit 1
+                _ddnsto_asus_publish "$restore/$leaf" || exit 1
+            else
+                rm -f "./$leaf" || exit 1
+            fi
+        ) || return 1
+    done
+    recovery_conflict=0
+    for key in $(_ddnsto_asus_metadata_keys); do
+        [ -f "$ASUS_ATTEMPT/changed/$key" ] || continue
+        case "$key" in ddnsto_token|ddnsto_enable)
+            expected=$(cat "$ASUS_ATTEMPT/changed/$key") || return 1
+            live=$(ddnsto_asus_get "$key") || return 1
+            if [ "$live" != "$expected" ]; then
+                recovery_conflict=1
+                continue
+            fi ;;
+        esac
+        value=$(cat "$ASUS_ATTEMPT/backup/config/$key") || return 1
+        ddnsto_asus_set "$key" "$value" || return 1
+    done
+    if [ -f "$ASUS_ATTEMPT/changed/current" ]; then
+        if [ -L "$ASUS_ATTEMPT/backup/current" ]; then
+            cp -pP "$ASUS_ATTEMPT/backup/current" "$restore/current" || return 1
+            (cd -P "$ASUS_STATE" && _ddnsto_asus_publish "$restore/current") || return 1
+        elif [ "$(cat "$ASUS_ATTEMPT/backup/config/ddnsto_enable")" != 1 ]; then
+            rm -f "$ASUS_STATE/current" || return 1
+        fi
+    fi
+    if [ "$recovery_conflict" = 1 ]; then
+        printf '%s\n' 'ASUS: recovery refused: concurrent account/enable change; external values preserved' >&2
+        return 1
+    fi
+    if [ "$(cat "$ASUS_ATTEMPT/backup/config/ddnsto_enable")" = 1 ]; then
+        if [ ! -L "$ASUS_STATE/current" ]; then
+            ln -s "$ASUS_ATTEMPT/runtime" "$restore/current" || return 1
+            (cd -P "$ASUS_STATE" && _ddnsto_asus_publish "$restore/current") || return 1
+        fi
+        ddnsto_asus_start && ddnsto_asus_running || return 1
+    fi
+)
+ddnsto_asus_identity() {
+    if [ "$#" = 2 ]; then
+        asus_existing_token=$1 asus_version=$2
+    else
+        asus_existing_token=$(ddnsto_asus_get ddnsto_token) || return 2
+        asus_version=$(ddnsto_asus_get ddnsto_version) || return 2
+    fi
+    [ -z "$asus_existing_token" ] || [ "$asus_existing_token" = "$TOKEN" ] || {
+        ddnsto_flow_error E_ACCOUNT '插件属于其他账号，未执行换绑' '请使用原账号重新复制命令'; return 2;
+    }
+    if [ -n "$asus_version" ]; then
+        asus_order=$(ddnsto_version_order "$asus_version" 4.2.8) || asus_order=unknown
+        case "$asus_order" in -1|0) ;; *)
+            ddnsto_flow_error E_VERSION '插件版本更新或无法识别，未覆盖现有版本' '请使用对应版本安装器；不会降级'; return 2 ;;
+        esac
+        [ -n "$asus_existing_token" ] || {
+            ddnsto_flow_error E_ACCOUNT '已安装插件缺少账号信息，未修改配置' '请先在软件中心检查 Token'; return 2;
+        }
+    fi
+}
+ddnsto_asus_checkpoint() {
+    [ -z "${ASUS_CANCEL:-}" ] || [ ! -f "$ASUS_CANCEL" ] || {
+        ddnsto_flow_error E_CANCELLED '安装已取消，正在完成必要恢复' '请等待当前命令结束后检查状态'; return 143;
+    }
+}
+ddnsto_asus_snapshot_config() {
+    mkdir "$ASUS_ATTEMPT/config" || return 12
+    for key in ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        ddnsto_feat_enabled ddnsto_feat_username ddnsto_feat_password \
+        ddnsto_feat_port ddnsto_feat_disk_path_selected; do
+        ddnsto_asus_get "$key" > "$ASUS_ATTEMPT/config/$key" || return 12
+    done
+}
+ddnsto_asus_config_unchanged() {
+    for key in ddnsto_token ddnsto_enable ddnsto_version ddnsto_client_version \
+        ddnsto_feat_enabled ddnsto_feat_username ddnsto_feat_password \
+        ddnsto_feat_port ddnsto_feat_disk_path_selected; do
+        ddnsto_asus_get "$key" > "$ASUS_ATTEMPT/compare" || return 12
+        cmp -s "$ASUS_ATTEMPT/config/$key" "$ASUS_ATTEMPT/compare" || return 2
+    done
+}
+ddnsto_asus_ensure_locked() (
+    umask 077
+    ddnsto_asus_preflight || exit $?
+    case "$TOKEN" in ''|*[!a-zA-Z0-9_-]*)
+        ddnsto_flow_error E_TOKEN 'Token 格式无效' '请从控制台重新复制'; exit 2 ;;
+    esac
+    ddnsto_asus_busy || { ddnsto_flow_error E_BUSY '软件中心正在安装其他插件' '请等待软件中心任务结束'; exit 16; }
+    ddnsto_asus_identity || exit $?
+    ASUS_ATTEMPT=$(ddnsto_asus_mktemp "$ASUS_STATE") || exit 12
+    ddnsto_asus_snapshot_config || exit $?
+    ddnsto_asus_identity "$(cat "$ASUS_ATTEMPT/config/ddnsto_token")" "$(cat "$ASUS_ATTEMPT/config/ddnsto_version")" || exit $?
+    ddnsto_asus_checkpoint || exit $?
+    if [ "$asus_version" = 4.2.8 ] && [ "$(cat "$ASUS_ATTEMPT/config/ddnsto_enable")" = 1 ] &&
+        ddnsto_asus_reusable && ddnsto_asus_running; then
+        ddnsto_asus_config_unchanged && ddnsto_asus_checkpoint || exit 2
+        ddnsto_flow_note installed
+        ddnsto_flow_note starting
+        ddnsto_flow_note started
+        exit 0
+    fi
+    ddnsto_asus_fetch "$ASUS_ATTEMPT/package.tar.gz" || {
+        ddnsto_flow_error E_DOWNLOAD '插件下载或校验失败，现有服务未停止' '请检查 HTTPS 下载后重试'; exit 11;
+    }
+    ddnsto_asus_extract "$ASUS_ATTEMPT/package.tar.gz" "$ASUS_ATTEMPT/payload" "$ASUS_CHANNEL" "$ASUS_ARCH" || {
+        ddnsto_flow_error E_PACKAGE '插件包结构或平台标记不符合审核记录' '请联系发布者检查安装包，未执行包内脚本'; exit 11;
+    }
+    ddnsto_asus_checkpoint || exit $?
+    ddnsto_asus_busy && ddnsto_asus_config_unchanged || {
+        ddnsto_flow_error E_CONFIG '下载期间软件中心或配置发生变化' '请稍后重新执行，未覆盖修改'; exit 2;
+    }
+    ddnsto_asus_backup_plugin || {
+        ddnsto_flow_error E_BACKUP '无法安全备份现有插件' '请检查存储和插件文件，未停止服务'; exit 12;
+    }
+    changed=0
+    finish_asus() {
+        result=$?
+        trap - EXIT HUP INT TERM
+        if [ "$result" != 0 ] && [ "$changed" = 1 ]; then
+            if ! ddnsto_asus_restore_plugin; then
+                ddnsto_flow_error E_RECOVERY '安装失败且恢复未完成，已保留私有备份' "请检查 $ASUS_ATTEMPT" || :
+            fi
+        fi
+        exit "$result"
+    }
+    trap finish_asus EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    ddnsto_asus_checkpoint || exit $?
+    ddnsto_flow_note installing
+    changed=1
+    ddnsto_asus_stop || { ddnsto_flow_error E_STOP '未确认旧进程停止，未覆盖文件' '请检查客户端进程'; exit 13; }
+    ddnsto_asus_install_plugin || {
+        ddnsto_flow_error E_PACKAGE '插件文件安装失败，正在尝试恢复' "备份位于 $ASUS_ATTEMPT"; exit 11;
+    }
+    ddnsto_asus_checkpoint || exit $?
+    [ "$(ddnsto_asus_get ddnsto_token)" = "$asus_existing_token" ] || {
+        ddnsto_flow_error E_ACCOUNT '安装期间账号发生变化，不覆盖新配置' '请检查软件中心账号后重试'; exit 2;
+    }
+    if [ -z "$asus_existing_token" ]; then
+        printf '%s' "$TOKEN" > "$ASUS_ATTEMPT/changed/ddnsto_token" || exit 12
+        ddnsto_asus_set ddnsto_token "$TOKEN" || exit 12
+    fi
+    printf '1' > "$ASUS_ATTEMPT/changed/ddnsto_enable" || exit 12
+    ddnsto_asus_set ddnsto_enable 1 || exit 12
+    [ "$(ddnsto_asus_get ddnsto_token)" = "$TOKEN" ] || {
+        ddnsto_flow_error E_ACCOUNT '启动前账号发生变化，不覆盖新配置' '请停止并发修改后重试'; exit 2;
+    }
+    ddnsto_flow_note installed
+    ddnsto_flow_note starting
+    ddnsto_asus_start && ddnsto_asus_running || {
+        ddnsto_flow_error E_START '插件安装后未确认稳定启动，正在尝试恢复' "请检查私有备份 $ASUS_ATTEMPT"; exit 13;
+    }
+    ddnsto_asus_checkpoint || exit $?
+    [ "$(ddnsto_asus_get ddnsto_token)" = "$TOKEN" ] || {
+        ddnsto_flow_error E_ACCOUNT '启动期间账号发生变化，不能确认安装成功' '请停止并发修改后检查软件中心配置'; exit 2;
+    }
+    changed=0
+    ddnsto_flow_note started
+)
+ddnsto_asus_get() { /usr/bin/dbus get "$1"; }
+ddnsto_asus_set() { /usr/bin/dbus set "$1=$2"; }
+ddnsto_asus_busy() {
+    [ -z "$(ddnsto_asus_get softcenter_installing_name)" ] &&
+        [ -z "$(ddnsto_asus_get softcenter_installing_todo)" ]
+}
+ddnsto_asus_facts() {
+    [ -x /bin/nvram ] && [ -x /usr/bin/dbus ] && [ -d /koolshare ] || {
+        ddnsto_flow_error E_PLATFORM '需要兼容的华硕软件中心固件' '不会自动刷机或安装软件中心'; return 2;
+    }
+    asus_model=$(/bin/nvram get odmpid)
+    [ -n "$asus_model" ] || asus_model=$(/bin/nvram get productid)
+    ASUS_ARCH=$(uname -m)
+    ASUS_CHANNEL=$(ddnsto_asus_channel "$asus_model" "$(uname -r)" "$ASUS_ARCH" "$(/bin/nvram get sc_url)") || {
+        ddnsto_flow_error E_PLATFORM '无法安全确定华硕插件渠道或处理器兼容性' '请核对软件中心来源和机型'; return 2;
+    }
+}
+ddnsto_asus_preflight() {
+    PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+    ddnsto_asus_facts || return $?
+    ddnsto_asus_storage || { ddnsto_flow_error E_STORAGE '华硕私有目录不安全或不可写' '请检查 /jffs 挂载及剩余空间'; return 12; }
+    for tool in awk openssl curl tar cmp wc readlink df; do
+        ddnsto_asus_has "$tool" || { ddnsto_flow_error E_DEPENDENCY '固件缺少安装校验工具' "缺少 $tool，请通过软件中心手动安装"; return 2; }
+    done
+    asus_available=$(df -Pk /jffs | awk 'NR==2 { print $4 }')
+    case "$asus_available" in ''|*[!0-9]*) return 12 ;; esac
+    [ "$asus_available" -ge 98304 ] || {
+        ddnsto_flow_error E_SPACE '安装及恢复备份需要至少 96 MiB 可用空间' '请释放 JFFS 空间后重试，不会删除现有插件'; return 12;
+    }
+}
+ddnsto_asus_transport() (
+    if ! type command >/dev/null 2>&1; then
+        command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
+    fi
+    ddnsto_https_fetch "$@"
+)
+ddnsto_asus_native() {
+    umask 077
+    case "$ASUS_ARCH" in aarch64) ZSETUP_ARCH=aarch64 ;; armv7l) ZSETUP_ARCH=armv7 ;; *) return 2 ;; esac
+    fetch_bootstrap_metadata || return $?
+    native_cache=$ASUS_STATE/native-$RESCUE_VERSION-$ZSETUP_ARCH
+    ddnsto_asus_private_dir "$native_cache" || return 12
+    ASUS_ZSETUP=$native_cache/zsetup
+    if [ -e "$ASUS_ZSETUP" ] || [ -L "$ASUS_ZSETUP" ]; then
+        ddnsto_asus_safe_file "$ASUS_ZSETUP" && [ -x "$ASUS_ZSETUP" ] &&
+            [ "$(ddnsto_asus_hash "$ASUS_ZSETUP")" = "$EXPECTED_SHA256" ] || return 11
+        return 0
+    fi
+    native_dir=$(ddnsto_asus_mktemp "$native_cache") || return 12
+    native_code=0
+    ddnsto_asus_transport "https://fw.koolcenter.com/binary/zsetup/$RESCUE_VERSION/zsetup-linux-$ZSETUP_ARCH" "$native_dir/zsetup" 16777216 || native_code=11
+    if [ "$native_code" = 0 ]; then
+        [ "$(ddnsto_asus_hash "$native_dir/zsetup")" = "$EXPECTED_SHA256" ] || native_code=11
+    fi
+    if [ "$native_code" = 0 ]; then
+        chmod 700 "$native_dir/zsetup" && (cd "$native_cache" && mv -f "$native_dir/zsetup" .) || native_code=12
+    fi
+    rm -f "$native_dir/zsetup"
+    rmdir "$native_dir" || return 12
+    return "$native_code"
+}
+ddnsto_asus_fetch() {
+    package_facts=$(ddnsto_asus_package "$ASUS_CHANNEL") || return 2
+    set -- "$1" $package_facts
+    asus_output=$1 asus_url=$2 asus_size=$5 asus_digest=$6
+    if [ "$ASUS_CHANNEL" = armsoft ]; then
+        ddnsto_asus_transport "$asus_url" "$asus_output" "$asus_size" || return 11
+    else
+        ddnsto_asus_native || return $?
+        "$ASUS_ZSETUP" download -o "$asus_output" --sha256 "$asus_digest" \
+            --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
+    fi
+    [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
+        [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
+}
+ddnsto_asus_ensure() {
+    ddnsto_asus_preflight || return $?
+    mkdir -m 700 "$ASUS_STATE/install.lock" 2>/dev/null || {
+        ddnsto_flow_error E_BUSY '另一安装或恢复任务持有华硕安装锁' '请确认任务结束后再处理残留锁'; return 16;
+    }
+    ASUS_CANCEL=$ASUS_STATE/install.lock/cancel
+    asus_cancel_rc=0 asus_worker= asus_worker_rc=0
+    trap 'asus_cancel_rc=129; : > "$ASUS_CANCEL"' HUP
+    trap 'asus_cancel_rc=130; : > "$ASUS_CANCEL"' INT
+    trap 'asus_cancel_rc=143; : > "$ASUS_CANCEL"' TERM
+    ddnsto_asus_ensure_locked &
+    asus_worker=$!
+    while :; do
+        asus_worker_rc=0
+        wait "$asus_worker" || asus_worker_rc=$?
+        kill -0 "$asus_worker" 2>/dev/null || break
+    done
+    trap - HUP INT TERM
+    rm -f "$ASUS_CANCEL"
+    rmdir "$ASUS_STATE/install.lock" || return 16
+    [ "$asus_cancel_rc" = 0 ] || return "$asus_cancel_rc"
+    return "$asus_worker_rc"
+}
 installer_dispatch ddnsto "$@"
 ZSETUP_PRIVATE_ROOT_PROGRAM
 }

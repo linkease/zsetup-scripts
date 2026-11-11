@@ -52,7 +52,7 @@ ddnsto_ensure_decision() {
 }
 
 ddnsto_ensure_preflight() {
-    case "$detected_platform" in linux|openwrt|synology) ;; *)
+    case "$detected_platform" in linux|openwrt|synology|asus) ;; *)
         ddnsto_flow_error E_PLATFORM '此设备暂不支持自动安装' '请使用该设备的手动安装教程'; return 2 ;;
     esac
     [ -n "$TOKEN" ] && [ "${#TOKEN}" -le 16384 ] || {
@@ -71,7 +71,10 @@ ddnsto_ensure_preflight() {
 
 ddnsto_flow_finish() {
     flow_rc=$1
-    trap - EXIT HUP INT TERM
+    trap - EXIT
+    # Once cancellation starts, repeated signals must not interrupt the join
+    # or abandon the platform controller's rollback/lock cleanup.
+    trap '' HUP INT TERM
     if [ -n "${flow_child:-}" ]; then
         kill -TERM "$flow_child" 2>/dev/null || true
         wait "$flow_child" 2>/dev/null || true
@@ -98,11 +101,18 @@ ddnsto_flow_finish() {
     exit "$flow_rc"
 }
 
-ddnsto_ensure_entry() (
+# This terminal entry exits via ddnsto_flow_finish. Keep its traps in the public
+# shell, not an implicit function subshell that SIGTERM to the public PID skips.
+ddnsto_ensure_entry() {
     set +x
     umask 077
     # mktemp creates the private destination, never reuse an inherited path.
-    DDNSTO_FLOW_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto-result.XXXXXX") || exit 12
+    if [ "${detected_platform:-}" = asus ]; then
+        ddnsto_asus_storage || { ddnsto_flow_error E_STORAGE '华硕受保护存储不可用' '请检查 /jffs 挂载，不要放宽目录权限'; exit 12; }
+        DDNSTO_FLOW_DIR=$(ddnsto_asus_mktemp "$ASUS_STATE") || exit 12
+    else
+        DDNSTO_FLOW_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ddnsto-result.XXXXXX") || exit 12
+    fi
     flow_child=
     trap 'ddnsto_flow_finish $?' EXIT
     trap 'exit 129' HUP
@@ -115,9 +125,10 @@ ddnsto_ensure_entry() (
     flow_rc=0; wait "$flow_child" || flow_rc=$?
     flow_child=
     exit "$flow_rc"
-)
+}
 
 ddnsto_ensure_execute() {
+    if [ "$detected_platform" = asus ]; then ddnsto_asus_ensure; return $?; fi
     if [ "$detected_platform" = synology ]; then ddnsto_synology_ensure; return $?; fi
     ZSETUP_INSTALL_SCOPE=${installer_scope:-system}
     ZSETUP_INSTALL_PREFIX=${installer_prefix:-}

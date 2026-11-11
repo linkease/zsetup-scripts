@@ -1,7 +1,8 @@
 ddnsto_usage() {
-    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
+    printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
         '群晖 DSM 7 支持自动安装/升级/启动，需管理员 sudo；其他 NAS/Docker 暂不支持默认自动安装。以下选项用于高级操作。' \
+        '华硕软件中心自动识别 rogsoft/armsoft/mtksoft/ipq32soft/ipq64soft/qcasoft；安装后在软件中心管理。' \
         '--plan: read-only local preflight; no downloads, token, or service changes.' \
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
         'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
@@ -45,7 +46,7 @@ ddnsto_parse_args() {
             *) ddnsto_error 'unknown argument (use --help)'; return 2 ;;
         esac
     done
-    case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
+    case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
     case "$REQUESTED_METHOD" in auto|native|docker) ;; *) ddnsto_error 'unknown installation method'; return 2 ;; esac
     [ "$REQUESTED_METHOD" = docker ] || [ -z "$DEVICE_NAME$NETWORK" ] || { ddnsto_error 'device-name/network require explicit Docker'; return 2; }
     case "$NETWORK" in ''|bridge|host) ;; *) ddnsto_error 'network must be bridge or host'; return 2 ;; esac
@@ -101,6 +102,8 @@ ddnsto_appliance_platform() {
         printf '%s\n' qnap
     elif [ -f "$appliance_root/etc/unraid-version" ]; then
         printf '%s\n' unraid
+    elif [ -x "$appliance_root/bin/nvram" ] && { [ -d "$appliance_root/koolshare" ] || [ -f "$appliance_root/www/Advanced_System_Content.asp" ]; }; then
+        printf '%s\n' asus
     fi
 }
 
@@ -165,6 +168,11 @@ ddnsto_plan() {
     # local preflight is deliberately labelled, not an installation guarantee.
     ddnsto_local_platform || return $?
     if [ "$detected_platform" = synology ]; then ddnsto_synology_download; return $?; fi
+    if [ "$detected_platform" = asus ]; then
+        ddnsto_asus_facts || return $?
+        printf '%s\n' 'facts_source=local-preflight' 'platform=asus' "channel=$ASUS_CHANNEL" "arch=$ASUS_ARCH" 'client_version=4.2.8' 'native_status=requires-plugin-preflight' 'installation_performed=false'
+        return 0
+    fi
     [ -z "${OUTPUT_DIR:-}" ] && [ "$ACTION" != download ] || { ddnsto_error 'download and output-dir require Synology'; return 2; }
     case "$(uname -m)" in
         x86_64|amd64) arch=x86_64 ;;

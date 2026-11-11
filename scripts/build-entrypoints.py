@@ -59,7 +59,9 @@ def main():
             for name in ('product-pins.sh', 'docker-probe.sh', 'docker-lifecycle.sh',
                          'method-selection.sh', 'synology-download.sh', 'extra-platforms.sh',
                          'openwrt-lifecycle.sh', 'openwrt-adapter.sh',
-                         'auto-install.sh', 'auto-linux.sh', 'auto-openwrt.sh', 'auto-synology.sh', 'auto-synology-fresh.sh'):
+                         'auto-install.sh', 'auto-linux.sh', 'auto-openwrt.sh', 'auto-synology.sh', 'auto-synology-fresh.sh',
+                         'asus-platform.sh', 'asus-storage.sh', 'asus-package.sh', 'asus-service.sh',
+                         'asus-transaction.sh', 'auto-asus.sh'):
                 business += (folder / name).read_text().rstrip() + '\n\n'
         content = common + "\n# Business logic: maintained in " + str(folder.relative_to(ROOT)) + "/business.sh\n"
         content += business
