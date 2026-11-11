@@ -153,6 +153,77 @@ class Recommendation(unittest.TestCase):
         self.assertEqual(self.package(self.work / 'next').returncode, 0)
         self.assertEqual(first, (self.work / 'next/recommended-entry.sh').read_bytes())
 
+    def test_asus_storage_helper_is_embedded_in_recommendation(self):
+        self.prepare()
+        entry = (self.release / 'recommended-entry.sh').read_text()
+        self.assertIn('ddnsto_asus_storage()', entry)
+        self.assertNotIn('@@ASUS_STORAGE@@', entry)
+        self.assertEqual(subprocess.run(['sh', '-n', str(self.release / 'recommended-entry.sh')]).returncode, 0)
+
+    def synology_entry(self):
+        self.prepare()
+        template = (self.release / 'recommended-entry.sh').read_text()
+        template = template.replace('[ -f /etc/synoinfo.conf ] || [ -d /usr/syno ]', 'true')
+        template = template.replace('/tmp/ddnsto-recommendation-$uid', str(self.work / 'dsm-cache'))
+        entry = self.work / 'synology-entry.sh'
+        entry.write_text(template)
+        home = self.work / 'dsm-home'
+        home.mkdir(mode=0o777)
+        home.chmod(0o777)
+        link = self.work / 'home-link'
+        link.symlink_to(home, target_is_directory=True)
+        env = self.env | {'HOME': str(link)}
+        env.pop('DDNSTO_RECOMMEND_CACHE', None)
+        return entry, env
+
+    def test_synology_default_cache_avoids_acl_home_and_reuses_private_cache(self):
+        entry, env = self.synology_entry()
+        for _ in range(2):
+            result = subprocess.run(['sh', str(entry), '--help'], env=env, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.work / 'dsm-cache').stat().st_mode & 0o777, 0o700)
+        self.assertFalse((self.work / 'dsm-home/.ddnsto-recommendation').exists())
+
+    def test_synology_explicit_unsafe_cache_is_not_silently_replaced(self):
+        entry, env = self.synology_entry()
+        env['DDNSTO_RECOMMEND_CACHE'] = str(self.work / 'home-link/cache')
+        result = subprocess.run(['sh', str(entry), '--help'], env=env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 12)
+        self.assertFalse((self.work / 'dsm-cache').exists())
+
+    def test_synology_default_cache_rejects_symlink_collision(self):
+        entry, env = self.synology_entry()
+        (self.work / 'dsm-cache').symlink_to(self.work / 'dsm-home', target_is_directory=True)
+        result = subprocess.run(['sh', str(entry), '--help'], env=env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 12)
+        self.assertFalse((self.work / 'args').exists())
+
+    def test_asus_recommendation_does_not_require_id_stat_mktemp(self):
+        self.prepare()
+        template = (ROOT / 'ddnsto/recommended-entry.sh').read_text()
+        self.assertIn('@@ASUS_STORAGE@@', template)
+        fixtures = '''
+ddnsto_asus_storage() { ASUS_STATE="$ASUS_FIXTURE"; mkdir -m 700 "$ASUS_STATE"; }
+ddnsto_asus_fields() { /usr/bin/stat -c '0 %a %h' "$1"; }
+ddnsto_asus_safe_ancestors() { [ -d "${1%/*}" ]; }
+ddnsto_asus_mktemp() { /usr/bin/mktemp -d "$1/attempt.XXXXXXXX"; }
+id() { return 99; }
+stat() { return 99; }
+mktemp() { return 99; }
+'''
+        template = template.replace('@@ASUS_STORAGE@@', fixtures)
+        template = template.replace('[ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]', 'true')
+        template = template.replace('@@SOURCE_URL@@', self.base + '/release').replace('@@CACHE_KEY@@', 'fixture')
+        path = self.work / 'asus-entry.sh'
+        path.write_text(template)
+        env = self.env | {'ASUS_FIXTURE': str(self.work / 'asus')}
+        env.pop('DDNSTO_RECOMMEND_CACHE', None)
+        result = subprocess.run(['sh', str(path), '--token', SECRET], env=env,
+                                text=True, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.work / 'args').exists())
+        self.assertNotIn(SECRET, result.stdout + result.stderr)
+
     def test_reject_unreviewed_bytes_and_existing_output(self):
         self.assertNotEqual(self.package(approved='0' * 64).returncode, 0)
         self.assertFalse((self.site / 'release').exists())
