@@ -32,11 +32,13 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-windows-") as name:
     channel = work / "setup.ps1"
     run([sys.executable, str(ROOT / "kai-skills/build.py"),
          "--release", str(release), "--windows-output", str(fixed),
+         "--allow-unfrozen-fixture",
          "--windows-channel-entrypoint", str(channel)])
     fixed2 = work / "kai-skills-install-2.ps1"
     channel2 = work / "setup-2.ps1"
     run([sys.executable, str(ROOT / "kai-skills/build.py"),
          "--release", str(release), "--windows-output", str(fixed2),
+         "--allow-unfrozen-fixture",
          "--windows-channel-entrypoint", str(channel2)])
     assert fixed.read_bytes() == fixed2.read_bytes()
     assert channel.read_bytes() == channel2.read_bytes()

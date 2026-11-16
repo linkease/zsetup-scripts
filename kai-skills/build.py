@@ -17,6 +17,34 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def verify_freeze(path, release, allow_fixture=False):
+    raw = Path(path).read_bytes()
+    if len(raw) > 16 * 1024 * 1024:
+        raise SystemExit("invalid KAI release freeze")
+    freeze = json.loads(raw)
+    release_id = freeze.pop("releaseId", None)
+    encoded = (json.dumps(freeze, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
+    if release_id != "sha256:" + hashlib.sha256(encoded).hexdigest():
+        raise SystemExit("KAI release freeze identity mismatch")
+    policy = freeze.get("sourcePolicy")
+    if policy != "clean-committed" and not (allow_fixture and policy == "explicit-test-fixture"):
+        raise SystemExit("KAI release freeze is not from clean committed sources")
+    sources = freeze.get("sources", {})
+    if policy == "clean-committed" and (set(sources) != {"kai-skills", "reasonix-kai"} or
+            any(value.get("state") != "committed" for value in sources.values())):
+        raise SystemExit("KAI release freeze source identity is invalid")
+    manifest_path = Path(release).resolve() / "release-manifest.json"
+    expected = freeze.get("files", {}).get("zsetup/release-manifest.json", {})
+    actual = "sha256:" + sha(manifest_path)
+    if expected.get("sha256") != actual or expected.get("size") != manifest_path.stat().st_size or \
+            freeze.get("identities", {}).get("zsetupManifestSHA256") != actual:
+        raise SystemExit("zsetup release does not match the reviewed KAI freeze")
+    release_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if release_manifest.get("sourceCommit") != sources.get("kai-skills", {}).get("commit"):
+        raise SystemExit("zsetup release source differs from the reviewed KAI freeze")
+    return release_id
+
+
 def entrypoint(version, kind=None, identity=None):
     selection = ""
     guard = ""
@@ -254,6 +282,9 @@ def main():
     parser.add_argument("--channel-entrypoint", type=Path)
     parser.add_argument("--windows-output", type=Path)
     parser.add_argument("--windows-channel-entrypoint", type=Path)
+    parser.add_argument("--freeze-manifest", type=Path)
+    parser.add_argument("--allow-unfrozen-fixture", action="store_true")
+    parser.add_argument("--allow-fixture-freeze", action="store_true")
     parser.add_argument("--channel-only", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
@@ -271,6 +302,10 @@ def main():
         return
     if args.release is None or (args.output is None and args.windows_output is None):
         parser.error("--release and at least one installer output are required unless --channel-only is used")
+    if args.freeze_manifest is None and not args.allow_unfrozen_fixture:
+        parser.error("--freeze-manifest is required for a release-bound installer")
+    if args.freeze_manifest is not None:
+        verify_freeze(args.freeze_manifest, args.release, args.allow_fixture_freeze)
     manifest_path = args.release.resolve() / "release-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if (manifest.get("schemaVersion"), manifest.get("distribution"),

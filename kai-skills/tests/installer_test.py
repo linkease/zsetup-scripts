@@ -29,6 +29,7 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-installer-") as name:
     channel = work / "channel-install.sh"
     run([sys.executable, str(ROOT / "kai-skills/build.py"),
          "--release", str(release), "--output", str(installer),
+         "--allow-unfrozen-fixture",
          "--entrypoints-dir", str(entrypoints),
          "--channel-entrypoint", str(channel)])
     run(["sh", "-n", str(installer)])
@@ -48,6 +49,7 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-installer-") as name:
     channel2 = work / "channel-install-2.sh"
     run([sys.executable, str(ROOT / "kai-skills/build.py"),
          "--release", str(release), "--output", str(installer2),
+         "--allow-unfrozen-fixture",
          "--entrypoints-dir", str(entrypoints2),
          "--channel-entrypoint", str(channel2)])
     assert installer.read_bytes() == installer2.read_bytes()

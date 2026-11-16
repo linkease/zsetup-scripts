@@ -12,7 +12,8 @@ Generate a release-specific script:
 
 ```sh
 python3 -B kai-skills/build.py \
-  --release /path/to/kai-skills-release \
+  --release /path/to/kai-release-freeze/zsetup \
+  --freeze-manifest /path/to/kai-release-freeze/freeze-manifest.json \
   --output /new/path/kai-skills-install.sh \
   --entrypoints-dir /new/path/entrypoints \
   --channel-entrypoint /new/path/install.sh
@@ -25,6 +26,13 @@ Windows Business Installer and its version-free public channel.
 The generated Business Installer pins the exact manifest. Product Configuration
 must in turn pin this generated script's exact size and SHA-256. In installer
 mode the script never downloads itself.
+
+Release-bound generation rejects an unreviewed schema-3 directory. The freeze
+must bind clean committed `kai-skills` and `reasonix-kai` sources, two
+byte-identical builds, the Capability Catalog, KaiPlus snapshot and the exact
+zsetup release manifest. `--allow-unfrozen-fixture` and
+`--allow-fixture-freeze` exist only for isolated tests and are not release
+workflow options.
 
 The separately generated `--channel-entrypoint` is the stable, version-free
 public `/binary/kai/kai-skills/setup.sh`; `install.sh` is published as a
