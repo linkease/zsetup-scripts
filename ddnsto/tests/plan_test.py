@@ -25,7 +25,7 @@ class PlanTest(unittest.TestCase):
                 DDNSTO_INSTALL_DIR=str(root / 'install'), DDNSTO_CONFIG_DIR=str(root / 'config'),
                 DDNSTO_LAUNCH_AGENTS_DIR=str(root / 'agents'))
             env.update(extra_env or {})
-            r = subprocess.run(['sh', str(ROOT / 'ddnsto/install.sh'), '--plan', *args], env=env,
+            r = subprocess.run(['sh', str(ROOT / 'ddnsto/ddnsto-install.sh'), '--plan', *args], env=env,
                                capture_output=True, text=True, timeout=10)
             for name in ('cache', 'install', 'config', 'agents'):
                 self.assertFalse((root / name).exists(), name)
@@ -48,7 +48,8 @@ class PlanTest(unittest.TestCase):
     def test_mac_target_mismatch(self):
         r = self.run_plan(('--platform', 'linux'), system='Darwin')
         self.assertEqual(r.returncode, 2, r.stderr)
-        self.assertIn('platform mismatch', r.stderr)
+        self.assertIn('参数或运行环境不支持', r.stderr)
+        self.assertIn('状态=未更改', r.stderr)
 
     def test_linux_target_mismatch(self):
         r = self.run_plan(('--platform', 'macos'))

@@ -76,13 +76,17 @@ ddnsto_asus_fetch() {
         # Explicitly approved Linux 2.6 compatibility path. Never unverified
         # execution or silent fallback after a modern native download fails.
         ddnsto_asus_transport "$asus_url" "$asus_output" "$asus_size" || return 11
+        [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
+            [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
     else
         ddnsto_asus_native || return $?
+        # The pinned native verifies digest AND exact size before publication.
+        # No copy/privilege boundary follows this call: do not rehash the same
+        # private file with a second implementation. Bootstrap trust and the
+        # package-content validation in ddnsto_asus_extract remain unchanged.
         "$ASUS_ZSETUP" download -o "$asus_output" --sha256 "$asus_digest" \
-            --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
+            --size "$asus_size" --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
     fi
-    [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
-        [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
 }
 
 ddnsto_asus_ensure() {

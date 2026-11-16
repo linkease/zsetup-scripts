@@ -38,7 +38,8 @@ if ddnsto_asus_native; then exit 99; fi
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             native = root / 'native'
-            native.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$FIXTURE/args"\nprintf payload > "$3"\n')
+            native.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$FIXTURE/args"\n'
+                              '[ "$CORRUPT" = 0 ] || exit 11\nprintf payload > "$3"\n')
             native.chmod(0o700)
             script = f'''
 set -eu
@@ -47,7 +48,7 @@ set -eu
 ASUS_STATE=$FIXTURE ASUS_CHANNEL=$CHANNEL ASUS_ARCH=aarch64
 ddnsto_asus_native() {{ ASUS_ZSETUP="$FIXTURE/native"; echo native >> "$FIXTURE/events"; }}
 ddnsto_asus_transport() {{ echo legacy >> "$FIXTURE/events"; printf payload > "$2"; }}
-ddnsto_asus_hash() {{ [ "$CORRUPT" = 0 ] && printf '%s' "$asus_digest" || echo bad; }}
+ddnsto_asus_hash() {{ echo hash >> "$FIXTURE/events"; [ "$CORRUPT" = 0 ] && printf '%s' "$asus_digest" || echo bad; }}
 # Product size is checked independently in real code; fixture represents a
 # bounded native/HTTPS download with a known seven-byte inert body.
 ddnsto_asus_package() {{ printf '%s\\n' "https://asusgo.koolcenter.com/$1/ddnsto/ddnsto.tar.gz" 4.2.8 arm384 7 fixture-digest; }}
@@ -65,17 +66,24 @@ ddnsto_asus_fetch "$FIXTURE/package.tar.gz"
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(events, ['native'])
             self.assertIn('--sha256\nfixture-digest', args)
+            self.assertIn('--size\n7\n', args)
+            self.assertIn('--max-bytes\n7\n', args)
             self.assertIn(f'https://asusgo.koolcenter.com/{channel}/ddnsto/ddnsto.tar.gz', args)
 
     def test_armsoft_uses_authorized_legacy_transport(self):
         result, events, _ = self.run_fetch('armsoft')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(events, ['legacy'])
+        self.assertEqual(events, ['legacy', 'hash'])
 
     def test_changed_bytes_are_rejected_in_both_paths(self):
         for channel in ('rogsoft', 'armsoft'):
             result, _, _ = self.run_fetch(channel, corrupt=True)
             self.assertNotEqual(result.returncode, 0)
+
+    def test_native_rejection_never_falls_back_to_legacy(self):
+        result, events, _ = self.run_fetch('rogsoft', corrupt=True)
+        self.assertEqual(result.returncode, 11)
+        self.assertEqual(events, ['native'])
 
 
 if __name__ == '__main__':

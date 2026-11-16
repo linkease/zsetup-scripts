@@ -16,6 +16,7 @@ import unittest
 
 SOURCE = Path(__file__).resolve().parents[1] / 'openwrt-lifecycle.sh'
 MAIN_HARNESS = r'''
+. "$APP/portable-files.sh"
 . "$APP/business.sh"
 . "$APP/managed-cli.sh"
 . "$APP/../lib/install-launcher.sh"
@@ -24,7 +25,13 @@ MAIN_HARNESS = r'''
 . "$APP/product-pins.sh"
 if [ -f "$APP/method-selection.sh" ]; then . "$APP/method-selection.sh"; fi
 id() { printf '%s\n' "${FAKE_UID:-0}"; }
-stat() { if [ "$1:$2" = '-c:%u' ]; then printf '0\n'; else command stat "$@"; fi; }
+stat() {
+    if [ "$1:$2" = '-c:%u' ]; then printf '0\n'
+    elif [ "$1:$2" = '-c:%u %a %h' ]; then
+        fields=$(command stat -c '%a %h' "$3") || return $?
+        printf '0 %s\n' "$fields"
+    else command stat "$@"; fi
+}
 ddnsto_bootstrap_safe_ancestors() { return 0; }
 ddnsto_machine_locked() {
     [ "$(id -u)" = 0 ] || return 2

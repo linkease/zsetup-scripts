@@ -140,6 +140,36 @@ printf 200
         self.assertTrue((self.root / 'committed').exists())
         self.assertFalse((self.root / 'state/install.lock').exists())
 
+    def test_native_download_term_joins_before_removing_work(self):
+        wrapper, _ = self.recommendation(self.installer())
+        native = self.root / 'native'
+        native.write_text('''#!/bin/sh
+while [ "$#" -gt 0 ]; do
+    case "$1" in -o) output=$2; shift 2 ;; *) shift ;; esac
+done
+finish() {
+    trap '' TERM
+    kill "$worker" 2>/dev/null || :
+    wait "$worker" 2>/dev/null || :
+    sleep 0.3
+    [ -d "${output%/*}" ] && : > "$FIXTURE/source-retained"
+    : > "$FIXTURE/joined"
+    exit 143
+}
+sleep 20 &
+worker=$!
+trap finish TERM
+: > "$FIXTURE/ready"
+wait "$worker"
+''')
+        native.chmod(0o700)
+        # Inject only the downloader boundary; production core pin/HTTPS checks
+        # are exercised separately with the real published binary.
+        wrapper.write_text(wrapper.read_text().replace('# @@NATIVE_FIRST@@',
+            f'. "{ROOT}/recommendation-native.sh"\nrecommend_native="$FIXTURE/native"'))
+        self.assert_cancelled_and_joined(self.launch(wrapper), repeated=True)
+        self.assertFalse(Path((self.root / 'entry-work').read_text().strip()).exists())
+
     def test_recommendation_preserves_stdin_argv_and_failure_status(self):
         installer = self.root / 'fixture.sh'
         installer.write_text('''#!/bin/sh

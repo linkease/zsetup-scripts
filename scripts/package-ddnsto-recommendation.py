@@ -26,10 +26,12 @@ exit 0. Those are executor acceptance gates before public activation. Arguments
 are forwarded unchanged. Environment overrides of the executor remain its own
 contract, not an alternate recommendation authority.
 
-Offline cache is per source URL and user, with no freshness guarantee. It only
-reuses complete metadata+script pairs; payload/native availability is separate.
-Cache permissions defend against other users, not a compromised current user
-or root. No crypto supply infrastructure or remote-code parser is introduced.
+Shell recommendations require fresh network metadata, without persistent
+recommendation cache. --native-first is a separately activated local candidate:
+fixed verified Linux core first, then native immutable-body download. Appliances
+and unvalidated architectures retain their existing path. Native HTTPS redirects
+differ from shell reject-all policy; this requires review before activation.
+No crypto supply infrastructure or remote-code parser is introduced.
 """
 import argparse
 import hashlib
@@ -94,10 +96,22 @@ def package(args):
         if extension == 'sh':
             template = template.replace('@@ASUS_STORAGE@@', (ROOT / 'ddnsto/asus-storage.sh').read_text())
             template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'ddnsto/portable-files.sh').read_text())
+            native = ''
+            if args.native_first:
+                policy = (ROOT / 'ddnsto/bootstrap-policy.sh').read_text()
+                pins = re.findall(r'^fetch_bootstrap_metadata\(\) \{\n.*?^\}', policy, re.M | re.S)
+                if len(pins) != 1:
+                    raise ValueError('cannot identify canonical native pins')
+                native += pins[0] + '\n' + (ROOT / 'ddnsto/recommendation-native.sh').read_text()
+                native += '\nddnsto_recommend_native_prepare\n'
+            template = template.replace('# @@NATIVE_FIRST@@', native)
         payloads[f'recommended-entry.{extension}'] = template.replace(
             '@@SOURCE_URL@@', base).replace('@@CACHE_KEY@@', digest(base.encode())).encode(
                 'utf-8-sig' if extension == 'ps1' else 'utf-8')
     review = dict(schema=1, candidate_version=args.candidate_version,
+                  shell_bootstrap='native-first-candidate' if args.native_first else 'shell-first',
+                  native_first_activation=('blocked: device-chain and HTTPS-redirect-policy review required'
+                                           if args.native_first else 'not-selected'),
                   published=False, source_url=base, installers=records,
                   lifecycle_acceptance='not-verified; canonical-executor-owned',
                   product_pins='embedded in the approved immutable installer bytes',
@@ -128,6 +142,8 @@ def main():
     parser.add_argument('--reviewed-shell-sha256', required=True)
     parser.add_argument('--reviewed-powershell-sha256', required=True)
     parser.add_argument('--candidate-version', default='0.2.4', choices=['0.2.4'])
+    parser.add_argument('--native-first', action='store_true',
+                        help='build isolated Linux x86_64/aarch64 native-first candidate; not release approval')
     args = parser.parse_args()
     try:
         package(args)

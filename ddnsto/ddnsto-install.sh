@@ -5296,7 +5296,8 @@ ddnsto_asus_hash() (
 # Validation covers the complete logical member listing reported by tar, not
 # raw extension headers or bytes tar ignores after its end marker. Exact pins
 # remain mandatory. Output is bounded; decompression CPU time is not bounded
-# here. Caller owns cancellation, trusted storage, and subsequent installation.
+# on the legacy path; trusted native capture bounds each command to 30s.
+# Caller owns cancellation, trusted storage, and subsequent installation.
 # On failure only this call's fixed staging filenames are removed. An existing
 # DEST is never reused/deleted. SIGKILL or I/O failure may leave private residue;
 # never consume DEST unless the function returned zero.
@@ -5304,15 +5305,23 @@ _ddnsto_asus_package_tar() { tar "$@"; }
 _ddnsto_asus_package_od() { od "$@"; }
 _ddnsto_asus_package_has_od() { type od >/dev/null 2>&1; }
 
+# Modern installation supplies ASUS_ZSETUP after verified bootstrap/download.
+# Reuse its bounded capture; failure never falls back to shell extraction.
+# Standalone callers without a trusted core and armsoft retain the legacy path.
 # Per-file kernel ceiling before opening output, then an exact byte ceiling.
 # POSIX/ash uses 512-byte blocks; shells using 1024-byte blocks can transiently
 # write up to twice the ceiling. No unbounded command substitution or pipeline
 # masks tar failure. gzip/tar stream data; no archive tree is ever materialized.
 _ddnsto_asus_package_capture() (
     ceiling=$1 output=$2; shift 2
-    (ulimit -c 0 || exit 1
-     ulimit -f "$(((ceiling + 511) / 512))" || exit 1
-     _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    if [ "${channel:-}" != armsoft ] && [ -n "${ASUS_ZSETUP:-}" ]; then
+        "$ASUS_ZSETUP" capture -o "$output" --max-bytes "$ceiling" \
+            --min-free-bytes 8388608 --timeout 30s -- tar "$@" || return 1
+    else
+        (ulimit -c 0 || exit 1
+         ulimit -f "$(((ceiling + 511) / 512))" || exit 1
+         _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    fi
     bytes=$(wc -c < "$output") || return 1
     [ "$bytes" -gt 0 ] && [ "$bytes" -le "$ceiling" ]
 )
@@ -6162,13 +6171,17 @@ ddnsto_asus_fetch() {
         # Explicitly approved Linux 2.6 compatibility path. Never unverified
         # execution or silent fallback after a modern native download fails.
         ddnsto_asus_transport "$asus_url" "$asus_output" "$asus_size" || return 11
+        [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
+            [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
     else
         ddnsto_asus_native || return $?
+        # The pinned native verifies digest AND exact size before publication.
+        # No copy/privilege boundary follows this call: do not rehash the same
+        # private file with a second implementation. Bootstrap trust and the
+        # package-content validation in ddnsto_asus_extract remain unchanged.
         "$ASUS_ZSETUP" download -o "$asus_output" --sha256 "$asus_digest" \
-            --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
+            --size "$asus_size" --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
     fi
-    [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
-        [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
 }
 
 ddnsto_asus_ensure() {
@@ -9281,9 +9294,14 @@ _ddnsto_asus_package_od() { od "$@"; }
 _ddnsto_asus_package_has_od() { type od >/dev/null 2>&1; }
 _ddnsto_asus_package_capture() (
     ceiling=$1 output=$2; shift 2
-    (ulimit -c 0 || exit 1
-     ulimit -f "$(((ceiling + 511) / 512))" || exit 1
-     _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    if [ "${channel:-}" != armsoft ] && [ -n "${ASUS_ZSETUP:-}" ]; then
+        "$ASUS_ZSETUP" capture -o "$output" --max-bytes "$ceiling" \
+            --min-free-bytes 8388608 --timeout 30s -- tar "$@" || return 1
+    else
+        (ulimit -c 0 || exit 1
+         ulimit -f "$(((ceiling + 511) / 512))" || exit 1
+         _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    fi
     bytes=$(wc -c < "$output") || return 1
     [ "$bytes" -gt 0 ] && [ "$bytes" -le "$ceiling" ]
 )
@@ -10031,13 +10049,13 @@ ddnsto_asus_fetch() {
     asus_output=$1 asus_url=$2 asus_size=$5 asus_digest=$6
     if [ "$ASUS_CHANNEL" = armsoft ]; then
         ddnsto_asus_transport "$asus_url" "$asus_output" "$asus_size" || return 11
+        [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
+            [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
     else
         ddnsto_asus_native || return $?
         "$ASUS_ZSETUP" download -o "$asus_output" --sha256 "$asus_digest" \
-            --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
+            --size "$asus_size" --max-bytes "$asus_size" --min-free-bytes 8388608 "$asus_url" || return 11
     fi
-    [ "$(wc -c < "$asus_output")" -eq "$asus_size" ] &&
-        [ "$(ddnsto_asus_hash "$asus_output")" = "$asus_digest" ] || return 11
 }
 ddnsto_asus_ensure() {
     ddnsto_asus_preflight || return $?

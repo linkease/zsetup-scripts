@@ -27,7 +27,8 @@ class WgetRecommendation(fixture.Recommendation):
         generate_certificate(directory)
         cls.cert = directory / 'ca.crt'
         cls.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        cls.context.load_cert_chain(directory / 'server.crt', directory / 'server.key')
+        cls.server_cert, cls.server_key = directory / 'server.crt', directory / 'server.key'
+        cls.context.load_cert_chain(cls.server_cert, cls.server_key)
 
     def setUp(self):
         super().setUp()

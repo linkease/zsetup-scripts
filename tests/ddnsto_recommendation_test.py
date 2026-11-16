@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import ssl
 import subprocess
 import sys
@@ -45,6 +46,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().send_error(code, message, explain)
 
     def do_GET(self):
+        self.server.requests.append(self.path)
         mode = self.server.modes.get(self.path)
         if mode:
             status, body = mode
@@ -76,6 +78,7 @@ class Recommendation(unittest.TestCase):
                         '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost'],
                        check=True, capture_output=True)
         cls.context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        cls.server_cert, cls.server_key = cls.cert, key
         cls.context.load_cert_chain(cls.cert, key)
 
     @classmethod
@@ -92,6 +95,7 @@ class Recommendation(unittest.TestCase):
             ('127.0.0.1', 0), functools.partial(Handler, directory=str(self.site)))
         self.server.socket = self.context.wrap_socket(self.server.socket, server_side=True)
         self.server.modes = {}
+        self.server.requests = []
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.addCleanup(self.close_server)
@@ -118,12 +122,118 @@ class Recommendation(unittest.TestCase):
         self.server.server_close()
         self.thread.join()
 
-    def package(self, output=None, base=None, approved=None):
+    def package(self, output=None, base=None, approved=None, native_first=False):
         return subprocess.run([
             sys.executable, '-B', str(PACKAGER), '--source-root', str(self.source),
             '--output', str(output or self.site / 'release'), '--source-url', base or self.base + '/release',
             '--reviewed-shell-sha256', approved or sha(self.shell),
-            '--reviewed-powershell-sha256', sha(self.ps)], capture_output=True, text=True)
+            '--reviewed-powershell-sha256', sha(self.ps),
+            *(['--native-first'] if native_first else [])], capture_output=True, text=True)
+
+    def test_native_first_is_explicit_and_records_unverified_gate(self):
+        result = self.package(native_first=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        release = self.site / 'release'
+        entry = (release / 'recommended-entry.sh').read_text()
+        self.assertIn('ddnsto_recommend_native_prepare\n', entry)
+        self.assertIn('RESCUE_VERSION=0.5.0', entry)
+        self.assertNotIn('@@NATIVE_FIRST@@', entry)
+        review = json.loads((release / 'review.json').read_text())
+        self.assertEqual(review['shell_bootstrap'], 'native-first-candidate')
+        self.assertFalse(review['published'])
+
+    def test_default_does_not_bootstrap_native_first(self):
+        self.prepare()
+        entry = (self.release / 'recommended-entry.sh').read_text()
+        self.assertNotIn('@@NATIVE_FIRST@@', entry)
+        self.assertNotIn('ddnsto_recommend_native_prepare\n', entry)
+
+    def test_native_first_real_core_chain_and_rejections(self):
+        native = os.environ.get('DDNSTO_TEST_NATIVE')
+        if not native:
+            self.skipTest('DDNSTO_TEST_NATIVE required for real 0.5.0 integration')
+        data = Path(native).read_bytes()
+        self.assertEqual(sha(data), '9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617')
+        from tls_fixture import generate_certificate
+        tls = self.work / 'native-tls'
+        tls.mkdir()
+        generate_certificate(tls)
+        self.addCleanup(self.context.load_cert_chain, self.server_cert, self.server_key)
+        self.context.load_cert_chain(tls / 'server.crt', tls / 'server.key')
+        self.cert = tls / 'ca.crt'
+        self.env['CURL_CA_BUNDLE'] = str(self.cert)
+        self.base = self.base.replace('localhost', '127.0.0.1')
+        result = self.package(native_first=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.release = self.site / 'release'
+        core = self.site / 'native/zsetup/0.5.0/zsetup-linux-x86_64'
+        core.parent.mkdir(parents=True)
+        core.write_bytes(data)
+        entry = self.release / 'recommended-entry.sh'
+        # Test-only mirror and CA injection; production exposes neither override.
+        text = entry.read_text().replace(
+            'https://fw.koolcenter.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary',
+            self.base + '/native')
+        text = text.replace('download --quiet', 'download --ca-file "' + str(self.cert) + '" --quiet')
+        entry.write_text(text)
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.work / 'args').read_text().splitlines(), ['--token', SECRET])
+        requests = self.server.requests
+        self.assertLess(requests.index('/native/zsetup/0.5.0/zsetup-linux-x86_64'),
+                        requests.index('/release/recommended-shell.txt'))
+        self.assertLess(requests.index('/release/recommended-shell.txt'),
+                        requests.index('/release/immutable/' + sha(self.shell) + '/install.sh'))
+        (self.work / 'args').unlink()
+        body_path = '/release/immutable/' + sha(self.shell) + '/install.sh'
+        # Native redirect policy is a separate activation gate, not silently
+        # assumed equal to the legacy wrapper's reject-all policy.
+        self.server.modes['/release/recommended-shell.txt'] = (302, (self.base + '/other').encode())
+        self.assertNotEqual(self.run_entry().returncode, 0)
+        self.assertFalse((self.work / 'args').exists())
+        del self.server.modes['/release/recommended-shell.txt']
+        (self.site / 'relocated.sh').write_bytes(self.shell)
+        self.server.modes[body_path] = (302, (self.base + '/relocated.sh').encode())
+        redirected = self.run_entry()
+        self.assertEqual(redirected.returncode, 0, redirected.stderr)
+        self.assertTrue((self.work / 'args').exists())
+        (self.work / 'args').unlink()
+        self.server.modes[body_path] = (302, b'http://127.0.0.1/forbidden')
+        self.assertNotEqual(self.run_entry().returncode, 0)
+        self.assertFalse((self.work / 'args').exists())
+        del self.server.modes[body_path]
+        installer = self.release / 'immutable' / sha(self.shell) / 'install.sh'
+        installer.write_bytes(b'x' * len(self.shell))
+        result = self.run_entry()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.work / 'args').exists())
+        # Cancel while the real core is downloading; no installer may run.
+        self.server.requests.clear()
+        self.server.modes[body_path] = (200, b'STALL_BODY')
+        proc = subprocess.Popen(['sh', str(entry), '--token', SECRET], env=self.env,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            deadline = time.monotonic() + 10
+            while body_path not in self.server.requests and proc.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.02)
+            self.assertIn(body_path, self.server.requests)
+            proc.send_signal(signal.SIGTERM)
+            self.assertEqual(proc.wait(timeout=5), 143)
+            self.assertFalse((self.work / 'args').exists())
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)
+        del self.server.modes[body_path]
+        self.server.requests.clear()
+        core.write_bytes(b'#!/bin/sh\nexit 0\n')
+        result = self.run_entry()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('/release/recommended-shell.txt', self.server.requests)
 
     def prepare(self):
         result = self.package()

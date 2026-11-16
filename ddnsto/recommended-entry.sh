@@ -235,6 +235,8 @@ verify() {
     [ -f "$1" ] && [ ! -L "$1" ] &&
         [ "$(wc -c < "$1")" -eq "$size" ] && [ "$(hash_file "$1")" = "$digest" ]
 }
+recommend_native=
+# @@NATIVE_FIRST@@
 rc=0
 fetch "$base/recommended-shell.txt" "$work/recommended.txt" 128 || rc=$?
 case "$rc" in
@@ -243,7 +245,11 @@ case "$rc" in
     *) fail '推荐源响应或 TLS 校验异常' '检查 HTTPS 证书、系统时间和下载工具' 11 ;;
 esac
 download_rc=0
-fetch "$base/immutable/$digest/install.sh" "$work/install.sh" "$size" || download_rc=$?
+if [ -n "${recommend_native:-}" ]; then
+    ddnsto_recommend_native_download
+else
+    fetch "$base/immutable/$digest/install.sh" "$work/install.sh" "$size" || download_rc=$?
+fi
 case "$download_rc" in
     0) verify "$work/install.sh" || fail '安装脚本校验失败' '联系发布者核对摘要和大小' 11 ;;
     41) fail '安装脚本暂不可用' '检查网络后重试；不会执行旧缓存' 11 ;;

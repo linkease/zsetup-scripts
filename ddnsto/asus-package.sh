@@ -14,7 +14,8 @@
 # Validation covers the complete logical member listing reported by tar, not
 # raw extension headers or bytes tar ignores after its end marker. Exact pins
 # remain mandatory. Output is bounded; decompression CPU time is not bounded
-# here. Caller owns cancellation, trusted storage, and subsequent installation.
+# on the legacy path; trusted native capture bounds each command to 30s.
+# Caller owns cancellation, trusted storage, and subsequent installation.
 # On failure only this call's fixed staging filenames are removed. An existing
 # DEST is never reused/deleted. SIGKILL or I/O failure may leave private residue;
 # never consume DEST unless the function returned zero.
@@ -22,15 +23,23 @@ _ddnsto_asus_package_tar() { tar "$@"; }
 _ddnsto_asus_package_od() { od "$@"; }
 _ddnsto_asus_package_has_od() { type od >/dev/null 2>&1; }
 
+# Modern installation supplies ASUS_ZSETUP after verified bootstrap/download.
+# Reuse its bounded capture; failure never falls back to shell extraction.
+# Standalone callers without a trusted core and armsoft retain the legacy path.
 # Per-file kernel ceiling before opening output, then an exact byte ceiling.
 # POSIX/ash uses 512-byte blocks; shells using 1024-byte blocks can transiently
 # write up to twice the ceiling. No unbounded command substitution or pipeline
 # masks tar failure. gzip/tar stream data; no archive tree is ever materialized.
 _ddnsto_asus_package_capture() (
     ceiling=$1 output=$2; shift 2
-    (ulimit -c 0 || exit 1
-     ulimit -f "$(((ceiling + 511) / 512))" || exit 1
-     _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    if [ "${channel:-}" != armsoft ] && [ -n "${ASUS_ZSETUP:-}" ]; then
+        "$ASUS_ZSETUP" capture -o "$output" --max-bytes "$ceiling" \
+            --min-free-bytes 8388608 --timeout 30s -- tar "$@" || return 1
+    else
+        (ulimit -c 0 || exit 1
+         ulimit -f "$(((ceiling + 511) / 512))" || exit 1
+         _ddnsto_asus_package_tar "$@" > "$output" 2>/dev/null) || return 1
+    fi
     bytes=$(wc -c < "$output") || return 1
     [ "$bytes" -gt 0 ] && [ "$bytes" -le "$ceiling" ]
 )
