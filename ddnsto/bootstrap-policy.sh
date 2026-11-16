@@ -4,6 +4,32 @@
 # bootstrap call site. The shared function remains intact; no alias is needed.
 # Desktop entrypoints retain their separate 0.3.0 / 0.4.0 policies.
 
+# The native bootstrap must understand the same hash backends as the entry,
+# including a BusyBox applet without a standalone command link.
+have_hash_tool() {
+    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
+        command -v shasum >/dev/null 2>&1 ||
+        { command -v busybox >/dev/null 2>&1 && busybox sha256sum </dev/null >/dev/null 2>&1; }
+}
+
+hash_matches() (
+    [ -f "$1" ] && [ -n "${EXPECTED_SHA256:-}" ] || return 1
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum < "$1") || return 1
+        actual=${actual%% *}
+    elif command -v openssl >/dev/null 2>&1; then
+        actual=$(openssl dgst -sha256 < "$1") || return 1
+        actual=${actual##* }
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 < "$1") || return 1
+        actual=${actual%% *}
+    else
+        actual=$(busybox sha256sum < "$1") || return 1
+        actual=${actual%% *}
+    fi
+    [ "$actual" = "$EXPECTED_SHA256" ]
+)
+
 # dl.istoreos.com redirects native downloads (verified 2026-11-09). The
 # bootstrap deliberately never follows redirects. Use direct HTTPS mirrors
 # only here; preserve shared bootstrap and native product source selection.
@@ -147,8 +173,8 @@ ddnsto_bootstrap_safe_ancestors() (
     directory=$1
     while :; do
         [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
-        owner=$(stat -c %u "$directory") || return 1
-        mode=$(stat -c %a "$directory") || return 1
+        owner=$(ddnsto_stat -c %u "$directory") || return 1
+        mode=$(ddnsto_stat -c %a "$directory") || return 1
         [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
         # A root-owned sticky /tmp is safe for an owned, private child.
         if [ "$((0$mode & 0022))" -ne 0 ]; then
@@ -165,8 +191,8 @@ ddnsto_bootstrap_private_dir() (
     if [ ! -e "$1" ]; then
         (umask 077; mkdir "$1") || return 1
     fi
-    [ -d "$1" ] && [ "$(stat -c %u "$1")" = "$(id -u)" ] &&
-        [ "$(stat -c %a "$1")" = 700 ]
+    [ -d "$1" ] && [ "$(ddnsto_stat -c %u "$1")" = "$(id -u)" ] &&
+        [ "$(ddnsto_stat -c %a "$1")" = 700 ]
 )
 
 is_expected_zsetup() (
@@ -176,11 +202,11 @@ is_expected_zsetup() (
     [ -n "${EXPECTED_SHA256:-}" ] && have_hash_tool || return 1
     case "$1" in /*) ;; *) return 1 ;; esac
     ddnsto_bootstrap_safe_ancestors "${1%/*}" || return 1
-    owner=$(stat -c %u "$1") || return 1
-    mode=$(stat -c %a "$1") || return 1
+    owner=$(ddnsto_stat -c %u "$1") || return 1
+    mode=$(ddnsto_stat -c %a "$1") || return 1
     [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
     [ "$((0$mode & 0022))" -eq 0 ] || return 1
-    [ "$(stat -c %h "$1")" = 1 ] || return 1
+    [ "$(ddnsto_stat -c %h "$1")" = 1 ] || return 1
     hash_matches "$1" || return 1
     [ "$("$1" --version 2>/dev/null)" = "zsetup $RESCUE_VERSION" ]
 )
@@ -190,7 +216,7 @@ ddnsto_bootstrap_zsetup() {
     bootstrap_arch || return $?
     fetch_bootstrap_metadata https '' '' || return $?
     have_hash_tool || {
-        printf '%s\n' 'DDNSTO: SHA-256 verification requires sha256sum or openssl' >&2
+        printf '%s\n' 'DDNSTO: SHA-256 verification requires sha256sum, openssl, shasum or BusyBox sha256sum' >&2
         return 1
     }
     # Use the existing override; no host services or global installation paths.

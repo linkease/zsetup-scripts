@@ -5,11 +5,11 @@ set +x
 set -eu
 umask 077
 base='@@SOURCE_URL@@'
-cache_key='@@CACHE_KEY@@'
 fail() { printf 'DDNSTO：%s；状态=推荐入口未执行安装；下一步=%s；code=%s\n' "$1" "$2" "$3" >&2; exit "$3"; }
 case "$(uname -s)" in Linux|Darwin) ;; *) fail '不支持此系统' '使用对应平台入口' 2 ;; esac
 case "$base" in https://*) ;; *) fail '入口尚未打包' '使用已审核的发布入口' 2 ;; esac
 @@ASUS_STORAGE@@
+@@PORTABLE_FILES@@
 asus_entry=0
 if [ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]; then
     asus_entry=1
@@ -18,13 +18,44 @@ if [ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]; then
         command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
     fi
     ddnsto_asus_storage || fail '华硕私有存储检查失败' '检查 /jffs 挂载及权限，不要修改系统目录权限' 12
-    required_tools='wc cmp'
+    required_tools='wc'
 else
-    required_tools='stat wc cmp mktemp'
+    required_tools='wc mktemp'
 fi
+# A hash backend is mandatory before any downloaded program can execute.
+# Also expose the BusyBox SHA applet to child bootstrap scripts.
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v openssl >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+    required_tools="$required_tools sha256sum"
+fi
+missing_tools= busybox_tools= busybox_applets= busybox_checked=0
 for tool in $required_tools; do
-    command -v "$tool" >/dev/null 2>&1 || fail '缺少校验依赖' '安装系统文件校验工具' 2
+    command -v "$tool" >/dev/null 2>&1 && continue
+    if [ "$busybox_checked" = 0 ]; then
+        busybox_checked=1
+        if command -v busybox >/dev/null 2>&1; then
+            busybox_applets=$(busybox --list 2>/dev/null) || busybox_applets=
+        fi
+    fi
+    # Match complete applet names. BusyBox existing does not mean an applet was
+    # compiled in; never silently replace permission or integrity checks.
+    case "
+$busybox_applets
+" in
+        *"
+$tool
+"*)
+            busybox_tools="$busybox_tools $tool"
+            # Bootstrap the private workspace without modifying system links.
+            # Explicit functions avoid eval of command names or firmware output.
+            case "$tool" in
+                sha256sum) sha256sum() { busybox sha256sum "$@"; } ;;
+                wc) wc() { busybox wc "$@"; } ;;
+                mktemp) mktemp() { busybox mktemp "$@"; } ;;
+            esac ;;
+        *) missing_tools="${missing_tools}${missing_tools:+ }$tool" ;;
+    esac
 done
+[ -z "$missing_tools" ] || fail "缺少校验依赖：$missing_tools" "检查 PATH 或安装上述命令（BusyBox 也未提供对应功能），然后重试；不会跳过校验" 2
 if command -v sha256sum >/dev/null 2>&1; then hash_tool=sha256sum
 elif command -v shasum >/dev/null 2>&1; then hash_tool=shasum
 elif command -v openssl >/dev/null 2>&1; then hash_tool=openssl
@@ -36,74 +67,32 @@ hash_file() {
         openssl) h=$(openssl dgst -sha256 "$1") || return 1; printf '%s\n' "${h##* }" ;;
     esac
 }
-if [ "$asus_entry" = 1 ]; then uid=0; else uid=$(id -u); fi
-stat_fields() {
-    if [ "$asus_entry" = 1 ]; then ddnsto_asus_fields "$1"
-    elif [ "$(uname -s)" = Darwin ]; then stat -f '%u %Lp %l' "$1"
-    else stat -c '%u %a %h' "$1"; fi
-}
-# Validate every ancestor before creating anything. Root-owned sticky ancestors
-# (e.g. /tmp) are allowed; cache itself must belong to this user, mode 0700.
-safe_ancestors() (
-    if [ "$asus_entry" = 1 ]; then ddnsto_asus_safe_ancestors "$1/probe"; exit $?; fi
-    p=$1
-    while :; do
-        [ ! -L "$p" ] && [ -d "$p" ] || return 1
-        fields=$(stat_fields "$p") || return 1
-        set -- $fields
-        [ "$#" = 3 ] || return 1
-        [ "$1" = "$uid" ] || [ "$1" = 0 ] || return 1
-        perm=$((0$2))
-        if [ "$((perm & 0022))" != 0 ]; then
-            [ "$1" = 0 ] && [ "$((perm & 01000))" != 0 ] || return 1
+# No persistent recommendation cache. Old cache overrides are deliberately
+# ignored: every invocation fetches a fresh recommendation into a private dir.
+# /tmp is a platform trust anchor, not an arbitrary caller-selected directory.
+if [ "$asus_entry" = 0 ]; then
+    temp_parent=$(CDPATH= cd -P /tmp && pwd -P) || fail '无法访问临时目录' '检查系统 /tmp' 12
+    case "$temp_parent" in /tmp|/private/tmp) ;; *) fail '临时目录位置不受支持' '检查系统 /tmp，不要放宽目录权限' 12 ;; esac
+    for parent in / ${temp_parent%/tmp} "$temp_parent"; do
+        [ -n "$parent" ] || continue
+        [ -d "$parent" ] && [ ! -L "$parent" ] || fail '临时目录不安全' '检查系统目录类型' 12
+        fields=$(ddnsto_file_fields "$parent") || fail '无法检查临时目录权限' '检查系统 ls/stat 功能；不会跳过权限检查' 12
+        field_owner=${fields%% *}; field_rest=${fields#* }; field_mode=${field_rest%% *}
+        [ "$field_owner" = 0 ] || fail '临时目录所有者不安全' '检查系统目录所有者' 12
+        permissions=$((0$field_mode))
+        if [ "$((permissions & 0022))" != 0 ]; then
+            [ "$parent" = "$temp_parent" ] && [ "$((permissions & 01000))" != 0 ] ||
+                fail '临时目录可被其他用户改写' '检查系统目录权限；不要关闭权限检查' 12
         fi
-        [ "$p" != / ] || break
-        p=${p%/*}; [ -n "$p" ] || p=/
     done
-)
-private_dir() {
-    [ ! -L "$1" ] && [ -d "$1" ] || return 1
-    [ "$(stat_fields "$1")" = "$uid 700 2" ] && return 0
-    fields=$(stat_fields "$1") || return 1
-    set -- $fields
-    [ "$1" = "$uid" ] && [ "$2" = 700 ]
-}
-safe_file() {
-    [ ! -L "$1" ] && [ -f "$1" ] || return 1
-    fields=$(stat_fields "$1") || return 1
-    set -- $fields
-    [ "$1" = "$uid" ] && [ "$3" = 1 ] && [ "$((0$2 & 0077))" = 0 ]
-}
-if [ "$asus_entry" = 1 ]; then
-    [ -z "${DDNSTO_RECOMMEND_CACHE:-}" ] || fail '华硕入口不接受自定义缓存' '取消 DDNSTO_RECOMMEND_CACHE 后重试' 12
-    cache_root=$ASUS_STATE/recommendation
-elif [ -f /etc/synoinfo.conf ] || [ -d /usr/syno ]; then
-    # DSM homes commonly use Synology ACLs and symlinked shared directories.
-    # Do not weaken ancestor checks or chmod them. A user-owned 0700 cache
-    # beneath the checked root-owned sticky /tmp is safe to reuse. Reboots may
-    # remove it; a cache miss simply requires a fresh verified HTTPS download.
-    cache_root=${DDNSTO_RECOMMEND_CACHE:-/tmp/ddnsto-recommendation-$uid}
-else
-    cache_root=${DDNSTO_RECOMMEND_CACHE:-${HOME:?}/.ddnsto-recommendation}
 fi
-case "$cache_root" in /*) ;; *) fail '缓存路径无效' '使用绝对私有目录' 12 ;; esac
-# Reject ambiguous path components; paths are never interpreted as shell code.
-case "$cache_root/" in *'/../'*|*'/./'*|*'//'*) fail '缓存路径无效' '使用规范私有目录' 12 ;; esac
-parent=${cache_root%/*}; [ -n "$parent" ] || parent=/
-safe_ancestors "$parent" || fail '缓存父目录不安全' '检查目录所有者及权限' 12
-if [ ! -e "$cache_root" ] && [ ! -L "$cache_root" ]; then mkdir -m 700 "$cache_root" 2>/dev/null || fail '无法创建缓存' '检查目录权限' 12; fi
-private_dir "$cache_root" || fail '缓存目录不安全' '使用本人所有的 0700 目录' 12
-cache="$cache_root/$cache_key"
-if [ ! -e "$cache" ] && [ ! -L "$cache" ]; then mkdir -m 700 "$cache" 2>/dev/null || fail '无法创建缓存' '检查目录权限' 12; fi
-private_dir "$cache" || fail '缓存目录不安全' '检查目录所有者及权限' 12
-mkdir "$cache/lock" 2>/dev/null || fail '推荐缓存被占用' '等待其他安装完成；异常中断后检查 lock' 12
 work=
 entry_child=
 cleanup() {
     cleanup_rc=$?
     trap - EXIT
     trap '' HUP INT TERM
-    # Retain the verified source and cache lock until the installer has joined
+    # Retain the verified source until the installer has joined
     # its worker/recovery. Only signal our own child, never a global process set.
     if [ -n "$entry_child" ]; then
         kill -TERM "$entry_child" 2>/dev/null || :
@@ -111,7 +100,6 @@ cleanup() {
         entry_child=
     fi
     [ -z "$work" ] || rm -rf -- "$work"
-    rmdir "$cache/lock" 2>/dev/null || :
     exit "$cleanup_rc"
 }
 trap cleanup EXIT
@@ -119,9 +107,20 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 if [ "$asus_entry" = 1 ]; then
-    work=$(ddnsto_asus_mktemp "$cache") || fail '无法创建工作目录' '检查缓存空间' 12
+    work=$(ddnsto_asus_mktemp "$ASUS_STATE") || fail '无法创建工作目录' '检查缓存空间' 12
 else
-    work=$(mktemp -d "$cache/attempt.XXXXXXXX") || fail '无法创建工作目录' '检查缓存空间' 12
+    work=$(mktemp -d "$temp_parent/ddnsto-entry.XXXXXXXX") || fail '无法创建工作目录' '检查缓存空间' 12
+fi
+if [ -n "$busybox_tools" ]; then
+    # POSIX functions are not inherited by the installer child. Provide only
+    # missing commands in this checked 0700 workspace, retained until child exit.
+    mkdir -m 700 "$work/tools" || fail '无法准备兼容命令' '检查私有缓存空间' 12
+    for tool in $busybox_tools; do
+        printf '#!/bin/sh\nexec busybox %s "$@"\n' "$tool" > "$work/tools/$tool" || fail '无法准备兼容命令' '检查私有缓存空间' 12
+        chmod 700 "$work/tools/$tool" || fail '无法保护兼容命令' '检查私有缓存权限' 12
+    done
+    PATH="$work/tools:$PATH"
+    export PATH
 fi
 # A narrow bootstrap transport, not a zsetup replacement. Do not execute a
 # caller-supplied/downloading zsetup just to ask its version. Reject ALL redirects.
@@ -217,8 +216,9 @@ fetch() (
     ddnsto_https_fetch "$@"
 )
 parse() {
-    safe_file "$1" || return 1
-    [ "$(wc -c < "$1")" -le 128 ] || return 1
+    [ -f "$1" ] && [ ! -L "$1" ] || return 1
+    manifest_bytes=$(wc -c < "$1") || return 1
+    [ "$manifest_bytes" -le 128 ] || return 1
     {
         IFS= read -r magic && IFS= read -r digest && IFS= read -r size
     } < "$1" || return 1
@@ -227,43 +227,29 @@ parse() {
     [ "${#digest}" = 64 ] || return 1
     case "$size" in ''|0*|*[!0-9]*) return 1 ;; esac
     [ "${#size}" -le 7 ] && [ "$size" -le 8388608 ] || return 1
-    printf '%s\n' "$magic" "$digest" "$size" > "$work/canonical.txt"
-    cmp -s "$1" "$work/canonical.txt"
+    # Fields are ASCII-only; exact byte length rejects NULs discarded by some
+    # shells, extra lines, CRLF and missing final newline without requiring cmp.
+    [ "$manifest_bytes" -eq "$((${#magic} + ${#digest} + ${#size} + 3))" ]
 }
 verify() {
-    safe_file "$1" && [ "$(wc -c < "$1")" -eq "$size" ] && [ "$(hash_file "$1")" = "$digest" ]
+    [ -f "$1" ] && [ ! -L "$1" ] &&
+        [ "$(wc -c < "$1")" -eq "$size" ] && [ "$(hash_file "$1")" = "$digest" ]
 }
-offline() { printf '%s\n' 'DDNSTO：推荐源暂不可用；状态=离线使用已校验缓存（可能非最新）；下一步=联网后重试；code=0' >&2; }
 rc=0
 fetch "$base/recommended-shell.txt" "$work/recommended.txt" 128 || rc=$?
 case "$rc" in
     0) parse "$work/recommended.txt" || fail '推荐清单非法' '联系发布者核对清单' 11 ;;
-    41)
-        parse "$cache/recommended.txt" || fail '推荐源不可用且无完整缓存' '检查网络后重试' 11
-        verify "$cache/$digest.sh" || fail '离线脚本缺失或校验失败' '联网重新取得完整推荐' 11
-        cp "$cache/recommended.txt" "$work/recommended.txt"
-        cp "$cache/$digest.sh" "$work/install.sh"
-        offline ;;
-    *) fail '推荐源响应或 TLS 校验异常' '检查 HTTPS 证书和发布路径' 11 ;;
+    41) fail '推荐源暂不可用，本入口需要联网' '检查网络后重新运行；也可使用官方手动安装指引' 11 ;;
+    *) fail '推荐源响应或 TLS 校验异常' '检查 HTTPS 证书、系统时间和下载工具' 11 ;;
 esac
-if [ "$rc" = 0 ]; then
-    download_rc=0
-    fetch "$base/immutable/$digest/install.sh" "$work/install.sh" "$size" || download_rc=$?
-    case "$download_rc" in
-        0) verify "$work/install.sh" || fail '安装脚本校验失败' '联系发布者核对摘要和大小' 11 ;;
-        41)
-            verify "$cache/$digest.sh" || fail '安装脚本不可用且无匹配缓存' '检查网络后重试' 11
-            cp "$cache/$digest.sh" "$work/install.sh"
-            offline ;;
-        *) fail '安装脚本响应异常' '检查 HTTPS 证书和不可变路径' 11 ;;
-    esac
-fi
-verify "$work/install.sh" || fail '执行前校验失败' '检查缓存完整性' 11
-# Commit the complete pair under the lock. A crash before metadata replacement
-# leaves the previous complete pair; every reuse rehashes the script bytes.
-cp "$work/install.sh" "$work/cached.sh"
-mv -f "$work/cached.sh" "$cache/$digest.sh"
-mv -f "$work/recommended.txt" "$cache/recommended.txt"
+download_rc=0
+fetch "$base/immutable/$digest/install.sh" "$work/install.sh" "$size" || download_rc=$?
+case "$download_rc" in
+    0) verify "$work/install.sh" || fail '安装脚本校验失败' '联系发布者核对摘要和大小' 11 ;;
+    41) fail '安装脚本暂不可用' '检查网络后重试；不会执行旧缓存' 11 ;;
+    *) fail '安装脚本响应异常' '检查 HTTPS 证书和不可变路径' 11 ;;
+esac
+verify "$work/install.sh" || fail '执行前校验失败' '重新下载或联系发布者' 11
 # Preserve exact argv and executor status. No token, manifest or exception dump.
 # Lifecycle success (including stable local service checks) belongs to executor.
 result=0

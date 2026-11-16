@@ -93,6 +93,7 @@ def package(args):
         template = (ROOT / f'ddnsto/recommended-entry.{extension}').read_text()
         if extension == 'sh':
             template = template.replace('@@ASUS_STORAGE@@', (ROOT / 'ddnsto/asus-storage.sh').read_text())
+            template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'ddnsto/portable-files.sh').read_text())
         payloads[f'recommended-entry.{extension}'] = template.replace(
             '@@SOURCE_URL@@', base).replace('@@CACHE_KEY@@', digest(base.encode())).encode(
                 'utf-8-sig' if extension == 'ps1' else 'utf-8')

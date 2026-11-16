@@ -60,3 +60,12 @@ installations are migration conflicts. OpenWrt keeps only its proven native
 package mappings and explicit root invocation. See ../docs/linux-install-storage.md
 for disk bounds, two-version cache, metadata/network behavior and recovery.
 This is an unpublished candidate, not a new production pointer.
+# 推荐入口依赖优化（2026-11-16，测试站）
+
+Shell 推荐入口默认联网获取推荐清单和不可变安装器，只使用本次运行的私有临时目录；不再读取或写入长期推荐缓存，旧 `DDNSTO_RECOMMEND_CACHE` 参数不再生效，旧缓存不会自动删除。zsetup 自身的受保护二进制缓存、客户端配置与诊断日志不受此项调整影响。
+
+入口不再要求独立 `stat` 或 `cmp`。Linux/OpenWrt 后续引导和配置保护使用同一元数据辅助函数：优先 stat，缺失时严格解析 `LC_ALL=C ls -dn` 的数字所有者、权限与链接数，仅接受无歧义路径和格式；符号链接、ACL 标记或无法确认的权限仍会拒绝。macOS、DSM 原有业务依赖不因此被取消。
+
+保留 SHA-256、字节数、清单严格解析、TLS 证书和下载边界检查；支持 BusyBox 的 wc、mktemp、sha256sum 功能，不创建系统命令链接、不自动安装依赖。缺少 mktemp 且 BusyBox 不提供时仍明确拒绝；未经验证的 BusyBox/uclient wget 仍不开放，使用 curl 或符合要求的 GNU Wget。不修改 zsetup 核心。
+
+本轮只发布测试站；本地隔离测试不代表真机安装验收，设备测试由用户完成。发布记录见 [无 stat 入口验证](../docs/verification/2026-11-16-ddnsto-statless-entry.md)。

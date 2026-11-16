@@ -30,9 +30,24 @@ ddnsto_ensure_ow_version() (
 $listing
 EOF
         [ "$count" = 1 ] || exit 2
+    elif [ "$package_manager" = apk ]; then
+        # apk info -v NAME prints description/URL/size on apk-tools 3, not
+        # NAME-VERSION. Query only installed packages; never infer a version
+        # from repository candidates or fall back to a coexisting opkg shim.
+        listing=$(LC_ALL=C apk list --installed ddnsto 2>/dev/null) || exit 2
+        count=0; installed=
+        while read -r name package_arch details; do
+            [ -n "$name" ] || continue
+            case "$name" in ddnsto-*) ;; *) exit 2 ;; esac
+            case "$package_arch" in ''|*[!a-zA-Z0-9_-]*) exit 2 ;; esac
+            case "$details" in *' [installed]') ;; *) exit 2 ;; esac
+            count=$((count + 1)); installed=${name#ddnsto-}
+        done <<EOF
+$listing
+EOF
+        [ "$count" = 1 ] || exit 2
     else
-        installed=$(apk info -v ddnsto 2>/dev/null) || exit 2
-        case "$installed" in ddnsto-*) installed=${installed#ddnsto-} ;; *) exit 2 ;; esac
+        exit 2
     fi
     # Official OpenWrt packages use PKG_SOURCE_DATE~ARCH_HEXCODE-rREV.
     # Accept only the publisher's exact architecture tag, not arbitrary

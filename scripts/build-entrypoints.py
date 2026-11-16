@@ -48,7 +48,8 @@ def main():
             common += (ROOT / "kspeeder/lib/binary.sh").read_text().rstrip() + "\n\n"
         business = (folder / "business.sh").read_text().rstrip() + "\n\n"
         if app == 'ddnsto':
-            business = ((folder / 'managed-cli.sh').read_text().rstrip() + '\n\n'
+            business = ((folder / 'portable-files.sh').read_text().rstrip() + '\n\n'
+                        + (folder / 'managed-cli.sh').read_text().rstrip() + '\n\n'
                         + (folder / 'managed-service.sh').read_text().rstrip() + '\n\n'
                         + business)
             # One shell entry on Linux/NAS/macOS; no sibling source fetch.

@@ -9,8 +9,8 @@ ddnsto_openwrt_protected() {
     for ow_target in "$binary" "$config" "$service_path"; do
         ddnsto_ow_safe_path "$ow_target" || return 2
         ddnsto_bootstrap_safe_ancestors "${ow_target%/*}" || return 12
-        [ -f "$ow_target" ] && [ "$(stat -c %u "$ow_target")" = "$(id -u)" ] || return 2
-        ow_mode=$(stat -c %a "$ow_target") || return 12
+        [ -f "$ow_target" ] && [ "$(ddnsto_stat -c %u "$ow_target")" = "$(id -u)" ] || return 2
+        ow_mode=$(ddnsto_stat -c %a "$ow_target") || return 12
         [ "$((0$ow_mode & 0022))" = 0 ] || return 12
         ddnsto_ow_owned "$ow_target" || return 2
     done
@@ -38,8 +38,8 @@ ddnsto_openwrt_preflight() {
         }
         [ ! -e "$binary" ] && [ ! -L "$binary" ] && [ ! -e "$service_path" ] && [ ! -L "$service_path" ] || return 2
         ddnsto_bootstrap_safe_ancestors "${config%/*}" || return 12
-        [ "$(stat -c %u "$config")" = "$(id -u)" ] || return 2
-        ow_mode=$(stat -c %a "$config") || return 12
+        [ "$(ddnsto_stat -c %u "$config")" = "$(id -u)" ] || return 2
+        ow_mode=$(ddnsto_stat -c %a "$config") || return 12
         [ "$((0$ow_mode & 0022))" = 0 ] || return 12
         DDNSTO_OW_RETAINED=1
     fi

@@ -2215,6 +2215,32 @@ installer_privilege_install() {
 # bootstrap call site. The shared function remains intact; no alias is needed.
 # Desktop entrypoints retain their separate 0.3.0 / 0.4.0 policies.
 
+# The native bootstrap must understand the same hash backends as the entry,
+# including a BusyBox applet without a standalone command link.
+have_hash_tool() {
+    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
+        command -v shasum >/dev/null 2>&1 ||
+        { command -v busybox >/dev/null 2>&1 && busybox sha256sum </dev/null >/dev/null 2>&1; }
+}
+
+hash_matches() (
+    [ -f "$1" ] && [ -n "${EXPECTED_SHA256:-}" ] || return 1
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum < "$1") || return 1
+        actual=${actual%% *}
+    elif command -v openssl >/dev/null 2>&1; then
+        actual=$(openssl dgst -sha256 < "$1") || return 1
+        actual=${actual##* }
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 < "$1") || return 1
+        actual=${actual%% *}
+    else
+        actual=$(busybox sha256sum < "$1") || return 1
+        actual=${actual%% *}
+    fi
+    [ "$actual" = "$EXPECTED_SHA256" ]
+)
+
 # dl.istoreos.com redirects native downloads (verified 2026-11-09). The
 # bootstrap deliberately never follows redirects. Use direct HTTPS mirrors
 # only here; preserve shared bootstrap and native product source selection.
@@ -2358,8 +2384,8 @@ ddnsto_bootstrap_safe_ancestors() (
     directory=$1
     while :; do
         [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
-        owner=$(stat -c %u "$directory") || return 1
-        mode=$(stat -c %a "$directory") || return 1
+        owner=$(ddnsto_stat -c %u "$directory") || return 1
+        mode=$(ddnsto_stat -c %a "$directory") || return 1
         [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
         # A root-owned sticky /tmp is safe for an owned, private child.
         if [ "$((0$mode & 0022))" -ne 0 ]; then
@@ -2376,8 +2402,8 @@ ddnsto_bootstrap_private_dir() (
     if [ ! -e "$1" ]; then
         (umask 077; mkdir "$1") || return 1
     fi
-    [ -d "$1" ] && [ "$(stat -c %u "$1")" = "$(id -u)" ] &&
-        [ "$(stat -c %a "$1")" = 700 ]
+    [ -d "$1" ] && [ "$(ddnsto_stat -c %u "$1")" = "$(id -u)" ] &&
+        [ "$(ddnsto_stat -c %a "$1")" = 700 ]
 )
 
 is_expected_zsetup() (
@@ -2387,11 +2413,11 @@ is_expected_zsetup() (
     [ -n "${EXPECTED_SHA256:-}" ] && have_hash_tool || return 1
     case "$1" in /*) ;; *) return 1 ;; esac
     ddnsto_bootstrap_safe_ancestors "${1%/*}" || return 1
-    owner=$(stat -c %u "$1") || return 1
-    mode=$(stat -c %a "$1") || return 1
+    owner=$(ddnsto_stat -c %u "$1") || return 1
+    mode=$(ddnsto_stat -c %a "$1") || return 1
     [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
     [ "$((0$mode & 0022))" -eq 0 ] || return 1
-    [ "$(stat -c %h "$1")" = 1 ] || return 1
+    [ "$(ddnsto_stat -c %h "$1")" = 1 ] || return 1
     hash_matches "$1" || return 1
     [ "$("$1" --version 2>/dev/null)" = "zsetup $RESCUE_VERSION" ]
 )
@@ -2401,7 +2427,7 @@ ddnsto_bootstrap_zsetup() {
     bootstrap_arch || return $?
     fetch_bootstrap_metadata https '' '' || return $?
     have_hash_tool || {
-        printf '%s\n' 'DDNSTO: SHA-256 verification requires sha256sum or openssl' >&2
+        printf '%s\n' 'DDNSTO: SHA-256 verification requires sha256sum, openssl, shasum or BusyBox sha256sum' >&2
         return 1
     }
     # Use the existing override; no host services or global installation paths.
@@ -2460,6 +2486,64 @@ ddnsto_bootstrap_zsetup() {
 
 
 # Business logic: maintained in ddnsto/business.sh
+# Metadata for DDNSTO only. Prefer native stat, but minimal OpenWrt firmware
+# may omit both stat and its BusyBox applet. Never replace checks with success.
+ddnsto_file_fields() (
+    [ "$#" = 1 ] && [ ! -L "$1" ] || return 1
+    if command -v stat >/dev/null 2>&1; then
+        if [ "$(uname -s)" = Darwin ]; then stat -f '%u %Lp %l' "$1"
+        else stat -c '%u %a %h' "$1"; fi
+        return $?
+    fi
+    # Only unambiguous paths and regular files/directories. Reject ACL markers,
+    # unexpected listing formats and symlinks rather than guessing permissions.
+    case "$1" in /*) ;; *) return 1 ;; esac
+    case "$1" in *[!a-zA-Z0-9_./-]*) return 1 ;; esac
+    expected_path=$1
+    listing=$(LC_ALL=C TIME_STYLE=locale ls -dn "$1") || return 1
+    set -f
+    IFS=$(printf ' \t\n_')
+    IFS=${IFS%_}
+    set -- $listing
+    [ "$#" = 9 ] && [ "$9" = "$expected_path" ] || return 1
+    permissions=$1 links=$2 owner=$3
+    case "$owner:$links" in *[!0-9:]*) return 1 ;; esac
+    [ -n "$owner" ] && [ -n "$links" ] && [ "$links" -gt 0 ] || return 1
+    case "$permissions" in
+        [-d][r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]) ;;
+        *) return 1 ;;
+    esac
+    bits=${permissions#?} mode=0 special=0 position=0
+    while [ -n "$bits" ]; do
+        character=${bits%"${bits#?}"}; bits=${bits#?}
+        position=$((position + 1))
+        case "$character" in -|S|T) bit=0 ;; *) bit=1 ;; esac
+        mode=$((mode * 2 + bit))
+        case "$position:$character" in
+            3:s|3:S) special=$((special + 2048)) ;;
+            6:s|6:S) special=$((special + 1024)) ;;
+            9:t|9:T) special=$((special + 512)) ;;
+        esac
+    done
+    printf '%s %o %s\n' "$owner" "$((mode + special))" "$links"
+)
+
+# Restricted interface used by Linux/OpenWrt protection checks. This is not a
+# replacement stat executable and is never installed into the system PATH.
+ddnsto_stat() (
+    [ "$#" = 3 ] && [ "$1" = -c ] || return 1
+    format=$2
+    fields=$(ddnsto_file_fields "$3") || return 1
+    set -- $fields
+    [ "$#" = 3 ] || return 1
+    case "$format" in
+        %u) printf '%s\n' "$1" ;;
+        %a) printf '%s\n' "$2" ;;
+        %h) printf '%s\n' "$3" ;;
+        *) return 1 ;;
+    esac
+)
+
 ddnsto_usage() {
     printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
@@ -4206,8 +4290,8 @@ ddnsto_openwrt_protected() {
     for ow_target in "$binary" "$config" "$service_path"; do
         ddnsto_ow_safe_path "$ow_target" || return 2
         ddnsto_bootstrap_safe_ancestors "${ow_target%/*}" || return 12
-        [ -f "$ow_target" ] && [ "$(stat -c %u "$ow_target")" = "$(id -u)" ] || return 2
-        ow_mode=$(stat -c %a "$ow_target") || return 12
+        [ -f "$ow_target" ] && [ "$(ddnsto_stat -c %u "$ow_target")" = "$(id -u)" ] || return 2
+        ow_mode=$(ddnsto_stat -c %a "$ow_target") || return 12
         [ "$((0$ow_mode & 0022))" = 0 ] || return 12
         ddnsto_ow_owned "$ow_target" || return 2
     done
@@ -4235,8 +4319,8 @@ ddnsto_openwrt_preflight() {
         }
         [ ! -e "$binary" ] && [ ! -L "$binary" ] && [ ! -e "$service_path" ] && [ ! -L "$service_path" ] || return 2
         ddnsto_bootstrap_safe_ancestors "${config%/*}" || return 12
-        [ "$(stat -c %u "$config")" = "$(id -u)" ] || return 2
-        ow_mode=$(stat -c %a "$config") || return 12
+        [ "$(ddnsto_stat -c %u "$config")" = "$(id -u)" ] || return 2
+        ow_mode=$(ddnsto_stat -c %a "$config") || return 12
         [ "$((0$ow_mode & 0022))" = 0 ] || return 12
         DDNSTO_OW_RETAINED=1
     fi
@@ -4578,9 +4662,24 @@ ddnsto_ensure_ow_version() (
 $listing
 EOF
         [ "$count" = 1 ] || exit 2
+    elif [ "$package_manager" = apk ]; then
+        # apk info -v NAME prints description/URL/size on apk-tools 3, not
+        # NAME-VERSION. Query only installed packages; never infer a version
+        # from repository candidates or fall back to a coexisting opkg shim.
+        listing=$(LC_ALL=C apk list --installed ddnsto 2>/dev/null) || exit 2
+        count=0; installed=
+        while read -r name package_arch details; do
+            [ -n "$name" ] || continue
+            case "$name" in ddnsto-*) ;; *) exit 2 ;; esac
+            case "$package_arch" in ''|*[!a-zA-Z0-9_-]*) exit 2 ;; esac
+            case "$details" in *' [installed]') ;; *) exit 2 ;; esac
+            count=$((count + 1)); installed=${name#ddnsto-}
+        done <<EOF
+$listing
+EOF
+        [ "$count" = 1 ] || exit 2
     else
-        installed=$(apk info -v ddnsto 2>/dev/null) || exit 2
-        case "$installed" in ddnsto-*) installed=${installed#ddnsto-} ;; *) exit 2 ;; esac
+        exit 2
     fi
     # Official OpenWrt packages use PKG_SOURCE_DATE~ARCH_HEXCODE-rREV.
     # Accept only the publisher's exact architecture tag, not arbitrary
@@ -6747,6 +6846,56 @@ installer_service_cleanup() {
         SERVICE_DEST_LOCK_HELD=0
     fi
 }
+ddnsto_file_fields() (
+    [ "$#" = 1 ] && [ ! -L "$1" ] || return 1
+    if command -v stat >/dev/null 2>&1; then
+        if [ "$(uname -s)" = Darwin ]; then stat -f '%u %Lp %l' "$1"
+        else stat -c '%u %a %h' "$1"; fi
+        return $?
+    fi
+    case "$1" in /*) ;; *) return 1 ;; esac
+    case "$1" in *[!a-zA-Z0-9_./-]*) return 1 ;; esac
+    expected_path=$1
+    listing=$(LC_ALL=C TIME_STYLE=locale ls -dn "$1") || return 1
+    set -f
+    IFS=$(printf ' \t\n_')
+    IFS=${IFS%_}
+    set -- $listing
+    [ "$#" = 9 ] && [ "$9" = "$expected_path" ] || return 1
+    permissions=$1 links=$2 owner=$3
+    case "$owner:$links" in *[!0-9:]*) return 1 ;; esac
+    [ -n "$owner" ] && [ -n "$links" ] && [ "$links" -gt 0 ] || return 1
+    case "$permissions" in
+        [-d][r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]) ;;
+        *) return 1 ;;
+    esac
+    bits=${permissions#?} mode=0 special=0 position=0
+    while [ -n "$bits" ]; do
+        character=${bits%"${bits#?}"}; bits=${bits#?}
+        position=$((position + 1))
+        case "$character" in -|S|T) bit=0 ;; *) bit=1 ;; esac
+        mode=$((mode * 2 + bit))
+        case "$position:$character" in
+            3:s|3:S) special=$((special + 2048)) ;;
+            6:s|6:S) special=$((special + 1024)) ;;
+            9:t|9:T) special=$((special + 512)) ;;
+        esac
+    done
+    printf '%s %o %s\n' "$owner" "$((mode + special))" "$links"
+)
+ddnsto_stat() (
+    [ "$#" = 3 ] && [ "$1" = -c ] || return 1
+    format=$2
+    fields=$(ddnsto_file_fields "$3") || return 1
+    set -- $fields
+    [ "$#" = 3 ] || return 1
+    case "$format" in
+        %u) printf '%s\n' "$1" ;;
+        %a) printf '%s\n' "$2" ;;
+        %h) printf '%s\n' "$3" ;;
+        *) return 1 ;;
+    esac
+)
 ddnsto_usage() {
     printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
@@ -8283,8 +8432,8 @@ ddnsto_openwrt_protected() {
     for ow_target in "$binary" "$config" "$service_path"; do
         ddnsto_ow_safe_path "$ow_target" || return 2
         ddnsto_bootstrap_safe_ancestors "${ow_target%/*}" || return 12
-        [ -f "$ow_target" ] && [ "$(stat -c %u "$ow_target")" = "$(id -u)" ] || return 2
-        ow_mode=$(stat -c %a "$ow_target") || return 12
+        [ -f "$ow_target" ] && [ "$(ddnsto_stat -c %u "$ow_target")" = "$(id -u)" ] || return 2
+        ow_mode=$(ddnsto_stat -c %a "$ow_target") || return 12
         [ "$((0$ow_mode & 0022))" = 0 ] || return 12
         ddnsto_ow_owned "$ow_target" || return 2
     done
@@ -8311,8 +8460,8 @@ ddnsto_openwrt_preflight() {
         }
         [ ! -e "$binary" ] && [ ! -L "$binary" ] && [ ! -e "$service_path" ] && [ ! -L "$service_path" ] || return 2
         ddnsto_bootstrap_safe_ancestors "${config%/*}" || return 12
-        [ "$(stat -c %u "$config")" = "$(id -u)" ] || return 2
-        ow_mode=$(stat -c %a "$config") || return 12
+        [ "$(ddnsto_stat -c %u "$config")" = "$(id -u)" ] || return 2
+        ow_mode=$(ddnsto_stat -c %a "$config") || return 12
         [ "$((0$ow_mode & 0022))" = 0 ] || return 12
         DDNSTO_OW_RETAINED=1
     fi
@@ -8611,9 +8760,21 @@ ddnsto_ensure_ow_version() (
 $listing
 EOF
         [ "$count" = 1 ] || exit 2
+    elif [ "$package_manager" = apk ]; then
+        listing=$(LC_ALL=C apk list --installed ddnsto 2>/dev/null) || exit 2
+        count=0; installed=
+        while read -r name package_arch details; do
+            [ -n "$name" ] || continue
+            case "$name" in ddnsto-*) ;; *) exit 2 ;; esac
+            case "$package_arch" in ''|*[!a-zA-Z0-9_-]*) exit 2 ;; esac
+            case "$details" in *' [installed]') ;; *) exit 2 ;; esac
+            count=$((count + 1)); installed=${name#ddnsto-}
+        done <<EOF
+$listing
+EOF
+        [ "$count" = 1 ] || exit 2
     else
-        installed=$(apk info -v ddnsto 2>/dev/null) || exit 2
-        case "$installed" in ddnsto-*) installed=${installed#ddnsto-} ;; *) exit 2 ;; esac
+        exit 2
     fi
     case "$installed" in
         *~*)
