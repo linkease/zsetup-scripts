@@ -173,22 +173,50 @@ check_version() {
         fail '保留配置来自更新版本，不能降级安装，请使用对应新版安装器'
     fi
 }
+wait_job_unloaded() {
+    unload_attempt=0
+    while launchctl print "$domain/$LABEL" >/dev/null 2>&1; do
+        [ "$unload_attempt" -lt 10 ] || fail 'service still loaded after stop' 1
+        unload_attempt=$((unload_attempt + 1))
+        sleep 1
+    done
+}
+protect_runtime_identity() {
+    identity="$CONFIG_DIR/.ddnsto_boot.cfg"
+    [ -e "$identity" ] || [ -L "$identity" ] || return 0
+    protected_path "$CONFIG_DIR" private
+    [ -f "$identity" ] && [ ! -L "$identity" ] || fail 'runtime identity must be regular'
+    metadata=$(stat -f '%u %l' "$identity") || fail 'cannot inspect runtime identity'
+    [ "$metadata" = "$uid 1" ] || fail 'runtime identity ownership or hardlink mismatch'
+    # Published CLI 4.2.8 explicitly chmods its boot file to 0777. It lives
+    # inside our owner-only directory; tighten only this owned regular file.
+    chmod 600 "$identity" || fail 'cannot protect runtime identity'
+}
 stable_running() {
     previous_pid=
     observation=0
-    while [ "$observation" -lt 3 ]; do
+    attempt=0
+    while [ "$attempt" -lt 30 ]; do
+        attempt=$((attempt + 1))
         sleep 1
         job=$(launchctl print "$domain/$LABEL" 2>/dev/null) || fail '本地服务未运行，请检查本地日志后重试' 1
         validate_job
-        job_state=$(printf '%s\n' "$job" | sed -n 's/^[[:space:]]*state = \([^[:space:]]*\)[[:space:]]*$/\1/p')
-        [ "$job_state" = running ] || fail '本地服务尚未处于运行状态，请检查本地日志' 1
+        # launchctl also prints nested coalition states. The first state is
+        # the service's own state; initial server reassignment may relaunch it.
+        job_state=$(printf '%s\n' "$job" | awk '$1 == "state" && $2 == "=" {print $3; exit}')
+        if [ "$job_state" != running ]; then observation=0; previous_pid=; continue; fi
         current_pid=$(printf '%s\n' "$job" | sed -n 's/^[[:space:]]*pid = \([1-9][0-9]*\)[[:space:]]*$/\1/p')
         case "$current_pid" in ''|*[!0-9]*) fail '本地服务没有有效进程，请检查本地日志' 1 ;; esac
-        [ -z "$previous_pid" ] || [ "$previous_pid" = "$current_pid" ] || fail '本地进程反复重启，尚未稳定，请检查本地日志' 1
+        if [ "$previous_pid" != "$current_pid" ]; then observation=0; fi
         previous_pid=$current_pid
         observation=$((observation + 1))
+        if [ "$observation" -ge 3 ]; then
+            protect_runtime_identity
+            diagnostic_event stable
+            return 0
+        fi
     done
-    diagnostic_event stable
+    fail '本地服务在 30 秒观察窗口内未稳定运行，请检查本地日志' 1
 }
 xml() { printf '%s' "$1" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
 managed_plist() {
@@ -356,7 +384,7 @@ uninstall_managed() (
         launchctl bootout "$domain/$LABEL" || fail 'could not stop service'
         unloaded=1
     fi
-    if launchctl print "$domain/$LABEL" >/dev/null 2>&1; then fail 'service still loaded after stop'; fi
+    wait_job_unloaded
     removed=1
     rm -f "$binary" "$plist"
     printf '%s\n' 'ddnsto-macos-v1-retained' > "$marker"
@@ -398,7 +426,7 @@ manage_service() (
         if launchctl print "$domain/$LABEL" >/dev/null 2>&1; then
             launchctl bootout "$domain/$LABEL" || fail 'could not stop service'
         fi
-        if launchctl print "$domain/$LABEL" >/dev/null 2>&1; then fail 'service still loaded after stop'; fi
+        wait_job_unloaded
         printf '%s\n' 'local_service=stopped cloud_status=unverified' '已停止并禁用登录启动。使用 --action start 恢复。'
         exit 0
     fi
@@ -406,6 +434,7 @@ manage_service() (
     launchctl enable "$domain/$LABEL" || fail 'could not enable service'
     if [ "$ACTION" = restart ] && launchctl print "$domain/$LABEL" >/dev/null 2>&1; then
         launchctl bootout "$domain/$LABEL" || fail 'could not stop service for restart'
+        wait_job_unloaded
     fi
     if ! launchctl print "$domain/$LABEL" >/dev/null 2>&1; then
         launchctl bootstrap "$domain" "$plist" || fail 'could not load service'
@@ -637,7 +666,9 @@ ensure_zsetup() {
         *) native=zsetup-macos-aarch64; native_sha=06ec453f851bd0395cf9ea8539de168f80a9628d1a25597dd598c85f9dc633b0 ;;
     esac
     printf '%s\n' 'DDNSTO：正在下载并校验 zsetup 0.3.0。' >&2
-    for base in https://dl.istoreos.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary https://fw.koolcenter.com/binary; do
+    # The fixed macOS 0.3.0 artifact redirects on dl.istoreos.com. Prefer its
+    # direct HTTPS origin without relaxing the no-redirect transport policy.
+    for base in https://fw.koolcenter.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary https://dl.istoreos.com/binary; do
         fetch_code=0
         ddnsto_https_fetch "$base/zsetup/0.3.0/$native" "$work/zsetup.part" 16777216 || fetch_code=$?
         if [ "$fetch_code" = 0 ]; then

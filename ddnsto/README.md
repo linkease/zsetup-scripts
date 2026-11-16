@@ -1,5 +1,7 @@
 # DDNSTO
 
+2026-11-16：[macOS 与 Windows CLI 真机验收](../docs/verification/2026-11-16-desktop-native-lifecycle.md)：本地 Mac 修复候选和 Windows CLI 执行器通过首次安装、重复执行及启停；Mac 公网入口尚未更新，Windows 公网脚本在 Restricted 执行策略下仍受限。未验收跨版本升级、重启或 Windows GUI Token 保存。
+
 2026-11-16：[zsetup 能力复用审查与候选开发任务](../docs/ddnsto-zsetup-reuse-audit-2026-11-16.md)。第一批已收敛现代华硕下载后的重复校验，并增加真实核心契约测试；[验证记录](../docs/verification/2026-11-16-ddnsto-native-reuse-batch1.md)。华硕 SSH 已恢复且身份校验通过，RT-AX86U 上两版核心的候选下载函数验证通过；未部署、未升级核心，完整安装/恢复真机验收仍待完成。
 
 第二批将现代华硕的解包输出捕获交给现用 zsetup 0.5.0（大小、空间与超时限制），保留 tar、包白名单及 armsoft 兼容路径。RT-AX86U 的真实包暂存解包通过；未执行安装或重启。详见上述验证记录。

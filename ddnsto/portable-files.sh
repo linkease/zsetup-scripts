@@ -3,7 +3,8 @@
 ddnsto_file_fields() (
     [ "$#" = 1 ] && [ ! -L "$1" ] || return 1
     if command -v stat >/dev/null 2>&1; then
-        if [ "$(uname -s)" = Darwin ]; then stat -f '%u %Lp %l' "$1"
+        # BSD stat L contains only rwx; M is required for sticky/set-ID bits.
+        if [ "$(uname -s)" = Darwin ]; then stat -f '%u %Mp%Lp %l' "$1"
         else stat -c '%u %a %h' "$1"; fi
         return $?
     fi
