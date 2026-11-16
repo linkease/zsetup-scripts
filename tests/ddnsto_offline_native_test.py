@@ -1,6 +1,7 @@
 """Offline native discovery: real hash/path validation, no download or services."""
 import hashlib
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -20,9 +21,9 @@ class OfflineNative(unittest.TestCase):
         self.native.chmod(0o700)
         self.digest = hashlib.sha256(self.native.read_bytes()).hexdigest()
 
-    def run_native(self, explicit=''):
+    def run_native(self, explicit='', no_stat=False):
         script = ''.join(f'. "{ROOT / p}"\n' for p in (
-            'lib/bootstrap.sh', 'ddnsto/bootstrap-policy.sh', 'ddnsto/managed-service.sh'))
+            'lib/bootstrap.sh', 'ddnsto/portable-files.sh', 'ddnsto/bootstrap-policy.sh', 'ddnsto/managed-service.sh'))
         script += '''
 ddnsto_error() { printf '%s\\n' "$*" >&2; }
 # Replace only reviewed metadata, not validation or discovery behavior.
@@ -33,6 +34,12 @@ printf '%s\\n' "$ZSETUP_BIN"
 '''
         env = dict(os.environ, ZSETUP_ROOT=str(self.root), ZSETUP_BIN=explicit,
                    TEST_DIGEST=self.digest, PATH='/usr/bin:/bin')
+        if no_stat:
+            tools = self.root / 'tools'
+            tools.mkdir()
+            for name in ('ls', 'uname', 'id', 'sh', 'sha256sum'):
+                (tools / name).symlink_to(shutil.which(name))
+            env['PATH'] = str(tools)
         return subprocess.run(['sh', '-eu', '-c', script], env=env,
                               capture_output=True, text=True, timeout=5)
 
@@ -41,6 +48,11 @@ printf '%s\\n' "$ZSETUP_BIN"
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), str(self.native))
         self.assertNotIn('NETWORK', result.stderr)
+
+    def test_native_validation_without_stat(self):
+        result = self.run_native(no_stat=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(self.native))
 
     def test_explicit_tampered_executable_never_runs(self):
         marker = self.root / 'executed'

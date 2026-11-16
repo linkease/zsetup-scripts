@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def shell(body, *args):
-    sources = ['lib/bootstrap.sh', 'ddnsto/bootstrap-policy.sh',
+    sources = ['lib/bootstrap.sh', 'ddnsto/portable-files.sh', 'ddnsto/bootstrap-policy.sh',
                'lib/install-storage.sh', 'lib/install-bounds.sh',
                'lib/install-transaction.sh', 'lib/install-service.sh',
                'ddnsto/product-pins.sh', 'ddnsto/docker-probe.sh',

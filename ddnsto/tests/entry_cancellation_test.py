@@ -67,16 +67,29 @@ entry "$@"
         fakebin = self.root / 'bin'
         fakebin.mkdir()
         curl = fakebin / 'curl'
-        curl.write_text('#!/bin/sh\nprintf 404\n')
+        curl.write_text('''#!/bin/sh
+while [ "$#" -gt 0 ]; do
+    case "$1" in --output) destination=$2; shift 2 ;; *) url=$1; shift ;; esac
+done
+printf '%s\n' "${destination%/*}" > "$FIXTURE/entry-work"
+case "$url" in
+    */recommended-shell.txt) cp "$FIXTURE_MANIFEST" "$destination" ;;
+    */install.sh) cp "$FIXTURE_PAYLOAD" "$destination" ;;
+    *) exit 22 ;;
+esac
+printf 200
+''')
         curl.chmod(0o700)
         self.env.update(DDNSTO_RECOMMEND_CACHE=str(cache),
+                        FIXTURE_MANIFEST=str(manifest), FIXTURE_PAYLOAD=str(payload),
                         PATH=str(fakebin) + ':' + os.environ['PATH'])
         wrapper = self.root / 'recommended.sh'
         # Instantiate only this test fixture; never regenerate a repository entry.
         wrapper.write_text((ROOT / 'recommended-entry.sh').read_text()
                            .replace('@@SOURCE_URL@@', 'https://fixture.invalid')
                            .replace('@@CACHE_KEY@@', 'fixture')
-                           .replace('@@ASUS_STORAGE@@', ''))
+                           .replace('@@ASUS_STORAGE@@', '')
+                           .replace('@@PORTABLE_FILES@@', (ROOT / 'portable-files.sh').read_text()))
         return wrapper, selected
 
     def launch(self, path):
@@ -119,6 +132,7 @@ entry "$@"
         self.assert_cancelled_and_joined(self.launch(wrapper), repeated=True)
         self.assertFalse((cache / 'lock').exists())
         self.assertEqual(list(cache.glob('attempt.*')), [])
+        self.assertFalse(Path((self.root / 'entry-work').read_text().strip()).exists())
 
     def test_normal_success_still_returns_zero(self):
         proc = self.launch(self.installer())

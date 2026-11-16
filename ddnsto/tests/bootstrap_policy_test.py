@@ -66,6 +66,7 @@ class BootstrapPolicyTest(unittest.TestCase):
     def run_shell(self, body, setup='', real_network=False):
         self.assertTrue(POLICY.is_file(), 'DDNSTO fixed bootstrap policy is missing')
         script = '. ' + shlex.quote(str(ROOT / 'lib/bootstrap.sh')) + '\n'
+        script += '. ' + shlex.quote(str(ROOT / 'ddnsto/portable-files.sh')) + '\n'
         script += '. ' + shlex.quote(str(POLICY)) + '\n'
         # Replace only network I/O; architecture, hashing, lookup and shared
         # bootstrap control flow remain real. Never invoke curl on the host.
@@ -225,6 +226,35 @@ bootstrap_and_run
         result = self.run_shell('if ddnsto_bootstrap_zsetup; then exit 0; else exit $?; fi')
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / 'executed').exists())
+
+    @unittest.skipUnless(os.environ.get('DDNSTO_TEST_NATIVE'), 'supply released 0.5.0 native bytes')
+    def test_released_native_with_busybox_hash_only(self):
+        tools = self.root / 'tools'
+        tools.mkdir()
+        for name in ('sh', 'uname', 'ls', 'id', 'mkdir', 'rmdir', 'rm', 'mv',
+                     'cp', 'chmod', 'wc', 'sleep'):
+            (tools / name).symlink_to(shutil.which(name))
+        busybox = tools / 'busybox'
+        busybox.write_text('#!/bin/sh\n[ "$1" = sha256sum ] || exit 127\nshift\nexec '
+                           + shlex.quote(shutil.which('sha256sum')) + ' "$@"\n')
+        busybox.chmod(0o700)
+        self.env['PATH'] = str(tools)
+        self.env['FIXTURE_NATIVE'] = os.environ['DDNSTO_TEST_NATIVE']
+        result = self.run_shell('ddnsto_bootstrap_zsetup && "$ACTIVE_ZSETUP" --version')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipUnless(os.environ.get('DDNSTO_TEST_NATIVE'), 'supply released 0.5.0 native bytes')
+    def test_released_native_fresh_bootstrap_without_stat(self):
+        tools = self.root / 'tools'
+        tools.mkdir()
+        for name in ('sh', 'uname', 'ls', 'id', 'mkdir', 'rmdir', 'rm', 'mv',
+                     'cp', 'chmod', 'sha256sum', 'wc', 'sleep'):
+            (tools / name).symlink_to(shutil.which(name))
+        self.env['PATH'] = str(tools)
+        self.env['FIXTURE_NATIVE'] = os.environ['DDNSTO_TEST_NATIVE']
+        result = self.run_shell('ddnsto_bootstrap_zsetup && "$ACTIVE_ZSETUP" --version')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('zsetup 0.5.0', result.stdout)
 
     @unittest.skipUnless(os.environ.get('DDNSTO_TEST_NATIVE'), 'supply released 0.5.0 native bytes')
     def test_released_native_download_cache_and_explicit_reuse(self):

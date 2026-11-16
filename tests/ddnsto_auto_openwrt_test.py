@@ -1,5 +1,6 @@
 """Default OpenWrt identity/version decisions against real UCI fixture files."""
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -16,7 +17,7 @@ class AutoOpenWrt(unittest.TestCase):
     def invoke(self, token='old-secret', pending='', body='ddnsto_ensure_ow_account'):
         script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in (
             'ddnsto/business.sh', 'ddnsto/auto-install.sh',
-            'ddnsto/openwrt-lifecycle.sh', 'ddnsto/openwrt-adapter.sh'))
+            'ddnsto/openwrt-lifecycle.sh', 'ddnsto/portable-files.sh', 'ddnsto/openwrt-adapter.sh'))
         path = ROOT / 'ddnsto/auto-openwrt.sh'
         if path.exists(): script += f'. "{path}"\n'
         script += '''
@@ -51,6 +52,52 @@ ENSURE_TOKEN=$1
         result = self.invoke(body='ddnsto_ensure_ow_version')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), '4.2.6')
+
+    def apk_version(self, listing, result_code=0, decide=False):
+        # Replay apk-tools 3.0.5: info -v with a package prints a description,
+        # not the installed package version. opkg may coexist as a shim.
+        body = '''
+package_manager=apk; arch=aarch64
+opkg() { echo unexpected-opkg >&2; return 99; }
+apk() {
+    case "$*" in
+        'info -v ddnsto') printf '%s\\n' 'ddnsto: DDNS.to is a reverse proxy service' 'ddnsto: https://www.ddnsto.com/' 'ddnsto: 9665 KiB' ;;
+        'list --installed ddnsto') printf '%s\\n' LISTING; return RESULT ;;
+        *) return 98 ;;
+    esac
+}
+current=$(ddnsto_ensure_ow_version) || exit $?
+printf '%s\\n' "$current"
+'''.replace('LISTING', shlex.quote(listing)).replace('RESULT', str(result_code))
+        if decide:
+            body += 'ddnsto_ensure_decision "$current" 4.2.8; printf "%s\\n" "$ENSURE_ACTION"\n'
+        return self.invoke(body=body)
+
+    def test_apk3_user_record_selects_upgrade_without_running_opkg(self):
+        before = self.config.read_bytes()
+        result = self.apk_version('ddnsto-4.2.2~aa64-r1 noarch {feeds/linkease_nas/feeds/linkease_nas/network/services/ddnsto} () [installed]', decide=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ['4.2.2', 'update'])
+        self.assertNotIn('unexpected-opkg', result.stderr)
+        self.assertEqual(self.config.read_bytes(), before)
+
+    def test_apk_list_requires_one_installed_valid_record(self):
+        valid = 'ddnsto-4.2.2~aa64-r1 noarch {ddnsto} () [installed]'
+        for listing in ('', valid + '\n' + valid, valid.replace('[installed]', ''),
+                        valid.replace('ddnsto-4.', 'ddnsto-other-4.'),
+                        valid.replace('aa64', '8664'), valid + '\njunk',
+                        valid.replace('4.2.2~aa64', '4.2.2~rc1')):
+            with self.subTest(listing=listing):
+                result = self.apk_version(listing)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(result.stdout, '')
+        self.assertEqual(self.apk_version(valid, result_code=1).returncode, 2)
+
+    def test_apk_no_downgrade_decision_is_preserved(self):
+        for version, expected in [('4.2.8-r1', 'start'), ('4.2.9-r1', 'start')]:
+            result = self.apk_version(f'ddnsto-{version} aarch64 {{ddnsto}} () [installed]', decide=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines()[-1], expected)
 
     def test_running_requires_same_procd_pid(self):
         result = self.invoke(body='''

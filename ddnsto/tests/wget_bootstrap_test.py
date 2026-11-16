@@ -165,13 +165,13 @@ exit 4
                 with self.subTest(code=code, source=source):
                     self.assertEqual(self.transport(source, self.base + '/body').returncode, expected)
 
-    def test_connection_refused_can_reuse_verified_cache(self):
+    def test_connection_refused_requires_online_retry(self):
         self.prepare()
         self.assertEqual(self.run_entry().returncode, 0)
         self.close_server()
         result = self.run_entry()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('离线', result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn('需要联网', result.stderr)
 
     def test_curl_tls_error_never_falls_through_to_wget(self):
         curl = self.bin / 'curl'

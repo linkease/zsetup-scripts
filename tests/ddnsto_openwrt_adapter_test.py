@@ -1,5 +1,6 @@
 """OpenWrt adapter tests: package/init/UCI fixtures, never host services."""
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -16,10 +17,18 @@ class Adapter(unittest.TestCase):
     setUp = fixtures.OpenWrtLifecycleTests.setUp
     calls = fixtures.OpenWrtLifecycleTests.calls
 
-    def invoke(self, action, fail=''):
+    def invoke(self, action, fail='', no_stat=False):
+        test_path = str(self.tools) + ':' + os.environ['PATH']
+        if no_stat:
+            for tool in ('sh', 'python3', 'ls', 'uname', 'id', 'wc', 'cat', 'grep',
+                         'awk', 'sed', 'mkdir', 'rm', 'cp', 'mv', 'chmod', 'tr', 'readlink'):
+                target = self.tools / tool
+                if not target.exists():
+                    target.symlink_to(shutil.which(tool))
+            test_path = str(self.tools)
         script = '\n'.join('. "' + str(ROOT / p) + '"' for p in (
             'ddnsto/business.sh', 'ddnsto/managed-cli.sh',
-            'ddnsto/openwrt-lifecycle.sh', 'ddnsto/openwrt-adapter.sh'))
+            'ddnsto/openwrt-lifecycle.sh', 'ddnsto/portable-files.sh', 'ddnsto/openwrt-adapter.sh'))
         script += '''
 binary=$DDNSTO_OPENWRT_BIN_PATH; config=$DDNSTO_CONFIG_PATH
 service_path=$DDNSTO_SERVICE_PATH; package_manager=opkg
@@ -35,7 +44,7 @@ fi
 '''
         return subprocess.run(['sh', '-eu', '-c', script], text=True,
             capture_output=True, env=dict(os.environ, ACTION=action, FAIL=fail,
-                PATH=str(self.tools) + ':' + os.environ['PATH'], FIXTURE=str(self.root),
+                PATH=test_path, FIXTURE=str(self.root),
                 DDNSTO_OPENWRT_BIN_PATH=str(self.binary),
                 DDNSTO_CONFIG_PATH=str(self.config), DDNSTO_SERVICE_PATH=str(self.service)))
 
@@ -45,6 +54,12 @@ fi
         self.assertIn('local_service=running', result.stdout)
         self.assertEqual(self.config.read_text(), ORIGINAL)
         self.assertNotIn('uci-command', self.calls())
+
+    def test_status_without_stat_preserves_config(self):
+        result = self.invoke('status', no_stat=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('local_service=running', result.stdout)
+        self.assertEqual(self.config.read_text(), ORIGINAL)
 
     def test_update_preserves_config_even_when_package_hook_replaces_it(self):
         for enabled in ('0', '1'):

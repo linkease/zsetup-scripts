@@ -160,6 +160,95 @@ class Recommendation(unittest.TestCase):
         self.assertNotIn('@@ASUS_STORAGE@@', entry)
         self.assertEqual(subprocess.run(['sh', '-n', str(self.release / 'recommended-entry.sh')]).returncode, 0)
 
+    def dependency_path(self, missing, applets=()):
+        directory = self.work / 'tools'
+        directory.mkdir(exist_ok=True)
+        for name in ('uname', 'stat', 'wc', 'cmp', 'mktemp', 'id', 'mkdir', 'rmdir',
+                     'rm', 'mv', 'cp', 'chmod', 'sh', 'sha256sum', 'curl', 'sleep', 'cat', 'ls'):
+            if name not in missing:
+                (directory / name).symlink_to(shutil.which(name))
+        if applets:
+            busybox = directory / 'busybox'
+            busybox.write_text('#!/bin/sh\ncase "$1" in\n--list) printf "%s\\n" '
+                              + ' '.join(applets) + ' ;;\n'
+                              + '\n'.join('%s) shift; exec %s "$@" ;;' % (name, shutil.which(name))
+                                          for name in applets)
+                              + '\n*) exit 127 ;;\nesac\n')
+            busybox.chmod(0o700)
+        self.env['PATH'] = str(directory)
+
+    def test_no_stat_or_cmp_and_no_persistent_cache(self):
+        self.prepare()
+        self.dependency_path({'stat', 'cmp'})
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.work / 'args').exists())
+        self.assertFalse((self.work / 'cache').exists())
+
+    def test_busybox_sha256_without_standalone_hash(self):
+        self.prepare()
+        self.dependency_path({'stat', 'cmp', 'sha256sum'}, ('sha256sum',))
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_repeated_invocation_requires_online_source(self):
+        self.prepare()
+        self.assertEqual(self.run_entry().returncode, 0)
+        (self.work / 'args').unlink()
+        self.manifest.unlink()
+        result = self.run_entry()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.work / 'args').exists())
+
+    def test_busybox_dependencies_work_in_entry_and_child(self):
+        self.shell = ("#!/bin/sh\n# " + PIN + "\n"
+                      "set -eu\nprintf x | wc -c >/dev/null\n"
+                      "d=$(mktemp -d /tmp/ddnsto-child.XXXXXX)\n"
+                      "rmdir \"$d\"\nprintf ok > \"$FIXTURE_ARGS\"\n").encode()
+        (self.source / 'ddnsto/ddnsto-install.sh').write_bytes(self.shell)
+        self.prepare()
+        self.dependency_path({'stat', 'wc', 'cmp', 'mktemp'}, ('wc', 'mktemp'))
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.work / 'args').read_text(), 'ok')
+        self.assertFalse((self.work / 'cache').exists())
+
+    def test_missing_dependency_names_are_reported_without_installing(self):
+        self.prepare()
+        self.dependency_path({'wc', 'mktemp'}, ('sha256sum',))
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('缺少校验依赖：wc mktemp', result.stderr)
+        self.assertIn('BusyBox', result.stderr)
+        self.assertFalse((self.work / 'args').exists())
+        self.assertFalse((self.work / 'cache').exists())
+
+    def test_native_tools_do_not_need_busybox(self):
+        self.prepare()
+        self.dependency_path(set())
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_busybox_fallback_still_rejects_tampered_installer(self):
+        self.prepare()
+        self.dependency_path({'stat', 'wc', 'cmp', 'mktemp'}, ('stat', 'wc', 'cmp', 'mktemp'))
+        self.installer.write_bytes(b'X' + self.shell[1:])
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 11, result.stderr)
+        self.assertIn('安装脚本校验失败', result.stderr)
+        self.assertFalse((self.work / 'args').exists())
+
+    def test_busybox_nonexact_applet_name_does_not_satisfy_dependency(self):
+        self.prepare()
+        self.dependency_path({'wc'})
+        busybox = self.work / 'tools/busybox'
+        busybox.write_text('#!/bin/sh\nprintf "wc-extra\\n"\n')
+        busybox.chmod(0o700)
+        result = self.run_entry()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('缺少校验依赖：wc', result.stderr)
+        self.assertFalse((self.work / 'args').exists())
+
     def synology_entry(self):
         self.prepare()
         template = (self.release / 'recommended-entry.sh').read_text()
@@ -176,27 +265,29 @@ class Recommendation(unittest.TestCase):
         env.pop('DDNSTO_RECOMMEND_CACHE', None)
         return entry, env
 
-    def test_synology_default_cache_avoids_acl_home_and_reuses_private_cache(self):
+    def test_synology_default_temp_avoids_acl_home(self):
         entry, env = self.synology_entry()
         for _ in range(2):
             result = subprocess.run(['sh', str(entry), '--help'], env=env, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.work / 'dsm-cache').stat().st_mode & 0o777, 0o700)
+        self.assertFalse((self.work / 'dsm-cache').exists())
         self.assertFalse((self.work / 'dsm-home/.ddnsto-recommendation').exists())
 
-    def test_synology_explicit_unsafe_cache_is_not_silently_replaced(self):
+    def test_obsolete_cache_override_is_not_used_or_modified(self):
         entry, env = self.synology_entry()
         env['DDNSTO_RECOMMEND_CACHE'] = str(self.work / 'home-link/cache')
         result = subprocess.run(['sh', str(entry), '--help'], env=env, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 12)
-        self.assertFalse((self.work / 'dsm-cache').exists())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.work / 'dsm-home/cache').exists())
 
-    def test_synology_default_cache_rejects_symlink_collision(self):
+    def test_old_cache_symlink_is_ignored(self):
         entry, env = self.synology_entry()
-        (self.work / 'dsm-cache').symlink_to(self.work / 'dsm-home', target_is_directory=True)
+        link = self.work / 'dsm-cache'
+        link.symlink_to(self.work / 'dsm-home', target_is_directory=True)
         result = subprocess.run(['sh', str(entry), '--help'], env=env, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 12)
-        self.assertFalse((self.work / 'args').exists())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(list((self.work / 'dsm-home').iterdir()), [])
 
     def test_asus_recommendation_does_not_require_id_stat_mktemp(self):
         self.prepare()
@@ -212,6 +303,7 @@ stat() { return 99; }
 mktemp() { return 99; }
 '''
         template = template.replace('@@ASUS_STORAGE@@', fixtures)
+        template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'ddnsto/portable-files.sh').read_text())
         template = template.replace('[ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]', 'true')
         template = template.replace('@@SOURCE_URL@@', self.base + '/release').replace('@@CACHE_KEY@@', 'fixture')
         path = self.work / 'asus-entry.sh'
@@ -262,8 +354,8 @@ mktemp() { return 99; }
         self.assertEqual(self.run_entry().returncode, 0)
         self.manifest.unlink()
         result = self.run_entry()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('离线', result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('状态=离线', result.stderr)
 
     def test_powershell_entry_preserves_chinese_on_windows_51(self):
         self.prepare()
@@ -278,7 +370,7 @@ mktemp() { return 99; }
         shutil.copytree(self.work / 'next/immutable', self.release / 'immutable', dirs_exist_ok=True)
         shutil.copyfile(self.work / 'next/recommended-shell.txt', self.manifest)
         self.assertEqual(self.run_entry().returncode, 0)
-        self.assertEqual((self.work / 'cache' / sha((self.base + '/release').encode()) / 'recommended.txt').read_bytes(), self.manifest.read_bytes())
+        self.assertFalse((self.work / 'cache').exists())
 
     def test_missing_without_cache_fails(self):
         self.prepare()
@@ -288,32 +380,24 @@ mktemp() { return 99; }
         self.assertIn('code=', result.stderr)
         self.assertFalse((self.work / 'args').exists())
 
-    def test_complete_cache_offline_warning(self):
+    def test_missing_source_no_longer_reuses_previous_run(self):
         self.prepare()
         self.assertEqual(self.run_entry().returncode, 0)
         self.manifest.unlink()
         self.installer.unlink()
         result = self.run_entry()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('离线', result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn('需要联网', result.stderr)
 
-    def test_incomplete_or_tampered_cache_never_executes(self):
-        for mode in ['missing', 'tampered']:
-            with self.subTest(mode=mode):
-                if not hasattr(self, 'release'):
-                    self.prepare()
-                self.assertEqual(self.run_entry().returncode, 0)
-                saved = self.manifest.read_bytes()
-                self.manifest.unlink()
-                cached = self.work / 'cache' / sha((self.base + '/release').encode()) / (sha(self.shell) + '.sh')
-                if mode == 'missing':
-                    cached.unlink()
-                else:
-                    cached.write_bytes(b'x' * len(self.shell))
-                (self.work / 'args').unlink()
-                self.assertNotEqual(self.run_entry().returncode, 0)
-                self.assertFalse((self.work / 'args').exists())
-                self.manifest.write_bytes(saved)
+    def test_old_cache_never_executes(self):
+        self.prepare()
+        cache = self.work / 'cache' / sha((self.base + '/release').encode())
+        cache.mkdir(parents=True)
+        (cache / 'recommended.txt').write_bytes(self.manifest.read_bytes())
+        (cache / (sha(self.shell) + '.sh')).write_bytes(self.shell)
+        self.manifest.unlink()
+        self.assertNotEqual(self.run_entry().returncode, 0)
+        self.assertFalse((self.work / 'args').exists())
 
     def test_remote_tamper_does_not_fall_back(self):
         self.prepare()
@@ -344,16 +428,12 @@ mktemp() { return 99; }
             self.assertNotEqual(self.run_entry().returncode, 0)
             self.assertFalse((self.work / 'args').exists())
 
-    def test_unsafe_cache_and_symlink_rejected(self):
+    def test_old_cache_is_not_touched(self):
         self.prepare()
         cache = self.work / 'cache'
-        cache.mkdir(mode=0o777)
-        cache.chmod(0o777)
-        self.assertNotEqual(self.run_entry().returncode, 0)
-        cache.rmdir()
         cache.symlink_to(self.site, target_is_directory=True)
-        self.assertNotEqual(self.run_entry().returncode, 0)
-        self.assertFalse((self.work / 'args').exists())
+        self.assertEqual(self.run_entry().returncode, 0)
+        self.assertTrue(cache.is_symlink())
 
     def test_unsupported_os_no_execution(self):
         self.prepare()
@@ -366,13 +446,13 @@ mktemp() { return 99; }
         self.assertEqual(self.run_entry().returncode, 2)
         self.assertFalse((self.work / 'args').exists())
 
-    def test_installer_missing_reuses_only_matching_cached_script(self):
+    def test_installer_missing_does_not_reuse_previous_run(self):
         self.prepare()
         self.assertEqual(self.run_entry().returncode, 0)
         self.installer.unlink()
         result = self.run_entry()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('离线', result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn('不会执行旧缓存', result.stderr)
         self.manifest.write_text('ddnsto-recommendation-v1-shell\n' + '0' * 64 + '\n100\n')
         self.assertNotEqual(self.run_entry().returncode, 0)
 
@@ -591,7 +671,7 @@ for _name in list(vars(Recommendation)):
     if _name.startswith('test_'):
         setattr(PowerShellReview, _name, None)
     if _name.startswith('test_') and _name not in {
-        'test_complete_cache_offline_warning', 'test_missing_without_cache_fails',
+        'test_missing_without_cache_fails',
         'test_remote_tamper_does_not_fall_back',
     }:
         setattr(WindowsRecommendation, _name, None)
