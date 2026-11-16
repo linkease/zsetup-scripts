@@ -37,9 +37,13 @@ class MacInstaller(unittest.TestCase):
         self.tool('id', 'echo "${TEST_UID:-501}"\n')
         self.tool('stat', '''
 if [ "$1" = -f ]; then
+ format=$2
  shift 2
  owner=$(/usr/bin/stat -c %u "$1")
  [ "$owner" != "$(/usr/bin/id -u)" ] || owner=501
+ if [ "$format" = '%u %l' ]; then
+  printf '%s %s\\n' "$owner" "$(/usr/bin/stat -c %h "$1")"; exit
+ fi
  printf '%s %s\\n' "$owner" "$(/usr/bin/stat -c %a "$1")"
 else
  exec /usr/bin/stat "$@"
@@ -84,14 +88,23 @@ enable)
 disable) touch "$TEST_ROOT/disabled" ;;
 print)
  [ "$2" != gui/501 ] || exit 0
+ if [ -f "$TEST_ROOT/stopping" ]; then
+  n=$(cat "$TEST_ROOT/stopping")
+  if [ "$n" -ge 2 ]; then rm -f "$TEST_ROOT/running" "$TEST_ROOT/stopping"; exit 1; fi
+  echo $((n+1)) > "$TEST_ROOT/stopping"
+ fi
  [ -f "$TEST_ROOT/running" ] || exit 1
- echo 'state = running'
+ if [ "${STARTUP_DELAY:-0}" = 1 ] && [ "$(wc -l < "$TEST_ROOT/observations")" -lt 3 ]; then
+  echo 'state = spawn scheduled'
+ else echo 'state = running'; fi
+ if [ "${NESTED_STATE:-0}" = 1 ]; then printf '\\t\\tstate = active\\n'; fi
  printf 'pid = %s\n' "$(cat "$TEST_ROOT/pid" 2>/dev/null || echo 123)"
  printf 'path = %s/com.ddnsto.client.plist\n' "$DDNSTO_LAUNCH_AGENTS_DIR"
  printf 'program = %s/ddnsto\n' "${FOREIGN_PROGRAM:-$DDNSTO_INSTALL_DIR}"
  printf '%s/ddnsto.yaml\n' "$DDNSTO_CONFIG_DIR" ;;
 bootout)
  [ "${FAIL_BOOTOUT:-0}" = 0 ] || exit 9
+ if [ "${BOOTOUT_DELAY:-0}" = 1 ]; then echo 0 > "$TEST_ROOT/stopping"; exit; fi
  rm -f "$TEST_ROOT/running" ;;
 bootstrap)
  [ -f "$3" ] || exit 4
@@ -101,7 +114,11 @@ bootstrap)
  if [ "${FAIL_START:-0}" = 1 ] && [ ! -f "$TEST_ROOT/failed-once" ]; then
   touch "$TEST_ROOT/failed-once"; exit 9
  fi
- touch "$TEST_ROOT/running" ;;
+ touch "$TEST_ROOT/running"
+ if [ "${BOOT_IDENTITY:-0}" = 1 ]; then
+  printf identity > "$DDNSTO_CONFIG_DIR/.ddnsto_boot.cfg"
+  chmod 777 "$DDNSTO_CONFIG_DIR/.ddnsto_boot.cfg"
+ fi ;;
 kickstart) : ;;
 esac
 ''')
@@ -120,6 +137,31 @@ esac
         path = self.config / '.installer-macos-version'
         path.write_text(f'{version} {digest}\n')
         path.chmod(0o600)
+
+    def test_nested_launchd_state_is_not_service_state(self):
+        result = self.run_script(NESTED_STATE='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_initial_relaunch_waits_for_three_stable_observations(self):
+        result = self.run_script(STARTUP_DELAY='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertGreaterEqual(len((self.root / 'observations').read_text().splitlines()), 5)
+
+    def test_runtime_identity_is_private_and_repeatable(self):
+        result = self.run_script(BOOT_IDENTITY='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        identity = self.config / '.ddnsto_boot.cfg'
+        self.assertEqual(identity.stat().st_mode & 0o777, 0o600)
+        before = identity.read_bytes()
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(identity.read_bytes(), before)
+
+    def test_stop_waits_for_launchd_asynchronous_unload(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        result = self.run_script(('--action', 'stop'), BOOTOUT_DELAY='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.root / 'running').exists())
 
     def run_menu(self, choice, token=None, **env):
         pid, terminal = pty.fork()
@@ -541,6 +583,26 @@ printf '%s  %s\\n' "${BAD_DIGEST:-$digest}" "$3"
         self.assertIn('校验失败', result.stderr)
         self.assertFalse((self.root / 'payload').exists())
         self.assertFalse((self.install / 'ddnsto').exists())
+
+    def test_cold_bootstrap_prefers_direct_mac_artifact_source(self):
+        self.prepare_cold_bootstrap()
+        self.tool('curl', '''
+while [ "$#" -gt 0 ]; do
+ case "$1" in
+  -o|--output) shift; output=$1 ;;
+  https://*) url=$1 ;;
+ esac
+ shift
+done
+printf '%s\\n' "$url" >> "$TEST_ROOT/bootstrap.log"
+case "$url" in https://dl.istoreos.com/*) printf 302; exit 0 ;; esac
+cp "$TEST_ROOT/native-fixture" "$output"
+printf 200
+''')
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / 'bootstrap.log').read_text().startswith(
+            'https://fw.koolcenter.com/binary/zsetup/0.3.0/'))
 
     def test_maintained_entry_bootstraps_intel_mac(self):
         self.prepare_cold_bootstrap()

@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import shlex
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -34,6 +35,32 @@ class PortableFiles(unittest.TestCase):
             result = self.run_probe('ddnsto_file_fields "$1"')
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), f'{os.getuid()} {mode:o} 1')
+
+    def test_darwin_stat_preserves_special_permission_bits(self):
+        # BSD stat's L subfield excludes sticky/setuid/setgid bits. Model its
+        # observed native formatting, not a canned successful probe response.
+        (self.tools / 'uname').unlink()
+        (self.tools / 'uname').write_text('#!/bin/sh\necho Darwin\n')
+        (self.tools / 'uname').chmod(0o700)
+        stat_tool = self.tools / 'stat'
+        stat_tool.write_text(f'#!{sys.executable}\n' + '''import os, sys
+s = os.lstat(sys.argv[3])
+mode = s.st_mode & 0o7777
+fmt = sys.argv[2]
+if fmt == '%u %Lp %l':
+    mode &= 0o777
+elif fmt != '%u %Mp%Lp %l':
+    sys.exit(2)
+print(f'{s.st_uid} {mode:o} {s.st_nlink}')
+''')
+        stat_tool.chmod(0o700)
+        for mode in (0o1777, 0o777, 0o755, 0o4755, 0o2640):
+            with self.subTest(mode=oct(mode)):
+                self.file.chmod(mode)
+                result = self.run_probe('ddnsto_file_fields "$1"')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                fields = result.stdout.split()
+                self.assertEqual(int(fields[1], 8), mode)
 
     def test_hardlink_count_and_directory(self):
         os.link(self.file, self.root / 'hardlink')
