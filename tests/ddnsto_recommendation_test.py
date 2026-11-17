@@ -142,11 +142,31 @@ class Recommendation(unittest.TestCase):
         self.assertEqual(review['shell_bootstrap'], 'native-first-candidate')
         self.assertFalse(review['published'])
 
+    def test_stale_product_configuration_cannot_be_packaged(self):
+        shutil.copytree(ROOT / 'ddnsto/templates', self.source / 'ddnsto/templates')
+        shutil.copyfile(ROOT / 'ddnsto/platform-releases.json',
+                        self.source / 'ddnsto/platform-releases.json')
+        result = self.package()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('stale generated product', result.stderr)
+        self.assertFalse((self.site / 'release').exists())
+
     def test_default_does_not_bootstrap_native_first(self):
         self.prepare()
         entry = (self.release / 'recommended-entry.sh').read_text()
         self.assertNotIn('@@NATIVE_FIRST@@', entry)
         self.assertNotIn('ddnsto_recommend_native_prepare\n', entry)
+
+    def test_stale_combined_entry_cannot_be_packaged(self):
+        shutil.copytree(ROOT / 'ddnsto/templates', self.source / 'ddnsto/templates')
+        shutil.copyfile(ROOT / 'ddnsto/platform-releases.json', self.source / 'ddnsto/platform-releases.json')
+        for template in (ROOT / 'ddnsto/templates').glob('*.in'):
+            name = template.name[:-3]
+            shutil.copyfile(ROOT / 'ddnsto' / name, self.source / 'ddnsto' / name)
+        result = self.package()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('stale generated product bundle', result.stderr)
+        self.assertFalse((self.site / 'release').exists())
 
     def test_native_first_real_core_chain_and_rejections(self):
         native = os.environ.get('DDNSTO_TEST_NATIVE')
