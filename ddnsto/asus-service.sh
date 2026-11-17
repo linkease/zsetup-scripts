@@ -1,3 +1,4 @@
+# Generated from templates/asus-service.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Controlled ASUS lifecycle. Source after asus-storage.sh; caller owns the
 # transaction lock and verified payload. Never execute the native plugin scripts.
 # Software-center execution trust is inherited: writable firmware dispatchers

@@ -1,3 +1,4 @@
+# Generated from templates/asus-platform.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Pure channel selection. Inputs are firmware facts, never executable settings.
 # Caller must first establish ASUS firmware + an existing software center.
 # Keep CPU selection separate: each modern archive contains two binaries.

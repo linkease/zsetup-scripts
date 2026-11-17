@@ -1,4 +1,5 @@
 #!/bin/sh
+# Generated from templates/install-macos.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Engineering candidate: bootstraps zsetup automatically; native canary pending.
 set -eu
 set +x

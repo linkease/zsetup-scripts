@@ -223,8 +223,10 @@ ddnsto_bootstrap_zsetup() {
     # Do not chmod/chown an existing cache to "repair" someone else's directory.
     ACTIVE_ZSETUP=$(
         umask 077
-        case "$WORK_ROOT" in /*) ;; *) exit 1 ;; esac
-        case "$WORK_ROOT/" in *//*|*/./*|*/../*) exit 1 ;; esac
+        # Balance case-pattern parentheses inside $(...) for Bash 4.2's
+        # POSIX parser; unpaired patterns can close the substitution early.
+        case "$WORK_ROOT" in (/*) ;; (*) exit 1 ;; esac
+        case "$WORK_ROOT/" in (*//*|*/./*|*/../*) exit 1 ;; esac
         ddnsto_bootstrap_safe_ancestors "${WORK_ROOT%/*}" &&
             ddnsto_bootstrap_private_dir "$WORK_ROOT" || {
             printf '%s\n' 'DDNSTO: bootstrap cache must be owned, private and free of symlinks' >&2

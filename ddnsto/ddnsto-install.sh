@@ -2,6 +2,7 @@
 if [ "$(uname -s)" = Darwin ]; then
 (
 #!/bin/sh
+# Generated from templates/install-macos.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Engineering candidate: bootstraps zsetup automatically; native canary pending.
 set -eu
 set +x
@@ -2465,8 +2466,10 @@ ddnsto_bootstrap_zsetup() {
     # Do not chmod/chown an existing cache to "repair" someone else's directory.
     ACTIVE_ZSETUP=$(
         umask 077
-        case "$WORK_ROOT" in /*) ;; *) exit 1 ;; esac
-        case "$WORK_ROOT/" in *//*|*/./*|*/../*) exit 1 ;; esac
+        # Balance case-pattern parentheses inside $(...) for Bash 4.2's
+        # POSIX parser; unpaired patterns can close the substitution early.
+        case "$WORK_ROOT" in (/*) ;; (*) exit 1 ;; esac
+        case "$WORK_ROOT/" in (*//*|*/./*|*/../*) exit 1 ;; esac
         ddnsto_bootstrap_safe_ancestors "${WORK_ROOT%/*}" &&
             ddnsto_bootstrap_private_dir "$WORK_ROOT" || {
             printf '%s\n' 'DDNSTO: bootstrap cache must be owned, private and free of symlinks' >&2
@@ -2576,6 +2579,7 @@ ddnsto_stat() (
     esac
 )
 
+# Generated from templates/managed-cli.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 ddnsto_usage() {
     printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
@@ -3168,6 +3172,7 @@ ddnsto_managed_action() {
     printf 'local_service=%s cloud_status=unverified\n' "$managed_state"
 }
 
+# Generated from templates/business.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Included at build time; only ddnsto-install.sh is a public installer.
 ddnsto_error() { printf 'DDNSTO: %s\n' "$*" >&2; }
 
@@ -3393,12 +3398,24 @@ ddnsto_install() {
     installer_transaction_finish
 }
 
+# Generated from templates/product-pins.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Maintained product metadata; embedded in install.sh, never fetched at runtime.
 # HTTPS bytes verified 2026-11-03; see docs/ddnsto-artifacts-2026-11-03.json.
 # lite retains the package naming used by the Micro client release.
-ddnsto_pinned_version() {
+ddnsto_recommended_version() {
     case "$1" in
-        standard|lite) printf '%s\n' 4.2.8 ;;
+        linux) printf '%s\n' 4.2.8 ;;
+        openwrt) printf '%s\n' 4.2.8 ;;
+        synology) printf '%s\n' 4.2.8 ;;
+        asus) printf '%s\n' 4.2.8 ;;
+        *) return 11 ;;
+    esac
+}
+
+ddnsto_pinned_version() {
+    case "${2:-openwrt}:$1" in
+        linux:standard) printf '%s\n' 4.2.8 ;;
+        openwrt:standard|openwrt:lite) printf '%s\n' 4.2.8 ;;
         *) printf '%s\n' 'DDNSTO: unknown pinned variant' >&2; return 11 ;;
     esac
 }
@@ -3773,6 +3790,7 @@ ddnsto_offer_install_method() {
 }
 
 #!/bin/sh
+# Generated from templates/synology-download.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Shared SPK selection; manual downloads and automatic DSM adapter use one pin.
 ddnsto_synology_select() {
     synology_error() { printf 'DDNSTO: %s\n' "$1" >&2; }
@@ -4478,7 +4496,7 @@ ddnsto_ensure_preflight() {
     [ -z "$FORCE_VERSION" ] && [ "$VERIFY_STATUS" = 0 ] || {
         ddnsto_flow_error E_OPTIONS '默认流程不接受手选版本或云端检查选项' '请重新复制默认命令'; return 2;
     }
-    [ "${DDNSTO_VERSION:-4.2.8}" = 4.2.8 ] || {
+    [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = "$(ddnsto_recommended_version "$detected_platform")" ] || {
         ddnsto_flow_error E_VERSION '默认流程只使用该审核安装器固定的客户端版本' '请使用推荐版本入口'; return 2;
     }
 }
@@ -4628,7 +4646,7 @@ ddnsto_ensure_linux() {
     elif [ -e "$SERVICE_CONFIG" ] || [ -L "$SERVICE_CONFIG" ]; then
         ddnsto_flow_error E_OWNERSHIP '发现未归属的历史配置' '请先人工确认历史安装；不会自动覆盖'; return 2
     fi
-    ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard)" || return $?
+    ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard linux)" || return $?
     if [ "$ENSURE_ACTION" = start ]; then
         ddnsto_flow_note installed
         ddnsto_flow_note starting
@@ -4652,7 +4670,7 @@ ddnsto_ensure_linux_locked() {
     if [ -n "${SERVICE_OLD:-}" ]; then
         ddnsto_ensure_linux_account || return $?
         if [ "${ACTION:-}" = update ]; then
-            ensure_locked_order=$(ddnsto_version_order "${SERVICE_OLD#versions/}" "$(ddnsto_pinned_version standard)") || return 2
+            ensure_locked_order=$(ddnsto_version_order "${SERVICE_OLD#versions/}" "$(ddnsto_pinned_version standard linux)") || return 2
             [ "$ensure_locked_order" != 1 ] || {
                 ddnsto_flow_error E_VERSION '已安装版本在执行期间变为更高版本' '请重新执行同一命令；不会降级'; return 2;
             }
@@ -4813,6 +4831,7 @@ ddnsto_ensure_ow_locked() {
     }
 }
 
+# Generated from templates/auto-synology.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # DSM package-managed default workflow. Never install a generic Linux service.
 ddnsto_synopkg() { /usr/syno/bin/synopkg "$@"; }
 
@@ -5024,6 +5043,7 @@ ddnsto_synology_fresh_install() (
     }
 )
 
+# Generated from templates/asus-platform.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Pure channel selection. Inputs are firmware facts, never executable settings.
 # Caller must first establish ASUS firmware + an existing software center.
 # Keep CPU selection separate: each modern archive contains two binaries.
@@ -5312,6 +5332,7 @@ ddnsto_asus_hash() (
     '
 )
 
+# Generated from templates/asus-package.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Controlled ASUS package adapter; source asus-platform.sh before this module.
 # ddnsto_asus_extract ARCHIVE DEST CHANNEL ARCH -> 0 success, nonzero rejection.
 # Caller MUST verify ARCHIVE size + SHA256 against ddnsto_asus_package CHANNEL,
@@ -5463,6 +5484,7 @@ ddnsto_asus_extract() (
     trap - 0
 )
 
+# Generated from templates/asus-service.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Controlled ASUS lifecycle. Source after asus-storage.sh; caller owns the
 # transaction lock and verified payload. Never execute the native plugin scripts.
 # Software-center execution trust is inherited: writable firmware dispatchers
@@ -5994,6 +6016,7 @@ ddnsto_asus_restore_plugin() (
     fi
 )
 
+# Generated from templates/asus-transaction.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Controlled transaction. OS/package/service boundaries live in ASUS adapters.
 # No vendor install.sh, uninstall.sh, base.sh or dbus export is executed.
 ddnsto_asus_identity() {
@@ -7683,9 +7706,19 @@ ddnsto_install() {
     PACKAGE_PHASE=complete
     installer_transaction_finish
 }
-ddnsto_pinned_version() {
+ddnsto_recommended_version() {
     case "$1" in
-        standard|lite) printf '%s\n' 4.2.8 ;;
+        linux) printf '%s\n' 4.2.8 ;;
+        openwrt) printf '%s\n' 4.2.8 ;;
+        synology) printf '%s\n' 4.2.8 ;;
+        asus) printf '%s\n' 4.2.8 ;;
+        *) return 11 ;;
+    esac
+}
+ddnsto_pinned_version() {
+    case "${2:-openwrt}:$1" in
+        linux:standard) printf '%s\n' 4.2.8 ;;
+        openwrt:standard|openwrt:lite) printf '%s\n' 4.2.8 ;;
         *) printf '%s\n' 'DDNSTO: unknown pinned variant' >&2; return 11 ;;
     esac
 }
@@ -8614,7 +8647,7 @@ ddnsto_ensure_preflight() {
     [ -z "$FORCE_VERSION" ] && [ "$VERIFY_STATUS" = 0 ] || {
         ddnsto_flow_error E_OPTIONS '默认流程不接受手选版本或云端检查选项' '请重新复制默认命令'; return 2;
     }
-    [ "${DDNSTO_VERSION:-4.2.8}" = 4.2.8 ] || {
+    [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = "$(ddnsto_recommended_version "$detected_platform")" ] || {
         ddnsto_flow_error E_VERSION '默认流程只使用该审核安装器固定的客户端版本' '请使用推荐版本入口'; return 2;
     }
 }
@@ -8744,7 +8777,7 @@ ddnsto_ensure_linux() {
     elif [ -e "$SERVICE_CONFIG" ] || [ -L "$SERVICE_CONFIG" ]; then
         ddnsto_flow_error E_OWNERSHIP '发现未归属的历史配置' '请先人工确认历史安装；不会自动覆盖'; return 2
     fi
-    ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard)" || return $?
+    ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard linux)" || return $?
     if [ "$ENSURE_ACTION" = start ]; then
         ddnsto_flow_note installed
         ddnsto_flow_note starting
@@ -8766,7 +8799,7 @@ ddnsto_ensure_linux_locked() {
     if [ -n "${SERVICE_OLD:-}" ]; then
         ddnsto_ensure_linux_account || return $?
         if [ "${ACTION:-}" = update ]; then
-            ensure_locked_order=$(ddnsto_version_order "${SERVICE_OLD#versions/}" "$(ddnsto_pinned_version standard)") || return 2
+            ensure_locked_order=$(ddnsto_version_order "${SERVICE_OLD#versions/}" "$(ddnsto_pinned_version standard linux)") || return 2
             [ "$ensure_locked_order" != 1 ] || {
                 ddnsto_flow_error E_VERSION '已安装版本在执行期间变为更高版本' '请重新执行同一命令；不会降级'; return 2;
             }

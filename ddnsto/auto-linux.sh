@@ -75,7 +75,7 @@ ddnsto_ensure_linux() {
     elif [ -e "$SERVICE_CONFIG" ] || [ -L "$SERVICE_CONFIG" ]; then
         ddnsto_flow_error E_OWNERSHIP '发现未归属的历史配置' '请先人工确认历史安装；不会自动覆盖'; return 2
     fi
-    ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard)" || return $?
+    ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard linux)" || return $?
     if [ "$ENSURE_ACTION" = start ]; then
         ddnsto_flow_note installed
         ddnsto_flow_note starting
@@ -99,7 +99,7 @@ ddnsto_ensure_linux_locked() {
     if [ -n "${SERVICE_OLD:-}" ]; then
         ddnsto_ensure_linux_account || return $?
         if [ "${ACTION:-}" = update ]; then
-            ensure_locked_order=$(ddnsto_version_order "${SERVICE_OLD#versions/}" "$(ddnsto_pinned_version standard)") || return 2
+            ensure_locked_order=$(ddnsto_version_order "${SERVICE_OLD#versions/}" "$(ddnsto_pinned_version standard linux)") || return 2
             [ "$ensure_locked_order" != 1 ] || {
                 ddnsto_flow_error E_VERSION '已安装版本在执行期间变为更高版本' '请重新执行同一命令；不会降级'; return 2;
             }

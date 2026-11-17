@@ -1,3 +1,4 @@
+# Generated from templates/install.ps1.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 ﻿# Engineering candidate. Automatic zsetup bootstrap; native canary pending.
 param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
       [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',

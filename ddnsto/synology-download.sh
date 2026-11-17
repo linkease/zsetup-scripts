@@ -1,4 +1,5 @@
 #!/bin/sh
+# Generated from templates/synology-download.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Shared SPK selection; manual downloads and automatic DSM adapter use one pin.
 ddnsto_synology_select() {
     synology_error() { printf 'DDNSTO: %s\n' "$1" >&2; }

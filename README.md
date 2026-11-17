@@ -1,5 +1,14 @@
 # zsetup-scripts
 
+DDNSTO 推荐版本更新、验收、发布和回滚统一遵循 [发布 SOP](docs/ddnsto-release-sop.md)，
+每次使用其链接的发布记录模板留存证据。
+
+DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
+[`ddnsto/platform-releases.json`](ddnsto/platform-releases.json)，支持各平台独立版本。
+修改后执行 `python3 -B scripts/build-entrypoints.py`，再审核发布；设备端不增加配置解析依赖。
+带有对应 `ddnsto/templates/*.in` 的文件为生成副本，维护规则见
+[分平台推荐配置](docs/ddnsto-platform-releases.md)。以下旧版平台表中的固定版本不是当前推荐配置。
+
 FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.9 本地候选的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
 
 新增[`kspeeder/ks-cli`](kspeeder/ks-cli/README.md)与[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md)两个Linux二进制安装器：按官方版本/SHA256下载，支持持久目录与版本切换，不自动安装或启动服务。脚本0.1.0已于2026-10-26分别公开发布；服务器同步和回滚方案见[发布说明](docs/kspeeder-installers.md)。

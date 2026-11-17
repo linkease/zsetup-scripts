@@ -64,7 +64,7 @@ ddnsto_ensure_preflight() {
     [ -z "$FORCE_VERSION" ] && [ "$VERIFY_STATUS" = 0 ] || {
         ddnsto_flow_error E_OPTIONS '默认流程不接受手选版本或云端检查选项' '请重新复制默认命令'; return 2;
     }
-    [ "${DDNSTO_VERSION:-4.2.8}" = 4.2.8 ] || {
+    [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = "$(ddnsto_recommended_version "$detected_platform")" ] || {
         ddnsto_flow_error E_VERSION '默认流程只使用该审核安装器固定的客户端版本' '请使用推荐版本入口'; return 2;
     }
 }

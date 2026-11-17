@@ -1,5 +1,19 @@
 # zsetup-scripts Agent Notes
 
+## DDNSTO product configuration (2026-11-17)
+
+- Before changing recommended versions, preparing a candidate, publishing or rolling back DDNSTO,
+  read `docs/ddnsto-release-sop.md` and create/update its linked release record. Follow its stage gates;
+  the SOP does not authorize commits, device mutations or deployments.
+
+- Native DDNSTO product versions/digests are maintained only in `ddnsto/platform-releases.json`.
+- If `ddnsto/templates/NAME.in` exists, edit that template for behavior, not generated `ddnsto/NAME`.
+  This includes desktop standalone installers and `install-rules.json`. Other modules remain directly maintained.
+- `python3 -B scripts/build-entrypoints.py` compiles product metadata before composing the standalone entry;
+  `--check` rejects drift. Run `python3 -B tests/ddnsto_release_config_test.py` after changes.
+- Preserve version-specific compatibility gates; a new recommended version is not proof of a new health protocol.
+  See `docs/ddnsto-platform-releases.md` for publication and GUI/Docker boundaries.
+
 - Business installation belongs to `APP/business.sh`; zsetup owns download/context/run/install and its existing configuration schema. Do not copy runtime-zig or invent a second downloader.
 - Read `docs/inventory.md`, `docs/release.md`, `docs/ai-contract.md`, and the owning zsetup product principles/config/lifecycle/release documents before changing behavior.
 - `lib/bootstrap.sh` is the shared shell bootstrap source extracted from tested FastNet. `scripts/build-entrypoints.py` embeds it; generated `APP/APP-install.sh` is the only public entry. Edit maintained sources, regenerate, then use `--check`.

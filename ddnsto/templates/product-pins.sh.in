@@ -1,0 +1,48 @@
+# Generated from templates/product-pins.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
+# Maintained product metadata; embedded in install.sh, never fetched at runtime.
+# HTTPS bytes verified 2026-11-03; see docs/ddnsto-artifacts-2026-11-03.json.
+# lite retains the package naming used by the Micro client release.
+ddnsto_recommended_version() {
+    case "$1" in
+        linux) printf '%s\n' @@linux.client_version@@ ;;
+        openwrt) printf '%s\n' @@openwrt.client_version@@ ;;
+        synology) printf '%s\n' @@synology.client_version@@ ;;
+        asus) printf '%s\n' @@asus.client_version@@ ;;
+        *) return 11 ;;
+    esac
+}
+
+ddnsto_pinned_version() {
+    case "${2:-openwrt}:$1" in
+        linux:standard) printf '%s\n' @@linux.client_version@@ ;;
+        openwrt:standard|openwrt:lite) printf '%s\n' @@openwrt.client_version@@ ;;
+        *) printf '%s\n' 'DDNSTO: unknown pinned variant' >&2; return 11 ;;
+    esac
+}
+
+ddnsto_pinned_sha() {
+    case "$1" in
+        linux-binary/ddnsto-standard-@@linux.client_version@@.tar.gz) printf '%s\n' @@linux.linux_binary_ddnsto_standard_tar_gz_sha256@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_aarch64.apk) printf '%s\n' @@openwrt.openwrt_lite_apk_ddnsto_aarch64_apk_sha256@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_arm.apk) printf '%s\n' @@openwrt.openwrt_lite_apk_ddnsto_arm_apk_sha256@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_mipsel.apk) printf '%s\n' @@openwrt.openwrt_lite_apk_ddnsto_mipsel_apk_sha256@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_x86_64.apk) printf '%s\n' @@openwrt.openwrt_lite_apk_ddnsto_x86_64_apk_sha256@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_aarch64.ipk) printf '%s\n' @@openwrt.openwrt_lite_ddnsto_aarch64_ipk_sha256@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_arm.ipk) printf '%s\n' @@openwrt.openwrt_lite_ddnsto_arm_ipk_sha256@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_mipsel.ipk) printf '%s\n' @@openwrt.openwrt_lite_ddnsto_mipsel_ipk_sha256@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_x86_64.ipk) printf '%s\n' @@openwrt.openwrt_lite_ddnsto_x86_64_ipk_sha256@@ ;;
+        openwrt/luci-app-ddnsto.apk) printf '%s\n' @@openwrt.openwrt_luci_app_ddnsto_apk_sha256@@ ;;
+        openwrt/luci-app-ddnsto.ipk) printf '%s\n' @@openwrt.openwrt_luci_app_ddnsto_ipk_sha256@@ ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.apk) printf '%s\n' @@openwrt.openwrt_luci_i18n_ddnsto_zh_cn_apk_sha256@@ ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.ipk) printf '%s\n' @@openwrt.openwrt_luci_i18n_ddnsto_zh_cn_ipk_sha256@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_aarch64.apk) printf '%s\n' @@openwrt.openwrt_standard_apk_ddnsto_aarch64_apk_sha256@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_arm.apk) printf '%s\n' @@openwrt.openwrt_standard_apk_ddnsto_arm_apk_sha256@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_mipsel.apk) printf '%s\n' @@openwrt.openwrt_standard_apk_ddnsto_mipsel_apk_sha256@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_x86_64.apk) printf '%s\n' @@openwrt.openwrt_standard_apk_ddnsto_x86_64_apk_sha256@@ ;;
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_aarch64.ipk) printf '%s\n' @@openwrt.openwrt_standard_ddnsto_aarch64_ipk_sha256@@ ;;
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_arm.ipk) printf '%s\n' @@openwrt.openwrt_standard_ddnsto_arm_ipk_sha256@@ ;;
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_mipsel.ipk) printf '%s\n' @@openwrt.openwrt_standard_ddnsto_mipsel_ipk_sha256@@ ;;
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_x86_64.ipk) printf '%s\n' @@openwrt.openwrt_standard_ddnsto_x86_64_ipk_sha256@@ ;;
+        *) printf '%s\n' "DDNSTO: no pinned artifact for $1; use a reviewed newer installer" >&2; return 11 ;;
+    esac
+}

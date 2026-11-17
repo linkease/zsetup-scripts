@@ -1,3 +1,4 @@
+# Generated from templates/asus-transaction.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Controlled transaction. OS/package/service boundaries live in ASUS adapters.
 # No vendor install.sh, uninstall.sh, base.sh or dbus export is executed.
 ddnsto_asus_identity() {

@@ -1,3 +1,4 @@
+# Generated from templates/business.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Included at build time; only ddnsto-install.sh is a public installer.
 ddnsto_error() { printf 'DDNSTO: %s\n' "$*" >&2; }
 

@@ -15,6 +15,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
+    subprocess.run(['python3', '-B', str(ROOT / 'scripts/build-ddnsto-products.py'),
+                    *(['--check'] if args.check else [])], check=True)
     def helper(name):
         return (ROOT / "lib" / name).read_text().rstrip() + "\n\n"
     dispatch = helper("install-launcher.sh").split("installer_launcher_prepare()", 1)[0]

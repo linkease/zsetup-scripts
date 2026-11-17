@@ -1,3 +1,4 @@
+# Generated from templates/asus-package.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Controlled ASUS package adapter; source asus-platform.sh before this module.
 # ddnsto_asus_extract ARCHIVE DEST CHANNEL ARCH -> 0 success, nonzero rejection.
 # Caller MUST verify ARCHIVE size + SHA256 against ddnsto_asus_package CHANNEL,

@@ -38,6 +38,9 @@ ZSETUP_TEST_NATIVE="$native_bin" TMPDIR="$software_test_tmp" python3 -B -m unitt
 rmdir "$software_test_tmp"
 for software_script in "$root"/software/*.sh; do bash -n "$software_script"; done
 python3 -B "$root/tests/module_layout_test.py"
+python3 -B "$root/scripts/build-ddnsto-products.py" --check
+python3 -B "$root/tests/ddnsto_release_config_test.py"
+python3 -B "$root/tests/ddnsto_shell_compat_test.py"
 python3 -B "$root/tests/publication_test.py"
 python3 -B "$root/tests/ddnsto_offline_native_test.py"
 python3 -B "$root/tests/ddnsto_autoinstall_test.py"

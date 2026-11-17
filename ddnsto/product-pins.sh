@@ -1,9 +1,21 @@
+# Generated from templates/product-pins.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Maintained product metadata; embedded in install.sh, never fetched at runtime.
 # HTTPS bytes verified 2026-11-03; see docs/ddnsto-artifacts-2026-11-03.json.
 # lite retains the package naming used by the Micro client release.
-ddnsto_pinned_version() {
+ddnsto_recommended_version() {
     case "$1" in
-        standard|lite) printf '%s\n' 4.2.8 ;;
+        linux) printf '%s\n' 4.2.8 ;;
+        openwrt) printf '%s\n' 4.2.8 ;;
+        synology) printf '%s\n' 4.2.8 ;;
+        asus) printf '%s\n' 4.2.8 ;;
+        *) return 11 ;;
+    esac
+}
+
+ddnsto_pinned_version() {
+    case "${2:-openwrt}:$1" in
+        linux:standard) printf '%s\n' 4.2.8 ;;
+        openwrt:standard|openwrt:lite) printf '%s\n' 4.2.8 ;;
         *) printf '%s\n' 'DDNSTO: unknown pinned variant' >&2; return 11 ;;
     esac
 }

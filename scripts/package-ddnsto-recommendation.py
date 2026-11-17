@@ -35,6 +35,7 @@ No crypto supply infrastructure or remote-code parser is introduced.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -65,6 +66,17 @@ def source_url(value):
 
 def package(args):
     base = source_url(args.source_url)
+    # Full product trees must be compiled before review/packaging. Minimal
+    # inert installer fixtures remain useful for testing the transport wrapper.
+    if args.source_root.resolve() == ROOT or (args.source_root / 'ddnsto/platform-releases.json').exists():
+        spec = importlib.util.spec_from_file_location('ddnsto_products', ROOT / 'scripts/build-ddnsto-products.py')
+        products = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(products)
+        products.generate(args.source_root, check=True)
+        combined = (args.source_root / 'ddnsto/ddnsto-install.sh').read_text()
+        for name in products.OUTPUTS:
+            if name.endswith('.sh') and (args.source_root / 'ddnsto' / name).read_text().rstrip() not in combined:
+                raise ValueError('stale generated product bundle: ' + name)
     output = args.output.absolute()
     if output.exists() or output.is_symlink():
         raise ValueError('output must not exist; preserve prior immutable releases')

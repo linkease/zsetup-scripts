@@ -1,3 +1,4 @@
+# Generated from templates/auto-synology.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # DSM package-managed default workflow. Never install a generic Linux service.
 ddnsto_synopkg() { /usr/syno/bin/synopkg "$@"; }
 
