@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-windows-") as name:
     run([sys.executable, str(KAI_ROOT / "tools/release/zsetup_release.py"),
          "build", str(release)])
     manifest = json.loads((release / "release-manifest.json").read_text())
-    assert manifest["version"] == "1.2.5"
+    assert manifest["version"] == "1.2.6"
 
     fixed = work / "kai-skills-install.ps1"
     channel = work / "setup.ps1"
@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-windows-") as name:
     fixed_source = fixed.read_text(encoding="utf-8")
     channel_source = channel.read_text(encoding="utf-8")
     digest = hashlib.sha256((release / "release-manifest.json").read_bytes()).hexdigest()
-    for value in ("KaiSkillsRelease = '1.2.5'", digest,
+    for value in ("KaiSkillsRelease = '1.2.6'", digest,
                   "archive extract", "install.ps1", "--max-files"):
         assert value in fixed_source, value
     for value in ("Get-ZsetupBootstrap", "install kai-skills", "kai-software", "all",
@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix="kai-skills-windows-") as name:
     assert len(kai) == 1
     assert kai[0]["os"] == "windows" and kai[0]["arch"] == "x86_64"
     assert kai[0]["path"] == (
-        "kai/kai-skills/installers/1.2.5/kai-skills-install.ps1"
+        "kai/kai-skills/installers/1.2.6/kai-skills-install.ps1"
     )
 
 print("kai-skills: reproducible native Windows installer and channel contract passed")

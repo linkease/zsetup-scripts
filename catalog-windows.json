@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "windows-apps-0.2.0",
+  "config_version": "windows-apps-0.2.1",
   "installers": [
     {
       "application": "scoop",
@@ -17,7 +17,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kai-skills/kai-skills-install.ps1",
-      "path": "kai/kai-skills/installers/1.2.5/kai-skills-install.ps1",
+      "path": "kai/kai-skills/installers/1.2.6/kai-skills-install.ps1",
       "background": false
     }
   ]

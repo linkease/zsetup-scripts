@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix="kai-windows-config-") as name:
     legacy = next(item for item in proposed["installers"] if item["application"] == "legacy")
     kai = next(item for item in proposed["installers"] if item["application"] == "kai-skills")
     assert legacy["min_version"] == "0.6.5"
-    assert kai["path"] == "kai/kai-skills/installers/1.2.5/kai-skills-install.ps1"
+    assert kai["path"] == "kai/kai-skills/installers/1.2.6/kai-skills-install.ps1"
     assert kai["source_group"] == "release" and kai["min_version"] == "0.6.5"
     assert len(proposed["source_groups"]) == 1
 

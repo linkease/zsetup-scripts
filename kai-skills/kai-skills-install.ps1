@@ -1,7 +1,7 @@
-$script:KaiSkillsRelease = '1.2.5'
-$script:KaiSkillsManifestPath = 'releases/1.2.5/release-manifest.json'
-$script:KaiSkillsManifestSha256 = 'cc62e2e00e75bf76ab6c26c4c49a56e0ee791fa8ebe9186445266148bdd999b7'
-$script:KaiSkillsManifestSize = 29797
+$script:KaiSkillsRelease = '1.2.6'
+$script:KaiSkillsManifestPath = 'releases/1.2.6/release-manifest.json'
+$script:KaiSkillsManifestSha256 = '011d048844314d0071bc8b030db0e81d54adf38eade7908fb1bf1b674431a754'
+$script:KaiSkillsManifestSize = 29910
 
 $ErrorActionPreference = 'Stop'
 $script:KaiSkillsUtf8 = [Text.UTF8Encoding]::new($false)
