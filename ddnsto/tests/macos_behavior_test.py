@@ -41,6 +41,9 @@ if [ "$1" = -f ]; then
  shift 2
  owner=$(/usr/bin/stat -c %u "$1")
  [ "$owner" != "$(/usr/bin/id -u)" ] || owner=501
+ if [ "${FOREIGN_IDENTITY_OWNER:-0}" = 1 ]; then
+  case "$1" in */.ddnsto_boot.cfg) owner=999 ;; esac
+ fi
  if [ "$format" = '%u %l' ]; then
   printf '%s %s\\n' "$owner" "$(/usr/bin/stat -c %h "$1")"; exit
  fi
@@ -162,6 +165,77 @@ esac
         result = self.run_script(('--action', 'stop'), BOOTOUT_DELAY='1')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.root / 'running').exists())
+
+    def test_historical_identity_permissions_repaired_without_restart(self):
+        self.assertEqual(self.run_script(BOOT_IDENTITY='1').returncode, 0)
+        identity = self.config / '.ddnsto_boot.cfg'
+        before = identity.read_bytes()
+        config = (self.config / 'ddnsto.yaml').read_bytes()
+        downloads = (self.root / 'download.log').read_bytes()
+        for args in (('--action', 'status'), ('--token', 'test-token')):
+            with self.subTest(args=args):
+                identity.chmod(0o777)  # CLI recreates this after a later launch.
+                calls_before = (self.root / 'service.log').read_bytes()
+                result = self.run_script(args, FAIL_DOWNLOAD='1')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(identity.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(identity.read_bytes(), before)
+                self.assertEqual((self.config / 'ddnsto.yaml').read_bytes(), config)
+                self.assertEqual((self.root / 'download.log').read_bytes(), downloads)
+                calls = (self.root / 'service.log').read_bytes()[len(calls_before):]
+                self.assertNotIn(b'bootout', calls)
+                self.assertNotIn(b'bootstrap', calls)
+
+    def test_identity_compatibility_does_not_touch_unsafe_or_foreign_state(self):
+        self.assertEqual(self.run_script(BOOT_IDENTITY='1').returncode, 0)
+        identity = self.config / '.ddnsto_boot.cfg'
+        marker = self.config / '.installer-macos-v1'
+        original_marker = marker.read_bytes()
+        for unsafe in ('hardlink', 'symlink', 'public_directory', 'foreign_marker',
+                       'missing_marker', 'public_config', 'foreign_job', 'foreign_owner'):
+            with self.subTest(unsafe=unsafe):
+                identity.chmod(0o777)
+                target = self.root / 'identity-target'
+                if unsafe == 'hardlink':
+                    os.link(identity, target)
+                elif unsafe == 'symlink':
+                    identity.rename(target)
+                    identity.symlink_to(target)
+                elif unsafe == 'public_directory':
+                    self.config.chmod(0o755)
+                elif unsafe == 'foreign_marker':
+                    marker.write_text('foreign')
+                elif unsafe == 'missing_marker':
+                    marker.unlink()
+                elif unsafe == 'public_config':
+                    (self.config / 'ddnsto.yaml').chmod(0o777)
+                env = {'FOREIGN_PROGRAM': '/foreign'} if unsafe == 'foreign_job' else {}
+                if unsafe == 'foreign_owner':
+                    env['FOREIGN_IDENTITY_OWNER'] = '1'
+                result = self.run_script(('--action', 'status'), **env)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(identity.stat().st_mode & 0o777, 0o777)
+                self.assertEqual(identity.read_bytes(), b'identity')
+                if unsafe == 'symlink':
+                    identity.unlink()
+                    target.rename(identity)
+                elif unsafe == 'hardlink':
+                    target.unlink()
+                self.config.chmod(0o700)
+                marker.write_bytes(original_marker)
+                marker.chmod(0o600)
+                (self.config / 'ddnsto.yaml').chmod(0o600)
+
+    def test_identity_permission_repair_failure_is_not_success(self):
+        self.assertEqual(self.run_script(BOOT_IDENTITY='1').returncode, 0)
+        identity = self.config / '.ddnsto_boot.cfg'
+        identity.chmod(0o777)
+        self.tool('chmod', 'exit 1\n')
+        result = self.run_script(('--action', 'status'))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('local_service=running', result.stdout)
+        self.assertEqual(identity.stat().st_mode & 0o777, 0o777)
+        self.assertEqual(identity.read_bytes(), b'identity')
 
     def run_menu(self, choice, token=None, **env):
         pid, terminal = pty.fork()
