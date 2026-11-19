@@ -12,7 +12,9 @@ GUIDE = Path(__file__).resolve().parents[1] / 'agent/install.md'
 class AgentGuideTest(unittest.TestCase):
     def test_required_boundaries_and_complete_document(self):
         text = GUIDE.read_text(encoding='utf-8')
-        for required in ['仅测试环境', '用户一次明确确认', 'Agent 沙箱', 'Windows',
+        self.assertNotIn('web.toany.net', text)
+        self.assertIn('https://installer.invalid/i', text)
+        for required in ['当前控制台', '用户一次明确确认', 'Agent 沙箱', 'Windows',
                          '不检查云端在线', '最多重试一次', '不得自动换绑',
                          '读取失败', '目前没有自动生成远程访问', '本地启动状态']:
             self.assertIn(required, text)

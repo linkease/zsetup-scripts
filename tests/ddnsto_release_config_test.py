@@ -28,6 +28,11 @@ class ReleaseConfigurationTests(unittest.TestCase):
         for name, content in builder.render(ROOT, self.config()).items():
             self.assertEqual((ROOT / 'ddnsto' / name).read_text(), content, name)
 
+    def test_powershell_bom_is_only_at_start(self):
+        content = self.builder().render(ROOT, self.config())['install.ps1']
+        self.assertTrue(content.startswith('\ufeff'))
+        self.assertNotIn('\ufeff', content[1:])
+
     def test_platform_versions_are_independent(self):
         builder = self.builder()
         original = self.config()
