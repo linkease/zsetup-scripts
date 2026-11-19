@@ -7,6 +7,8 @@
 再从仓库根目录运行 `python3 -B scripts/build-entrypoints.py`。不要直接修改这些生成文件。
 更新流程与边界见 [分平台推荐配置](../docs/ddnsto-platform-releases.md)。设备端不增加 JSON 解析依赖。
 
+2026-11-19：[macOS 历史身份文件 0777 兼容修复](../docs/verification/2026-11-19-macos-identity-permissions.md)：仅在私有目录、文件归属及安装记录检查通过后收紧身份文件权限，保留配置和设备身份；已通过 Mac 真机状态检查、重复安装与服务重启验证。本项尚未发布至测试站 `/i`。
+
 2026-11-16：[macOS 与 Windows CLI 真机验收](../docs/verification/2026-11-16-desktop-native-lifecycle.md)：本地 Mac 修复候选和 Windows CLI 执行器通过首次安装、重复执行及启停；Mac 公网入口尚未更新，Windows 公网脚本在 Restricted 执行策略下仍受限。未验收跨版本升级、重启或 Windows GUI Token 保存。
 
 2026-11-16：[zsetup 能力复用审查与候选开发任务](../docs/ddnsto-zsetup-reuse-audit-2026-11-16.md)。第一批已收敛现代华硕下载后的重复校验，并增加真实核心契约测试；[验证记录](../docs/verification/2026-11-16-ddnsto-native-reuse-batch1.md)。华硕 SSH 已恢复且身份校验通过，RT-AX86U 上两版核心的候选下载函数验证通过；未部署、未升级核心，完整安装/恢复真机验收仍待完成。

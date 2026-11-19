@@ -182,13 +182,17 @@ wait_job_unloaded() {
         sleep 1
     done
 }
-protect_runtime_identity() {
+check_runtime_identity() {
     identity="$CONFIG_DIR/.ddnsto_boot.cfg"
     [ -e "$identity" ] || [ -L "$identity" ] || return 0
     protected_path "$CONFIG_DIR" private
     [ -f "$identity" ] && [ ! -L "$identity" ] || fail 'runtime identity must be regular'
     metadata=$(stat -f '%u %l' "$identity") || fail 'cannot inspect runtime identity'
     [ "$metadata" = "$uid 1" ] || fail 'runtime identity ownership or hardlink mismatch'
+}
+protect_runtime_identity() {
+    check_runtime_identity
+    [ -e "$identity" ] || return 0
     # Published CLI 4.2.8 explicitly chmods its boot file to 0777. It lives
     # inside our owner-only directory; tighten only this owned regular file.
     chmod 600 "$identity" || fail 'cannot protect runtime identity'
@@ -239,7 +243,7 @@ check_state() {
         protected_parents "$directory"
         protected_path "$directory"
     done
-    for file in "$config" "$binary" "$plist" "$marker" "$receipt" "$CONFIG_DIR/.ddnsto_boot.cfg"; do
+    for file in "$config" "$binary" "$plist" "$marker" "$receipt"; do
         [ ! -L "$file" ] || fail 'managed files must not be symlinks'
         [ ! -e "$file" ] || [ -f "$file" ] || fail 'managed files must be regular'
         protected_path "$file"
@@ -247,6 +251,10 @@ check_state() {
     protected_path "$config" private
     protected_path "$marker" private
     protected_path "$receipt" private
+    # The client may restore 0777 on a later launch. Accept only this owned,
+    # single-link identity inside an owner-private directory; never relax the
+    # checks for configuration, receipts, executable or service definition.
+    check_runtime_identity
     if [ -e "$binary" ] || [ -e "$config" ] || [ -e "$plist" ] || [ -e "$marker" ] || [ -e "$receipt" ] || [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then
         [ -f "$marker" ] && [ -f "$config" ] || fail 'existing unmanaged or incomplete installation'
         case "$(cat "$marker")" in
@@ -270,6 +278,12 @@ check_state() {
                 [ "$actual_plist" = "$(managed_plist)" ] || fail 'existing unmanaged plist; migrate it before retrying'
             fi
         fi
+    fi
+    if [ "$state" != absent ] && [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then
+        # Confirm both the installation and any loaded job before chmod.
+        # Preserve identity bytes and avoid restarting an already healthy job.
+        check_job
+        protect_runtime_identity
     fi
 }
 check_job() {
