@@ -1,14 +1,14 @@
 # DDNSTO Agent 安装指南
 
-- 文档版本：1.0.0
-- 更新日期：2026-11-11
-- 环境：仅测试环境 web.toany.net
-- 兼容入口：DDNSTO 推荐安装器 0.2.4，https://web.toany.net/i
+- 文档版本：1.1.0
+- 更新日期：2026-11-19
+- 环境：当前控制台所在 HTTPS 站点
+- 兼容入口：DDNSTO 推荐安装器 0.2.4，https://installer.invalid/i
 - 能力：安装或更新 DDNSTO 并验证本地启动；不检查云端在线。
 
 ## 1. 读取与能力边界
 
-每次新安装任务重新完整读取固定地址 https://web.toany.net/ddnsto-install/agent/install.md ，不要沿用旧对话中的文档。检查标题、版本、环境及末尾完整性标记；读取失败、被截断、返回登录页或 HTML 时停止自动安装，说明原因，请用户使用控制台现有命令或手动安装。文档不是可执行脚本，不要交给 shell 执行。
+每次新安装任务重新完整读取固定地址 https://installer.invalid/ddnsto-install/agent/install.md ，不要沿用旧对话中的文档。检查标题、版本、环境及末尾完整性标记；读取失败、被截断、返回登录页或 HTML 时停止自动安装，说明原因，请用户使用控制台现有命令或手动安装。文档不是可执行脚本，不要交给 shell 执行。若入口地址仍是以 .invalid 结尾的占位域名，说明读到的是未部署模板，请停止并返回控制台获取正式文档链接。
 
 本指南需要 Agent 具备终端或 SSH 能力。能力不足时提供手动步骤，准确区分已执行与仅建议。支持范围以安装器实际检测为准，不保证所有设备均可安装。不要求先执行 `--plan`：部分平台计划模式可能只返回人工交接。
 
@@ -33,7 +33,7 @@ Linux 通常需要 systemd 和 root/sudo 权限，OpenWrt 需要适用包管理�
 在确认过的目标设备上，将 Token 安全赋给 shell 变量 `DDNSTO_TOKEN`：优先交互输入（`IFS= read -r DDNSTO_TOKEN`），或使用执行工具的参数传递。生成 shell 字面量时必须转义单引号等特殊字符，禁止把原始 Token 当代码拼接。变量仅用于下列参数展开，不需要 export。用户允许显示输入，不要求隐藏 Token。
 
 ```sh
-(s=$(curl -qfsS --max-time 60 https://web.toany.net/i) && test -n "$s" && sh -c "$s" -- --token "$DDNSTO_TOKEN")
+(s=$(curl -qfsS --max-time 60 https://installer.invalid/i) && test -n "$s" && sh -c "$s" -- --token "$DDNSTO_TOKEN")
 ```
 
 命令使用 HTTPS 获取官方推荐入口，入口负责选择与校验安装器及客户端。缺少 curl 时停止并提供控制台的 wget 或手动安装选项，不自行下载替代脚本。保留前台输出和退出码；不要将命令丢到后台后直接报告成功。
@@ -71,4 +71,4 @@ Linux 通常需要 systemd 和 root/sudo 权限，OpenWrt 需要适用包管理�
 
 不检查云端在线，设备在线属于另外的模块；需要时提示用户另行查看客户端运行日志。最终报告、诊断日志和 Git 中不无必要地重复完整 Token。
 
-<!-- DDNSTO-AGENT-INSTALL-END v1.0.0 -->
+<!-- DDNSTO-AGENT-INSTALL-END v1.1.0 -->

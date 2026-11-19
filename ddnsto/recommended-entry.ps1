@@ -203,11 +203,13 @@ try {
     if (-not (Test-Installer $scriptPath $metadata)) {
         Stop-Recommendation '安装脚本校验失败' '联系发布者核对摘要和大小' }
     # File.Replace is atomic for an existing target on the same volume.
+    # Windows PowerShell 5.1 coerces $null to an empty string for this .NET
+    # string argument; NullString passes a real null backup filename.
     $stage = Join-Path $work 'cached.ps1'
     Copy-Item -LiteralPath $scriptPath -Destination $stage
-    if (Test-Path -LiteralPath $cachedScript) { [IO.File]::Replace($stage, $cachedScript, $null) }
+    if (Test-Path -LiteralPath $cachedScript) { [IO.File]::Replace($stage, $cachedScript, [NullString]::Value) }
     else { [IO.File]::Move($stage, $cachedScript) }
-    if (Test-Path -LiteralPath $cachedManifest) { [IO.File]::Replace($manifest, $cachedManifest, $null) }
+    if (Test-Path -LiteralPath $cachedManifest) { [IO.File]::Replace($manifest, $cachedManifest, [NullString]::Value) }
     else { [IO.File]::Move($manifest, $cachedManifest) }
     $lease.Dispose(); $lease = $null
     # Hashtable splatting binds named parameters without reinterpreting strings.
@@ -216,7 +218,10 @@ try {
     $script:entryCode = 1
     $script:entryMessage = $null
     $global:LASTEXITCODE = 0
-    & $scriptPath @forward
+    # Run only the size/SHA-verified private file, using the same in-memory
+    # invocation as the public command. Do not change any execution policy.
+    $executor = [scriptblock]::Create([IO.File]::ReadAllText($scriptPath, (New-Object Text.UTF8Encoding($false, $true))))
+    & $executor @forward
     $executorSucceeded = $?
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     if (-not $executorSucceeded) { Stop-Recommendation '安装执行失败' '检查本地服务状态后重试' 1 }

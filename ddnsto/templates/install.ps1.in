@@ -1,5 +1,5 @@
-# Generated from templates/install.ps1.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
-﻿# Engineering candidate. Automatic zsetup bootstrap; native canary pending.
+﻿# Generated from templates/install.ps1.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
+# Engineering candidate. Automatic zsetup bootstrap; native canary pending.
 param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '@@windows.client_version@@',
       [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
       [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure')
