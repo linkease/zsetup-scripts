@@ -214,10 +214,10 @@ function Get-ZsetupBootstrap {
     }
 }
 
-$script:ScoopInstallerVersion = '0.1.1'
-$script:ScoopRuntimeId = '0.7.16-08aea475819b8037977684c7fbbde2ae40bb1b96-windows-amd64'
-$script:ScoopRuntimeSize = 38021762
-$script:ScoopRuntimeSha256 = '66fa51769556b8d52289f354d3e43952338814b6ef357b04868f829fc1c5c4dc'
+$script:ScoopInstallerVersion = '0.1.2'
+$script:ScoopRuntimeId = '0.9.1-market.238d13be-windows-amd64'
+$script:ScoopRuntimeSize = 24149573
+$script:ScoopRuntimeSha256 = 'e2163542c5edf03327df537be56df9b17ebf22d0eacaafb93cd9ccef7d19bb9a'
 $script:ScoopCoreCommit = 'e6aa3b366bdee8ed138c1e0f7b85192ebdd35d0f'
 $script:ScoopCoreSize = 1289426
 $script:ScoopCoreSha256 = 'fa96b15950f3726d2c9a35493e192eefe56d2eddba718e8121c32f7a19257a0a'
@@ -319,9 +319,9 @@ function Expand-VerifiedRuntimeBundle([string]$Archive, [string]$Destination) {
 }
 
 function Invoke-ZsetupRuntimeDownload([string]$Output) {
-    $relative = "kspeeder/candidates/$($script:ScoopRuntimeId)/runtime.zip"
-    $urls = @("https://dl.istoreos.com/$relative", "https://fw.d4ctech.com/$relative", "https://fw20.koolcenter.com/$relative")
-    & $env:ZSETUP_BIN download -o $Output --sha256 $script:ScoopRuntimeSha256 --size $script:ScoopRuntimeSize @urls --fallback-url "https://fw.koolcenter.com/$relative"
+    $relative = "kspeeder/runtimes/$($script:ScoopRuntimeId)/runtime.zip"
+    $urls = @("https://kspeeder.com/bin/runtimes/$($script:ScoopRuntimeId)/runtime.zip", "https://dl.istoreos.com/binary/$relative", "https://fw.d4ctech.com/binary/$relative")
+    & $env:ZSETUP_BIN download -o $Output --sha256 $script:ScoopRuntimeSha256 --size $script:ScoopRuntimeSize @urls --fallback-url "https://fw.koolcenter.com/binary/$relative"
     if ($LASTEXITCODE -ne 0) { throw "scoop: zsetup runtime download failed with exit $LASTEXITCODE" }
     Assert-ScoopLockedFile $Output $script:ScoopRuntimeSize $script:ScoopRuntimeSha256 'downloaded runtime bundle'
 }
@@ -330,7 +330,7 @@ function Invoke-AcceleratedBootstrap([string]$Runtime, [string]$Work) {
     $plan = Join-Path $Work 'bootstrap-plan.json'; $receipt = Join-Path $Work 'bootstrap-receipt.json'; $archives = Join-Path $Work 'accelerated-archives'
     Write-ScoopJson $plan (Get-ScoopBootstrapPlan)
     $cli = Join-Path $Runtime 'ks-cli.exe'
-    & $cli runtime exec --service-binary (Join-Path $Runtime 'kspeeder.exe') --identity (Join-Path $Runtime 'identity.json') --require-capability download-gateway.v1 --require-capability route.github-archive.v1 -- $cli scoop bootstrap --plan $plan --staging $archives --receipt $receipt --require-accelerated --json
+    & $cli runtime exec --service-binary (Join-Path $Runtime 'kspeeder.exe') --identity (Join-Path $Runtime 'identity.json') --require-capability download-gateway.v1 --require-capability route.github-archive.v1 -- $cli scoop bootstrap --service-binary (Join-Path $Runtime 'kspeeder.exe') --identity (Join-Path $Runtime 'identity.json') --plan $plan --staging $archives --receipt $receipt --require-accelerated --json
     if ($LASTEXITCODE -ne 0) { throw "scoop: accelerated bootstrap failed with exit $LASTEXITCODE" }
     $proof = Get-Content -LiteralPath $receipt -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
     if ($proof.status -cne 'passed' -or $proof.origin_fallback_allowed -ne $false -or $proof.artifacts.Count -ne 2) { throw 'scoop: invalid accelerated bootstrap receipt' }
@@ -398,7 +398,7 @@ function Test-ScoopOwnedCurrent([string]$Root) {
     $path = Join-Path $Root $script:ScoopReceiptName
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
     try { $receipt = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { return $false }
-    return $receipt.owner -ceq 'linkease-zsetup' -and $receipt.installer_version -ceq $script:ScoopInstallerVersion -and $receipt.runtime_bundle_id -ceq $script:ScoopRuntimeId -and $receipt.core_commit -ceq $script:ScoopCoreCommit -and $receipt.main_commit -ceq $script:ScoopMainCommit -and (Test-Path -LiteralPath (Join-Path $Root 'apps\scoop\current\bin\scoop.ps1') -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $Root 'buckets\main\bucket\7zip.json') -PathType Leaf)
+    return $receipt.owner -ceq 'linkease-zsetup' -and $receipt.installer_version -ceq $script:ScoopInstallerVersion -and $receipt.runtime_bundle_id -ceq $script:ScoopRuntimeId -and $receipt.runtime_bundle_sha256 -ceq $script:ScoopRuntimeSha256 -and $receipt.core_sha256 -ceq $script:ScoopCoreSha256 -and $receipt.main_sha256 -ceq $script:ScoopMainSha256 -and $receipt.core_commit -ceq $script:ScoopCoreCommit -and $receipt.main_commit -ceq $script:ScoopMainCommit -and (Test-Path -LiteralPath (Join-Path $Root 'apps\scoop\current\bin\scoop.ps1') -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $Root 'buckets\main\bucket\7zip.json') -PathType Leaf)
 }
 
 function Write-ScoopShims([string]$Root) {
@@ -551,23 +551,26 @@ function New-ScoopStage([string]$Root, [string]$Work, $Archives) {
         }
     }
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    foreach ($relative in @('apps\scoop\current', 'buckets\main', 'shims')) { Remove-Item -LiteralPath (Join-Path $stage $relative) -Recurse -Force -ErrorAction SilentlyContinue }
+    $preserveMain = Test-Path -LiteralPath (Join-Path $stage 'buckets\main') -PathType Container
+    foreach ($relative in @('apps\scoop\current')) { Remove-Item -LiteralPath (Join-Path $stage $relative) -Recurse -Force -ErrorAction SilentlyContinue }
     $junctions = @($junctions | Where-Object {
-        $_.path -notmatch '^(?i:apps\\scoop\\current|buckets\\main|shims)(?:\\|$)'
+        $_.path -notmatch '^(?i:apps\\scoop\\current)(?:\\|$)'
     })
     Expand-VerifiedScoopArchive $Archives.Core (Join-Path $stage 'apps\scoop\current') ("Scoop-" + $script:ScoopCoreCommit) $script:ScoopCoreSize $script:ScoopCoreSha256
-    Expand-VerifiedScoopArchive $Archives.Main (Join-Path $stage 'buckets\main') ("Main-" + $script:ScoopMainCommit) $script:ScoopMainSize $script:ScoopMainSha256
+    if (-not $preserveMain) {Expand-VerifiedScoopArchive $Archives.Main (Join-Path $stage 'buckets\main') ("Main-" + $script:ScoopMainCommit) $script:ScoopMainSize $script:ScoopMainSha256}
     Write-ScoopShims $stage; Write-ScoopOwnedReceipt $stage $Archives.Transport
+    if ($Archives.Receipt) {Copy-Item -LiteralPath $Archives.Receipt -Destination (Join-Path $stage '.linkease-scoop-bootstrap-receipt.json') -Force}
     return [pscustomobject]@{path=$stage;junctions=@($junctions)}
 }
 
 function Get-ScoopInstallOptions([string[]]$Arguments) {
-    $options = @{ Scope = 'user'; Root = $null; Cache = $null; Bundle = $null; AllowAdmin = $false }
+    $options = @{ RuntimeBundle = $null; Scope = 'user'; Root = $null; Cache = $null; Bundle = $null; AllowAdmin = $false }
     for ($index = 0; $index -lt $Arguments.Count; $index++) {
         switch -CaseSensitive ($Arguments[$index]) {
             '--installer-scope' { if (++$index -ge $Arguments.Count) { throw 'scoop: missing scope value' }; $options.Scope = $Arguments[$index] }
             '--installer-root' { if (++$index -ge $Arguments.Count) { throw 'scoop: missing root value' }; $options.Root = $Arguments[$index] }
             '--installer-cache' { if (++$index -ge $Arguments.Count) { throw 'scoop: missing cache value' }; $options.Cache = $Arguments[$index] }
+            '--installer-runtime-bundle' { if (++$index -ge $Arguments.Count) { throw 'scoop: missing runtime bundle value' }; $options.RuntimeBundle = $Arguments[$index] }
             '--installer-bundle' { if (++$index -ge $Arguments.Count) { throw 'scoop: missing bundle value' }; $options.Bundle = $Arguments[$index] }
             '--installer-allow-admin' { $options.AllowAdmin = $true }
             default { throw "scoop: unknown installer argument $($Arguments[$index])" }
@@ -578,7 +581,7 @@ function Get-ScoopInstallOptions([string[]]$Arguments) {
     return $options
 }
 
-function Invoke-ScoopBusiness {
+function Invoke-ScoopBusinessUnlocked {
     param([string[]]$InstallerArguments)
     if ($InstallerArguments.Count -ge 3 -and $InstallerArguments[0] -ceq '--explain' -and $InstallerArguments[1] -ceq '--json' -and $InstallerArguments[2] -ceq '--') {
         $literal = if ($InstallerArguments.Count -gt 3) { @($InstallerArguments[3..($InstallerArguments.Count - 1)]) } else { @() }
@@ -587,6 +590,7 @@ function Invoke-ScoopBusiness {
     $options = Get-ScoopInstallOptions $InstallerArguments
     if ((Test-ScoopAdministrator) -and -not $options.AllowAdmin) { throw 'scoop: elevated administrator install is rejected by default' }
     $root = Test-ScoopSafePath $options.Root 'installation root'; $cache = Test-ScoopSafePath $options.Cache 'cache path'
+    if ($options.RuntimeBundle -and -not [IO.Path]::IsPathRooted($options.RuntimeBundle)) { throw 'scoop: runtime bundle path must be absolute' }
     if ($options.Bundle) {
         if (-not [IO.Path]::IsPathRooted($options.Bundle)) { throw 'scoop: sealed bundle path must be absolute' }
         $bundle = [IO.Path]::GetFullPath($options.Bundle); $bundleItem = Get-Item -LiteralPath $bundle -Force -ErrorAction Stop
@@ -601,10 +605,31 @@ function Invoke-ScoopBusiness {
     $work = Join-Path $parent ('.linkease-scoop-' + [Guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $work -ErrorAction Stop | Out-Null
     try {
         if ($options.Bundle) { $archives = Expand-VerifiedSealedBundle $bundle $work }
-        else { $runtimeZip = Join-Path $work 'runtime-bundle.zip'; Invoke-ZsetupRuntimeDownload $runtimeZip; $runtime = Expand-VerifiedRuntimeBundle $runtimeZip (Join-Path $work 'runtime'); $archives = Invoke-AcceleratedBootstrap $runtime $work }
+        else {
+            $runtimeZip = if ($options.RuntimeBundle) { [IO.Path]::GetFullPath($options.RuntimeBundle) } else { Join-Path $work 'runtime-bundle.zip' }
+            if (-not $options.RuntimeBundle) { Invoke-ZsetupRuntimeDownload $runtimeZip }
+            $runtime = Expand-VerifiedRuntimeBundle $runtimeZip (Join-Path $work 'runtime')
+            $archives = Invoke-AcceleratedBootstrap $runtime $work
+        }
         $stage = New-ScoopStage $root $work $archives; Commit-ScoopTransaction $root $cache $configPath $stage.path $stage.junctions $archives.Transport $work
         return [ordered]@{ schema_version = 1; status = 'passed'; operation = 'scoop-install'; idempotent = $false; transport = $archives.Transport; root = $root; cache = $cache; runtime_bundle_id = $script:ScoopRuntimeId; core_commit = $script:ScoopCoreCommit; main_commit = $script:ScoopMainCommit } | ConvertTo-Json -Compress
     } finally { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+# Standalone owner invocations coordinate across KAIPlus instances and sessions.
+function Invoke-ScoopBusiness {
+    param([string[]]$InstallerArguments)
+    if ($InstallerArguments.Count -gt 0 -and $InstallerArguments[0] -ceq '--explain') {return Invoke-ScoopBusinessUnlocked -InstallerArguments $InstallerArguments}
+    $options=Get-ScoopInstallOptions $InstallerArguments
+    $root=Test-ScoopSafePath $options.Root 'installation root'
+    if ((Test-ScoopAdministrator) -and -not $options.AllowAdmin) {throw 'scoop: elevated administrator install is rejected by default'}
+    New-Item -ItemType Directory -Path (Split-Path -Parent $root) -Force | Out-Null
+    $handle=$null;$deadline=[DateTime]::UtcNow.AddSeconds(30)
+    while ($null -eq $handle) {
+        try {$handle=[IO.File]::Open(($root+'.owner.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)}
+        catch [IO.IOException] {if([DateTime]::UtcNow -ge $deadline){throw 'scoop: another owner operation holds the installation lock'};Start-Sleep -Milliseconds 100}
+    }
+    try {Invoke-ScoopBusinessUnlocked -InstallerArguments $InstallerArguments} finally {$handle.Dispose()}
 }
 
 $script:ScoopEntryArguments = @($args)

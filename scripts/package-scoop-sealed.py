@@ -7,9 +7,9 @@ from pathlib import Path
 import tempfile
 import zipfile
 
-RUNTIME_ID = "0.7.16-08aea475819b8037977684c7fbbde2ae40bb1b96-windows-amd64"
+RUNTIME_ID = "0.9.1-market.238d13be-windows-amd64"
 LOCKS = {
-    "runtime-bundle.zip": (38021762, "66fa51769556b8d52289f354d3e43952338814b6ef357b04868f829fc1c5c4dc"),
+    "runtime-bundle.zip": (24149573, "e2163542c5edf03327df537be56df9b17ebf22d0eacaafb93cd9ccef7d19bb9a"),
     "scoop-core.zip": (1289426, "fa96b15950f3726d2c9a35493e192eefe56d2eddba718e8121c32f7a19257a0a"),
     "scoop-main.zip": (1266906, "4287b169ce39f3a6566da666ce3c8b73f450c887d9a71481485b2ad2ca951636"),
 }

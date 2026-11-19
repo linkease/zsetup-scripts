@@ -12,9 +12,11 @@
   },
   "applications": {
     "scoop": {
-      "minimum_runtime": "0.4.0",
+      "minimum_runtime": "0.6.5",
       "source_directory": "scoop",
-      "public_entries": ["scoop/scoop-install.ps1"]
+      "public_entries": [
+        "scoop/scoop-install.ps1"
+      ]
     }
   }
 }
