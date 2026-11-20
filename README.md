@@ -3,6 +3,10 @@
 DDNSTO 推荐版本更新、验收、发布和回滚统一遵循 [发布 SOP](docs/ddnsto-release-sop.md)，
 每次使用其链接的发布记录模板留存证据。
 
+2026-11-20 本地迁移方案：[独立安装域名与业务环境](docs/ddnsto-install-deployment.md)。
+DDNSTO 安装站点由本仓库单独打包；控制台固定引用 install.ddnsto.com，
+测试参数只切换客户端业务环境，不切换脚本推荐渠道。域名尚未部署。
+
 DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
 [`ddnsto/platform-releases.json`](ddnsto/platform-releases.json)，支持各平台独立版本。
 修改后执行 `python3 -B scripts/build-entrypoints.py`，再审核发布；设备端不增加配置解析依赖。

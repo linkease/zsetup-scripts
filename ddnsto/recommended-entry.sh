@@ -123,9 +123,10 @@ if [ -n "$busybox_tools" ]; then
     export PATH
 fi
 # A narrow bootstrap transport, not a zsetup replacement. Do not execute a
-# caller-supplied/downloading zsetup just to ask its version. Reject ALL redirects.
+# caller-supplied/downloading zsetup just to ask its version. Curl follows at
+# most five HTTPS-only redirects; wget safely refuses redirects (see below).
 # ulimit bounds even chunked bodies on older curl; max-filesize adds exact limits.
-# Kept identical in the three standalone DDNSTO bootstrap sources; tested together.
+# Recommendation transport policy is independent of executor bootstrap policy.
 # Only installer/native bootstrap uses this transport. Products use zsetup.
 ddnsto_https_fetch() (
     case "$1" in https://*) ;; *) return 42 ;; esac
@@ -137,6 +138,7 @@ ddnsto_https_fetch() (
     code=0 status=
     if command -v curl >/dev/null 2>&1; then
         status=$(curl -q --silent --proto '=https' --proto-redir '=https' \
+            --location --max-redirs 5 \
             --connect-timeout 5 --max-time 20 --max-filesize "$limit" \
             --output "$destination" --write-out '%{http_code}' "$url" 2>/dev/null) || code=$?
         case "$code" in 0) ;; 6|7|28) return 41 ;; *) return 42 ;; esac
@@ -202,6 +204,13 @@ ddnsto_https_fetch() (
             case "${1:-}" in HTTP/*) status=${2:-} ;; esac
         done < "$log"
         [ "$tls_error" = 0 ] || return 42
+        # GNU wget --https-only governs recursive link selection, not redirect
+        # schemes. Keep max-redirect=0: never contact an HTTP Location, and do
+        # not turn a refused redirect into an availability/cache fallback.
+        case "$status" in 301|302|303|307|308)
+            printf '%s\n' 'DDNSTO：下载地址需要重定向，wget 已安全拒绝；请安装 curl 后重试（最多五次 HTTPS 跳转，不允许降级 HTTP）' >&2
+            return 42 ;;
+        esac
         case "$code" in 0|8)
             case "$status" in 404|500|502|503|504) return 41 ;; esac ;;
         esac

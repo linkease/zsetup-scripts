@@ -58,10 +58,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.flush()
                 time.sleep(7)  # Exceeds the production 5s body-read timeout.
                 return
-            if status == 302:
+            if status in (301, 302):
                 self.send_header('Location', body.decode())
             self.end_headers()
-            if status != 302:
+            if status not in (301, 302):
                 self.wfile.write(body)
             return
         super().do_GET()
@@ -549,7 +549,7 @@ mktemp() { return 99; }
                 self.assertNotEqual(self.run_entry().returncode, 0)
                 self.assertFalse((self.work / 'args').exists())
 
-    def test_redirects_rejected_even_with_cache(self):
+    def test_unsafe_or_looping_redirects_rejected_even_with_cache(self):
         self.prepare()
         self.assertEqual(self.run_entry().returncode, 0)
         (self.work / 'args').unlink()
@@ -620,7 +620,7 @@ class PowerShellReview(Recommendation):
     TLS, streaming reads, manifest parsing and SHA verification are real .NET.
     These tests do not claim Windows filesystem ACL enforcement coverage.
     """
-    def ps_run(self, body, *, acl=False):
+    def ps_run(self, body, *, acl=False, args=()):
         source = (ROOT / 'ddnsto/recommended-entry.ps1').read_text()
         # Definitions only: never enter the Windows installer main function.
         definitions = source.split('\ntry {\n', 1)[0]
@@ -629,7 +629,7 @@ class PowerShellReview(Recommendation):
                 '[Security.Principal.WindowsIdentity]::GetCurrent().User.Value', "'S-1-5-21-1000'")
         script = self.work / 'review.ps1'
         script.write_text(definitions + '\n' + body, encoding='utf-8-sig')
-        return subprocess.run([PWSH, '-NoProfile', '-NonInteractive', '-File', str(script)],
+        return subprocess.run([PWSH, '-NoProfile', '-NonInteractive', '-File', str(script), *args],
                               env=dict(self.env, SSL_CERT_FILE=str(self.cert),
                                        TEST_BASE=self.base + '/release', TEST_WORK=str(self.work)),
                               capture_output=True, text=True, timeout=25)
@@ -783,7 +783,7 @@ class WindowsRecommendation(Recommendation):
     def test_windows_redirects(self):
         self.prepare()
         self.assertEqual(self.run_entry().returncode, 0)
-        for target in ['http://localhost/evil', self.base + '/anything', 'file:///C:/Windows']:
+        for target in ['http://localhost/evil', self.base + '/release/recommended-powershell.txt', 'file:///C:/Windows']:
             self.server.modes['/release/recommended-powershell.txt'] = (302, target.encode())
             self.assertNotEqual(self.run_entry().returncode, 0)
 

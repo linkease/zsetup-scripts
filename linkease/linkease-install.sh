@@ -1388,7 +1388,8 @@ installer_privilege_install() {
             # Older adapters retain their original token-only protocol.
             if command -v ddnsto_privilege_args >/dev/null 2>&1; then
                 ddnsto_privilege_args || return $?
-                set -- --action "$DDNSTO_ROOT_ACTION"
+                set -- --action "$DDNSTO_ROOT_ACTION" --env "$DDNSTO_ROOT_ENV"
+                [ "$DDNSTO_ROOT_SWITCH_ENVIRONMENT" != 1 ] || set -- "$@" --switch-environment
                 [ -z "$DDNSTO_ROOT_TOKEN" ] || set -- "$@" --token "$DDNSTO_ROOT_TOKEN"
             else
                 set -- --token "$TOKEN"

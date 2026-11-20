@@ -2,6 +2,8 @@
 """Execute the installer with isolated native-download/launchd boundaries."""
 import os
 import hashlib
+import importlib.util
+import json
 from pathlib import Path
 import plistlib
 import pty
@@ -10,6 +12,7 @@ import time
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'install-macos.sh'
 
@@ -19,6 +22,16 @@ class MacInstaller(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
+        repository = Path(__file__).resolve().parents[2]
+        spec = importlib.util.spec_from_file_location('products', repository / 'scripts/build-ddnsto-products.py')
+        builder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(builder)
+        rendered = builder.render(repository, json.loads((repository / 'ddnsto/platform-releases.json').read_text()))
+        script = self.root / 'install-macos.sh'
+        script.write_text(rendered['install-macos.sh'])
+        script_patch = patch(__name__ + '.SCRIPT', script)
+        script_patch.start()
+        self.addCleanup(script_patch.stop)
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         self.install = self.root / 'install'
@@ -97,6 +110,11 @@ print)
   echo $((n+1)) > "$TEST_ROOT/stopping"
  fi
  [ -f "$TEST_ROOT/running" ] || exit 1
+ if [ "${FOREIGN_BUSINESS_ENV:-0}" = 1 ]; then
+  echo 'DDNSTO_TEST_SERVER_ASSIGNMENT_JSON => custom-server'
+ elif [ -f "$TEST_ROOT/loaded.plist" ]; then
+  /usr/bin/python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); v=p.get("EnvironmentVariables",{}).get("DDNSTO_TEST_SERVER_ASSIGNMENT_JSON"); print("DDNSTO_TEST_SERVER_ASSIGNMENT_JSON => " + v if v else "")' "$TEST_ROOT/loaded.plist"
+ fi
  if [ "${STARTUP_DELAY:-0}" = 1 ] && [ "$(wc -l < "$TEST_ROOT/observations")" -lt 3 ]; then
   echo 'state = spawn scheduled'
  else echo 'state = running'; fi
@@ -118,6 +136,7 @@ bootstrap)
   touch "$TEST_ROOT/failed-once"; exit 9
  fi
  touch "$TEST_ROOT/running"
+ cp "$3" "$TEST_ROOT/loaded.plist"
  if [ "${BOOT_IDENTITY:-0}" = 1 ]; then
   printf identity > "$DDNSTO_CONFIG_DIR/.ddnsto_boot.cfg"
   chmod 777 "$DDNSTO_CONFIG_DIR/.ddnsto_boot.cfg"
@@ -797,18 +816,20 @@ printf 200
                 self.assertTrue((self.root / 'running').exists())
                 self.assertFalse((self.root / 'disabled').exists())
 
-    def test_repair_failure_restores_missing_plist_and_disabled_state(self):
+    def test_repair_without_plist_or_loaded_environment_defaults_to_production(self):
         self.assertEqual(self.run_script().returncode, 0)
         plist = self.agents / 'com.ddnsto.client.plist'
         plist.unlink()
         (self.root / 'running').unlink()
         (self.root / 'disabled').touch()
-        result = self.run_script(('--action', 'repair'), FAIL_START='1', FAIL_DOWNLOAD='1')
-        self.assertNotEqual(result.returncode, 0)
-        self.assertTrue((self.root / 'failed-once').exists())
-        self.assertFalse(plist.exists())
-        self.assertTrue((self.root / 'disabled').exists())
-        self.assertFalse((self.root / 'running').exists())
+        config = (self.config / 'ddnsto.yaml').read_bytes()
+        result = self.run_script(('--action', 'repair'), FAIL_DOWNLOAD='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        assignment = plistlib.loads(plist.read_bytes())['EnvironmentVariables']['DDNSTO_TEST_SERVER_ASSIGNMENT_JSON']
+        self.assertEqual(json.loads(assignment)['serverDomain'], 'kooldns.cn')
+        self.assertEqual((self.config / 'ddnsto.yaml').read_bytes(), config)
+        self.assertFalse((self.root / 'disabled').exists())
+        self.assertTrue((self.root / 'running').exists())
 
     def test_lifecycle_rejects_foreign_job_and_marker(self):
         self.assertEqual(self.run_script().returncode, 0)

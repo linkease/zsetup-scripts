@@ -133,8 +133,8 @@ python3 -B scripts/package-ddnsto-recommendation.py \
 推荐清单回滚只影响后续执行安装命令的推荐结果，**不会自动把已升级设备降级**。
 设备恢复必须依据该平台实际事务状态另行处理，不能承诺所有平台都能完整回退安装包。
 
-## 同域部署补充（2026-11-19）
+## 独立安装域名（2026-11-20，替代同域部署方案）
 
-控制台新安装流程现准备在所有构建启用。网站入口由 `ddns-server` 提供，静态资源归属 `ddnsto-static/runtime/py-static/ddnsto-install/`，不要求 Nginx 文件 alias。使用现有推荐打包工具的 `--source-url https://installer.invalid/ddnsto-install/current` 生成跨域名通用模板；网关仅在响应当前 wrapper 和 AI 指南时渲染当前 HTTPS Host，正文仍按 SHA256 保持不可变。
+控制台固定访问 `https://install.ddnsto.com`。本站点内容仅由 `zsetup-scripts` 的 `scripts/package-ddnsto-site.py` 打包，不进入 `ddns-server` 或 `ddnsto-static`，不使用 Host 渲染或 `.invalid` 占位域名。推荐清单打包器继续负责实际执行器审核与摘要，站点打包器只组织完整路径。
 
-先安装正文、再清单/入口、最后控制台；保留历史摘要。测试站旧目录已迁移，旧链接继续保留。运维交接见工作区 `ddnsto-meta/09-playbooks-SOP/DDNSTO一键安装-正式部署说明.md`。独立仓库使用者需向发布负责人获取该交接资料，不能将本说明当作正式发布已完成的证据。
+先安装正文、再清单/入口、最后控制台；保留历史摘要。现有线上文件本轮不清理。业务环境参数不改变脚本下载源；候选脚本测试分发暂未实施。完整边界和发布命令见 [部署模型](ddnsto-install-deployment.md)，本次证据见 [发布记录](verification/2026-11-20-ddnsto-release-install-domain.md)。运维交接在工作区 `ddnsto-meta/09-playbooks-SOP/DDNSTO一键安装-正式部署说明.md`。本轮仅本地修改，不代表上线。

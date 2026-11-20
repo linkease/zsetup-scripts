@@ -15,6 +15,10 @@ REQUESTED_PLATFORM=auto
 REQUESTED_METHOD=auto
 PLAN_ONLY=0
 ACTION=ensure
+BUSINESS_ENV=production
+SWITCH_ENVIRONMENT=0
+mac_plist_env=production
+environment_change=0
 diagnostic_path=
 diagnostic_write_failed=0
 diagnostic_event() {
@@ -61,18 +65,22 @@ fail() {
 }
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --token|--token-file|--version|--platform|--method|--action)
+        --token|--token-file|--version|--platform|--method|--action|--env)
             [ "$#" -ge 2 ] || fail 'argument requires a value'
             case "$1" in --token) TOKEN=$2 ;; --token-file) TOKEN_FILE=$2 ;;
                 --platform) REQUESTED_PLATFORM=$2 ;; --method) REQUESTED_METHOD=$2 ;;
-                --action) ACTION=$2 ;; *) VERSION=$2 ;; esac
+                --action) ACTION=$2 ;; --env) BUSINESS_ENV=$2 ;; *) VERSION=$2 ;; esac
             shift 2 ;;
         --token=*) TOKEN=${1#--token=}; shift ;;
+        --env=*) BUSINESS_ENV=${1#--env=}; shift ;;
+        --switch-environment) SWITCH_ENVIRONMENT=1; shift ;;
         --plan) PLAN_ONLY=1; shift ;;
         --help|-h) printf '%s\n' 'Usage: install-macos.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|uninstall|configure] [--platform auto|macos] [--method auto|native] [--token TOKEN | --token-file FILE] [--version 4.2.8]' '默认 ensure：自动安装、升级或启动同账号服务，保留配置和设备身份，不降级。请传入 Token，不提供交互菜单。' 'configure 显式更换 Token；uninstall 保留配置和身份。'; exit 0 ;;
         *) fail 'unknown argument' ;;
     esac
 done
+case "$BUSINESS_ENV" in production|test) ;; *) fail '--env must be test or production' ;; esac
+mac_plist_env=$BUSINESS_ENV
 [ "$(uname -s)" = Darwin ] || fail 'this installer requires macOS'
 case "$REQUESTED_PLATFORM" in auto|macos) ;; *) fail 'platform mismatch: this device is macos' ;; esac
 case "$REQUESTED_METHOD" in auto|native) ;; docker) fail 'Docker installer is not available for macOS' ;; *) fail 'unknown installation method' ;; esac
@@ -144,6 +152,9 @@ check_account() {
     # alternate documents or quoted keys make ownership ambiguous.
     [ "$(grep -c 'userToken' "$config")" = 1 ] &&
         grep -F -x -q -- "$token_line" "$config" || fail '账号不一致或 Token 配置不明，已停止'
+    check_config_shape
+}
+check_config_shape() {
     # A flat mapping is the format we write. Do not interpret escaped keys,
     # explicit keys or multiline YAML as proof of account ownership.
     awk '/^[A-Za-z][A-Za-z0-9_]*:/ {next}
@@ -224,6 +235,54 @@ stable_running() {
     fail '本地服务在 30 秒观察窗口内未稳定运行，请检查本地日志' 1
 }
 xml() { printf '%s' "$1" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
+mac_environment_xml() {
+    case "$mac_plist_env" in
+        legacy) return 0 ;;
+        production) assignment='{"serverDomain":"kooldns.cn","legacyControlAddr":"tunnel.kooldns.cn:4445"}' ;;
+        test) assignment='{"serverDomain":"toany.net","legacyControlAddr":"tunnel.toany.net:4445","controlWssURLs":["wss://web.toany.net:9445/ws/control"],"publicWssURLs":["wss://web.toany.net:9445/__ws/public"]}' ;;
+    esac
+    printf '<key>EnvironmentVariables</key><dict><key>DDNSTO_TEST_SERVER_ASSIGNMENT_JSON</key><string>%s</string></dict>' "$(xml "$assignment")"
+}
+check_loaded_environment() {
+    # Compare with the CURRENT authenticated definition, not the requested
+    # target, so an explicitly authorized switch can inspect the old job.
+    expected_assignment=
+    if [ ! -f "$plist" ]; then
+        # Repair may recover a removed definition from the still-loaded owned
+        # job. Its program/path/config have already been authenticated.
+        for job_environment in production test; do
+            loaded_assignment=$(mac_plist_env=$job_environment; mac_environment_xml >/dev/null; printf '%s' "$assignment")
+            if printf '%s\n' "$normalized" | grep -F -x -q "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON => $loaded_assignment"; then
+                if [ "$job_environment" != "$BUSINESS_ENV" ]; then
+                    [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '已加载服务的业务环境不同；确认后使用 --switch-environment'
+                    environment_change=1
+                fi
+                return 0
+            fi
+        done
+        if printf '%s\n' "$normalized" | grep -F -q DDNSTO_TEST_SERVER_ASSIGNMENT_JSON; then
+            fail '服务定义缺失且加载环境无法确认；未修改设备'
+        fi
+        if [ "$BUSINESS_ENV" != production ]; then
+            [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '已加载服务默认 production；确认后使用 --switch-environment'
+            environment_change=1
+        fi
+        return 0
+    fi
+    for job_environment in production test; do
+        expected_xml=$(mac_plist_env=$job_environment; mac_environment_xml)
+        if grep -F -x -q "$expected_xml" "$plist"; then
+            expected_assignment=$(mac_plist_env=$job_environment; mac_environment_xml >/dev/null; printf '%s' "$assignment")
+            break
+        fi
+    done
+    if [ -n "$expected_assignment" ]; then
+        printf '%s\n' "$normalized" | grep -F -x -q "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON => $expected_assignment" ||
+            fail '已加载服务的业务环境与受管定义不同；未修改设备，请核对 launchd 状态'
+    elif printf '%s\n' "$normalized" | grep -F -q DDNSTO_TEST_SERVER_ASSIGNMENT_JSON; then
+        fail '历史服务继承了未确认的业务环境；未修改设备'
+    fi
+}
 managed_plist() {
     cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -231,6 +290,7 @@ managed_plist() {
 <key>Label</key><string>$LABEL</string>
 <key>ProgramArguments</key><array><string>$(xml "$binary")</string><string>--config</string><string>$(xml "$config")</string></array>
 <key>WorkingDirectory</key><string>$(xml "$CONFIG_DIR")</string>
+$(mac_environment_xml)
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
 <key>StandardOutPath</key><string>$(xml "$CONFIG_DIR/stdout.log")</string>
 <key>StandardErrorPath</key><string>$(xml "$CONFIG_DIR/stderr.log")</string>
@@ -257,13 +317,20 @@ check_state() {
     check_runtime_identity
     if [ -e "$binary" ] || [ -e "$config" ] || [ -e "$plist" ] || [ -e "$marker" ] || [ -e "$receipt" ] || [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then
         [ -f "$marker" ] && [ -f "$config" ] || fail 'existing unmanaged or incomplete installation'
+        retained_environment=
         case "$(cat "$marker")" in
             ddnsto-macos-v1) state=installed ;;
-            ddnsto-macos-v1-retained) state=retained ;;
+            ddnsto-macos-v1-retained) state=retained; retained_environment=production ;;
+            ddnsto-macos-v1-retained:production) state=retained; retained_environment=production ;;
+            ddnsto-macos-v1-retained:test) state=retained; retained_environment=test ;;
             *) fail 'unrecognized ownership marker' ;;
         esac
         if [ "$state" = retained ]; then
             [ ! -e "$binary" ] && [ ! -e "$plist" ] || fail 'retained installation contains unexpected files'
+            if [ -n "$retained_environment" ] && [ "$retained_environment" != "$BUSINESS_ENV" ]; then
+                [ "$SWITCH_ENVIRONMENT" = 1 ] && [ "$ACTION" = install ] || fail '保留配置的业务环境不同；确认重新安装并切换后使用 --switch-environment'
+                environment_change=1
+            fi
         else
             [ -f "$binary" ] || fail 'managed binary missing'
             if [ ! -f "$plist" ]; then
@@ -275,19 +342,50 @@ check_state() {
                 # misses duplicate keys, environment and working-directory edits.
                 # Preserve the existing repair contract for a disabled KeepAlive.
                 actual_plist=$(sed 's,<key>KeepAlive</key><false/>,<key>KeepAlive</key><true/>,' "$plist")
-                [ "$actual_plist" = "$(managed_plist)" ] || fail 'existing unmanaged plist; migrate it before retrying'
+                existing_environment=
+                for mac_plist_env in production test legacy; do
+                    expected_plist=$(managed_plist)
+                    # Historical plist has no blank environment line.
+                    [ "$mac_plist_env" != legacy ] || expected_plist=$(printf '%s\n' "$expected_plist" | sed '/^$/d')
+                    if [ "$actual_plist" = "$expected_plist" ]; then existing_environment=$mac_plist_env; break; fi
+                done
+                mac_plist_env=$BUSINESS_ENV
+                [ -n "$existing_environment" ] || fail 'existing unmanaged plist; migrate it before retrying'
+                if [ "$existing_environment" = legacy ]; then
+                    existing_environment=production
+                fi
+                if [ "$existing_environment" != "$BUSINESS_ENV" ]; then
+                    [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '业务环境不同；确认切换后使用 --switch-environment；未修改设备'
+                    case "$ACTION" in install|update|repair) ;; *) fail '环境切换需要 ensure/install/update/repair，维护动作不会隐式切换' ;; esac
+                    environment_change=1
+                fi
             fi
         fi
     fi
-    if [ "$state" != absent ] && [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then
+    if [ -f "$config" ]; then
+        check_config_shape
+        if grep -E -i -q '^[[:space:]]*(remote_?addr|server_?addr|serverAssignment|serverDomain|bootConfigPath)[[:space:]]*:' "$config"; then
+            fail '配置包含自定义服务器或启动记录路径，业务环境无法确认；未修改设备'
+        fi
+    fi
+    if [ "$state" != absent ] && { [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ] ||
+        { [ ! -f "$plist" ] && [ -z "${retained_environment:-}" ]; }; }; then
         # Confirm both the installation and any loaded job before chmod.
         # Preserve identity bytes and avoid restarting an already healthy job.
         check_job
-        protect_runtime_identity
+        if [ ! -f "$plist" ] && [ -z "${retained_environment:-}" ] && [ "$job_present" = 0 ]; then
+            if [ "$BUSINESS_ENV" != production ]; then
+                [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '历史安装默认 production；确认后使用 --switch-environment'
+                environment_change=1
+            fi
+        fi
+        if [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then protect_runtime_identity; fi
     fi
 }
 check_job() {
+    job_present=0
     job=$(launchctl print "$domain/$LABEL" 2>/dev/null) || return 0
+    job_present=1
     [ "$state" = installed ] || fail 'existing unmanaged launchd job'
     validate_job
 }
@@ -297,6 +395,7 @@ validate_job() {
     printf '%s\n' "$normalized" | grep -F -x -q "program = $binary" &&
     printf '%s\n' "$normalized" | grep -F -x -q "path = $plist" &&
     printf '%s\n' "$normalized" | grep -F -x -q "$config" || fail 'existing unmanaged launchd job'
+    check_loaded_environment
 }
 check_state
 if [ "$default_install" = 1 ]; then
@@ -402,7 +501,7 @@ uninstall_managed() (
     wait_job_unloaded
     removed=1
     rm -f "$binary" "$plist"
-    printf '%s\n' 'ddnsto-macos-v1-retained' > "$marker"
+    printf 'ddnsto-macos-v1-retained:%s\n' "$BUSINESS_ENV" > "$marker"
     printf '%s\n' 'operation=uninstall local_service=not-installed configuration=retained cloud_status=unverified' '卸载完成：保留配置、设备身份和日志。默认重装请传入原账号 Token。'
 )
 manage_service() (
@@ -487,7 +586,7 @@ if [ "$state" = installed ] && { [ "$ACTION" = install ] || [ "$ACTION" = update
     check_version
     if [ "$older" = 0 ] && { [ "$ACTION" = install ] || [ "$installed_version" != "$VERSION" ]; }; then
         # Repair the owned definition as needed, without replacing newer bytes.
-        if [ ! -f "$plist" ] || [ "$(cat "$plist")" != "$(managed_plist)" ]; then
+        if [ "$environment_change" = 1 ] || [ ! -f "$plist" ] || [ "$(cat "$plist")" != "$(managed_plist)" ]; then
             ACTION=repair
         else
             ACTION=start

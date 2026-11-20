@@ -35,7 +35,8 @@ ddnsto_package_restore() {
 ddnsto_register() {
     if [ "${ACTION:-install}" = update ]; then
         SERVICE_CONFIG_TOUCHED=0
-        ddnsto_managed_rewrite_unit
+        ddnsto_managed_rewrite_unit || return $?
+        ddnsto_linux_register_environment
         return $?
     fi
     # Rebinding requires explicit configure, never a repeated install.
@@ -43,7 +44,21 @@ ddnsto_register() {
         ddnsto_error 'already installed; use update to preserve identity or configure to change Token'
         return 2
     fi
-    installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -u "$TOKEN" -daemon
+    business_assignment=$(ddnsto_business_assignment "${BUSINESS_ENV:-production}") || return 2
+    if [ "${BUSINESS_ENV:-production}" = production ]; then
+        # Preserve legacy registration without adding jq to production installs.
+        # Pin the launch assignment rather than inheriting the caller's test value.
+        installer_exec_native "$ZSETUP_BIN" run -- env "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment" "$SERVICE_EXEC" -u "$TOKEN" -daemon || return $?
+        ddnsto_linux_register_environment
+        return $?
+    fi
+    # Test registration must not start before its systemd environment is written.
+    command -v jq >/dev/null 2>&1 || { ddnsto_error '测试环境首次安装需要 jq；未启动服务'; return 2; }
+    installer_exec_native "$ZSETUP_BIN" run -- env "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment" "$SERVICE_EXEC" install -u "$TOKEN" || return $?
+    mkdir -p "${SERVICE_CONFIG%/*}" || return 12
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_CONFIG" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- jq -n --arg token "$TOKEN" '{token:$token, routeridx:0, supplierCode:""}' || return $?
+    chmod 0600 "$SERVICE_CONFIG" || return 12
+    ddnsto_linux_register_environment
 }
 
 ddnsto_openwrt() {
@@ -111,6 +126,9 @@ ddnsto_openwrt_apply_packages() {
 }
 
 ddnsto_linux_metadata() {
+    if [ "${BUSINESS_ENV:-production}" = test ] && [ "${ACTION:-install}" != update ]; then
+        command -v jq >/dev/null 2>&1 || { ddnsto_error '测试环境首次安装需要 jq，请先通过系统包管理器安装；未修改服务'; return 2; }
+    fi
     case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
     [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
@@ -146,11 +164,13 @@ ddnsto_linux() {
         mkdir -p "$transaction_dir/products"
         installer_extract_member "$transaction_dir/products/ddnsto" tar -xOzf "$archive_path" "ddnsto-standard-$version_num/ddnsto.$arch" || return $?
         chmod 0755 "$transaction_dir/products/ddnsto"
+        ddnsto_linux_environment_capability "$transaction_dir/products/ddnsto" || return $?
         installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/products/ddnsto" -v || return $?
         installer_service_stage || return $?
         installer_service_copy ddnsto || return $?
         installer_service_commit_version || return $?
     else
+        ddnsto_linux_environment_capability "$SERVICE_EXEC" || return $?
         installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -v || return $?
     fi
     status '[4/4] Installing and checking the DDNSTO system service...'
@@ -167,6 +187,7 @@ ddnsto_install() {
     arch=${ZSETUP_ARCH:-$("$ZSETUP_BIN" context get arch)}
     ddnsto_detect_platform || return $?
     ddnsto_validate_platform_options || return $?
+    ddnsto_business_environment_preflight || return $?
     [ "$REQUESTED_METHOD" != docker ] || { ddnsto_error 'Docker requires the public entry'; return 2; }
     case "$detected_platform" in linux|openwrt) business_platform=$detected_platform ;; *) ddnsto_error 'native installation unavailable for this device'; return 2 ;; esac
     case "$ACTION" in

@@ -1,5 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
+. (Join-Path $PSScriptRoot 'windows_task_fixture.ps1')
 function Assert($Ok, $Message) { if (-not $Ok) { throw $Message } }
 function Assert-DDNSTOPlatform {}
 function Receive-DDNSTOCandidate { throw 'unexpected download' }
@@ -17,11 +18,9 @@ try {
     foreach ($name in @('ddnsto_cli.x86_64.exe', 'ddnsto.yaml')) {
         [IO.File]::WriteAllText((Join-Path $root $name), 'unchanged')
     }
-    $script:task = [pscustomobject]@{ State = 'Running'; Actions = @([pscustomobject]@{
-        Execute = (Join-Path $root 'ddnsto_cli.x86_64.exe')
-        Arguments = ('--config "' + (Join-Path $root 'ddnsto.yaml') + '"')
-        WorkingDirectory = $root
-    }) }
+    $originalConfig = "# ddnsto-business-environment-v1=production`nuserToken: 'unchanged'`n"
+    [IO.File]::WriteAllText((Join-Path $root 'ddnsto.yaml'), $originalConfig)
+    $script:task = [pscustomobject]@{ State = 'Running'; Actions = @(New-DDNSTOFixtureAction (Join-Path $root 'ddnsto_cli.x86_64.exe') (Join-Path $root 'ddnsto.yaml') $root) }
     $script:enabled = $true
     $script:confirmed = 0
     foreach ($action in @('status', 'stop', 'start', 'restart')) {
@@ -30,7 +29,7 @@ try {
         if ($action -in @('start','restart')) { Assert ($result -match '启动成功') 'manual start needs Chinese success' }
         Assert (($result -join "`n") -match 'cloud_status=unverified') 'missing independent cloud status'
         Assert ($script:enabled -eq ($action -ne 'stop')) 'wrong startup state'
-        Assert (([IO.File]::ReadAllText((Join-Path $root 'ddnsto.yaml'))) -eq 'unchanged') 'changed config'
+        Assert (([IO.File]::ReadAllText((Join-Path $root 'ddnsto.yaml'))) -ceq $originalConfig) 'changed config'
     }
     foreach ($args in @(@{TokenFile='missing'}, @{Plan=$true}, @{Method='docker'})) {
         $failed = $false

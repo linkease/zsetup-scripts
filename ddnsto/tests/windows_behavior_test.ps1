@@ -1,6 +1,7 @@
 # Run with pwsh or Windows PowerShell 5.1. Native OS/task APIs are isolated.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
+. (Join-Path $PSScriptRoot 'windows_task_fixture.ps1')
 if (-not (Get-Command Invoke-DDNSTOInstall -ErrorAction SilentlyContinue)) { throw 'missing transactional installer' }
 function Assert($Condition, $Message) { if (-not $Condition) { throw $Message } }
 function Assert-DDNSTOPlatform { }
@@ -19,16 +20,12 @@ function Stop-DDNSTOTask { $script:Stopped = $true; $script:Task.State = 'Ready'
 function Remove-DDNSTOTask { $script:Task = $null }
 function Register-DDNSTOTask($Binary, $Config, $Directory) {
     Assert ($null -eq $script:Task -or $script:Stopped) 'must stop old task before replacing it'
-    $script:Task = [pscustomobject]@{ State = 'Ready'; Actions = @([pscustomobject]@{
-        Execute = $Binary; Arguments = ('--config "' + $Config + '"'); WorkingDirectory = $Directory
-    }) }
+    $script:Task = [pscustomobject]@{ State = 'Ready'; Actions = @(New-DDNSTOFixtureAction $Binary $Config $Directory) }
     $script:TaskXml = 'new task'
 }
 function Restore-DDNSTOTask($Xml) {
     $script:TaskXml = $Xml
-    $script:Task = [pscustomobject]@{ State = 'Ready'; Actions = @([pscustomobject]@{
-        Execute = (Join-Path $root 'ddnsto_cli.x86_64.exe'); Arguments = ('--config "' + (Join-Path $root 'ddnsto.yaml') + '"'); WorkingDirectory = $root
-    }) }
+    $script:Task = [pscustomobject]@{ State = 'Ready'; Actions = @(New-DDNSTOFixtureAction (Join-Path $root 'ddnsto_cli.x86_64.exe') (Join-Path $root 'ddnsto.yaml') $root) }
 }
 function Start-DDNSTOTask {
     if ($script:StartFail) { $script:StartFail = $false; throw 'fixture start failure' }

@@ -19,7 +19,7 @@ class AutoLinux(unittest.TestCase):
     def invoke(self, token='old'):
         Path('/run/systemd/system').mkdir(parents=True, exist_ok=True)
         sources = ['lib/install-storage.sh', 'lib/install-bounds.sh', 'lib/install-transaction.sh',
-                   'lib/install-service.sh', 'ddnsto/product-pins.sh', 'ddnsto/business.sh',
+                   'lib/install-service.sh', 'ddnsto/product-pins.sh', 'ddnsto/managed-cli.sh', 'ddnsto/business.sh',
                    'ddnsto/managed-service.sh', 'ddnsto/auto-install.sh', 'ddnsto/auto-linux.sh']
         script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in sources)
         script += '''

@@ -2,7 +2,9 @@
 # native executable are used to establish trust. Lifecycle belongs to install.ps1.
 param([string]$Token, [string]$TokenFile, [string]$Version,
       [string]$InstallDir, [string]$Platform, [string]$Method,
-      [switch]$Plan, [string]$Action)
+      [switch]$Plan, [string]$Action,
+      [ValidateSet('test', 'production')][string]$Environment,
+      [switch]$SwitchEnvironment)
 Set-PSDebug -Off
 $ErrorActionPreference = 'Stop'
 $forward = @{} + $PSBoundParameters
@@ -78,19 +80,40 @@ function New-PrivateDirectory([string]$Path) {
 
 function Receive-Bounded([string]$Url, [string]$Path, [int]$Limit) {
     $response = $null; $stream = $null; $file = $null
+    $timer = [Diagnostics.Stopwatch]::StartNew()
     try {
-        $request = [Net.HttpWebRequest]::Create($Url)
-        $request.AllowAutoRedirect = $false
-        $request.Timeout = 20000
-        $request.ReadWriteTimeout = 5000
-        try { $response = $request.GetResponse() }
-        catch [Net.WebException] {
-            if ($_.Exception.Response) { $response = $_.Exception.Response }
-            elseif ($_.Exception.Status -in @([Net.WebExceptionStatus]::NameResolutionFailure,
-                        [Net.WebExceptionStatus]::ConnectFailure, [Net.WebExceptionStatus]::Timeout)) { return $false }
-            else { Stop-Recommendation 'HTTPS 校验失败' '检查证书和网络' }
+        $target = [Uri]$Url
+        $redirects = 0
+        while ($true) {
+            # Validate BEFORE creating any request, including relative Location
+            # resolution. TLS validation remains the platform default.
+            if (-not $target.IsAbsoluteUri -or $target.Scheme -ne 'https' -or $target.UserInfo) {
+                Stop-Recommendation '重定向地址不安全' '只允许 HTTPS 下载地址' }
+            $remaining = 20000 - [int]$timer.ElapsedMilliseconds
+            if ($remaining -le 0) { return $false }
+            $request = [Net.HttpWebRequest]::Create($target)
+            $request.AllowAutoRedirect = $false
+            $request.Timeout = $remaining
+            $request.ReadWriteTimeout = [Math]::Min(5000, $remaining)
+            try { $response = $request.GetResponse() }
+            catch [Net.WebException] {
+                if ($_.Exception.Response) { $response = $_.Exception.Response }
+                elseif ($_.Exception.Status -in @([Net.WebExceptionStatus]::NameResolutionFailure,
+                            [Net.WebExceptionStatus]::ConnectFailure, [Net.WebExceptionStatus]::Timeout)) { return $false }
+                else { Stop-Recommendation 'HTTPS 校验失败' '检查证书和网络' }
+            }
+            $status = [int]$response.StatusCode
+            if ($status -notin @(301, 302, 303, 307, 308)) { break }
+            if ($redirects -ge 5) {
+                Stop-Recommendation '重定向次数超过限制' '检查发布地址，最多允许五次跳转' }
+            $location = $response.Headers['Location']
+            if ([string]::IsNullOrWhiteSpace($location)) {
+                Stop-Recommendation '重定向地址缺失' '检查发布配置' }
+            try { $target = [Uri]::new($target, $location) }
+            catch { Stop-Recommendation '重定向地址非法' '检查发布配置' }
+            $redirects++
+            $response.Close(); $response = $null
         }
-        $status = [int]$response.StatusCode
         if ($status -in @(404, 500, 502, 503, 504)) { return $false }
         if ($status -ne 200 -or $response.ContentLength -gt $Limit) {
             Stop-Recommendation '推荐源响应异常' '检查发布路径、大小及重定向' }
@@ -98,7 +121,6 @@ function Receive-Bounded([string]$Url, [string]$Path, [int]$Limit) {
         $file = [IO.File]::Open($Path, 'Create', 'Write', 'None')
         $buffer = New-Object byte[] 8192
         $total = 0
-        $timer = [Diagnostics.Stopwatch]::StartNew()
         while ($true) {
             try { $count = $stream.Read($buffer, 0, [Math]::Min($buffer.Length, $Limit - $total + 1)) }
             catch {

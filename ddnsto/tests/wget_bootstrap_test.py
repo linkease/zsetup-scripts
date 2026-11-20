@@ -227,14 +227,20 @@ exit 4
                 os.killpg(process.pid, signal.SIGKILL)
                 process.communicate()
 
-    def test_standalone_transport_copies_stay_identical(self):
+    def test_executor_transports_identical_recommendation_redirects_scoped(self):
         copies = []
         for source in ('recommended-entry.sh', 'bootstrap-policy.sh', 'install-macos.sh'):
             text = (ROOT / 'ddnsto' / source).read_text()
             start = text.index('ddnsto_https_fetch() (')
             copies.append(text[start:text.index('\n)\n', start) + 3])
-        self.assertEqual(copies[0], copies[1])
-        self.assertEqual(copies[0], copies[2])
+        # The recommendation entry now follows bounded HTTPS redirects with
+        # curl. Executor/native transports are intentionally unchanged.
+        self.assertEqual(copies[1], copies[2])
+        self.assertIn('--location --max-redirs 5', copies[0])
+        self.assertNotIn('--location', copies[1])
+        for transport in copies:
+            self.assertIn("--proto '=https' --proto-redir '=https'", transport)
+            self.assertIn('--https-only --max-redirect=0', transport)
 
     def test_macos_cold_bootstrap_with_real_wget_and_no_curl(self):
         case = mac_fixture.MacInstaller()

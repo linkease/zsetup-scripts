@@ -18,6 +18,10 @@ REQUESTED_PLATFORM=auto
 REQUESTED_METHOD=auto
 PLAN_ONLY=0
 ACTION=ensure
+BUSINESS_ENV=production
+SWITCH_ENVIRONMENT=0
+mac_plist_env=production
+environment_change=0
 diagnostic_path=
 diagnostic_write_failed=0
 diagnostic_event() {
@@ -64,18 +68,22 @@ fail() {
 }
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --token|--token-file|--version|--platform|--method|--action)
+        --token|--token-file|--version|--platform|--method|--action|--env)
             [ "$#" -ge 2 ] || fail 'argument requires a value'
             case "$1" in --token) TOKEN=$2 ;; --token-file) TOKEN_FILE=$2 ;;
                 --platform) REQUESTED_PLATFORM=$2 ;; --method) REQUESTED_METHOD=$2 ;;
-                --action) ACTION=$2 ;; *) VERSION=$2 ;; esac
+                --action) ACTION=$2 ;; --env) BUSINESS_ENV=$2 ;; *) VERSION=$2 ;; esac
             shift 2 ;;
         --token=*) TOKEN=${1#--token=}; shift ;;
+        --env=*) BUSINESS_ENV=${1#--env=}; shift ;;
+        --switch-environment) SWITCH_ENVIRONMENT=1; shift ;;
         --plan) PLAN_ONLY=1; shift ;;
         --help|-h) printf '%s\n' 'Usage: install-macos.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|uninstall|configure] [--platform auto|macos] [--method auto|native] [--token TOKEN | --token-file FILE] [--version 4.2.8]' '默认 ensure：自动安装、升级或启动同账号服务，保留配置和设备身份，不降级。请传入 Token，不提供交互菜单。' 'configure 显式更换 Token；uninstall 保留配置和身份。'; exit 0 ;;
         *) fail 'unknown argument' ;;
     esac
 done
+case "$BUSINESS_ENV" in production|test) ;; *) fail '--env must be test or production' ;; esac
+mac_plist_env=$BUSINESS_ENV
 [ "$(uname -s)" = Darwin ] || fail 'this installer requires macOS'
 case "$REQUESTED_PLATFORM" in auto|macos) ;; *) fail 'platform mismatch: this device is macos' ;; esac
 case "$REQUESTED_METHOD" in auto|native) ;; docker) fail 'Docker installer is not available for macOS' ;; *) fail 'unknown installation method' ;; esac
@@ -147,6 +155,9 @@ check_account() {
     # alternate documents or quoted keys make ownership ambiguous.
     [ "$(grep -c 'userToken' "$config")" = 1 ] &&
         grep -F -x -q -- "$token_line" "$config" || fail '账号不一致或 Token 配置不明，已停止'
+    check_config_shape
+}
+check_config_shape() {
     # A flat mapping is the format we write. Do not interpret escaped keys,
     # explicit keys or multiline YAML as proof of account ownership.
     awk '/^[A-Za-z][A-Za-z0-9_]*:/ {next}
@@ -227,6 +238,54 @@ stable_running() {
     fail '本地服务在 30 秒观察窗口内未稳定运行，请检查本地日志' 1
 }
 xml() { printf '%s' "$1" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
+mac_environment_xml() {
+    case "$mac_plist_env" in
+        legacy) return 0 ;;
+        production) assignment='{"serverDomain":"kooldns.cn","legacyControlAddr":"tunnel.kooldns.cn:4445"}' ;;
+        test) assignment='{"serverDomain":"toany.net","legacyControlAddr":"tunnel.toany.net:4445","controlWssURLs":["wss://web.toany.net:9445/ws/control"],"publicWssURLs":["wss://web.toany.net:9445/__ws/public"]}' ;;
+    esac
+    printf '<key>EnvironmentVariables</key><dict><key>DDNSTO_TEST_SERVER_ASSIGNMENT_JSON</key><string>%s</string></dict>' "$(xml "$assignment")"
+}
+check_loaded_environment() {
+    # Compare with the CURRENT authenticated definition, not the requested
+    # target, so an explicitly authorized switch can inspect the old job.
+    expected_assignment=
+    if [ ! -f "$plist" ]; then
+        # Repair may recover a removed definition from the still-loaded owned
+        # job. Its program/path/config have already been authenticated.
+        for job_environment in production test; do
+            loaded_assignment=$(mac_plist_env=$job_environment; mac_environment_xml >/dev/null; printf '%s' "$assignment")
+            if printf '%s\n' "$normalized" | grep -F -x -q "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON => $loaded_assignment"; then
+                if [ "$job_environment" != "$BUSINESS_ENV" ]; then
+                    [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '已加载服务的业务环境不同；确认后使用 --switch-environment'
+                    environment_change=1
+                fi
+                return 0
+            fi
+        done
+        if printf '%s\n' "$normalized" | grep -F -q DDNSTO_TEST_SERVER_ASSIGNMENT_JSON; then
+            fail '服务定义缺失且加载环境无法确认；未修改设备'
+        fi
+        if [ "$BUSINESS_ENV" != production ]; then
+            [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '已加载服务默认 production；确认后使用 --switch-environment'
+            environment_change=1
+        fi
+        return 0
+    fi
+    for job_environment in production test; do
+        expected_xml=$(mac_plist_env=$job_environment; mac_environment_xml)
+        if grep -F -x -q "$expected_xml" "$plist"; then
+            expected_assignment=$(mac_plist_env=$job_environment; mac_environment_xml >/dev/null; printf '%s' "$assignment")
+            break
+        fi
+    done
+    if [ -n "$expected_assignment" ]; then
+        printf '%s\n' "$normalized" | grep -F -x -q "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON => $expected_assignment" ||
+            fail '已加载服务的业务环境与受管定义不同；未修改设备，请核对 launchd 状态'
+    elif printf '%s\n' "$normalized" | grep -F -q DDNSTO_TEST_SERVER_ASSIGNMENT_JSON; then
+        fail '历史服务继承了未确认的业务环境；未修改设备'
+    fi
+}
 managed_plist() {
     cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -234,6 +293,7 @@ managed_plist() {
 <key>Label</key><string>$LABEL</string>
 <key>ProgramArguments</key><array><string>$(xml "$binary")</string><string>--config</string><string>$(xml "$config")</string></array>
 <key>WorkingDirectory</key><string>$(xml "$CONFIG_DIR")</string>
+$(mac_environment_xml)
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
 <key>StandardOutPath</key><string>$(xml "$CONFIG_DIR/stdout.log")</string>
 <key>StandardErrorPath</key><string>$(xml "$CONFIG_DIR/stderr.log")</string>
@@ -260,13 +320,20 @@ check_state() {
     check_runtime_identity
     if [ -e "$binary" ] || [ -e "$config" ] || [ -e "$plist" ] || [ -e "$marker" ] || [ -e "$receipt" ] || [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then
         [ -f "$marker" ] && [ -f "$config" ] || fail 'existing unmanaged or incomplete installation'
+        retained_environment=
         case "$(cat "$marker")" in
             ddnsto-macos-v1) state=installed ;;
-            ddnsto-macos-v1-retained) state=retained ;;
+            ddnsto-macos-v1-retained) state=retained; retained_environment=production ;;
+            ddnsto-macos-v1-retained:production) state=retained; retained_environment=production ;;
+            ddnsto-macos-v1-retained:test) state=retained; retained_environment=test ;;
             *) fail 'unrecognized ownership marker' ;;
         esac
         if [ "$state" = retained ]; then
             [ ! -e "$binary" ] && [ ! -e "$plist" ] || fail 'retained installation contains unexpected files'
+            if [ -n "$retained_environment" ] && [ "$retained_environment" != "$BUSINESS_ENV" ]; then
+                [ "$SWITCH_ENVIRONMENT" = 1 ] && [ "$ACTION" = install ] || fail '保留配置的业务环境不同；确认重新安装并切换后使用 --switch-environment'
+                environment_change=1
+            fi
         else
             [ -f "$binary" ] || fail 'managed binary missing'
             if [ ! -f "$plist" ]; then
@@ -278,19 +345,50 @@ check_state() {
                 # misses duplicate keys, environment and working-directory edits.
                 # Preserve the existing repair contract for a disabled KeepAlive.
                 actual_plist=$(sed 's,<key>KeepAlive</key><false/>,<key>KeepAlive</key><true/>,' "$plist")
-                [ "$actual_plist" = "$(managed_plist)" ] || fail 'existing unmanaged plist; migrate it before retrying'
+                existing_environment=
+                for mac_plist_env in production test legacy; do
+                    expected_plist=$(managed_plist)
+                    # Historical plist has no blank environment line.
+                    [ "$mac_plist_env" != legacy ] || expected_plist=$(printf '%s\n' "$expected_plist" | sed '/^$/d')
+                    if [ "$actual_plist" = "$expected_plist" ]; then existing_environment=$mac_plist_env; break; fi
+                done
+                mac_plist_env=$BUSINESS_ENV
+                [ -n "$existing_environment" ] || fail 'existing unmanaged plist; migrate it before retrying'
+                if [ "$existing_environment" = legacy ]; then
+                    existing_environment=production
+                fi
+                if [ "$existing_environment" != "$BUSINESS_ENV" ]; then
+                    [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '业务环境不同；确认切换后使用 --switch-environment；未修改设备'
+                    case "$ACTION" in install|update|repair) ;; *) fail '环境切换需要 ensure/install/update/repair，维护动作不会隐式切换' ;; esac
+                    environment_change=1
+                fi
             fi
         fi
     fi
-    if [ "$state" != absent ] && [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then
+    if [ -f "$config" ]; then
+        check_config_shape
+        if grep -E -i -q '^[[:space:]]*(remote_?addr|server_?addr|serverAssignment|serverDomain|bootConfigPath)[[:space:]]*:' "$config"; then
+            fail '配置包含自定义服务器或启动记录路径，业务环境无法确认；未修改设备'
+        fi
+    fi
+    if [ "$state" != absent ] && { [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ] ||
+        { [ ! -f "$plist" ] && [ -z "${retained_environment:-}" ]; }; }; then
         # Confirm both the installation and any loaded job before chmod.
         # Preserve identity bytes and avoid restarting an already healthy job.
         check_job
-        protect_runtime_identity
+        if [ ! -f "$plist" ] && [ -z "${retained_environment:-}" ] && [ "$job_present" = 0 ]; then
+            if [ "$BUSINESS_ENV" != production ]; then
+                [ "$SWITCH_ENVIRONMENT" = 1 ] || fail '历史安装默认 production；确认后使用 --switch-environment'
+                environment_change=1
+            fi
+        fi
+        if [ -e "$CONFIG_DIR/.ddnsto_boot.cfg" ]; then protect_runtime_identity; fi
     fi
 }
 check_job() {
+    job_present=0
     job=$(launchctl print "$domain/$LABEL" 2>/dev/null) || return 0
+    job_present=1
     [ "$state" = installed ] || fail 'existing unmanaged launchd job'
     validate_job
 }
@@ -300,6 +398,7 @@ validate_job() {
     printf '%s\n' "$normalized" | grep -F -x -q "program = $binary" &&
     printf '%s\n' "$normalized" | grep -F -x -q "path = $plist" &&
     printf '%s\n' "$normalized" | grep -F -x -q "$config" || fail 'existing unmanaged launchd job'
+    check_loaded_environment
 }
 check_state
 if [ "$default_install" = 1 ]; then
@@ -405,7 +504,7 @@ uninstall_managed() (
     wait_job_unloaded
     removed=1
     rm -f "$binary" "$plist"
-    printf '%s\n' 'ddnsto-macos-v1-retained' > "$marker"
+    printf 'ddnsto-macos-v1-retained:%s\n' "$BUSINESS_ENV" > "$marker"
     printf '%s\n' 'operation=uninstall local_service=not-installed configuration=retained cloud_status=unverified' '卸载完成：保留配置、设备身份和日志。默认重装请传入原账号 Token。'
 )
 manage_service() (
@@ -490,7 +589,7 @@ if [ "$state" = installed ] && { [ "$ACTION" = install ] || [ "$ACTION" = update
     check_version
     if [ "$older" = 0 ] && { [ "$ACTION" = install ] || [ "$installed_version" != "$VERSION" ]; }; then
         # Repair the owned definition as needed, without replacing newer bytes.
-        if [ ! -f "$plist" ] || [ "$(cat "$plist")" != "$(managed_plist)" ]; then
+        if [ "$environment_change" = 1 ] || [ ! -f "$plist" ] || [ "$(cat "$plist")" != "$(managed_plist)" ]; then
             ACTION=repair
         else
             ACTION=start
@@ -2199,7 +2298,8 @@ installer_privilege_install() {
             # Older adapters retain their original token-only protocol.
             if command -v ddnsto_privilege_args >/dev/null 2>&1; then
                 ddnsto_privilege_args || return $?
-                set -- --action "$DDNSTO_ROOT_ACTION"
+                set -- --action "$DDNSTO_ROOT_ACTION" --env "$DDNSTO_ROOT_ENV"
+                [ "$DDNSTO_ROOT_SWITCH_ENVIRONMENT" != 1 ] || set -- "$@" --switch-environment
                 [ -z "$DDNSTO_ROOT_TOKEN" ] || set -- "$@" --token "$DDNSTO_ROOT_TOKEN"
             else
                 set -- --token "$TOKEN"
@@ -2600,6 +2700,7 @@ ddnsto_usage() {
         '群晖 DSM 7 支持自动安装/升级/启动，需管理员 sudo；其他 NAS/Docker 暂不支持默认自动安装。以下选项用于高级操作。' \
         '华硕软件中心自动识别 rogsoft/armsoft/mtksoft/ipq32soft/ipq64soft/qcasoft；安装后在软件中心管理。' \
         '--plan: read-only local preflight; no downloads, token, or service changes.' \
+        '--env production|test: client business environment (default production); --switch-environment explicitly authorizes a known-environment change.' \
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
         'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
         'Docker: explicit selection only; no automatic native/container migration.' \
@@ -2619,29 +2720,39 @@ ddnsto_parse_args() {
     REQUESTED_METHOD=auto
     PLAN_ONLY=0
     ACTION=ensure
+    BUSINESS_ENV=production
+    SWITCH_ENVIRONMENT=0
+    BUSINESS_ENV_FAILURE=
     OUTPUT_DIR=
     DEVICE_NAME=
     NETWORK=
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            --token|--token-file|--force-version|--platform|--method|--action|--output-dir|--device-name|--network)
+            --token|--token-file|--force-version|--platform|--method|--action|--output-dir|--device-name|--network|--env)
                 [ "$#" -ge 2 ] && [ -n "$2" ] || { ddnsto_error "$1 requires a value"; return 2; }
                 case "$1" in
                     --token) TOKEN=$2 ;; --token-file) TOKEN_FILE=$2 ;;
                     --platform) REQUESTED_PLATFORM=$2 ;; --method) REQUESTED_METHOD=$2 ;;
                     --action) ACTION=$2 ;;
+                    --env) BUSINESS_ENV=$2 ;;
                     --output-dir) OUTPUT_DIR=$2 ;;
                     --device-name) DEVICE_NAME=$2 ;; --network) NETWORK=$2 ;;
                     *) FORCE_VERSION=$2 ;;
                 esac
                 shift 2 ;;
             --token=*) TOKEN=${1#--token=}; [ -n "$TOKEN" ] || return 2; shift ;;
+            --env=*) BUSINESS_ENV=${1#--env=}; shift ;;
+            --switch-environment) SWITCH_ENVIRONMENT=1; shift ;;
             --force-version=*) FORCE_VERSION=${1#--force-version=}; shift ;;
             --verify-status) VERIFY_STATUS=1; shift ;;
             --plan) PLAN_ONLY=1; shift ;;
             *) ddnsto_error 'unknown argument (use --help)'; return 2 ;;
         esac
     done
+    case "$BUSINESS_ENV" in production|test) ;; *) ddnsto_error '--env must be production or test'; return 2 ;; esac
+    if [ "$SWITCH_ENVIRONMENT" = 1 ]; then
+        case "$ACTION" in ensure|install|update) ;; *) ddnsto_error '环境切换仅支持 ensure/install/update；服务维护动作不会隐式切换'; return 2 ;; esac
+    fi
     case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
     case "$REQUESTED_METHOD" in auto|native|docker) ;; *) ddnsto_error 'unknown installation method'; return 2 ;; esac
     [ "$REQUESTED_METHOD" = docker ] || [ -z "$DEVICE_NAME$NETWORK" ] || { ddnsto_error 'device-name/network require explicit Docker'; return 2; }
@@ -2687,6 +2798,71 @@ ddnsto_parse_args() {
     fi
     case "$TOKEN" in *"
 "*|*"$(printf '\r')"*) ddnsto_error 'token must be one line'; return 2 ;; esac
+}
+
+# The client applies this existing assignment override after encrypted boot
+# state. Do not replace identity files or guess a server from the console URL.
+ddnsto_business_assignment() {
+    case "$1" in
+        production) printf '%s\n' '{"serverDomain":"kooldns.cn","legacyControlAddr":"tunnel.kooldns.cn:4445"}' ;;
+        test) printf '%s\n' '{"serverDomain":"toany.net","legacyControlAddr":"tunnel.toany.net:4445","controlWssURLs":["wss://web.toany.net:9445/ws/control"],"publicWssURLs":["wss://web.toany.net:9445/__ws/public"]}' ;;
+        *) return 2 ;;
+    esac
+}
+
+ddnsto_business_error() {
+    BUSINESS_ENV_FAILURE=$1
+    if command -v ddnsto_flow_error >/dev/null 2>&1; then
+        ddnsto_flow_error "$1" "$2" '未更改业务配置；请核对已有服务环境后重试'
+    else
+        ddnsto_error "$1：$2"; return 2
+    fi
+}
+
+ddnsto_business_match() {
+    case "$1" in production|test) ;; *) ddnsto_business_error E_ENV_UNKNOWN '历史配置或服务参数的业务环境无法确认；未更改设备'; return 2 ;; esac
+    [ "$1" = "${BUSINESS_ENV:-production}" ] && return 0
+    [ "${SWITCH_ENVIRONMENT:-0}" = 1 ] || {
+        ddnsto_business_error E_ENV_SWITCH '业务环境不同；确认后使用 --switch-environment；未更改设备'; return 2;
+    }
+}
+
+ddnsto_business_environment_preflight() {
+    case "$detected_platform" in
+        openwrt) ddnsto_business_service_file "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" || return $? ;;
+        synology) ddnsto_business_service_file /var/packages/ddnsto/scripts/start-stop-status || return $? ;;
+        asus)
+            ddnsto_business_service_file /koolshare/scripts/ddnsto_config.sh || return $?
+            ddnsto_business_service_file /koolshare/init.d/S70ddnsto.sh || return $? ;;
+    esac
+    [ "${BUSINESS_ENV:-production}" = test ] || return 0
+    if [ "${REQUESTED_METHOD:-native}" = docker ]; then
+        ddnsto_error 'E_ENV_UNSUPPORTED：现有 Docker 入口未验证 assignment 持久化；未修改容器'; return 2
+    fi
+    case "$detected_platform" in
+        linux)
+            [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = 4.2.8 ] || {
+                ddnsto_error 'E_ENV_VERSION：测试业务环境仅验证 4.2.8 assignment 协议；未修改设备'; return 2;
+            }
+            command -v jq >/dev/null 2>&1 || { ddnsto_error 'E_ENV_DEPENDENCY：测试业务环境需要 jq，请先安装系统 jq；未修改设备'; return 2; }
+            return 0 ;;
+        openwrt) env_reason='已发布 procd 模板仅传入 Token/index，未提供服务器 assignment 配置入口' ;;
+        synology) env_reason='已发布 SPK 启动器未提供服务器 assignment 环境配置入口' ;;
+        asus) env_reason='各软件中心渠道启动脚本未提供已验证的统一服务器 assignment 配置入口' ;;
+        *) env_reason='平台尚未提供可验证的测试业务环境服务配置' ;;
+    esac
+    ddnsto_error "E_ENV_UNSUPPORTED：$env_reason；未修改设备，不会回退到正式环境"
+    return 2
+}
+
+ddnsto_business_service_file() {
+    [ -e "$1" ] || return 0
+    [ -f "$1" ] && [ ! -L "$1" ] && [ -r "$1" ] || { ddnsto_business_match unknown; return 2; }
+    # Conservative negative check, additional to the platform's ownership and
+    # package checks. Never rewrite vendor launchers to force a business server.
+    env_scan=0
+    grep -E -i -q 'DDNSTO_.*(SERVER|WSS)|[[:space:]]-r([[:space:]]|=)|remote_?addr|server_?addr|serverAssignment' "$1" || env_scan=$?
+    [ "$env_scan" = 1 ] || { ddnsto_business_match unknown; return 2; }
 }
 
 # Inspect marker existence only. Never source vendor configuration as shell code.
@@ -2823,10 +2999,67 @@ ddnsto_managed_native() {
     return 2
 }
 
+ddnsto_linux_environment() {
+    # Legacy installations without an environment record use production.
+    # A boot identity file alone is not an explicit environment selection.
+    BUSINESS_CURRENT_ENV=production
+    business_environment_line=
+    if [ -f "$SERVICE_CONFIG" ] && grep -E -i -q '"(remoteAddr|serverAddr|serverAssignment|serverDomain|bootConfigPath)"[[:space:]]*:' "$SERVICE_CONFIG"; then
+        ddnsto_business_match unknown; return 2
+    fi
+    if [ ! -f "$SERVICE_UNIT" ]; then
+        ddnsto_business_match "$BUSINESS_CURRENT_ENV"; return $?
+    fi
+    [ ! -L "$SERVICE_UNIT" ] || return 2
+    while IFS= read -r business_line || [ -n "$business_line" ]; do
+        case "$business_line" in
+            Environment=*)
+                [ -z "$business_environment_line" ] || { ddnsto_business_match unknown; return 2; }
+                business_environment_line=$business_line ;;
+        esac
+    done < "$SERVICE_UNIT"
+    if [ -n "$business_environment_line" ]; then
+        BUSINESS_CURRENT_ENV=unknown
+        for business_candidate in production test; do
+            if [ "$business_environment_line" = "Environment='DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$(ddnsto_business_assignment "$business_candidate")'" ]; then
+                BUSINESS_CURRENT_ENV=$business_candidate
+            fi
+        done
+    fi
+    ddnsto_business_match "$BUSINESS_CURRENT_ENV"
+}
+
+ddnsto_linux_environment_capability() {
+    [ "${BUSINESS_ENV:-production}" = test ] || [ "${SWITCH_ENVIRONMENT:-0}" = 1 ] || return 0
+    # This is only a fail-closed negative capability check on already verified
+    # product bytes, not a substitute for the pinned digest/source review.
+    # Do not run a client to test network selection: even a probe could bind it.
+    LC_ALL=C grep -a -F -q 'DDNSTO_TEST_SERVER_ASSIGNMENT_JSON' "$1" || {
+        ddnsto_business_error E_ENV_CAPABILITY '已校验客户端未包含审核的 assignment 能力；未启动或切换服务'; return 2;
+    }
+}
+
+ddnsto_linux_register_environment() {
+    business_assignment=$(ddnsto_business_assignment "${BUSINESS_ENV:-production}") || return 2
+    # The complete previous unit is already in the service transaction backup.
+    # Rewrite only our closed-vocabulary assignment, never execute config data.
+    while IFS= read -r business_line || [ -n "$business_line" ]; do
+        case "$business_line" in
+            Environment=*) ;;
+            '[Service]') printf '%s\n' "$business_line" "Environment='DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment'" ;;
+            *) printf '%s\n' "$business_line" ;;
+        esac
+    done < "$SERVICE_UNIT" > "$transaction_dir/business-unit" || return 12
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_UNIT" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/business-unit"
+}
+
 ddnsto_privilege_args() {
     case "${ACTION:-install}" in ensure|install|update) ;; *) return 2 ;; esac
     DDNSTO_ROOT_ACTION=${ACTION:-install}
     DDNSTO_ROOT_TOKEN=$TOKEN
+    DDNSTO_ROOT_ENV=${BUSINESS_ENV:-production}
+    DDNSTO_ROOT_SWITCH_ENVIRONMENT=${SWITCH_ENVIRONMENT:-0}
+    case "$DDNSTO_ROOT_ENV:$DDNSTO_ROOT_SWITCH_ENVIRONMENT" in production:0|production:1|test:0|test:1) ;; *) return 2 ;; esac
     [ "$DDNSTO_ROOT_ACTION" != update ] || [ -z "$TOKEN" ]
 }
 
@@ -2914,6 +3147,8 @@ ddnsto_managed_owned() {
     ddnsto_managed_receipt "$SERVICE_OLD" || return $?
     SERVICE_EXEC="$INSTALLER_PREFIX/$SERVICE_OLD/bin/ddnsto"
     version_num=${SERVICE_OLD#versions/}
+    ddnsto_linux_environment || return $?
+    ddnsto_linux_environment_capability "$SERVICE_EXEC" || return $?
 }
 
 # Called by the shared service coordinator for install/update as well as local
@@ -3006,10 +3241,19 @@ ddnsto_managed_effective() {
     managed_load=$(ddnsto_managed_property LoadState) || return 2
     managed_reload=$(ddnsto_managed_property NeedDaemonReload) || return 2
     [ "$managed_reload" = no ] || return 2
-    for managed_property in DropInPaths ExecCondition ExecStartPre ExecStartPost ExecStop ExecStopPost ExecReload RootDirectory RootImage Environment User Group WorkingDirectory BindPaths BindReadOnlyPaths; do
+    for managed_property in DropInPaths ExecCondition ExecStartPre ExecStartPost ExecStop ExecStopPost ExecReload RootDirectory RootImage User Group WorkingDirectory BindPaths BindReadOnlyPaths; do
         managed_value=$(ddnsto_managed_property "$managed_property") || return 2
         [ -z "$managed_value" ] || return 2
     done
+    managed_value=$(ddnsto_managed_property Environment) || return 2
+    if [ -n "$managed_value" ]; then
+        managed_assignment="DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$(ddnsto_business_assignment "$BUSINESS_CURRENT_ENV")" || return 2
+        # systemd renders embedded double quotes escaped on some releases.
+        installer_service_replace "$managed_assignment" '"' '\"'
+        case "$managed_value" in "$managed_assignment"|"$service_replaced"|"\"$service_replaced\"") ;; *) return 2 ;; esac
+    else
+        [ -z "${business_environment_line:-}" ] || return 2
+    fi
     managed_env=$(ddnsto_managed_property EnvironmentFiles) || return 2
     if [ -n "$managed_env" ]; then
         managed_optional=/etc/sysconfig/com.linkease.ddnstoshell
@@ -3223,7 +3467,8 @@ ddnsto_package_restore() {
 ddnsto_register() {
     if [ "${ACTION:-install}" = update ]; then
         SERVICE_CONFIG_TOUCHED=0
-        ddnsto_managed_rewrite_unit
+        ddnsto_managed_rewrite_unit || return $?
+        ddnsto_linux_register_environment
         return $?
     fi
     # Rebinding requires explicit configure, never a repeated install.
@@ -3231,7 +3476,21 @@ ddnsto_register() {
         ddnsto_error 'already installed; use update to preserve identity or configure to change Token'
         return 2
     fi
-    installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -u "$TOKEN" -daemon
+    business_assignment=$(ddnsto_business_assignment "${BUSINESS_ENV:-production}") || return 2
+    if [ "${BUSINESS_ENV:-production}" = production ]; then
+        # Preserve legacy registration without adding jq to production installs.
+        # Pin the launch assignment rather than inheriting the caller's test value.
+        installer_exec_native "$ZSETUP_BIN" run -- env "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment" "$SERVICE_EXEC" -u "$TOKEN" -daemon || return $?
+        ddnsto_linux_register_environment
+        return $?
+    fi
+    # Test registration must not start before its systemd environment is written.
+    command -v jq >/dev/null 2>&1 || { ddnsto_error '测试环境首次安装需要 jq；未启动服务'; return 2; }
+    installer_exec_native "$ZSETUP_BIN" run -- env "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment" "$SERVICE_EXEC" install -u "$TOKEN" || return $?
+    mkdir -p "${SERVICE_CONFIG%/*}" || return 12
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_CONFIG" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- jq -n --arg token "$TOKEN" '{token:$token, routeridx:0, supplierCode:""}' || return $?
+    chmod 0600 "$SERVICE_CONFIG" || return 12
+    ddnsto_linux_register_environment
 }
 
 ddnsto_openwrt() {
@@ -3299,6 +3558,9 @@ ddnsto_openwrt_apply_packages() {
 }
 
 ddnsto_linux_metadata() {
+    if [ "${BUSINESS_ENV:-production}" = test ] && [ "${ACTION:-install}" != update ]; then
+        command -v jq >/dev/null 2>&1 || { ddnsto_error '测试环境首次安装需要 jq，请先通过系统包管理器安装；未修改服务'; return 2; }
+    fi
     case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
     [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
@@ -3334,11 +3596,13 @@ ddnsto_linux() {
         mkdir -p "$transaction_dir/products"
         installer_extract_member "$transaction_dir/products/ddnsto" tar -xOzf "$archive_path" "ddnsto-standard-$version_num/ddnsto.$arch" || return $?
         chmod 0755 "$transaction_dir/products/ddnsto"
+        ddnsto_linux_environment_capability "$transaction_dir/products/ddnsto" || return $?
         installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/products/ddnsto" -v || return $?
         installer_service_stage || return $?
         installer_service_copy ddnsto || return $?
         installer_service_commit_version || return $?
     else
+        ddnsto_linux_environment_capability "$SERVICE_EXEC" || return $?
         installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -v || return $?
     fi
     status '[4/4] Installing and checking the DDNSTO system service...'
@@ -3355,6 +3619,7 @@ ddnsto_install() {
     arch=${ZSETUP_ARCH:-$("$ZSETUP_BIN" context get arch)}
     ddnsto_detect_platform || return $?
     ddnsto_validate_platform_options || return $?
+    ddnsto_business_environment_preflight || return $?
     [ "$REQUESTED_METHOD" != docker ] || { ddnsto_error 'Docker requires the public entry'; return 2; }
     case "$detected_platform" in linux|openwrt) business_platform=$detected_platform ;; *) ddnsto_error 'native installation unavailable for this device'; return 2 ;; esac
     case "$ACTION" in
@@ -4650,6 +4915,7 @@ ddnsto_ensure_linux() {
     ensure_current=
     if [ -e "$INSTALLER_PREFIX/.managed" ] || [ -L "$INSTALLER_PREFIX/.managed" ]; then
         ddnsto_managed_owned || {
+            [ -z "${BUSINESS_ENV_FAILURE:-}" ] || return 2
             ddnsto_flow_error E_OWNERSHIP '现有安装不完整或不是可管理的安装' '请先检查安装来源和残留事务'; return 2;
         }
         ddnsto_ensure_jq || {
@@ -4661,6 +4927,12 @@ ddnsto_ensure_linux() {
         ddnsto_flow_error E_OWNERSHIP '发现未归属的历史配置' '请先人工确认历史安装；不会自动覆盖'; return 2
     fi
     ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard linux)" || return $?
+    if [ -n "$ensure_current" ] && [ "${BUSINESS_CURRENT_ENV:-production}" != "${BUSINESS_ENV:-production}" ]; then
+        [ "$ensure_current" = "$(ddnsto_pinned_version standard linux)" ] || {
+            ddnsto_flow_error E_ENV_VERSION '环境切换只支持审核版本，不能借切换降级或覆盖历史安装' '请先完成独立版本迁移'; return 2;
+        }
+        ENSURE_ACTION=update
+    fi
     if [ "$ENSURE_ACTION" = start ]; then
         ddnsto_flow_note installed
         ddnsto_flow_note starting
@@ -4668,9 +4940,13 @@ ddnsto_ensure_linux() {
     else
         ddnsto_flow_note installing
         if [ "$ENSURE_ACTION" = install ]; then
-            ddnsto_install --action install --token "$ENSURE_TOKEN" || return $?
+            ddnsto_install --action install --token "$ENSURE_TOKEN" --env "${BUSINESS_ENV:-production}" || return $?
         else
-            ddnsto_install --action update || return $?
+            if [ "${SWITCH_ENVIRONMENT:-0}" = 1 ]; then
+                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" --switch-environment || return $?
+            else
+                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" || return $?
+            fi
         fi
         ddnsto_flow_note installed
     fi
@@ -6984,6 +7260,7 @@ ddnsto_usage() {
         '群晖 DSM 7 支持自动安装/升级/启动，需管理员 sudo；其他 NAS/Docker 暂不支持默认自动安装。以下选项用于高级操作。' \
         '华硕软件中心自动识别 rogsoft/armsoft/mtksoft/ipq32soft/ipq64soft/qcasoft；安装后在软件中心管理。' \
         '--plan: read-only local preflight; no downloads, token, or service changes.' \
+        '--env production|test: client business environment (default production); --switch-environment explicitly authorizes a known-environment change.' \
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
         'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
         'Docker: explicit selection only; no automatic native/container migration.' \
@@ -7002,29 +7279,39 @@ ddnsto_parse_args() {
     REQUESTED_METHOD=auto
     PLAN_ONLY=0
     ACTION=ensure
+    BUSINESS_ENV=production
+    SWITCH_ENVIRONMENT=0
+    BUSINESS_ENV_FAILURE=
     OUTPUT_DIR=
     DEVICE_NAME=
     NETWORK=
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            --token|--token-file|--force-version|--platform|--method|--action|--output-dir|--device-name|--network)
+            --token|--token-file|--force-version|--platform|--method|--action|--output-dir|--device-name|--network|--env)
                 [ "$#" -ge 2 ] && [ -n "$2" ] || { ddnsto_error "$1 requires a value"; return 2; }
                 case "$1" in
                     --token) TOKEN=$2 ;; --token-file) TOKEN_FILE=$2 ;;
                     --platform) REQUESTED_PLATFORM=$2 ;; --method) REQUESTED_METHOD=$2 ;;
                     --action) ACTION=$2 ;;
+                    --env) BUSINESS_ENV=$2 ;;
                     --output-dir) OUTPUT_DIR=$2 ;;
                     --device-name) DEVICE_NAME=$2 ;; --network) NETWORK=$2 ;;
                     *) FORCE_VERSION=$2 ;;
                 esac
                 shift 2 ;;
             --token=*) TOKEN=${1#--token=}; [ -n "$TOKEN" ] || return 2; shift ;;
+            --env=*) BUSINESS_ENV=${1#--env=}; shift ;;
+            --switch-environment) SWITCH_ENVIRONMENT=1; shift ;;
             --force-version=*) FORCE_VERSION=${1#--force-version=}; shift ;;
             --verify-status) VERIFY_STATUS=1; shift ;;
             --plan) PLAN_ONLY=1; shift ;;
             *) ddnsto_error 'unknown argument (use --help)'; return 2 ;;
         esac
     done
+    case "$BUSINESS_ENV" in production|test) ;; *) ddnsto_error '--env must be production or test'; return 2 ;; esac
+    if [ "$SWITCH_ENVIRONMENT" = 1 ]; then
+        case "$ACTION" in ensure|install|update) ;; *) ddnsto_error '环境切换仅支持 ensure/install/update；服务维护动作不会隐式切换'; return 2 ;; esac
+    fi
     case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
     case "$REQUESTED_METHOD" in auto|native|docker) ;; *) ddnsto_error 'unknown installation method'; return 2 ;; esac
     [ "$REQUESTED_METHOD" = docker ] || [ -z "$DEVICE_NAME$NETWORK" ] || { ddnsto_error 'device-name/network require explicit Docker'; return 2; }
@@ -7070,6 +7357,62 @@ ddnsto_parse_args() {
     fi
     case "$TOKEN" in *"
 "*|*"$(printf '\r')"*) ddnsto_error 'token must be one line'; return 2 ;; esac
+}
+ddnsto_business_assignment() {
+    case "$1" in
+        production) printf '%s\n' '{"serverDomain":"kooldns.cn","legacyControlAddr":"tunnel.kooldns.cn:4445"}' ;;
+        test) printf '%s\n' '{"serverDomain":"toany.net","legacyControlAddr":"tunnel.toany.net:4445","controlWssURLs":["wss://web.toany.net:9445/ws/control"],"publicWssURLs":["wss://web.toany.net:9445/__ws/public"]}' ;;
+        *) return 2 ;;
+    esac
+}
+ddnsto_business_error() {
+    BUSINESS_ENV_FAILURE=$1
+    if command -v ddnsto_flow_error >/dev/null 2>&1; then
+        ddnsto_flow_error "$1" "$2" '未更改业务配置；请核对已有服务环境后重试'
+    else
+        ddnsto_error "$1：$2"; return 2
+    fi
+}
+ddnsto_business_match() {
+    case "$1" in production|test) ;; *) ddnsto_business_error E_ENV_UNKNOWN '历史配置或服务参数的业务环境无法确认；未更改设备'; return 2 ;; esac
+    [ "$1" = "${BUSINESS_ENV:-production}" ] && return 0
+    [ "${SWITCH_ENVIRONMENT:-0}" = 1 ] || {
+        ddnsto_business_error E_ENV_SWITCH '业务环境不同；确认后使用 --switch-environment；未更改设备'; return 2;
+    }
+}
+ddnsto_business_environment_preflight() {
+    case "$detected_platform" in
+        openwrt) ddnsto_business_service_file "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" || return $? ;;
+        synology) ddnsto_business_service_file /var/packages/ddnsto/scripts/start-stop-status || return $? ;;
+        asus)
+            ddnsto_business_service_file /koolshare/scripts/ddnsto_config.sh || return $?
+            ddnsto_business_service_file /koolshare/init.d/S70ddnsto.sh || return $? ;;
+    esac
+    [ "${BUSINESS_ENV:-production}" = test ] || return 0
+    if [ "${REQUESTED_METHOD:-native}" = docker ]; then
+        ddnsto_error 'E_ENV_UNSUPPORTED：现有 Docker 入口未验证 assignment 持久化；未修改容器'; return 2
+    fi
+    case "$detected_platform" in
+        linux)
+            [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = 4.2.8 ] || {
+                ddnsto_error 'E_ENV_VERSION：测试业务环境仅验证 4.2.8 assignment 协议；未修改设备'; return 2;
+            }
+            command -v jq >/dev/null 2>&1 || { ddnsto_error 'E_ENV_DEPENDENCY：测试业务环境需要 jq，请先安装系统 jq；未修改设备'; return 2; }
+            return 0 ;;
+        openwrt) env_reason='已发布 procd 模板仅传入 Token/index，未提供服务器 assignment 配置入口' ;;
+        synology) env_reason='已发布 SPK 启动器未提供服务器 assignment 环境配置入口' ;;
+        asus) env_reason='各软件中心渠道启动脚本未提供已验证的统一服务器 assignment 配置入口' ;;
+        *) env_reason='平台尚未提供可验证的测试业务环境服务配置' ;;
+    esac
+    ddnsto_error "E_ENV_UNSUPPORTED：$env_reason；未修改设备，不会回退到正式环境"
+    return 2
+}
+ddnsto_business_service_file() {
+    [ -e "$1" ] || return 0
+    [ -f "$1" ] && [ ! -L "$1" ] && [ -r "$1" ] || { ddnsto_business_match unknown; return 2; }
+    env_scan=0
+    grep -E -i -q 'DDNSTO_.*(SERVER|WSS)|[[:space:]]-r([[:space:]]|=)|remote_?addr|server_?addr|serverAssignment' "$1" || env_scan=$?
+    [ "$env_scan" = 1 ] || { ddnsto_business_match unknown; return 2; }
 }
 ddnsto_appliance_platform() {
     appliance_root=${1:-}
@@ -7189,10 +7532,57 @@ ddnsto_managed_native() {
     ddnsto_error 'offline management requires the verified pinned zsetup in the installer cache, PATH or ZSETUP_BIN; restore it using the installer before retrying'
     return 2
 }
+ddnsto_linux_environment() {
+    BUSINESS_CURRENT_ENV=production
+    business_environment_line=
+    if [ -f "$SERVICE_CONFIG" ] && grep -E -i -q '"(remoteAddr|serverAddr|serverAssignment|serverDomain|bootConfigPath)"[[:space:]]*:' "$SERVICE_CONFIG"; then
+        ddnsto_business_match unknown; return 2
+    fi
+    if [ ! -f "$SERVICE_UNIT" ]; then
+        ddnsto_business_match "$BUSINESS_CURRENT_ENV"; return $?
+    fi
+    [ ! -L "$SERVICE_UNIT" ] || return 2
+    while IFS= read -r business_line || [ -n "$business_line" ]; do
+        case "$business_line" in
+            Environment=*)
+                [ -z "$business_environment_line" ] || { ddnsto_business_match unknown; return 2; }
+                business_environment_line=$business_line ;;
+        esac
+    done < "$SERVICE_UNIT"
+    if [ -n "$business_environment_line" ]; then
+        BUSINESS_CURRENT_ENV=unknown
+        for business_candidate in production test; do
+            if [ "$business_environment_line" = "Environment='DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$(ddnsto_business_assignment "$business_candidate")'" ]; then
+                BUSINESS_CURRENT_ENV=$business_candidate
+            fi
+        done
+    fi
+    ddnsto_business_match "$BUSINESS_CURRENT_ENV"
+}
+ddnsto_linux_environment_capability() {
+    [ "${BUSINESS_ENV:-production}" = test ] || [ "${SWITCH_ENVIRONMENT:-0}" = 1 ] || return 0
+    LC_ALL=C grep -a -F -q 'DDNSTO_TEST_SERVER_ASSIGNMENT_JSON' "$1" || {
+        ddnsto_business_error E_ENV_CAPABILITY '已校验客户端未包含审核的 assignment 能力；未启动或切换服务'; return 2;
+    }
+}
+ddnsto_linux_register_environment() {
+    business_assignment=$(ddnsto_business_assignment "${BUSINESS_ENV:-production}") || return 2
+    while IFS= read -r business_line || [ -n "$business_line" ]; do
+        case "$business_line" in
+            Environment=*) ;;
+            '[Service]') printf '%s\n' "$business_line" "Environment='DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment'" ;;
+            *) printf '%s\n' "$business_line" ;;
+        esac
+    done < "$SERVICE_UNIT" > "$transaction_dir/business-unit" || return 12
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_UNIT" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/business-unit"
+}
 ddnsto_privilege_args() {
     case "${ACTION:-install}" in ensure|install|update) ;; *) return 2 ;; esac
     DDNSTO_ROOT_ACTION=${ACTION:-install}
     DDNSTO_ROOT_TOKEN=$TOKEN
+    DDNSTO_ROOT_ENV=${BUSINESS_ENV:-production}
+    DDNSTO_ROOT_SWITCH_ENVIRONMENT=${SWITCH_ENVIRONMENT:-0}
+    case "$DDNSTO_ROOT_ENV:$DDNSTO_ROOT_SWITCH_ENVIRONMENT" in production:0|production:1|test:0|test:1) ;; *) return 2 ;; esac
     [ "$DDNSTO_ROOT_ACTION" != update ] || [ -z "$TOKEN" ]
 }
 ddnsto_managed_rewrite_unit() {
@@ -7270,6 +7660,8 @@ ddnsto_managed_owned() {
     ddnsto_managed_receipt "$SERVICE_OLD" || return $?
     SERVICE_EXEC="$INSTALLER_PREFIX/$SERVICE_OLD/bin/ddnsto"
     version_num=${SERVICE_OLD#versions/}
+    ddnsto_linux_environment || return $?
+    ddnsto_linux_environment_capability "$SERVICE_EXEC" || return $?
 }
 ddnsto_service_lock() {
     DDNSTO_GLOBAL_HELD=0; DDNSTO_UNINSTALL_BACKUP=; DDNSTO_UNINSTALL_MOVED=0
@@ -7348,10 +7740,18 @@ ddnsto_managed_effective() {
     managed_load=$(ddnsto_managed_property LoadState) || return 2
     managed_reload=$(ddnsto_managed_property NeedDaemonReload) || return 2
     [ "$managed_reload" = no ] || return 2
-    for managed_property in DropInPaths ExecCondition ExecStartPre ExecStartPost ExecStop ExecStopPost ExecReload RootDirectory RootImage Environment User Group WorkingDirectory BindPaths BindReadOnlyPaths; do
+    for managed_property in DropInPaths ExecCondition ExecStartPre ExecStartPost ExecStop ExecStopPost ExecReload RootDirectory RootImage User Group WorkingDirectory BindPaths BindReadOnlyPaths; do
         managed_value=$(ddnsto_managed_property "$managed_property") || return 2
         [ -z "$managed_value" ] || return 2
     done
+    managed_value=$(ddnsto_managed_property Environment) || return 2
+    if [ -n "$managed_value" ]; then
+        managed_assignment="DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$(ddnsto_business_assignment "$BUSINESS_CURRENT_ENV")" || return 2
+        installer_service_replace "$managed_assignment" '"' '\"'
+        case "$managed_value" in "$managed_assignment"|"$service_replaced"|"\"$service_replaced\"") ;; *) return 2 ;; esac
+    else
+        [ -z "${business_environment_line:-}" ] || return 2
+    fi
     managed_env=$(ddnsto_managed_property EnvironmentFiles) || return 2
     if [ -n "$managed_env" ]; then
         managed_optional=/etc/sysconfig/com.linkease.ddnstoshell
@@ -7545,14 +7945,26 @@ ddnsto_package_restore() {
 ddnsto_register() {
     if [ "${ACTION:-install}" = update ]; then
         SERVICE_CONFIG_TOUCHED=0
-        ddnsto_managed_rewrite_unit
+        ddnsto_managed_rewrite_unit || return $?
+        ddnsto_linux_register_environment
         return $?
     fi
     if [ "$SERVICE_HAD_UNIT" = 1 ]; then
         ddnsto_error 'already installed; use update to preserve identity or configure to change Token'
         return 2
     fi
-    installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -u "$TOKEN" -daemon
+    business_assignment=$(ddnsto_business_assignment "${BUSINESS_ENV:-production}") || return 2
+    if [ "${BUSINESS_ENV:-production}" = production ]; then
+        installer_exec_native "$ZSETUP_BIN" run -- env "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment" "$SERVICE_EXEC" -u "$TOKEN" -daemon || return $?
+        ddnsto_linux_register_environment
+        return $?
+    fi
+    command -v jq >/dev/null 2>&1 || { ddnsto_error '测试环境首次安装需要 jq；未启动服务'; return 2; }
+    installer_exec_native "$ZSETUP_BIN" run -- env "DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment" "$SERVICE_EXEC" install -u "$TOKEN" || return $?
+    mkdir -p "${SERVICE_CONFIG%/*}" || return 12
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_CONFIG" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- jq -n --arg token "$TOKEN" '{token:$token, routeridx:0, supplierCode:""}' || return $?
+    chmod 0600 "$SERVICE_CONFIG" || return 12
+    ddnsto_linux_register_environment
 }
 ddnsto_openwrt() {
     case "$package_manager" in opkg) pkg_ext=ipk ;; apk) pkg_ext=apk ;; *) ddnsto_error 'OpenWrt requires opkg or apk'; return 2 ;; esac
@@ -7614,6 +8026,9 @@ ddnsto_openwrt_apply_packages() {
     installer_exec_native "$ZSETUP_BIN" run -- "${DDNSTO_OPENWRT_BIN_PATH:-/usr/sbin/ddnstod}" -v || return $?
 }
 ddnsto_linux_metadata() {
+    if [ "${BUSINESS_ENV:-production}" = test ] && [ "${ACTION:-install}" != update ]; then
+        command -v jq >/dev/null 2>&1 || { ddnsto_error '测试环境首次安装需要 jq，请先通过系统包管理器安装；未修改服务'; return 2; }
+    fi
     case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
     [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
@@ -7647,11 +8062,13 @@ ddnsto_linux() {
         mkdir -p "$transaction_dir/products"
         installer_extract_member "$transaction_dir/products/ddnsto" tar -xOzf "$archive_path" "ddnsto-standard-$version_num/ddnsto.$arch" || return $?
         chmod 0755 "$transaction_dir/products/ddnsto"
+        ddnsto_linux_environment_capability "$transaction_dir/products/ddnsto" || return $?
         installer_exec_native "$ZSETUP_BIN" run -- "$transaction_dir/products/ddnsto" -v || return $?
         installer_service_stage || return $?
         installer_service_copy ddnsto || return $?
         installer_service_commit_version || return $?
     else
+        ddnsto_linux_environment_capability "$SERVICE_EXEC" || return $?
         installer_exec_native "$ZSETUP_BIN" run -- "$SERVICE_EXEC" -v || return $?
     fi
     status '[4/4] Installing and checking the DDNSTO system service...'
@@ -7667,6 +8084,7 @@ ddnsto_install() {
     arch=${ZSETUP_ARCH:-$("$ZSETUP_BIN" context get arch)}
     ddnsto_detect_platform || return $?
     ddnsto_validate_platform_options || return $?
+    ddnsto_business_environment_preflight || return $?
     [ "$REQUESTED_METHOD" != docker ] || { ddnsto_error 'Docker requires the public entry'; return 2; }
     case "$detected_platform" in linux|openwrt) business_platform=$detected_platform ;; *) ddnsto_error 'native installation unavailable for this device'; return 2 ;; esac
     case "$ACTION" in
@@ -8781,6 +9199,7 @@ ddnsto_ensure_linux() {
     ensure_current=
     if [ -e "$INSTALLER_PREFIX/.managed" ] || [ -L "$INSTALLER_PREFIX/.managed" ]; then
         ddnsto_managed_owned || {
+            [ -z "${BUSINESS_ENV_FAILURE:-}" ] || return 2
             ddnsto_flow_error E_OWNERSHIP '现有安装不完整或不是可管理的安装' '请先检查安装来源和残留事务'; return 2;
         }
         ddnsto_ensure_jq || {
@@ -8792,6 +9211,12 @@ ddnsto_ensure_linux() {
         ddnsto_flow_error E_OWNERSHIP '发现未归属的历史配置' '请先人工确认历史安装；不会自动覆盖'; return 2
     fi
     ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard linux)" || return $?
+    if [ -n "$ensure_current" ] && [ "${BUSINESS_CURRENT_ENV:-production}" != "${BUSINESS_ENV:-production}" ]; then
+        [ "$ensure_current" = "$(ddnsto_pinned_version standard linux)" ] || {
+            ddnsto_flow_error E_ENV_VERSION '环境切换只支持审核版本，不能借切换降级或覆盖历史安装' '请先完成独立版本迁移'; return 2;
+        }
+        ENSURE_ACTION=update
+    fi
     if [ "$ENSURE_ACTION" = start ]; then
         ddnsto_flow_note installed
         ddnsto_flow_note starting
@@ -8799,9 +9224,13 @@ ddnsto_ensure_linux() {
     else
         ddnsto_flow_note installing
         if [ "$ENSURE_ACTION" = install ]; then
-            ddnsto_install --action install --token "$ENSURE_TOKEN" || return $?
+            ddnsto_install --action install --token "$ENSURE_TOKEN" --env "${BUSINESS_ENV:-production}" || return $?
         else
-            ddnsto_install --action update || return $?
+            if [ "${SWITCH_ENVIRONMENT:-0}" = 1 ]; then
+                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" --switch-environment || return $?
+            else
+                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" || return $?
+            fi
         fi
         ddnsto_flow_note installed
     fi
@@ -10190,6 +10619,7 @@ ddnsto_entry_install() {
         ddnsto_local_platform || return $?
     fi
     ddnsto_validate_platform_options || return $?
+    ddnsto_business_environment_preflight || return $?
     if [ "$ACTION" = ensure ] && [ "$PLAN_ONLY" = 0 ]; then
         if [ "$detected_platform" = synology ] && [ "$(id -u)" != 0 ]; then
             # Recommendation entry is already a verified private file. DSM

@@ -49,6 +49,7 @@ printf '%s' "$syno_volume"
 ddnsto_parse_args() { ACTION=ensure; PLAN_ONLY=0; }
 ddnsto_local_platform() { detected_platform=synology; }
 ddnsto_validate_platform_options() { :; }
+ddnsto_business_environment_preflight() { :; }
 id() { echo 1000; }
 sudo() { [ "$1" != -v ] || return 1; echo UNEXPECTED_EXECUTION; }
 ddnsto_entry_install --token fixture

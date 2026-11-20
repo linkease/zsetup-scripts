@@ -10,6 +10,7 @@ ddnsto_entry_install() {
         ddnsto_local_platform || return $?
     fi
     ddnsto_validate_platform_options || return $?
+    ddnsto_business_environment_preflight || return $?
     if [ "$ACTION" = ensure ] && [ "$PLAN_ONLY" = 0 ]; then
         if [ "$detected_platform" = synology ] && [ "$(id -u)" != 0 ]; then
             # Recommendation entry is already a verified private file. DSM

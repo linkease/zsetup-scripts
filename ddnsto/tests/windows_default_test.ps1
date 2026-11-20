@@ -1,5 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
+. (Join-Path $PSScriptRoot 'windows_task_fixture.ps1')
 function Assert($Ok, $Message) { if (-not $Ok) { throw $Message } }
 function Fails($Body) { $failed=$false; try { & $Body | Out-Null } catch { $failed=$true }; Assert $failed 'expected refusal' }
 function Assert-DDNSTOPlatform {}
@@ -12,15 +13,13 @@ function Receive-DDNSTOCandidate($Work, $Version) {
     $p=Join-Path $Work 'candidate.exe'; [IO.File]::WriteAllText($p, 'new'); return $p
 }
 function Register-DDNSTOTask($Binary, $Config, $Directory) {
-    $script:task=[pscustomobject]@{State='Ready'; Actions=@([pscustomobject]@{
-        Execute=$Binary; Arguments=('--config "'+$Config+'"'); WorkingDirectory=$Directory
-    })}
+    $script:task=[pscustomobject]@{State='Ready'; Actions=@(New-DDNSTOFixtureAction $Binary $Config $Directory)}
 }
 function Export-DDNSTOTask { $script:task | ConvertTo-Json -Depth 5 }
 function Restore-DDNSTOTask($Xml) { $script:task=$Xml | ConvertFrom-Json }
 function Stop-DDNSTOTask { $script:stops++; $script:task.State='Ready' }
 function Enable-ScheduledTask { $script:task.Settings.Enabled=$true }
-function Get-CimInstance { [pscustomobject]@{ProcessId=123; CreationDate=[datetime]'2026-01-01'; ExecutablePath=$script:task.Actions[0].Execute} }
+function Get-CimInstance { [pscustomobject]@{ProcessId=123; CreationDate=[datetime]'2026-01-01'; ExecutablePath=(Join-Path $script:task.Actions[0].WorkingDirectory 'ddnsto_cli.x86_64.exe')} }
 function Start-DDNSTOTask { $script:task.State='Running' }
 function Remove-DDNSTOTask { $script:task=$null }
 # Exercise the real stability loop with only its clock/task dependencies replaced.

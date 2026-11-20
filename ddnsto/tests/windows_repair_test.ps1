@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
+. (Join-Path $PSScriptRoot 'windows_task_fixture.ps1')
 function Assert($Ok, $Message) { if (-not $Ok) { throw $Message } }
 function Assert-DDNSTOPlatform {}
 function Receive-DDNSTOCandidate { throw 'unexpected download' }
@@ -10,9 +11,7 @@ function Stop-DDNSTOTask { $script:task.State = 'Ready' }
 function Remove-DDNSTOTask { $script:task = $null }
 function Register-DDNSTOTask($Binary, $Config, $Directory) {
     $script:registered++
-    $script:task = [pscustomobject]@{ State = 'Ready'; Actions = @([pscustomobject]@{
-        Execute = $Binary; Arguments = ('--config "' + $Config + '"'); WorkingDirectory = $Directory
-    }) }
+    $script:task = [pscustomobject]@{ State = 'Ready'; Actions = @(New-DDNSTOFixtureAction $Binary $Config $Directory) }
 }
 function Restore-DDNSTOTask($Xml) {
     Assert ($Xml -eq 'old-task-xml') 'lost original task XML'
@@ -42,12 +41,15 @@ try {
     foreach ($name in @('ddnsto_cli.x86_64.exe', 'ddnsto.yaml', '.ddnsto_boot.cfg')) {
         [IO.File]::WriteAllText((Join-Path $root $name), 'preserve-' + $name)
     }
+    $originalConfig = "# ddnsto-business-environment-v1=production`nuserToken: 'preserve-token'`n"
+    [IO.File]::WriteAllText((Join-Path $root 'ddnsto.yaml'), $originalConfig)
     $result = Invoke-DDNSTOEntry -Action repair -InstallDir $root
     Assert (($result -join "`n") -match 'operation=repair.*local_service=running.*cloud_status=unverified') 'repair did not succeed'
     Assert ($script:task.State -eq 'Running') 'missing task not recreated'
     Assert ([IO.File]::ReadAllText((Join-Path $root '.installer-windows-v1')) -ceq 'ddnsto-windows-v1') 'repair changed marker'
     foreach ($name in @('ddnsto_cli.x86_64.exe', 'ddnsto.yaml', '.ddnsto_boot.cfg')) {
-        Assert (([IO.File]::ReadAllText((Join-Path $root $name))) -eq ('preserve-' + $name)) 'repair changed client files'
+        $expected = if ($name -eq 'ddnsto.yaml') { $originalConfig } else { 'preserve-' + $name }
+        Assert (([IO.File]::ReadAllText((Join-Path $root $name))) -ceq $expected) 'repair changed client files'
     }
     $script:startFail = $true
     $failed = $false

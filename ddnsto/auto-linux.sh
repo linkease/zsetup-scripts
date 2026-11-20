@@ -65,6 +65,7 @@ ddnsto_ensure_linux() {
     ensure_current=
     if [ -e "$INSTALLER_PREFIX/.managed" ] || [ -L "$INSTALLER_PREFIX/.managed" ]; then
         ddnsto_managed_owned || {
+            [ -z "${BUSINESS_ENV_FAILURE:-}" ] || return 2
             ddnsto_flow_error E_OWNERSHIP '现有安装不完整或不是可管理的安装' '请先检查安装来源和残留事务'; return 2;
         }
         ddnsto_ensure_jq || {
@@ -76,6 +77,12 @@ ddnsto_ensure_linux() {
         ddnsto_flow_error E_OWNERSHIP '发现未归属的历史配置' '请先人工确认历史安装；不会自动覆盖'; return 2
     fi
     ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard linux)" || return $?
+    if [ -n "$ensure_current" ] && [ "${BUSINESS_CURRENT_ENV:-production}" != "${BUSINESS_ENV:-production}" ]; then
+        [ "$ensure_current" = "$(ddnsto_pinned_version standard linux)" ] || {
+            ddnsto_flow_error E_ENV_VERSION '环境切换只支持审核版本，不能借切换降级或覆盖历史安装' '请先完成独立版本迁移'; return 2;
+        }
+        ENSURE_ACTION=update
+    fi
     if [ "$ENSURE_ACTION" = start ]; then
         ddnsto_flow_note installed
         ddnsto_flow_note starting
@@ -83,9 +90,13 @@ ddnsto_ensure_linux() {
     else
         ddnsto_flow_note installing
         if [ "$ENSURE_ACTION" = install ]; then
-            ddnsto_install --action install --token "$ENSURE_TOKEN" || return $?
+            ddnsto_install --action install --token "$ENSURE_TOKEN" --env "${BUSINESS_ENV:-production}" || return $?
         else
-            ddnsto_install --action update || return $?
+            if [ "${SWITCH_ENVIRONMENT:-0}" = 1 ]; then
+                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" --switch-environment || return $?
+            else
+                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" || return $?
+            fi
         fi
         ddnsto_flow_note installed
     fi

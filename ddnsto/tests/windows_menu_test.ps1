@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
 function Assert($Ok, $Message) { if (-not $Ok) { throw $Message } }
 function Read-Host { throw 'unexpected menu/input' }
+function Assert-DDNSTOBusinessEnvironment { 'production' }
 function Invoke-DDNSTOManageService($InstallDir, $Action) { return $Action }
 function Invoke-DDNSTORepair($InstallDir) { return 'repair' }
 function Invoke-DDNSTOLifecycle($InstallDir, $Action, $Token) { return $Action }

@@ -1,5 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../install.ps1')
+. (Join-Path $PSScriptRoot 'windows_task_fixture.ps1')
 function Assert($Ok, $Message) { if (-not $Ok) { throw $Message } }
 function Fails($Body) { $failed = $false; try { & $Body | Out-Null } catch { $failed = $true }; Assert $failed 'expected refusal/failure' }
 function Assert-DDNSTOPlatform {}
@@ -16,9 +17,7 @@ function Stop-DDNSTOTask {
 }
 function Remove-DDNSTOTask { $script:task = $null; if ($script:removeFail) { throw 'remove failed after removal' } }
 function Register-DDNSTOTask($Binary, $Config, $Directory) {
-    $script:task = [pscustomobject]@{ State = 'Ready'; Actions = @([pscustomobject]@{
-        Execute = $Binary; Arguments = ('--config "' + $Config + '"'); WorkingDirectory = $Directory
-    }) }
+    $script:task = [pscustomobject]@{ State = 'Ready'; Actions = @(New-DDNSTOFixtureAction $Binary $Config $Directory) }
     if ($script:registerFail) { $script:registerFail = $false; throw 'register failed after mutation' }
 }
 function Start-DDNSTOTask {
@@ -36,7 +35,8 @@ $cfg = Join-Path $root 'ddnsto.yaml'
 $marker = Join-Path $root '.installer-windows-v1'
 $binary = Join-Path $root 'ddnsto_cli.x86_64.exe'
 $identity = Join-Path $root '.ddnsto_boot.cfg'
-$original = "userToken: 'old-secret'`r`nrouterName: keep`r`n"
+$environmentRecord = "# ddnsto-business-environment-v1=production`r`n"
+$original = $environmentRecord + "userToken: 'old-secret'`r`nrouterName: keep`r`n"
 try {
     [IO.File]::WriteAllText($cfg, $original)
     [IO.File]::WriteAllText($marker, 'ddnsto-windows-v1')
@@ -89,7 +89,7 @@ try {
     Assert ($script:task.State -eq 'Running') 'configure rollback lost running state'
     $result = Invoke-DDNSTOEntry -Action configure -Token "new:'secret" -InstallDir $root
     Assert ($result -match 'operation=configure' -and $result -notmatch 'secret') 'configure result leaks token or missing'
-    Assert ([IO.File]::ReadAllText($cfg) -ceq "userToken: 'new:''secret'`r`nrouterName: keep`r`n") 'configure changed unrelated fields'
+    Assert ([IO.File]::ReadAllText($cfg) -ceq ($environmentRecord + "userToken: 'new:''secret'`r`nrouterName: keep`r`n")) 'configure changed unrelated fields'
     Assert ([IO.File]::ReadAllText($identity) -ceq 'original identity') 'configure changed identity'
     foreach ($bad in @(
         "userToken: 'old`n  continued'`nrouterName: keep`n",

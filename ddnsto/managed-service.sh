@@ -14,10 +14,67 @@ ddnsto_managed_native() {
     return 2
 }
 
+ddnsto_linux_environment() {
+    # Legacy installations without an environment record use production.
+    # A boot identity file alone is not an explicit environment selection.
+    BUSINESS_CURRENT_ENV=production
+    business_environment_line=
+    if [ -f "$SERVICE_CONFIG" ] && grep -E -i -q '"(remoteAddr|serverAddr|serverAssignment|serverDomain|bootConfigPath)"[[:space:]]*:' "$SERVICE_CONFIG"; then
+        ddnsto_business_match unknown; return 2
+    fi
+    if [ ! -f "$SERVICE_UNIT" ]; then
+        ddnsto_business_match "$BUSINESS_CURRENT_ENV"; return $?
+    fi
+    [ ! -L "$SERVICE_UNIT" ] || return 2
+    while IFS= read -r business_line || [ -n "$business_line" ]; do
+        case "$business_line" in
+            Environment=*)
+                [ -z "$business_environment_line" ] || { ddnsto_business_match unknown; return 2; }
+                business_environment_line=$business_line ;;
+        esac
+    done < "$SERVICE_UNIT"
+    if [ -n "$business_environment_line" ]; then
+        BUSINESS_CURRENT_ENV=unknown
+        for business_candidate in production test; do
+            if [ "$business_environment_line" = "Environment='DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$(ddnsto_business_assignment "$business_candidate")'" ]; then
+                BUSINESS_CURRENT_ENV=$business_candidate
+            fi
+        done
+    fi
+    ddnsto_business_match "$BUSINESS_CURRENT_ENV"
+}
+
+ddnsto_linux_environment_capability() {
+    [ "${BUSINESS_ENV:-production}" = test ] || [ "${SWITCH_ENVIRONMENT:-0}" = 1 ] || return 0
+    # This is only a fail-closed negative capability check on already verified
+    # product bytes, not a substitute for the pinned digest/source review.
+    # Do not run a client to test network selection: even a probe could bind it.
+    LC_ALL=C grep -a -F -q 'DDNSTO_TEST_SERVER_ASSIGNMENT_JSON' "$1" || {
+        ddnsto_business_error E_ENV_CAPABILITY '已校验客户端未包含审核的 assignment 能力；未启动或切换服务'; return 2;
+    }
+}
+
+ddnsto_linux_register_environment() {
+    business_assignment=$(ddnsto_business_assignment "${BUSINESS_ENV:-production}") || return 2
+    # The complete previous unit is already in the service transaction backup.
+    # Rewrite only our closed-vocabulary assignment, never execute config data.
+    while IFS= read -r business_line || [ -n "$business_line" ]; do
+        case "$business_line" in
+            Environment=*) ;;
+            '[Service]') printf '%s\n' "$business_line" "Environment='DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$business_assignment'" ;;
+            *) printf '%s\n' "$business_line" ;;
+        esac
+    done < "$SERVICE_UNIT" > "$transaction_dir/business-unit" || return 12
+    installer_exec_native "$ZSETUP_BIN" capture -o "$SERVICE_UNIT" --max-bytes 16384 --min-free-bytes "$INSTALLER_RESERVE" -- cat "$transaction_dir/business-unit"
+}
+
 ddnsto_privilege_args() {
     case "${ACTION:-install}" in ensure|install|update) ;; *) return 2 ;; esac
     DDNSTO_ROOT_ACTION=${ACTION:-install}
     DDNSTO_ROOT_TOKEN=$TOKEN
+    DDNSTO_ROOT_ENV=${BUSINESS_ENV:-production}
+    DDNSTO_ROOT_SWITCH_ENVIRONMENT=${SWITCH_ENVIRONMENT:-0}
+    case "$DDNSTO_ROOT_ENV:$DDNSTO_ROOT_SWITCH_ENVIRONMENT" in production:0|production:1|test:0|test:1) ;; *) return 2 ;; esac
     [ "$DDNSTO_ROOT_ACTION" != update ] || [ -z "$TOKEN" ]
 }
 
@@ -105,6 +162,8 @@ ddnsto_managed_owned() {
     ddnsto_managed_receipt "$SERVICE_OLD" || return $?
     SERVICE_EXEC="$INSTALLER_PREFIX/$SERVICE_OLD/bin/ddnsto"
     version_num=${SERVICE_OLD#versions/}
+    ddnsto_linux_environment || return $?
+    ddnsto_linux_environment_capability "$SERVICE_EXEC" || return $?
 }
 
 # Called by the shared service coordinator for install/update as well as local
@@ -197,10 +256,19 @@ ddnsto_managed_effective() {
     managed_load=$(ddnsto_managed_property LoadState) || return 2
     managed_reload=$(ddnsto_managed_property NeedDaemonReload) || return 2
     [ "$managed_reload" = no ] || return 2
-    for managed_property in DropInPaths ExecCondition ExecStartPre ExecStartPost ExecStop ExecStopPost ExecReload RootDirectory RootImage Environment User Group WorkingDirectory BindPaths BindReadOnlyPaths; do
+    for managed_property in DropInPaths ExecCondition ExecStartPre ExecStartPost ExecStop ExecStopPost ExecReload RootDirectory RootImage User Group WorkingDirectory BindPaths BindReadOnlyPaths; do
         managed_value=$(ddnsto_managed_property "$managed_property") || return 2
         [ -z "$managed_value" ] || return 2
     done
+    managed_value=$(ddnsto_managed_property Environment) || return 2
+    if [ -n "$managed_value" ]; then
+        managed_assignment="DDNSTO_TEST_SERVER_ASSIGNMENT_JSON=$(ddnsto_business_assignment "$BUSINESS_CURRENT_ENV")" || return 2
+        # systemd renders embedded double quotes escaped on some releases.
+        installer_service_replace "$managed_assignment" '"' '\"'
+        case "$managed_value" in "$managed_assignment"|"$service_replaced"|"\"$service_replaced\"") ;; *) return 2 ;; esac
+    else
+        [ -z "${business_environment_line:-}" ] || return 2
+    fi
     managed_env=$(ddnsto_managed_property EnvironmentFiles) || return 2
     if [ -n "$managed_env" ]; then
         managed_optional=/etc/sysconfig/com.linkease.ddnstoshell

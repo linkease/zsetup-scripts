@@ -12,7 +12,8 @@ try { Invoke-DDNSTOEntry -Token $sentinel; throw 'unexpected success' } catch {
     Assert ($_.Exception.Message -match '诊断日志不可用') 'diagnostic failure must be explicit'
 }
 $source=[IO.File]::ReadAllText((Join-Path $PSScriptRoot '../install.ps1'))
-Assert ($source -notmatch 'Read-Host|ExecutionPolicy|EncodedCommand|Verb RunAs') 'interactive or unsafe elevation path'
+Assert ($source -notmatch 'Read-Host|ExecutionPolicy|Verb RunAs') 'interactive or unsafe elevation path'
+Assert ($source -match '-NoLogo -NoProfile -NonInteractive -EncodedCommand ') 'task launcher must suppress profiles and interaction without policy bypass'
 Assert ($source -notmatch 'Write-Warning[^\r\n]*\$work') 'warnings must not print user-controlled backup paths'
 $bytes=[IO.File]::ReadAllBytes((Join-Path $PSScriptRoot '../install.ps1'))
 Assert ($bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191) 'Windows PowerShell 5.1 needs UTF-8 BOM for Chinese diagnostics'

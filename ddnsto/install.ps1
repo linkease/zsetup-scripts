@@ -2,7 +2,8 @@
 # Engineering candidate. Automatic zsetup bootstrap; native canary pending.
 param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
       [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
-      [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure')
+      [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure',
+      [ValidateSet('production', 'test')][string]$Environment = 'production', [switch]$SwitchEnvironment)
 $ErrorActionPreference = 'Stop'
 $script:DDNSTOTaskName = 'DDNSTO'
 
@@ -122,7 +123,8 @@ function Get-DDNSTODiagnosticPointer {
 function Invoke-DDNSTOEntry {
     param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
           [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
-          [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure')
+          [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure',
+          [ValidateSet('production', 'test')][string]$Environment = 'production', [switch]$SwitchEnvironment)
     $previousLog = $script:DDNSTODiagnostic
     $script:DDNSTODiagnostic = $null
     try {
@@ -151,11 +153,15 @@ function Invoke-DDNSTOEntry {
 function Invoke-DDNSTOEntryCore {
     param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8',
           [string]$InstallDir = "$env:ProgramData\DDNSTO", [string]$Platform = 'auto',
-          [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure')
+          [string]$Method = 'auto', [switch]$Plan, [string]$Action = 'ensure',
+          [ValidateSet('production', 'test')][string]$Environment = 'production', [switch]$SwitchEnvironment)
     if ($Action -notin @('ensure', 'install', 'update', 'status', 'start', 'stop', 'restart', 'repair', 'uninstall', 'configure')) { throw 'DDNSTO: unknown action' }
     if ($Platform -notin @('auto', 'windows')) { throw 'DDNSTO: platform mismatch: this entry requires windows' }
     if ($Method -eq 'docker') { throw 'DDNSTO: Docker installer is not available for Windows' }
     if ($Method -notin @('auto', 'native')) { throw 'DDNSTO: unknown installation method' }
+    if ($SwitchEnvironment -and $Action -notin @('ensure', 'update')) {
+        Stop-DDNSTOError 2 'E_ENV_SWITCH_ACTION：仅 ensure/update 可以切换业务环境' '未修改安装' '使用原 Token 和 -Environment 配合 -SwitchEnvironment'
+    }
     if ($Plan) {
         if ($Action -notin @('ensure', 'install')) { throw 'DDNSTO: -Plan requires ensure or install' }
         if ($Token -or $TokenFile) { throw 'DDNSTO: -Plan does not accept credentials' }
@@ -165,7 +171,11 @@ function Invoke-DDNSTOEntryCore {
         return @('facts_source=local-preflight', 'platform=windows', 'arch=x86_64',
             'client_version=4.2.8', 'zsetup_version=0.4.0',
             'native_status=requires-admin-task-preflight', 'docker_installable=false',
-            'installation_performed=false')
+            "business_environment=$Environment", 'installation_performed=false')
+    }
+    if ($Action -in @('start', 'restart', 'repair', 'configure')) {
+        $null = Assert-DDNSTOBusinessEnvironment $InstallDir $Environment
+        Assert-DDNSTOEnvironmentCapability (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe') $Environment
     }
     if ($Action -in @('uninstall', 'configure')) {
         return Invoke-DDNSTOLifecycle -InstallDir $InstallDir -Action $Action -Token $Token -TokenFile $TokenFile
@@ -175,7 +185,94 @@ function Invoke-DDNSTOEntryCore {
         if ($Action -eq 'repair') { return Invoke-DDNSTORepair -InstallDir $InstallDir }
         return Invoke-DDNSTOManageService -InstallDir $InstallDir -Action $Action
     }
-    Invoke-DDNSTOInstall -Token $Token -TokenFile $TokenFile -Version $Version -InstallDir $InstallDir -Action $Action
+    Invoke-DDNSTOInstall -Token $Token -TokenFile $TokenFile -Version $Version -InstallDir $InstallDir -Action $Action -Environment $Environment -SwitchEnvironment:$SwitchEnvironment
+}
+
+# Closed vocabulary, not arbitrary server URLs. These assignments override the
+# encrypted boot server after loading it; Token and identity remain untouched.
+function Get-DDNSTOBusinessAssignment([string]$Environment) {
+    switch -CaseSensitive ($Environment) {
+        'production' { return '{"serverDomain":"kooldns.cn","legacyControlAddr":"tunnel.kooldns.cn:4445"}' }
+        'test' { return '{"serverDomain":"toany.net","legacyControlAddr":"tunnel.toany.net:4445","controlWssURLs":["wss://web.toany.net:9445/ws/control"],"publicWssURLs":["wss://web.toany.net:9445/__ws/public"]}' }
+        default { throw 'DDNSTO: unknown business environment' }
+    }
+}
+
+function Get-DDNSTORecordedEnvironment($Config) {
+    $text = [IO.File]::ReadAllText($Config)
+    $records = [regex]::Matches($text, '(?m)^# ddnsto-business-environment-v1=(production|test)\r?$')
+    if ($records.Count -eq 1 -and [regex]::Matches($text, 'ddnsto-business-environment-v1').Count -eq 1) {
+        return $records[0].Groups[1].Value
+    }
+    if ($text.Contains('ddnsto-business-environment-v1')) { throw 'DDNSTO: invalid business environment record' }
+    return ''
+}
+
+function Get-DDNSTOEnvironmentAction($Binary, $Config, $Directory, $Environment) {
+    $assignment = Get-DDNSTOBusinessAssignment $Environment
+    # The task owns this literal command. No .ps1 file, execution-policy change,
+    # user profile, machine-wide environment, or data interpreted as code.
+    $command = "`$ErrorActionPreference='Stop'; `$env:DDNSTO_TEST_SERVER_ASSIGNMENT_JSON='" + $assignment + "'; & '" + $Binary.Replace("'", "''") + "' --config '" + $Config.Replace("'", "''") + "'; exit `$LASTEXITCODE"
+    return [pscustomobject]@{
+        Execute = [IO.Path]::Combine([Environment]::GetFolderPath([Environment+SpecialFolder]::System), 'WindowsPowerShell\v1.0\powershell.exe')
+        Arguments = ('-NoLogo -NoProfile -NonInteractive -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command)))
+        WorkingDirectory = $Directory
+    }
+}
+
+function Test-DDNSTOTaskAction($Task, $Expected) {
+    return ($Task -and @($Task.Actions).Count -eq 1 -and
+        $Task.Actions[0].Execute -ieq $Expected.Execute -and
+        $Task.Actions[0].Arguments -ceq $Expected.Arguments -and
+        $Task.Actions[0].WorkingDirectory -ieq $Expected.WorkingDirectory)
+}
+
+function Assert-DDNSTOBusinessEnvironment($InstallDir, $Environment, [switch]$SwitchEnvironment) {
+    Assert-DDNSTOSafePaths $InstallDir
+    $config = Join-Path $InstallDir 'ddnsto.yaml'
+    if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { return $Environment }
+    $text = [IO.File]::ReadAllText($config)
+    # Check explicit server/identity overrides without imposing a whole-YAML
+    # grammar on legacy configurations. Token and task ownership are separate.
+    foreach ($line in ($text -split '\r?\n')) {
+        if ($line -match '^\s*(#.*)?$') { continue }
+        if ($line -imatch '(?:^|[,{])\s*[''"]?(remoteAddr|serverAddr|serverAssignment|serverDomain|controlWssURLs|publicWssURLs|bootConfigPath)[''"]?\s*:') {
+            Stop-DDNSTOError 2 'E_ENV_UNKNOWN：配置包含自定义服务端/身份路径' '原安装保留' '人工确认并迁移自定义配置'
+        }
+    }
+    $current = Get-DDNSTORecordedEnvironment $config
+    # A comment alone is not proof of the running task's environment. Require
+    # byte-exact canonical task arguments whenever a task is present.
+    if (Get-DDNSTOTask) { $null = Assert-DDNSTOManagedTask $InstallDir }
+    if (-not $current) {
+        # Legacy installations without a record use the production default.
+        # Task ownership is still checked above, independently of this default.
+        $current = 'production'
+    }
+    if ($current -cne $Environment -and -not $SwitchEnvironment) {
+        Stop-DDNSTOError 2 "E_ENV_MISMATCH：已有业务环境为 $current，目标为 $Environment" '原安装保留' '确认后使用 ensure/update 与 -SwitchEnvironment；维护原环境请传入匹配的 -Environment'
+    }
+    return $current
+}
+
+function Set-DDNSTOBusinessEnvironment($Config, $Environment) {
+    $null = Get-DDNSTOBusinessAssignment $Environment
+    $text = [IO.File]::ReadAllText($Config)
+    $record = '# ddnsto-business-environment-v1=' + $Environment
+    if (Get-DDNSTORecordedEnvironment $Config) {
+        $text = [regex]::Replace($text, '(?m)^# ddnsto-business-environment-v1=(production|test)(?=\r?$)', $record)
+    } else { $text = $record + "`n" + $text }
+    [IO.File]::WriteAllText($Config, $text, (New-Object Text.UTF8Encoding($false)))
+}
+
+function Assert-DDNSTOEnvironmentCapability($Binary, $Environment, [switch]$SwitchEnvironment) {
+    if ($Environment -eq 'test' -or $SwitchEnvironment) {
+        # Only the reviewed, pinned binary is certified for assignment. Version
+        # strings alone do not prove a historic/custom build implements it.
+        if ((Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash -ine '5ef383feb22857dd3cbfe8b60f49018218855c1b67e778d27e34ba702f64aa8d') {
+            Stop-DDNSTOError 2 'E_ENV_CAPABILITY：客户端不在已审核的业务环境支持范围' '原安装保留' '使用推荐的 Windows CLI 安装包；不强制降级'
+        }
+    }
 }
 
 function Assert-DDNSTOSafePaths($InstallDir) {
@@ -355,10 +452,11 @@ function Assert-DDNSTOManagedTask($InstallDir, [switch]$AllowMissingTask) {
     }
     $task = Get-DDNSTOTask
     if (-not $task -and $AllowMissingTask) { return $null }
-    if (-not $task -or @($task.Actions).Count -ne 1 -or
-        $task.Actions[0].Execute -ne $binary -or
-        $task.Actions[0].Arguments -ne ('--config "' + $config + '"') -or
-        $task.Actions[0].WorkingDirectory -ne $InstallDir) {
+    $environment = Get-DDNSTORecordedEnvironment $config
+    $expected = if ($environment) { Get-DDNSTOEnvironmentAction $binary $config $InstallDir $environment } else {
+        [pscustomobject]@{ Execute=$binary; Arguments=('--config "' + $config + '"'); WorkingDirectory=$InstallDir }
+    }
+    if (-not (Test-DDNSTOTaskAction $task $expected)) {
         throw 'DDNSTO: task does not match this managed installation'
     }
     return $task
@@ -538,18 +636,44 @@ function Receive-DDNSTOCandidate($Work, $Version) {
 function Get-DDNSTOTask { return Get-ScheduledTask -TaskPath '\' -ErrorAction Stop | Where-Object { $_.TaskName -eq $script:DDNSTOTaskName } }
 function Export-DDNSTOTask { return Export-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName }
 function Stop-DDNSTOTask {
+    $task = Get-DDNSTOTask
+    if (-not $task -or @($task.Actions).Count -ne 1) { throw 'DDNSTO: cannot identify task to stop' }
+    $directory = $task.Actions[0].WorkingDirectory
+    Assert-DDNSTOSafePaths $directory
+    $binary = Join-Path $directory 'ddnsto_cli.x86_64.exe'
+    $config = Join-Path $directory 'ddnsto.yaml'
+    # During rollback the saved task can still use the old environment while
+    # YAML already has the new record. Accept only the three exact owned action
+    # shapes, not an arbitrary command, independently of that changing record.
+    $legacy = [pscustomobject]@{Execute=$binary; Arguments=('--config "'+$config+'"'); WorkingDirectory=$directory}
+    $owned = Test-DDNSTOTaskAction $task $legacy
+    foreach ($knownEnvironment in @('production','test')) {
+        if (Test-DDNSTOTaskAction $task (Get-DDNSTOEnvironmentAction $binary $config $directory $knownEnvironment)) { $owned=$true }
+    }
+    if (-not $owned) { throw 'DDNSTO: task ownership changed before stop' }
     Stop-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName
     for ($i = 0; $i -lt 20; $i++) {
-        if ((Get-DDNSTOTask).State -ne 'Running') { return }
+        # The task is now a PowerShell parent. A stopped task is NOT evidence
+        # that its client child exited. Never replace files or launch a second
+        # environment while an exact-path owned process may still be alive.
+        $clients = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'ddnsto_cli.x86_64.exe'" -Property ProcessId,ExecutablePath -ErrorAction Stop |
+            Where-Object { -not $_.ExecutablePath -or [string]::Equals($_.ExecutablePath, $binary, [StringComparison]::OrdinalIgnoreCase) })
+        if ((Get-DDNSTOTask).State -ne 'Running' -and $clients.Count -eq 0) { return }
         Start-Sleep -Milliseconds 250
     }
-    throw 'DDNSTO: old task did not stop'
+    throw 'DDNSTO: old task/client did not stop; files retained; inspect the exact managed client process before retrying'
 }
 function Remove-DDNSTOTask {
     if (Get-DDNSTOTask) { Unregister-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName -Confirm:$false }
 }
 function Register-DDNSTOTask($Binary, $Config, $Directory) {
-    $action = New-ScheduledTaskAction -Execute $Binary -Argument ('--config "' + $Config + '"') -WorkingDirectory $Directory
+    $environment = Get-DDNSTORecordedEnvironment $Config
+    if ($environment) {
+        $expected = Get-DDNSTOEnvironmentAction $Binary $Config $Directory $environment
+        $action = New-ScheduledTaskAction -Execute $expected.Execute -Argument $expected.Arguments -WorkingDirectory $Directory
+    } else {
+        $action = New-ScheduledTaskAction -Execute $Binary -Argument ('--config "' + $Config + '"') -WorkingDirectory $Directory
+    }
     $principal = New-ScheduledTaskPrincipal -UserId 'S-1-5-18' -LogonType ServiceAccount -RunLevel Highest
     $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
     Register-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName -Action $action -Principal $principal -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings $settings -Force | Out-Null
@@ -566,8 +690,13 @@ function Confirm-DDNSTORunning($Binary) {
         for ($i = 0; $i -lt 4; $i++) {
             Start-Sleep -Seconds 1
             $task = Get-DDNSTOTask
-            if ($task.State -ne 'Running' -or @($task.Actions).Count -ne 1 -or
-                -not [string]::Equals($task.Actions[0].Execute, $Binary, [StringComparison]::OrdinalIgnoreCase)) { throw 'task mismatch' }
+            $directory = [IO.Path]::GetDirectoryName($Binary)
+            $config = Join-Path $directory 'ddnsto.yaml'
+            $environment = Get-DDNSTORecordedEnvironment $config
+            $expected = if ($environment) { Get-DDNSTOEnvironmentAction $Binary $config $directory $environment } else {
+                [pscustomobject]@{ Execute=$Binary; Arguments=('--config "' + $config + '"'); WorkingDirectory=$directory }
+            }
+            if ($task.State -ne 'Running' -or -not (Test-DDNSTOTaskAction $task $expected)) { throw 'task mismatch' }
             $processes = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'ddnsto_cli.x86_64.exe'" -Property ProcessId,CreationDate,ExecutablePath -ErrorAction Stop |
                 Where-Object { [string]::Equals($_.ExecutablePath, $Binary, [StringComparison]::OrdinalIgnoreCase) })
             if ($processes.Count -ne 1 -or -not $processes[0].CreationDate -or $processes[0].ProcessId -le 0) { throw 'unknown process' }
@@ -648,13 +777,17 @@ function Get-DDNSTOClientVersion($Path) {
     }
 }
 function Invoke-DDNSTOInstall {
-    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8', [string]$InstallDir, [string]$Action = 'ensure')
+    param([string]$Token = '', [string]$TokenFile = '', [string]$Version = '4.2.8', [string]$InstallDir, [string]$Action = 'ensure',
+          [ValidateSet('production', 'test')][string]$Environment = 'production', [switch]$SwitchEnvironment)
     if ($Action -notin @('ensure', 'install', 'update')) { throw 'DDNSTO: unknown action' }
+    if ($SwitchEnvironment -and $Action -eq 'install') { Stop-DDNSTOError 2 'E_ENV_SWITCH_ACTION：显式 install 不切换环境' '未修改安装' '使用 ensure/update 与 -SwitchEnvironment' }
     if ($Action -eq 'update' -and ($Token -or $TokenFile)) { throw 'DDNSTO: update preserves existing Token; do not supply credentials' }
     Assert-DDNSTOPlatform
     if ($Version -ne '4.2.8') { throw 'DDNSTO: no pinned artifact for requested version' }
     if (-not [IO.Path]::IsPathRooted($InstallDir)) { throw 'DDNSTO: installation path must be absolute' }
     Assert-DDNSTOSafePaths $InstallDir
+    $currentEnvironment = Assert-DDNSTOBusinessEnvironment $InstallDir $Environment -SwitchEnvironment:$SwitchEnvironment
+    $changingEnvironment = $currentEnvironment -cne $Environment
     if ($TokenFile) {
         if ($Token) { Stop-DDNSTOError 2 'Token 与 TokenFile 不能同时传入' '未修改安装' '仅保留一个凭据参数' }
         try { $Token = [IO.File]::ReadAllText($TokenFile) -replace '\r?\n$', '' }
@@ -665,6 +798,7 @@ function Invoke-DDNSTOInstall {
     }
     if (Test-Path -LiteralPath (Join-Path $InstallDir '.installer-windows-v1')) {
         if ((Get-DDNSTOManagedState $InstallDir) -eq 'retained') {
+            if ($changingEnvironment) { Stop-DDNSTOError 2 'E_ENV_SWITCH_ACTION：保留配置须先在原环境重新安装' '未修改安装' '恢复原环境后再使用 ensure -SwitchEnvironment' }
             if ($Action -notin @('ensure', 'install')) { throw 'DDNSTO: retained configuration requires ensure or install' }
             Assert-DDNSTOSameToken (Join-Path $InstallDir 'ddnsto.yaml') $Token
             return Invoke-DDNSTOLifecycle -InstallDir $InstallDir -Action reinstall -Token $Token -Version $Version
@@ -712,13 +846,16 @@ function Invoke-DDNSTOInstall {
             [bool]$oldTask -ne [bool]$currentTask) { throw 'DDNSTO: installation changed; retry' }
         if ($hadOld) {
             $null = Assert-DDNSTOManagedTask $InstallDir
+            $lockedEnvironment = Assert-DDNSTOBusinessEnvironment $InstallDir $Environment -SwitchEnvironment:$SwitchEnvironment
+            if ($lockedEnvironment -cne $currentEnvironment) { throw 'DDNSTO: business environment changed; retry' }
             if (-not (Test-Path -LiteralPath $binary -PathType Leaf) -or -not (Test-Path -LiteralPath $config -PathType Leaf)) { throw 'DDNSTO: incomplete previous installation' }
             if ($Action -eq 'ensure') { Assert-DDNSTOSameToken $config $Token }
             $installedVersion = Get-DDNSTOClientVersion $binary
             if ($installedVersion -notmatch '^\d+\.\d+\.\d+$') {
                 Stop-DDNSTOError 4 '无法确认已安装版本' '原安装保留，禁止降级' '检查客户端版本后重试'
             }
-            if ([version]$installedVersion -ge [version]$Version) {
+            if ([version]$installedVersion -ge [version]$Version -and -not $changingEnvironment) {
+                Assert-DDNSTOEnvironmentCapability $binary $Environment
                 $alreadyRunning = $currentTask.State -eq 'Running'
                 # A running instance may coexist with a disabled startup task.
                 Enable-ScheduledTask -TaskPath '\' -TaskName $script:DDNSTOTaskName | Out-Null
@@ -732,20 +869,26 @@ function Invoke-DDNSTOInstall {
         } elseif ((Test-Path -LiteralPath $binary) -or (Test-Path -LiteralPath $config)) { throw 'DDNSTO: installation changed; retry' }
         $wasRunning = $hadOld -and $currentTask.State -eq 'Running'
         New-Item -ItemType Directory -Path $work | Out-Null
-        $candidate = Receive-DDNSTOCandidate $work $Version
+        # A same/newer client can change environment without a downgrade/download.
+        $candidate = if ($hadOld -and [version]$installedVersion -ge [version]$Version) { $binary } else { Receive-DDNSTOCandidate $work $Version }
+        Assert-DDNSTOEnvironmentCapability $candidate $Environment -SwitchEnvironment:$changingEnvironment
         if ($hadOld) {
             Copy-Item -LiteralPath $binary -Destination (Join-Path $work 'old.exe')
             Copy-Item -LiteralPath $config -Destination (Join-Path $work 'old.yaml')
             $oldXml = Export-DDNSTOTask
             [IO.File]::WriteAllText((Join-Path $work 'old-task.xml'), $oldXml)
+            if (Test-Path -LiteralPath (Join-Path $InstallDir '.ddnsto_boot.cfg')) {
+                Copy-Item -LiteralPath (Join-Path $InstallDir '.ddnsto_boot.cfg') -Destination (Join-Path $work 'old-identity')
+            }
         }
         $changed = $true
         if ($hadOld) { Stop-DDNSTOTask }
-        Copy-Item -LiteralPath $candidate -Destination $binary -Force
+        if ($candidate -ne $binary) { Copy-Item -LiteralPath $candidate -Destination $binary -Force }
         if (-not $hadOld) {
             $logPath = (Join-Path $InstallDir 'logs').Replace("'", "''")
             [IO.File]::WriteAllText($config, $tokenLine + "`nlogPath: '" + $logPath + "'`n", (New-Object Text.UTF8Encoding($false)))
         }
+        Set-DDNSTOBusinessEnvironment $config $Environment
         Register-DDNSTOTask $binary $config $InstallDir
         Start-DDNSTOTask
         Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe')
@@ -760,6 +903,12 @@ function Invoke-DDNSTOInstall {
                 if ($hadOld) {
                     Copy-Item -LiteralPath (Join-Path $work 'old.exe') -Destination $binary -Force
                     Copy-Item -LiteralPath (Join-Path $work 'old.yaml') -Destination $config -Force
+                    if ($changingEnvironment) {
+                        $identity = Join-Path $InstallDir '.ddnsto_boot.cfg'
+                        if (Test-Path -LiteralPath (Join-Path $work 'old-identity')) {
+                            Copy-Item -LiteralPath (Join-Path $work 'old-identity') -Destination $identity -Force
+                        } elseif (Test-Path -LiteralPath $identity) { Remove-Item -LiteralPath $identity -Force }
+                    }
                     Restore-DDNSTOTask $oldXml
                     if ($wasRunning) { Start-DDNSTOTask; Confirm-DDNSTORunning (Join-Path $InstallDir 'ddnsto_cli.x86_64.exe') }
                 } else {
@@ -784,7 +933,7 @@ function Invoke-DDNSTOInstall {
 }
 if ($MyInvocation.InvocationName -ne '.') {
     try {
-        Invoke-DDNSTOEntry -Token $Token -TokenFile $TokenFile -Version $Version -InstallDir $InstallDir -Platform $Platform -Method $Method -Plan:$Plan -Action $Action
+        Invoke-DDNSTOEntry -Token $Token -TokenFile $TokenFile -Version $Version -InstallDir $InstallDir -Platform $Platform -Method $Method -Plan:$Plan -Action $Action -Environment $Environment -SwitchEnvironment:$SwitchEnvironment
         exit 0
     } catch {
         [Console]::Error.WriteLine($_.Exception.Message)

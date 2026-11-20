@@ -72,11 +72,23 @@ ddnsto_register
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'ensure:account')
 
+    def test_root_bridge_forwards_parsed_environment_not_ambient_defaults(self):
+        source = (ROOT / 'lib/install-privilege.sh').read_text()
+        bridge = source.split('            # Older adapters retain their original token-only protocol.', 1)[1].split('            ;;', 1)[0]
+        for arguments, expected in [
+            ('--action update --env test --switch-environment', ['--action', 'update', '--env', 'test', '--switch-environment']),
+            ('--action ensure --token account', ['--action', 'ensure', '--env', 'production', '--token', 'account']),
+        ]:
+            result = shell('BUSINESS_ENV=test; SWITCH_ENVIRONMENT=1; ddnsto_parse_args ' + arguments + '; ' + bridge + '\nprintf "%s\\n" "$@"')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), expected)
+
     def test_update_registration_never_sets_token(self):
         result = shell('''ACTION=update; TOKEN=; SERVICE_HAD_UNIT=1; SERVICE_CONFIG_TOUCHED=1
 SERVICE_EXEC=/protected/versions/4.2.8/bin/ddnsto
 installer_service_manager() { :; }
 ddnsto_managed_rewrite_unit() { printf 'rewrite'; }
+ddnsto_linux_register_environment() { :; }
 installer_exec_native() { printf 'UNEXPECTED product execution'; return 99; }
 ddnsto_register
 ''')

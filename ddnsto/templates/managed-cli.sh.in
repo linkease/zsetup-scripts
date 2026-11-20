@@ -5,6 +5,7 @@ ddnsto_usage() {
         '群晖 DSM 7 支持自动安装/升级/启动，需管理员 sudo；其他 NAS/Docker 暂不支持默认自动安装。以下选项用于高级操作。' \
         '华硕软件中心自动识别 rogsoft/armsoft/mtksoft/ipq32soft/ipq64soft/qcasoft；安装后在软件中心管理。' \
         '--plan: read-only local preflight; no downloads, token, or service changes.' \
+        '--env production|test: client business environment (default production); --switch-environment explicitly authorizes a known-environment change.' \
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
         'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
         'Docker: explicit selection only; no automatic native/container migration.' \
@@ -24,29 +25,39 @@ ddnsto_parse_args() {
     REQUESTED_METHOD=auto
     PLAN_ONLY=0
     ACTION=ensure
+    BUSINESS_ENV=production
+    SWITCH_ENVIRONMENT=0
+    BUSINESS_ENV_FAILURE=
     OUTPUT_DIR=
     DEVICE_NAME=
     NETWORK=
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            --token|--token-file|--force-version|--platform|--method|--action|--output-dir|--device-name|--network)
+            --token|--token-file|--force-version|--platform|--method|--action|--output-dir|--device-name|--network|--env)
                 [ "$#" -ge 2 ] && [ -n "$2" ] || { ddnsto_error "$1 requires a value"; return 2; }
                 case "$1" in
                     --token) TOKEN=$2 ;; --token-file) TOKEN_FILE=$2 ;;
                     --platform) REQUESTED_PLATFORM=$2 ;; --method) REQUESTED_METHOD=$2 ;;
                     --action) ACTION=$2 ;;
+                    --env) BUSINESS_ENV=$2 ;;
                     --output-dir) OUTPUT_DIR=$2 ;;
                     --device-name) DEVICE_NAME=$2 ;; --network) NETWORK=$2 ;;
                     *) FORCE_VERSION=$2 ;;
                 esac
                 shift 2 ;;
             --token=*) TOKEN=${1#--token=}; [ -n "$TOKEN" ] || return 2; shift ;;
+            --env=*) BUSINESS_ENV=${1#--env=}; shift ;;
+            --switch-environment) SWITCH_ENVIRONMENT=1; shift ;;
             --force-version=*) FORCE_VERSION=${1#--force-version=}; shift ;;
             --verify-status) VERIFY_STATUS=1; shift ;;
             --plan) PLAN_ONLY=1; shift ;;
             *) ddnsto_error 'unknown argument (use --help)'; return 2 ;;
         esac
     done
+    case "$BUSINESS_ENV" in production|test) ;; *) ddnsto_error '--env must be production or test'; return 2 ;; esac
+    if [ "$SWITCH_ENVIRONMENT" = 1 ]; then
+        case "$ACTION" in ensure|install|update) ;; *) ddnsto_error '环境切换仅支持 ensure/install/update；服务维护动作不会隐式切换'; return 2 ;; esac
+    fi
     case "$REQUESTED_PLATFORM" in auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid) ;; *) ddnsto_error 'unknown platform'; return 2 ;; esac
     case "$REQUESTED_METHOD" in auto|native|docker) ;; *) ddnsto_error 'unknown installation method'; return 2 ;; esac
     [ "$REQUESTED_METHOD" = docker ] || [ -z "$DEVICE_NAME$NETWORK" ] || { ddnsto_error 'device-name/network require explicit Docker'; return 2; }
@@ -92,6 +103,71 @@ ddnsto_parse_args() {
     fi
     case "$TOKEN" in *"
 "*|*"$(printf '\r')"*) ddnsto_error 'token must be one line'; return 2 ;; esac
+}
+
+# The client applies this existing assignment override after encrypted boot
+# state. Do not replace identity files or guess a server from the console URL.
+ddnsto_business_assignment() {
+    case "$1" in
+        production) printf '%s\n' '{"serverDomain":"kooldns.cn","legacyControlAddr":"tunnel.kooldns.cn:4445"}' ;;
+        test) printf '%s\n' '{"serverDomain":"toany.net","legacyControlAddr":"tunnel.toany.net:4445","controlWssURLs":["wss://web.toany.net:9445/ws/control"],"publicWssURLs":["wss://web.toany.net:9445/__ws/public"]}' ;;
+        *) return 2 ;;
+    esac
+}
+
+ddnsto_business_error() {
+    BUSINESS_ENV_FAILURE=$1
+    if command -v ddnsto_flow_error >/dev/null 2>&1; then
+        ddnsto_flow_error "$1" "$2" '未更改业务配置；请核对已有服务环境后重试'
+    else
+        ddnsto_error "$1：$2"; return 2
+    fi
+}
+
+ddnsto_business_match() {
+    case "$1" in production|test) ;; *) ddnsto_business_error E_ENV_UNKNOWN '历史配置或服务参数的业务环境无法确认；未更改设备'; return 2 ;; esac
+    [ "$1" = "${BUSINESS_ENV:-production}" ] && return 0
+    [ "${SWITCH_ENVIRONMENT:-0}" = 1 ] || {
+        ddnsto_business_error E_ENV_SWITCH '业务环境不同；确认后使用 --switch-environment；未更改设备'; return 2;
+    }
+}
+
+ddnsto_business_environment_preflight() {
+    case "$detected_platform" in
+        openwrt) ddnsto_business_service_file "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" || return $? ;;
+        synology) ddnsto_business_service_file /var/packages/ddnsto/scripts/start-stop-status || return $? ;;
+        asus)
+            ddnsto_business_service_file /koolshare/scripts/ddnsto_config.sh || return $?
+            ddnsto_business_service_file /koolshare/init.d/S70ddnsto.sh || return $? ;;
+    esac
+    [ "${BUSINESS_ENV:-production}" = test ] || return 0
+    if [ "${REQUESTED_METHOD:-native}" = docker ]; then
+        ddnsto_error 'E_ENV_UNSUPPORTED：现有 Docker 入口未验证 assignment 持久化；未修改容器'; return 2
+    fi
+    case "$detected_platform" in
+        linux)
+            [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = 4.2.8 ] || {
+                ddnsto_error 'E_ENV_VERSION：测试业务环境仅验证 4.2.8 assignment 协议；未修改设备'; return 2;
+            }
+            command -v jq >/dev/null 2>&1 || { ddnsto_error 'E_ENV_DEPENDENCY：测试业务环境需要 jq，请先安装系统 jq；未修改设备'; return 2; }
+            return 0 ;;
+        openwrt) env_reason='已发布 procd 模板仅传入 Token/index，未提供服务器 assignment 配置入口' ;;
+        synology) env_reason='已发布 SPK 启动器未提供服务器 assignment 环境配置入口' ;;
+        asus) env_reason='各软件中心渠道启动脚本未提供已验证的统一服务器 assignment 配置入口' ;;
+        *) env_reason='平台尚未提供可验证的测试业务环境服务配置' ;;
+    esac
+    ddnsto_error "E_ENV_UNSUPPORTED：$env_reason；未修改设备，不会回退到正式环境"
+    return 2
+}
+
+ddnsto_business_service_file() {
+    [ -e "$1" ] || return 0
+    [ -f "$1" ] && [ ! -L "$1" ] && [ -r "$1" ] || { ddnsto_business_match unknown; return 2; }
+    # Conservative negative check, additional to the platform's ownership and
+    # package checks. Never rewrite vendor launchers to force a business server.
+    env_scan=0
+    grep -E -i -q 'DDNSTO_.*(SERVER|WSS)|[[:space:]]-r([[:space:]]|=)|remote_?addr|server_?addr|serverAssignment' "$1" || env_scan=$?
+    [ "$env_scan" = 1 ] || { ddnsto_business_match unknown; return 2; }
 }
 
 # Inspect marker existence only. Never source vendor configuration as shell code.
