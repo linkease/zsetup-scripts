@@ -3,15 +3,17 @@ from pathlib import Path
 import subprocess
 import unittest
 
-from test_inspect import InspectTests, ROOT
+import test_inspect as inspect_fixture
+
+ROOT = inspect_fixture.ROOT
 
 
 class StoreTransaction(unittest.TestCase):
-    script = InspectTests.script
-    installed_meta = InspectTests.installed_meta
+    script = inspect_fixture.InspectTests.script
+    installed_meta = inspect_fixture.InspectTests.installed_meta
 
     def setUp(self):
-        InspectTests.setUp(self)
+        inspect_fixture.InspectTests.setUp(self)
         self.installed_meta('1.0.0')
         self.state=self.root/'registered-version';self.state.write_text('1.0.0-r1')
         self.env.update(TEST_STATE=str(self.state),TEST_META=str(self.meta/'sample-agent.json'))
