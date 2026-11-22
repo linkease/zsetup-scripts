@@ -129,7 +129,9 @@
   not invoke the low-level transaction against a hand-written production path.
 - Tests and fixtures remain outside `apps/`. Regenerate and check the committed
   entries, configs and `SHA256SUMS` with `scripts/build.py`.
-- The current complete candidate is development-complete but not published.
-  Preparation and `plan` are local/read-only; never run `stage`, `publish`,
-  `activate` or `rollback` without explicit production authorization for the
-  exact release ID. See `docs/apps-release.md` and the coordinator evidence.
+- The first complete release was published on 2026-11-22 with release ID
+  `f0bdc493992caa7d2fc61a9c4ec7ceb5996f0adec2534a01e3490cb0e8943e0d`.
+  Preparation and `plan` are local/read-only; never run a later `stage`,
+  `publish`, `activate` or `rollback` without explicit production authorization
+  for that exact release ID. See `docs/apps-release.md` and the coordinator
+  evidence.

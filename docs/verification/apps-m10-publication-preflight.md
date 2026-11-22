@@ -79,3 +79,14 @@ not expressible through its interface. The coordinator's local release,
 approval, remote transaction and HTTPS byte-verification contracts are covered
 by `tests/contracts/publish_coordinator_test.py`. This remains development
 evidence only; no production command was run.
+
+## Subsequent correct-namespace activation
+
+After the preflight and an explicit later authorization, release
+`f0bdc493992caa7d2fc61a9c4ec7ceb5996f0adec2534a01e3490cb0e8943e0d`
+was activated at `/binary/zsetup-scripts/apps/` through the coordinator. The
+four configured sources passed 48 immutable checks before activation and 556
+complete checks afterward; a separate verify repeated all 556 successfully.
+Existing root-level zsetup configuration and the previously removed incorrect
+DDNSTO targets were unchanged. Full evidence is in
+[`apps-publication-coordinator.md`](apps-publication-coordinator.md).

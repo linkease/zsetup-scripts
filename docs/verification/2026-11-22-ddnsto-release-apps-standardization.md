@@ -1,6 +1,6 @@
 # DDNSTO 推荐版本发布记录：2026-11-22 apps 标准化
 
-状态：误发布已完整回滚；zsetup-scripts 整体业务候选开发完成，明确暂不发布
+状态：误发布已完整回滚；zsetup-scripts 整体业务已在正确命名空间发布
 
 ## 范围与授权
 
@@ -90,3 +90,14 @@
   去除组/其他写权限、`SHA256SUMS` 自身纳入快照/激活/验证/回滚。误激活期间的 139 个
   公开文件均通过权限检查；回滚后不保留这些错误目标文件。
 - 回滚只恢复本次可变入口和配置，不删除不可变版本，不代表客户端降级。
+
+## 后续整体业务正确发布
+
+用户后续明确授权提交并发布完整 zsetup-scripts。Release ID
+`f0bdc493992caa7d2fc61a9c4ec7ceb5996f0adec2534a01e3490cb0e8943e0d`
+已通过仓库统一协调器发布到 `/binary/zsetup-scripts/apps/`，不是此前错误的
+`/binary/` 根。激活前四站点 48 次不可变回读、激活后 556 次完整回读及独立
+556 次复核均通过。原 `/binary/zsetup/config.json` 摘要保持不变，错误目标的
+`/binary/ddnsto/install.sh` 与 `ddnsto/0.2.4/installer.sh` 仍不存在。
+完整事务、回滚位置和摘要见
+[`apps-publication-coordinator.md`](apps-publication-coordinator.md)。

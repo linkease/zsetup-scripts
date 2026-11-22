@@ -37,8 +37,10 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastpve
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
 
-**当前整体 `apps/` 仍是本地候选，尚未发布到 `/binary/zsetup-scripts/apps/`。**
-FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余实现，不代表整体候选已经上线。
+**完整 `apps/` 已于 2026-11-22 通过统一协调器发布到
+`/binary/zsetup-scripts/apps/`。当前 Release ID 为
+`f0bdc493992caa7d2fc61a9c4ec7ceb5996f0adec2534a01e3490cb0e8943e0d`。**
+FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余实现，不再作为整体发布状态的判定依据。
 产品包继续由各业务发布流程提前放在现有 `/binary/APP/` 目录，安装时由 zsetup 下载和校验；
 本仓库只把完整 `apps/` 目录作为一个 zsetup-scripts 业务命名空间发布，不采集或复制产品包。
 整体候选以后只使用 [apps 发布协调器](docs/apps-release.md)：它强制从 `binary` 根派生
