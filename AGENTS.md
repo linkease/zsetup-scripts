@@ -145,6 +145,11 @@
   `/binary/kspeeder/VERSION/` plus root `version.txt` and
   `ks-cli-version.txt`. Stage immutable bytes, verify four HTTPS sources, then
   activate pointers. The low-level shell transaction never deletes history.
+- Future latest-version work starts with `scripts/release-kspeeder.py`: run
+  `check`, use `update-lock` when GitHub advances, review and commit the exact
+  ten-asset lock, then use `prepare`, `plan` and exact-ID `publish`. The wrapper
+  must pass generated apps identity checks and the native KSpeeder HTTPS suite
+  before it delegates any production mutation.
 - KSpeeder and KS-CLI app script 0.1.1 read the mirrored root metadata and
   fetch from the versioned product directory. Publish and verify product bytes
   before publishing the complete apps tree that references them.

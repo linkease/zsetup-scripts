@@ -28,27 +28,66 @@ entries are not deleted by this release. Cleanup is a separate, explicitly
 authorized operation after the versioned mirror and both public apps have
 passed production canaries.
 
-## Reproducible workflow
+## Standard latest-release workflow
+
+`scripts/release-kspeeder.py` is the maintained operator entry point. It reads
+GitHub's latest stable release API, requires the exact ten Linux/Docker release
+assets and GitHub SHA256 digests, verifies both metadata files against the
+binary assets, and checks that the canonical KSpeeder sources and generated
+`apps/kspeeder` / `apps/ks-cli` payloads are identical.
+
+Check without changing the repository:
+
+```sh
+python3 -B scripts/release-kspeeder.py check \
+  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64
+```
+
+When GitHub has a newer stable release, update only the reviewed product lock:
+
+```sh
+python3 -B scripts/release-kspeeder.py update-lock
+git diff -- release/kspeeder-products.json
+```
+
+Review and commit the lock before preparing or publishing. Product upgrades do
+not require an apps installer version bump: the 0.1.1 installers deliberately
+read the activated root metadata and then download from
+`kspeeder/VERSION/`. Change and rebuild the apps only when installer behavior
+itself changes.
+
+After committing, prepare and inspect the exact deployment plan:
+
+```sh
+python3 -B scripts/release-kspeeder.py prepare \
+  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64
+python3 -B scripts/release-kspeeder.py plan \
+  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64 \
+  --server SSH_CONFIG_HOST --binary-root /ABSOLUTE/WEB/ROOT/binary
+```
+
+Production mutation requires the exact Release ID printed by `prepare`:
+
+```sh
+python3 -B scripts/release-kspeeder.py publish \
+  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64 \
+  --server SSH_CONFIG_HOST --binary-root /ABSOLUTE/WEB/ROOT/binary \
+  --approve RELEASE_ID
+```
+
+The wrapper refuses publication when the lock is not GitHub latest, relevant
+sources are uncommitted, generated apps are stale, their catalog identities do
+not match, shell syntax fails, or the isolated native HTTPS/runtime suite fails.
+`GITHUB_TOKEN` may be set to avoid anonymous API rate limits; it is never stored
+in the lock.
+
+## Transaction implementation
 
 `scripts/publish-kspeeder-products.py` owns preparation and production
 coordination. `prepare` downloads every locked GitHub asset over HTTPS, rejects
 any size/SHA mismatch, checks the Linux hashes inside both metadata files, and
 creates an independently checksummed package below
 `dist/kspeeder-products/RELEASE_ID/`.
-
-```sh
-python3 -B scripts/publish-kspeeder-products.py prepare
-python3 -B scripts/publish-kspeeder-products.py plan \
-  --server SSH_CONFIG_HOST --binary-root /ABSOLUTE/WEB/ROOT/binary
-```
-
-Production requires the exact ID printed by `prepare`:
-
-```sh
-python3 -B scripts/publish-kspeeder-products.py publish \
-  --server SSH_CONFIG_HOST --binary-root /ABSOLUTE/WEB/ROOT/binary \
-  --approve RELEASE_ID
-```
 
 The coordinator uploads one private release package, stages the immutable
 version directory, verifies every byte through all four configured HTTPS

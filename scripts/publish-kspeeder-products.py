@@ -80,7 +80,7 @@ def load_lock(path: Path = DEFAULT_LOCK) -> dict:
             raise ProductReleaseError("public bases must be plain HTTPS URLs")
     assets = data["assets"]
     if not isinstance(assets, list) or len(assets) != 10:
-        raise ProductReleaseError("v0.9.1 release must contain exactly ten locked assets")
+        raise ProductReleaseError("KSpeeder release must contain exactly ten locked assets")
     seen = set()
     for asset in assets:
         if set(asset) != {"name", "size", "sha256"}:

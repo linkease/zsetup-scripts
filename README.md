@@ -19,7 +19,9 @@ FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一�
 [`kspeeder/kspeeder`](kspeeder/kspeeder/README.md) 两个 Linux 二进制安装器已升级到
 0.1.1：从四站点版本化 `/binary/kspeeder/0.9.1/` 镜像下载并校验产品，不自动安装
 或启动服务。产品镜像、完整 apps 和真实公开入口 canary 已于 2026-11-22 发布通过；
-服务器同步和回滚方案见[发布说明](docs/kspeeder-installers.md)。
+未来最新版发现、资产锁定、apps 验证及产品发布统一使用
+[`scripts/release-kspeeder.py`](scripts/release-kspeeder.py)，服务器同步和回滚方案见
+[产品镜像说明](docs/kspeeder-product-mirror.md)。
 
 既有全局配置已经收录的应用仍可直接使用 zsetup：
 
