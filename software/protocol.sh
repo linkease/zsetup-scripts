@@ -8,6 +8,10 @@ fi
 task_jq_binary=$task_jq
 task_jq_native_windows=0
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) task_jq_native_windows=1 ;; esac
+if [ "$task_jq_native_windows" = 1 ] && ! "$task_jq_binary" --binary -ne true >/dev/null 2>&1; then
+    printf '%s\n' '{"protocol":"software-task/v1","schemaVersion":1,"operation":null,"targetId":null,"software":null,"status":"blocked","reason":"missing-native-jq-binary-mode","nativeExitCode":127,"effects":[],"details":{}}'
+    exit 21
+fi
 task_json() {
     # Native jq must receive JSON string arguments literally. MSYS otherwise
     # rewrites --arg /d/path into a Windows path inside the JSON document.
@@ -17,6 +21,7 @@ task_json() {
 }
 task_jq=task_json
 TASK_OPERATION=${1:-}; TASK_SOFTWARE=; TASK_TARGET=${ZSETUP_TASK_TARGET_ID:-local}
+TASK_STORE_CATALOG_FOR=
 task_result() {
     local details="${4:-\{\}}" result bytes overflow=0 original=$1
     bytes=$(printf '%s' "$details" | wc -c)

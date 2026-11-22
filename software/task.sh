@@ -4,10 +4,11 @@ set -u
 set -o pipefail
 task_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$task_root/protocol.sh"
-case "$TASK_OPERATION" in search|query|plan|apply|verify|remove|storage-plan|storage-check|backup-plan|backup-run|backup-restore) ;; *) task_stop invalid unknown-operation 2 ;; esac
+case "$TASK_OPERATION" in inspect|search|query|plan|apply|verify|remove|storage-plan|storage-check|backup-plan|backup-run|backup-restore) ;; *) task_stop invalid unknown-operation 2 ;; esac
 task_request "${2:-}"
 . "$task_root/load.sh"
 case "$TASK_OPERATION" in
+    inspect) task_inspect; exit $? ;;
     storage-plan) task_storage_plan; task_result success storage-planned 0 "$TASK_STORAGE_PLAN"; exit 0 ;;
     storage-check) task_storage_check; task_result success storage-verified 0 "$TASK_STORAGE_PLAN"; exit 0 ;;
 esac
