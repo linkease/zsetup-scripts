@@ -3,20 +3,27 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 zroot=${1:?usage: check.sh --native-bin ZSETUP_BINARY | ZSETUP_RUST_ROOT [RUST_RELEASE_PACKAGE]}
 native_only=0
+compatible_native_version() (
+    value=${1#zsetup }
+    [ "$value" != "$1" ] || return 1
+    old_ifs=$IFS; IFS=.; set -- $value; IFS=$old_ifs
+    [ "$#" = 3 ] || return 1
+    for part in "$@"; do
+        [ -n "$part" ] || return 1
+        case "$part" in *[!0-9]*) return 1 ;; esac
+    done
+    [ "$1" -gt 0 ] || { [ "$1" = 0 ] && [ "$2" -ge 5 ]; }
+)
 if [ "$zroot" = --native-bin ]; then
     native_only=1
     native_bin=${2:-}
     [ -f "$native_bin" ] && [ -x "$native_bin" ] || { printf '%s\n' 'executable native binary required' >&2; exit 2; }
     native_bin=$(CDPATH= cd -- "$(dirname -- "$native_bin")" && pwd)/$(basename -- "$native_bin")
     native_version=$("$native_bin" --version) || exit 2
-    case "$native_version" in
-        'zsetup 0.'*)
-            minor=${native_version#zsetup 0.}; minor=${minor%%.*}
-            case "$minor" in ''|*[!0-9]*) exit 2 ;; esac
-            [ "$minor" -ge 5 ] || { printf '%s\n' 'zsetup >=0.5.0 required' >&2; exit 2; } ;;
-        'zsetup '[1-9].*) ;;
-        *) printf '%s\n' 'zsetup >=0.5.0 required' >&2; exit 2 ;;
-    esac
+    compatible_native_version "$native_version" || {
+        printf '%s\n' 'zsetup >=0.5.0 with a stable semantic version is required' >&2
+        exit 2
+    }
     zroot=; release=; tunnel_root=$root
     printf '%s\n' 'Using published native binary; native source and aggregate packaging not checked.'
 else
@@ -55,12 +62,12 @@ python3 -B "$root/tests/ddnsto_autoinstall_test.py"
 python3 -B "$root/tests/ddnsto_auto_openwrt_test.py"
 python3 -B "$root/tests/ddnsto_auto_synology_test.py"
 python3 -B "$root/tests/ddnsto_recommendation_test.py"
-DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/ddnsto/tests/bootstrap_policy_test.py"
-DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/ddnsto/tests/wget_bootstrap_test.py"
-python3 -B "$root/ddnsto/tests/macos_default_test.py"
-python3 -B "$root/ddnsto/tests/macos_diagnostics_test.py"
-DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/tests/ddnsto_managed_cli_test.py"
-python3 -B "$root/ddnsto/tests/operation_lock_test.py"
+python3 -B "$root/tests/apps/ddnsto/internal/bootstrap_policy_test.py"
+python3 -B "$root/tests/apps/ddnsto/internal/wget_bootstrap_test.py"
+python3 -B "$root/tests/apps/ddnsto/internal/macos_default_test.py"
+python3 -B "$root/tests/apps/ddnsto/internal/macos_diagnostics_test.py"
+ZSETUP_TEST_NATIVE="$native_bin" python3 -B "$root/tests/ddnsto_managed_cli_test.py"
+python3 -B "$root/tests/apps/ddnsto/internal/operation_lock_test.py"
 if [ "$native_only" = 0 ] && [ -f "$zroot/Cargo.toml" ]; then
     python3 -B "$root/tests/app_release_test.py" "$zroot" "$native_bin"
     python3 -B "$root/tests/windows_app_release_test.py" "$zroot" "$native_bin"
@@ -70,10 +77,11 @@ python3 -B "$root/tests/minimum_native_test.py"
 python3 -B "$root/tests/windows_scoop_contract_test.py"
 python3 -B "$root/tests/install_storage_test.py"
 python3 -B "$root/tests/managed_remove_test.py" "$native_bin"
-python3 -B "$root/jq/tests/jq_install_test.py" "$native_bin"
-sh -n "$root/jq/business.sh"
-sh -n "$root/jq/jq-install.sh"
-for script in "$root"/kspeeder/ks-cli/*.sh "$root"/kspeeder/kspeeder/*.sh "$root"/kspeeder/lib/*.sh "$root"/linkspace/*.sh "$root"/fastnet/*.sh "$root"/ddnsto/*.sh "$root"/linkease/*.sh "$root"/fastpve/*.sh "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh "$root"/apps/*/*.sh "$root"/apps/*/*/*.sh; do
+python3 -B "$root/tests/apps/jq/jq_install_test.py" "$native_bin"
+sh -n "$root/apps/jq/source/business.sh"
+sh -n "$root/apps/jq/0.1.0/installer.sh"
+for script in "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh \
+    "$root"/apps/*/*.sh "$root"/apps/*/*/*.sh "$root"/apps/*/source/*.sh; do
     sh -n "$script"
 done
 for script in "$root"/legacy/*.sh; do
@@ -85,13 +93,13 @@ done
 for suite in install_bounds_test install_transaction_test launcher_storage_test privilege_bridge_test; do
     python3 -B "$root/tests/$suite.py" "$native_bin"
 done
-python3 -B "$root/linkspace/tests/linkspace_test.py" "$native_bin"
-python3 -B "$root/kspeeder/tests/binary_install_test.py" "$native_bin"
-python3 -B "$root/fastpve/tests/fastpve_test.py" "$native_bin"
-python3 -B "$root/fastnet/tests/fastnet_bootstrap_test.py" "$native_bin"
-python3 -B "$root/fastnet/tests/fastnet_zsetup_test.py" "$native_bin" "$tunnel_root"
-python3 -B "$root/ddnsto/tests/ddnsto_test.py" "$native_bin" "$tunnel_root"
-python3 -B "$root/linkease/tests/linkease_test.py" "$native_bin"
+python3 -B "$root/tests/apps/linkspace/linkspace_test.py" "$native_bin"
+python3 -B "$root/tests/apps/kspeeder/binary_install_test.py" "$native_bin"
+python3 -B "$root/tests/apps/fastpve/fastpve_test.py" "$native_bin"
+python3 -B "$root/tests/apps/fastnet/fastnet_bootstrap_test.py" "$native_bin"
+python3 -B "$root/tests/apps/fastnet/fastnet_zsetup_test.py" "$native_bin" "$tunnel_root"
+python3 -B "$root/tests/apps/ddnsto/ddnsto_test.py" "$native_bin" "$tunnel_root"
+python3 -B "$root/tests/apps/linkease/linkease_test.py" "$native_bin"
 if [ "$native_only" = 0 ]; then
     python3 -B "$root/tests/package_test.py" "$zroot" "$release"
 fi

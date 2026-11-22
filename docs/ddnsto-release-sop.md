@@ -30,15 +30,18 @@
 
 ## 3. 修改唯一维护源并生成
 
-版本/摘要改 `ddnsto/platform-releases.json`；安装行为改对应 `ddnsto/templates/*.in`。
+版本/摘要改 `apps/ddnsto/source/platform-releases.json`；安装行为改对应
+`apps/ddnsto/source/templates/*.in`。
 没有模板的模块直接修改源文件。生成副本不作为人工修改入口。
 
 ```sh
-python3 -B scripts/build-entrypoints.py
-python3 -B scripts/build-entrypoints.py --check
+python3 -B scripts/build-ddnsto-products.py
+python3 -B scripts/build-ddnsto-products.py --check
+python3 -B scripts/build.py
+python3 -B scripts/build.py --check
 git diff --check
 git diff --stat
-git diff -- ddnsto/platform-releases.json ddnsto/templates
+git diff -- apps/ddnsto/source/platform-releases.json apps/ddnsto/source/templates
 ```
 
 同时审查未跟踪文件，`git diff` 不会显示它们。检查生成结果中各平台版本、包路径、摘要、
@@ -54,7 +57,7 @@ python3 -B -m unittest discover -s tests -p 'ddnsto*test.py'
 ```
 
 需要真实核心的测试使用已验证的 zsetup 可执行文件设置 `DDNSTO_TEST_NATIVE`；另按修改平台
-运行 `ddnsto/tests/` 下相关测试。使用 `sh scripts/check.sh --native-bin /绝对路径/zsetup`
+运行 `tests/apps/ddnsto/` 下相关测试。使用 `sh scripts/check.sh --native-bin /绝对路径/zsetup`
 执行标准检查，不需要修改或重编 zsetup 源码。
 
 Shell 入口/生成器变更还必须通过 Bash 4.2 POSIX 模式验证，不能仅用开发机的 `sh -n`。
@@ -70,7 +73,7 @@ Shell 入口/生成器变更还必须通过 Bash 4.2 POSIX 模式验证，不能
 先审查差异，再取得两个实际安装器的 SHA-256：
 
 ```sh
-sha256sum ddnsto/ddnsto-install.sh ddnsto/install.ps1
+sha256sum apps/ddnsto/0.2.4/installer.sh apps/ddnsto/source/install.ps1
 python3 -B scripts/package-ddnsto-recommendation.py --help
 ```
 

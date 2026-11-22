@@ -20,7 +20,7 @@ class WindowsScoopContract(unittest.TestCase):
         self.assertEqual(record["path"], "scoop/0.1.2/scoop-install.ps1")
 
     def test_business_source_pins_and_uses_the_verified_bootstrap_chain(self):
-        source = (ROOT / "scoop/business.ps1").read_text(encoding="utf-8")
+        source = (ROOT / "apps/scoop/source/business.ps1").read_text(encoding="utf-8")
         self.assertIn("$script:ScoopInstallerVersion = '0.1.2'", source)
         for value in (
             "0.9.1-market.238d13be-windows-amd64",
@@ -43,9 +43,11 @@ class WindowsScoopContract(unittest.TestCase):
         self.assertNotIn("Start-BitsTransfer", source)
 
     def test_generated_entry_is_current_and_bounded(self):
-        entry = ROOT / "scoop/scoop-install.ps1"
+        entry = ROOT / "apps/scoop/0.1.2/installer.ps1"
         self.assertLess(entry.stat().st_size, 131072)
-        spec = importlib.util.spec_from_file_location("scoop_build", ROOT / "scoop/build.py")
+        spec = importlib.util.spec_from_file_location(
+            "scoop_build", ROOT / "apps/scoop/source/build.py"
+        )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         self.assertEqual(entry.read_text(encoding="utf-8"), module.render())

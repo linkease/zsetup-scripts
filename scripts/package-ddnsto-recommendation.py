@@ -28,7 +28,7 @@ contract, not an alternate recommendation authority.
 
 Shell recommendations require fresh network metadata, without persistent
 recommendation cache. --native-first is a separately activated local candidate:
-fixed verified Linux core first, then native immutable-body download. Appliances
+latest verified Linux stable core first, then native immutable-body download. Appliances
 and unvalidated architectures retain their existing path. Native HTTPS redirects
 differ from shell reject-all policy; this requires review before activation.
 No crypto supply infrastructure or remote-code parser is introduced.
@@ -66,16 +66,20 @@ def source_url(value):
 
 def package(args):
     base = source_url(args.source_url)
+    repository_source = args.source_root.resolve() == ROOT
+    source_directory = (args.source_root / 'apps/ddnsto/source'
+                        if repository_source else args.source_root / 'ddnsto')
     # Full product trees must be compiled before review/packaging. Minimal
     # inert installer fixtures remain useful for testing the transport wrapper.
-    if args.source_root.resolve() == ROOT or (args.source_root / 'ddnsto/platform-releases.json').exists():
+    if repository_source or (source_directory / 'platform-releases.json').exists():
         spec = importlib.util.spec_from_file_location('ddnsto_products', ROOT / 'scripts/build-ddnsto-products.py')
         products = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(products)
         products.generate(args.source_root, check=True)
-        combined = (args.source_root / 'ddnsto/ddnsto-install.sh').read_text()
+        combined = ((args.source_root / 'apps/ddnsto/0.2.4/installer.sh')
+                    if repository_source else source_directory / 'ddnsto-install.sh').read_text()
         for name in products.OUTPUTS:
-            if name.endswith('.sh') and (args.source_root / 'ddnsto' / name).read_text().rstrip() not in combined:
+            if name.endswith('.sh') and (source_directory / name).read_text().rstrip() not in combined:
                 raise ValueError('stale generated product bundle: ' + name)
     output = args.output.absolute()
     if output.exists() or output.is_symlink():
@@ -86,7 +90,9 @@ def package(args):
         ('shell', 'ddnsto-install.sh', args.reviewed_shell_sha256, 'sh'),
         ('powershell', 'install.ps1', args.reviewed_powershell_sha256, 'ps1'),
     ]:
-        path = args.source_root / 'ddnsto' / name
+        path = ((args.source_root / 'apps/ddnsto/0.2.4/installer.sh')
+                if repository_source and extension == 'sh'
+                else source_directory / name)
         if path.is_symlink() or not path.is_file() or not 0 < path.stat().st_size <= MAX_SCRIPT:
             raise ValueError('canonical installer must be a bounded regular file')
         data = path.read_bytes()
@@ -104,17 +110,14 @@ def package(args):
         payloads[relative] = data
         payloads[f'recommended-{platform}.txt'] = (
             f'ddnsto-recommendation-v1-{platform}\n{actual}\n{len(data)}\n').encode('ascii')
-        template = (ROOT / f'ddnsto/recommended-entry.{extension}').read_text()
+        template = (ROOT / 'apps/ddnsto/source' / f'recommended-entry.{extension}').read_text()
         if extension == 'sh':
-            template = template.replace('@@ASUS_STORAGE@@', (ROOT / 'ddnsto/asus-storage.sh').read_text())
-            template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'ddnsto/portable-files.sh').read_text())
+            template = template.replace('@@ASUS_STORAGE@@', (ROOT / 'apps/ddnsto/source/asus-storage.sh').read_text())
+            template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'apps/ddnsto/source/portable-files.sh').read_text())
             native = ''
             if args.native_first:
-                policy = (ROOT / 'ddnsto/bootstrap-policy.sh').read_text()
-                pins = re.findall(r'^fetch_bootstrap_metadata\(\) \{\n.*?^\}', policy, re.M | re.S)
-                if len(pins) != 1:
-                    raise ValueError('cannot identify canonical native pins')
-                native += pins[0] + '\n' + (ROOT / 'ddnsto/recommendation-native.sh').read_text()
+                native += (ROOT / 'lib/bootstrap.sh').read_text().rstrip() + '\n'
+                native += (ROOT / 'apps/ddnsto/source/recommendation-native.sh').read_text()
                 native += '\nddnsto_recommend_native_prepare\n'
             template = template.replace('# @@NATIVE_FIRST@@', native)
         payloads[f'recommended-entry.{extension}'] = template.replace(

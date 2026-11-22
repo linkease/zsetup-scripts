@@ -6,7 +6,7 @@
 
 4.2.8 客户端可能在后续启动时将 `.ddnsto_boot.cfg` 设为 0777。安装器原有启动后收紧权限逻辑无法覆盖下一次执行：`check_state` 会先以文件可被其他用户写入为由退出。
 
-模板 `ddnsto/templates/install-macos.sh.in` 将该文件的归属验证与权限收紧分开：
+模板 `apps/ddnsto/source/templates/install-macos.sh.in` 将该文件的归属验证与权限收紧分开：
 
 - 仍验证所有父目录；身份文件必须位于当前用户的私有配置目录内，属于当前用户、为普通文件、不是符号链接且只有一个硬链接。
 - 配置、程序、安装标记、版本凭据、plist 保持原来的权限检查；安装标记及已有 launchd job 也必须通过归属验证。

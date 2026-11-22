@@ -1,7 +1,7 @@
 # 用户与 AI 调用协议
 
 Linux已发布入口`zsetup install ks-cli --foreground`与`zsetup install kspeeder --foreground`，
-源码分别为`kspeeder/ks-cli`和`kspeeder/kspeeder`。两者只安装二进制，接受前置
+源码分别为`apps/ks-cli`和`apps/kspeeder`。两者只安装二进制，接受前置
 `--installer-prefix ABS`/`--installer-work-dir ABS`，拒绝system scope和业务参数；
 不自动启动服务。安装后stdout为`application/version/command/prefix`四行字段，
 进度在stderr；版本检查仅执行受限`version`。这两个脚本0.1.0已于2026-10-26上线；
@@ -13,8 +13,8 @@ Linux已发布入口`zsetup install ks-cli --foreground`与`zsetup install kspee
 |---|---|---|
 | fastnet | `zsetup install fastnet --foreground -- ARGS...` | 原样传 ARGS，安装器最终 exec FastNet，退出码继承业务程序；它可能打开菜单，自动化须使用业务已支持的非交互参数，本文不虚构 FastNet 参数 |
 | ddnsto | `zsetup install ddnsto --foreground -- --token TOKEN [--force-version lite\|standard] [--verify-status]` | OpenWrt token 可选；Linux 无终端 token 必需。Linux 不支持 lite/verify-status。前台退出码为业务结果 |
-| ddnsto/macOS | `sh ddnsto/install-macos.sh --token TOKEN [--version 4.2.1]` | 仅支持 x86_64/arm64；使用用户级 launchd；当前固定客户端归档为 4.2.1，入口会校验归档 SHA256 |
-| ddnsto/Windows | `powershell -ExecutionPolicy Bypass -File ddnsto/install.ps1 -Token TOKEN [-Version 4.2.1]` | Windows 10 x64 WOW64 / PowerShell 5.1 验证范围；使用 x86_64 CLI 和 SYSTEM 计划任务；入口会校验归档及二进制 SHA256 |
+| ddnsto/macOS | `sh apps/ddnsto/ddnsto-install.sh --token TOKEN` | 仅支持 x86_64/arm64；使用用户级 launchd；入口校验归档 SHA256 |
+| ddnsto/Windows | `powershell -ExecutionPolicy Bypass -File apps/ddnsto/ddnsto-install.ps1 -Token TOKEN` | Windows 10 x64 WOW64 / PowerShell 5.1 验证范围；使用 x86_64 CLI 和 SYSTEM 计划任务；入口校验归档及二进制 SHA256 |
 | linkease | `zsetup install linkease --foreground -- [--version VERSION]` | 无 token/菜单交互；Linux 默认 1.7.5、OpenWrt 默认服务器 VERSION；默认前台，可后台读取最终 result；root/已配置 sudo 与 tar/unzip 或 opkg 要求见模块 README |
 | fastpve | `zsetup install fastpve --foreground -- ARGS...` | Debian/apt/x86_64 PVE、root/pveversion 必需；exec FastPVE，默认交互菜单；参数/退出码原样继承，不虚构非交互参数 |
 
@@ -22,7 +22,9 @@ Linux已发布入口`zsetup install ks-cli --foreground`与`zsetup install kspee
 
 后台：`zsetup install ddnsto --background -- --token TOKEN` 返回 0 仅表示成功启动，stdout 给出 pid/log/result。等待 result 出现并读取其最终退出码。后台 stdin 关闭，不能回答 token 或 HTTP bootstrap 确认。FastNet 菜单默认使用前台；DDNSTO 默认前台便于直接拿到真实错误。
 
-一键脚本中的 bootstrap 只处理 zsetup 的 HTTPS stable/exact version；直接进入当前脚本的业务函数。安装模式由 zsetup 设置 `ZSETUP_INSTALLER_MODE=1`，提供 ZSETUP_BIN、OS/PACKAGE_MANAGER/ARCH/MEMORY_TOTAL_MB、SOURCE_BASES/SOURCE_FALLBACK、CONFIG_VERSION。AI 正常使用 install，不能伪造这些变量来绕过平台或摘要校验。
+一键脚本中的 bootstrap 只处理当前平台的 zsetup HTTPS stable；应用配置的 `min_version`
+是能力最低门槛，不是精确版本。当前核心高于门槛或配置 stable 时继续使用，不能因旧配置降级。
+安装模式由 zsetup 设置 `ZSETUP_INSTALLER_MODE=1`，提供 ZSETUP_BIN、OS/PACKAGE_MANAGER/ARCH/MEMORY_TOTAL_MB、SOURCE_BASES/SOURCE_FALLBACK、CONFIG_VERSION。AI 正常使用 install，不能伪造这些变量来绕过平台或摘要校验。完整规则见 [zsetup 兼容策略](zsetup-compatibility.md)。
 
 zsetup 默认完整本地配置 `/etc/zsetup/config.json` 优先于云端；无本地配置时读云端，故障才使用已验证 last-known-good。配置不按字段合并。SOURCE_GROUP 三个 primary 与 final fallback 顺序保持既有规则。脚本通过 HTTPS 的 VERSION/SHA256SUMS 获取业务发布信息；下载的新包必须由 zsetup 校验 digest。业务缓存复用只信任私有工作目录中已成功校验后写入、与 metadata digest 和文件大小一致的标记；不把该目录用于外部可写内容。
 
@@ -30,11 +32,13 @@ zsetup 默认完整本地配置 `/etc/zsetup/config.json` 优先于云端；无�
 
 0.1.6 脚本要求 zsetup >=0.2.4。`context --json` 增加 `memory_total_mb`（整数 MiB，未知为 null）；字段模式为整数或 unknown。`metadata version FILE [KEY]` 与 `metadata sha256 FILE NAME` 仅读取受限本地数据；0 成功、2 参数错误、11 内容错误、12 文件错误，成功 stdout 只有一行值。DDNSTO 的 900 MiB 阈值仍由业务决定；测试可用既有 DDNSTO_MEM_MB，普通用户无需传内存参数。
 
-维护与直接调用入口统一命名为 APP/APP-install.sh：fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh、linkease/linkease-install.sh、fastpve/fastpve-install.sh。公开 URL 使用 /binary/APP/APP-install.sh；原 /binary/APP/install.sh 为同字节兼容副本。zsetup install 的应用标识和参数协议不变。
+整体业务的维护与直接调用入口位于 `apps/APP/APP-install.*`；配置索引固定引用
+`apps/APP/VERSION/installer.*`。整体公开 URL 位于 `/binary/zsetup-scripts/apps/`，既有
+`/binary/APP/` 独立入口只作为兼容发布保留。zsetup install 的应用标识和参数协议不变。
 
-LinkEase 只支持 opkg 的 OpenWrt 及已声明 Linux 的 x86_64/aarch64/armv7，不声明 APK/MIPS。--version 原样通过现有 install 参数协议传入；LINKEASE_VERSION 作为默认，命令行优先。Linux 安装/启动失败会恢复旧文件/服务，恢复失败保留备份并报告；opkg 部分安装结果须由包管理器恢复，不解释成完整事务回滚。详见 [LinkEase 协议](../linkease/README.md)。
+LinkEase 只支持 opkg 的 OpenWrt 及已声明 Linux 的 x86_64/aarch64/armv7，不声明 APK/MIPS。--version 原样通过现有 install 参数协议传入；LINKEASE_VERSION 作为默认，命令行优先。Linux 安装/启动失败会恢复旧文件/服务，恢复失败保留备份并报告；opkg 部分安装结果须由包管理器恢复，不解释成完整事务回滚。详见 [LinkEase 协议](../apps/linkease/README.md)。
 
-FastPVE 使用原 version.txt 的 VERSION/FASTPVE_SHA256 与 FastPVE-<VERSION> 协议；默认前台菜单，AI 不能将启动成功解释成 PVE 业务操作完成。PVE 大版本兼容性仍需设备验证。私有缓存 marker/size 不检测同大小的外部篡改，不允许共享可写工作目录。详见 [FastPVE 协议](../fastpve/README.md)。
+FastPVE 使用原 version.txt 的 VERSION/FASTPVE_SHA256 与 FastPVE-<VERSION> 协议；默认前台菜单，AI 不能将启动成功解释成 PVE 业务操作完成。PVE 大版本兼容性仍需设备验证。私有缓存 marker/size 不检测同大小的外部篡改，不允许共享可写工作目录。详见 [FastPVE 协议](../apps/fastpve/README.md)。
 
 
 ## Linux storage candidate protocol (scripts-0.1.8 / Rust zsetup0.5.0)

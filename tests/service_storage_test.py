@@ -143,15 +143,16 @@ def inside():
             native_version = subprocess.check_output([native, '--version'], text=True).strip().removeprefix('zsetup ')
             stable = root / 'stable'; stable.write_text(native_version + '\n')
             executable(bindir / 'curl', '''#!/bin/sh
-out=; url=
+out=; url=; write_status=0
 while [ "$#" -gt 0 ]; do
  case "$1" in -o|--output) shift; out=$1; shift; continue ;; esac
+ case "$1" in --write-out) write_status=1; shift 2; continue ;; esac
  case "$1" in https://*|http://*) url=$1 ;; esac
  shift
 done
 case "$url" in
- */zsetup/stable) cp "$TEST_STABLE" "$out"; printf 200 ;;
- */zsetup/0.5.0/zsetup-linux-x86_64) cp "$TEST_NATIVE" "$out"; printf 200 ;;
+ */zsetup/stable) cp "$TEST_STABLE" "$out"; [ "$write_status" = 0 ] || printf 200 ;;
+ */zsetup/*/zsetup-linux-x86_64) cp "$TEST_NATIVE" "$out"; [ "$write_status" = 0 ] || printf 200 ;;
  http://127.0.0.1:18334/healthz) printf ok ;;
  *) exit 97 ;;
 esac
@@ -223,7 +224,8 @@ if [ "$1" = /proc/111/exe ]; then printf '%s\n' "$TEST_EXPECTED_EXEC"; else exec
                     sums = ''.join(f'{hashlib.sha256(body).hexdigest()}  {filename}\n' for filename, body in files.items()).encode()
                     if app == 'ddnsto': Handler.bodies[f'{folder}/SHA256SUMS'] = Handler.bodies.get(f'{folder}/SHA256SUMS', b'') + sums
                     else: Handler.bodies[f'{folder}/SHA256SUMS'] = sums
-                script = ROOT / app / f'{app}-install.sh'
+                version = {'ddnsto': '0.2.4', 'linkease': '0.1.9'}[app]
+                script = ROOT / 'apps' / app / version / 'installer.sh'
                 if app == 'ddnsto':
                     fixture_archive = Handler.bodies['/binary/ddnsto/linux-binary/ddnsto-standard-4.2.8.tar.gz']
                     source = script.read_text()

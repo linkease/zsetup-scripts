@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
     assert not (output.parent / "ddnsto-artifacts").exists()
     assert not any(p.suffix in {".ipk", ".apk"} or p.suffix == ".gz" and p.relative_to(binary).parts[0] != "zsetup" for p in binary.rglob("*"))
     for relative in ("openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh", "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh"):
-        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "ddnsto/ddnsto-install.sh").read_bytes()
+        assert (binary / "ddnsto" / relative).read_bytes() == (ROOT / "apps/ddnsto/0.2.4/installer.sh").read_bytes()
     for relative in ("install.ps1", "install-macos.sh"):
         assert not (binary / "ddnsto" / relative).exists(), 'desktop candidates must not activate aliases'
     config = json.loads((binary / "zsetup/config.json").read_text())
@@ -58,8 +58,8 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert (binary / record["path"]).read_bytes() == current.read_bytes()
         # Historical public URL remains an identical compatibility copy.
         assert (binary / app / "install.sh").read_bytes() == current.read_bytes()
-    assert (binary/'jq/jq-install.ps1').read_bytes() == (ROOT/'jq/jq-install.ps1').read_bytes()
-    assert (binary/'jq/0.1.0/jq-install.ps1').read_bytes() == (ROOT/'jq/jq-install.ps1').read_bytes()
+    assert (binary/'jq/jq-install.ps1').read_bytes() == (ROOT/'apps/jq/0.1.0/installer.ps1').read_bytes()
+    assert (binary/'jq/0.1.0/jq-install.ps1').read_bytes() == (ROOT/'apps/jq/0.1.0/installer.ps1').read_bytes()
     def select(app, os_name, pm, arch):
         matches = [r for r in config["installers"] if r["application"] == app and all(r[k] in ("*", v) for k,v in (("os", os_name), ("package_manager", pm), ("arch", arch)))]
         assert len(matches) == 1, (app, os_name, pm, arch, matches)

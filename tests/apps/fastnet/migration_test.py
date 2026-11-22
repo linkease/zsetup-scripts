@@ -26,9 +26,9 @@ assert manifest == {
     "compatibility_aliases": ["fastnet-install.sh"],
 }
 payload = APP / "0.1.9/installer.sh"
-assert payload.read_bytes() == (ROOT / "fastnet/fastnet-install.sh").read_bytes()
+assert payload.is_file() and not payload.is_symlink()
 for source in ("business.sh", "main.sh", "README.md"):
-    assert (APP / source).read_bytes() == (ROOT / "fastnet" / source).read_bytes()
+    assert (APP / source).is_file(), source
 assert (APP / "install.sh").read_bytes() == (APP / "fastnet-install.sh").read_bytes()
 assert not (APP / "tests").exists()
 
@@ -41,7 +41,7 @@ assert {record["path"] for record in records} == {
 }
 assert {record["sha256"] for record in records} == {hashlib.sha256(payload.read_bytes()).hexdigest()}
 assert {record["size"] for record in records} == {payload.stat().st_size}
-assert {record["min_version"] for record in records} == {"0.6.4"}
+assert {record["min_version"] for record in records} == {manifest["min_zsetup"]}
 assert "fastnet" in {record["application"] for record in config["installers"]}
 
 print("FastNet apps migration: public source, standard entry, immutable payload and config passed")

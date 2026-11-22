@@ -237,8 +237,7 @@ def relevant_status() -> str:
         "git", "-C", ROOT, "status", "--porcelain=v1", "--",
         "release/kspeeder-products.json", "scripts/install-kspeeder-product-release.sh",
         "scripts/publish-kspeeder-products.py", "scripts/release-kspeeder.py",
-        "kspeeder", "apps/kspeeder", "apps/ks-cli",
-        "apps/_shared/kspeeder-binary.sh", "apps/_shared/kspeeder-binary.ps1",
+        "apps/kspeeder", "apps/ks-cli",
         "apps/zsetup/config.json", "apps/zsetup/config-windows.json", "apps/SHA256SUMS",
     ], capture=True).stdout
 
@@ -298,12 +297,11 @@ def validate_apps(*, root: Path = ROOT, native_bin: Path | None = None,
             raise WorkflowError(f"apps/{app}/app.json has an invalid installer version")
         application_result = {"installer_version": version, "records": 0, "sha256": {}}
         for extension in ("sh", "ps1"):
-            source = root / "kspeeder" / app / f"{app}-install.{extension}"
             payload = root / "apps" / app / version / f"installer.{extension}"
             alias = root / "apps" / app / f"{app}-install.{extension}"
             standard = root / "apps" / app / f"install.{extension}"
-            if not source.is_file() or payload.read_bytes() != source.read_bytes():
-                raise WorkflowError(f"apps/{app} immutable {extension} payload differs from canonical source")
+            if not payload.is_file() or payload.is_symlink():
+                raise WorkflowError(f"apps/{app} immutable {extension} payload is missing")
             if alias.read_bytes() != standard.read_bytes():
                 raise WorkflowError(f"apps/{app} standard {extension} aliases differ")
             expected_sha = hashlib.sha256(payload.read_bytes()).hexdigest()
@@ -316,18 +314,16 @@ def validate_apps(*, root: Path = ROOT, native_bin: Path | None = None,
                     f"apps/{app} {extension} config records do not identify its immutable payload"
                 )
             if extension == "sh":
-                for script in (source, payload, alias, standard):
+                for script in (payload, alias, standard):
                     command_runner(["sh", "-n", script])
             application_result["records"] += len(records)
             application_result["sha256"][extension] = expected_sha
         results[app] = application_result
 
-    for extension in ("sh", "ps1"):
-        shared = root / "apps/_shared" / f"kspeeder-binary.{extension}"
-        if shared.read_bytes() != (root / "kspeeder/lib" / f"binary.{extension}").read_bytes():
-            raise WorkflowError(f"apps shared KSpeeder {extension} policy differs from canonical source")
-    policy = (root / "apps/_shared/kspeeder-binary.sh").read_text(encoding="utf-8")
-    powershell_policy = (root / "apps/_shared/kspeeder-binary.ps1").read_text(encoding="utf-8")
+    policy = (root / "apps/ks-cli" / results["ks-cli"]["installer_version"] /
+              "installer.sh").read_text(encoding="utf-8")
+    powershell_policy = (root / "apps/ks-cli" / results["ks-cli"]["installer_version"] /
+                         "installer.ps1").read_text(encoding="utf-8-sig")
     if ("INSTALLER_REMOTE_APP=$kp_product_root/releases/$kp_release" not in policy
             or '"kspeeder/releases/$($release.Release)"' not in powershell_policy
             or any(base not in policy or base not in powershell_policy for base in PUBLIC_BASES)):
@@ -338,7 +334,7 @@ def validate_apps(*, root: Path = ROOT, native_bin: Path | None = None,
         native_bin = native_bin.resolve()
         if not native_bin.is_file() or not os.access(native_bin, os.X_OK):
             raise WorkflowError("--native-bin must be an executable zsetup binary")
-        command_runner([sys.executable, "-B", root / "kspeeder/tests/binary_install_test.py", native_bin])
+        command_runner([sys.executable, "-B", root / "tests/apps/kspeeder/binary_install_test.py", native_bin])
         runtime = True
     return {"applications": results, "native_runtime": runtime}
 

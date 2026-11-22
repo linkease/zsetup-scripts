@@ -5,7 +5,7 @@
 仅修改 zsetup-scripts。本地配置集中化，原生六平台版本、摘要、华硕包大小保持迁移前值；
 未改 zsetup 核心、前端、设备、测试站或正式站。Windows 为 CLI 配置，不包括控制台 GUI 下载入口。
 
-配置文件：`ddnsto/platform-releases.json`。构建入口：`scripts/build-entrypoints.py`。
+配置文件：`apps/ddnsto/source/platform-releases.json`。构建入口：`scripts/build-ddnsto-products.py`。
 模板只在维护者机器展开，设备执行带固定产品校验值的自包含脚本。
 
 ## 自动测试

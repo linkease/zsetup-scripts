@@ -64,7 +64,7 @@ def audit(base, fetch=None, mode='indexed', verify_products=False, fetch_product
             checks.append({'path': path, 'ok': False, 'error': str(exc)})
             return None
 
-    installer = (ROOT / 'ddnsto/ddnsto-install.sh').read_bytes()
+    installer = (ROOT / 'apps/ddnsto/0.2.4/installer.sh').read_bytes()
     digest = hashlib.sha256(installer).hexdigest()
 
     def verify_entry(data):
@@ -86,7 +86,8 @@ def audit(base, fetch=None, mode='indexed', verify_products=False, fetch_product
 
     if mode == 'indexed':
         check('zsetup/config.json', verify_config)
-    windows = (ROOT / 'ddnsto/install.ps1').read_bytes()
+    windows_path = ROOT / 'apps/ddnsto/source/install.ps1'
+    windows = windows_path.read_bytes() if windows_path.is_file() else b''
     def verify_windows(data):
         if data != windows:
             raise ValueError('PowerShell entry does not match this checkout')
@@ -111,14 +112,15 @@ def audit(base, fetch=None, mode='indexed', verify_products=False, fetch_product
         owners = {'linux-binary': 'product-pins.sh', 'openwrt': 'product-pins.sh',
                   'macOS': 'install-macos.sh', 'windows': 'install.ps1',
                   'synology': 'synology-download.sh'}
-        sources = {name: (ROOT / 'ddnsto' / name).read_text() for name in set(owners.values())}
+        combined_policy = installer.decode('utf-8', errors='strict') + windows.decode(
+            'utf-8', errors='strict'
+        )
         fetch_product = fetch_product or (lambda path: remote_product(base.rstrip('/') + '/' + path))
         product_state = 'verified'
         for record in products:
             path = 'ddnsto/' + record['source_path']
             try:
-                owner = owners[record['source_path'].split('/')[0]]
-                if record['sha256'] not in sources[owner]:
+                if record['sha256'] not in combined_policy:
                     raise ValueError('reviewed product manifest differs from current installer pins')
                 digest_size = fetch_product(path)
                 if digest_size != (record['sha256'], record['size']):

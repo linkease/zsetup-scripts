@@ -24,7 +24,7 @@ class SynologyRunningUpgrade(unittest.TestCase):
             (root / 'version').write_text('4.2.7-7')
             (root / 'running').touch()
             (root / 'flow').mkdir()
-            script = f'. "{ROOT}/ddnsto/auto-install.sh"\n. "{ROOT}/ddnsto/auto-synology.sh"\n' + r'''
+            script = f'. "{ROOT}/apps/ddnsto/source/auto-install.sh"\n. "{ROOT}/apps/ddnsto/source/auto-synology.sh"\n' + r'''
 set -eu
 TOKEN=same-token
 DDNSTO_FLOW_DIR=$FIXTURE/flow

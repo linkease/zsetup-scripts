@@ -10,18 +10,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class SynologyAuto(unittest.TestCase):
     def test_help_describes_synology_automatic_support(self):
-        result = subprocess.run(['sh', str(ROOT / 'ddnsto/ddnsto-install.sh'), '--help'], capture_output=True, text=True)
+        result = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/0.2.4/installer.sh'), '--help'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0)
         self.assertIn('DS220j', result.stdout)
         self.assertNotIn('暂不支持 NAS/Docker', result.stdout)
 
     def test_fresh_volume_selection_does_not_require_jq_regex_library(self):
-        source = (ROOT / 'ddnsto/auto-synology-fresh.sh').read_text()
+        source = (ROOT / 'apps/ddnsto/source/auto-synology-fresh.sh').read_text()
         self.assertNotIn('test("', source)
 
     def test_fresh_preflight_requires_unoccupied_listed_numeric_volume(self):
-        source = (ROOT / 'ddnsto/auto-synology-fresh.sh').read_text().replace('/usr/syno/bin/synowebapi', '/bin/true')
-        script = f'. "{ROOT}/ddnsto/auto-install.sh"\n' + source + '''
+        source = (ROOT / 'apps/ddnsto/source/auto-synology-fresh.sh').read_text().replace('/usr/syno/bin/synowebapi', '/bin/true')
+        script = f'. "{ROOT}/apps/ddnsto/source/auto-install.sh"\n' + source + '''
 ddnsto_synowebapi() { printf '%s' "$RESPONSE"; }
 ddnsto_bootstrap_safe_ancestors() { :; }
 ddnsto_synology_fresh_check() { :; }
@@ -44,8 +44,8 @@ printf '%s' "$syno_volume"
                 self.assertEqual(result.stdout, volume)
 
     def test_sudo_authorization_failure_is_explicit_and_never_executes(self):
-        main = (ROOT / 'ddnsto/main.sh').read_text().rsplit('\nmain "$@"', 1)[0]
-        script = f'. "{ROOT}/ddnsto/auto-install.sh"\n' + main + '''
+        main = (ROOT / 'apps/ddnsto/source/main.sh').read_text().rsplit('\nmain "$@"', 1)[0]
+        script = f'. "{ROOT}/apps/ddnsto/source/auto-install.sh"\n' + main + '''
 ddnsto_parse_args() { ACTION=ensure; PLAN_ONLY=0; }
 ddnsto_local_platform() { detected_platform=synology; }
 ddnsto_validate_platform_options() { :; }
@@ -54,13 +54,13 @@ id() { echo 1000; }
 sudo() { [ "$1" != -v ] || return 1; echo UNEXPECTED_EXECUTION; }
 ddnsto_entry_install --token fixture
 '''
-        result = subprocess.run(['sh', '-c', script, str(ROOT / 'ddnsto/main.sh')], capture_output=True, text=True)
+        result = subprocess.run(['sh', '-c', script, str(ROOT / 'apps/ddnsto/source/main.sh')], capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('E_PRIVILEGE', result.stderr)
         self.assertNotIn('UNEXPECTED_EXECUTION', result.stdout)
 
     def test_default_synology_routes_without_generic_linux_dispatch(self):
-        script = f'. "{ROOT}/ddnsto/auto-install.sh"\n' + '''
+        script = f'. "{ROOT}/apps/ddnsto/source/auto-install.sh"\n' + '''
 detected_platform=synology
 ddnsto_synology_ensure() { printf 'SYNOLOGY'; }
 bootstrap_and_run() { exit 99; }
@@ -71,9 +71,9 @@ ddnsto_ensure_execute
 
     def test_bootstrap_uses_protected_storage_not_noexec_tmp(self):
         with tempfile.TemporaryDirectory() as directory:
-            script = f'. "{ROOT}/ddnsto/auto-synology.sh"\n' + '''
+            script = f'. "{ROOT}/apps/ddnsto/source/auto-synology.sh"\n' + '''
 ddnsto_synology_storage() { syno_storage=$FIXTURE; }
-ddnsto_bootstrap_zsetup() { [ "$WORK_ROOT" = "$FIXTURE/native" ] || exit 99; ACTIVE_ZSETUP=/bin/true; }
+bootstrap_zsetup_path() { [ "$WORK_ROOT" = "$FIXTURE/native" ] || exit 99; printf '/bin/true\\n'; }
 ddnsto_synology_select() { digest=fixture; relative=fixture; }
 ddnsto_synology_fetch "$FIXTURE/package.spk"
 '''
@@ -93,9 +93,9 @@ ddnsto_synology_fetch "$FIXTURE/package.spk"
                 config.chmod(0o600)
             script = f'''
 set -eu
-. "{ROOT}/ddnsto/auto-install.sh"
-. "{ROOT}/ddnsto/auto-synology.sh"
-. "{ROOT}/ddnsto/auto-synology-fresh.sh"
+. "{ROOT}/apps/ddnsto/source/auto-install.sh"
+. "{ROOT}/apps/ddnsto/source/auto-synology.sh"
+. "{ROOT}/apps/ddnsto/source/auto-synology-fresh.sh"
 TOKEN=$1
 jq() {{
   for arg do [ "$arg" != --rawfile ] || return 2; done
@@ -199,7 +199,7 @@ ddnsto_synology_ensure_locked
             root = Path(directory)
             (root / 'data').mkdir()
             (root / 'link').symlink_to(root / 'missing')
-            script = f'. "{ROOT}/ddnsto/auto-install.sh"\n. "{ROOT}/ddnsto/auto-synology-fresh.sh"\nddnsto_synology_absent_paths "$1"\n'
+            script = f'. "{ROOT}/apps/ddnsto/source/auto-install.sh"\n. "{ROOT}/apps/ddnsto/source/auto-synology-fresh.sh"\nddnsto_synology_absent_paths "$1"\n'
             for name, expected in [('data', 2), ('link', 2), ('absent', 0)]:
                 result = subprocess.run(['sh', '-c', script, 'test', str(root / name)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, expected, result.stderr)

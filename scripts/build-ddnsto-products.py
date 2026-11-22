@@ -17,6 +17,9 @@ VERSION = r'(?:0|[1-9][0-9]{0,5})\.(?:0|[1-9][0-9]{0,5})\.(?:0|[1-9][0-9]{0,5})'
 
 
 def render(root, config):
+    source = root / 'apps/ddnsto/source'
+    if not source.is_dir():
+        source = root / 'ddnsto'
     if set(config) != {'schema_version', 'platforms'} or config['schema_version'] != 1:
         raise ValueError('unsupported product configuration schema')
     if set(config['platforms']) != PLATFORMS:
@@ -43,16 +46,21 @@ def render(root, config):
             values[platform + '.' + field] = value
     outputs = {}
     used = set()
-    if {p.name[:-3] for p in (root / 'ddnsto/templates').glob('*.in')} != OUTPUTS:
+    if {p.name[:-3] for p in (source / 'templates').glob('*.in')} != OUTPUTS:
         raise ValueError('missing or unexpected product template')
-    for path in sorted((root / 'ddnsto/templates').glob('*.in')):
+    for path in sorted((source / 'templates').glob('*.in')):
+        template = path.read_text()
+        shared_marker = '@@SHARED_BOOTSTRAP@@'
+        if shared_marker in template:
+            bootstrap = ROOT / 'lib' / ('bootstrap.ps1' if path.suffixes[-2:] == ['.ps1', '.in'] else 'bootstrap.sh')
+            template = template.replace(shared_marker, bootstrap.read_text().rstrip())
         def replace(match):
             key = match[1]
             if key not in values:
                 raise ValueError('missing product value: ' + key)
             used.add(key)
             return values[key]
-        content = TOKEN.sub(replace, path.read_text())
+        content = TOKEN.sub(replace, template)
         if '@@' in content:
             raise ValueError('unresolved product token: ' + path.name)
         outputs[path.name[:-3]] = content
@@ -62,10 +70,13 @@ def render(root, config):
 
 
 def generate(root=ROOT, check=False):
-    config = json.loads((root / 'ddnsto/platform-releases.json').read_text())
+    source = root / 'apps/ddnsto/source'
+    if not source.is_dir():
+        source = root / 'ddnsto'
+    config = json.loads((source / 'platform-releases.json').read_text())
     outputs = render(root, config)  # Validate everything before writing anything.
     for name, content in outputs.items():
-        path = root / 'ddnsto' / name
+        path = source / name
         if path.is_file() and path.read_text() == content:
             continue
         if check:

@@ -4,6 +4,7 @@
 set -eu
 set +x
 umask 077
+@@SHARED_BOOTSTRAP@@
 VERSION=${DDNSTO_VERSION:-@@macos.client_version@@}
 INSTALL_DIR=${DDNSTO_INSTALL_DIR:-$HOME/.local/bin}
 CONFIG_DIR=${DDNSTO_CONFIG_DIR:-$HOME/Library/Application Support/DDNSTO}
@@ -94,7 +95,8 @@ case "$(uname -m)" in x86_64|amd64) member=ddnsto_cli.amd64 ;; arm64|aarch64) me
 if [ "$PLAN_ONLY" = 1 ]; then
     [ -z "$TOKEN$TOKEN_FILE" ] || fail '--plan does not accept credentials'
     printf '%s\n' 'facts_source=local-preflight' 'platform=macos' "arch=${member#ddnsto_cli.}" \
-        "client_version=$VERSION" 'zsetup_version=0.3.0' 'native_status=requires-launchd-preflight' \
+        "client_version=$VERSION" 'zsetup_channel=zsetup/stable-macos' 'zsetup_min_version=0.5.0' \
+        'native_status=requires-launchd-preflight' \
         'docker_installable=false' 'installation_performed=false'
     exit 0
 fi
@@ -770,43 +772,19 @@ ddnsto_https_fetch() (
 )
 
 ensure_zsetup() {
-    if [ -n "$ZSETUP_BIN" ]; then
-        [ -x "$ZSETUP_BIN" ] && [ "$(installer_output "$ZSETUP_BIN" --version)" = 'zsetup 0.3.0' ] || fail 'explicit zsetup must be executable version 0.3.0'
-        return
-    fi
-    command -v shasum >/dev/null || fail 'shasum is required for initial bootstrap verification'
-    case "$member" in
-        ddnsto_cli.amd64) native=zsetup-macos-x86_64; native_sha=608323145bcd8f083c0845b4bd0481eabccf0d74b99aa2aa6a88e59b34ce5b31 ;;
-        *) native=zsetup-macos-aarch64; native_sha=06ec453f851bd0395cf9ea8539de168f80a9628d1a25597dd598c85f9dc633b0 ;;
-    esac
-    printf '%s\n' 'DDNSTO：正在下载并校验 zsetup 0.3.0。' >&2
-    # The fixed macOS 0.3.0 artifact redirects on dl.istoreos.com. Prefer its
-    # direct HTTPS origin without relaxing the no-redirect transport policy.
-    for base in https://fw.koolcenter.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary https://dl.istoreos.com/binary; do
-        fetch_code=0
-        ddnsto_https_fetch "$base/zsetup/0.3.0/$native" "$work/zsetup.part" 16777216 || fetch_code=$?
-        if [ "$fetch_code" = 0 ]; then
-            actual=$(shasum -a 256 "$work/zsetup.part")
-            if [ "${actual%% *}" = "$native_sha" ]; then
-                mv "$work/zsetup.part" "$work/zsetup"
-                chmod 700 "$work/zsetup"
-                ZSETUP_BIN="$work/zsetup"
-                [ "$(installer_output "$ZSETUP_BIN" --version)" = 'zsetup 0.3.0' ] || fail 'unexpected zsetup version'
-                return
-            fi
-            fail 'zsetup bootstrap checksum failed' 11
-        fi
-        [ "$fetch_code" = 41 ] || fail 'HTTPS 证书、响应或下载边界检查失败；需要支持 TLS 校验的 curl 或 GNU Wget' 11
-    done
-    fail 'zsetup bootstrap download/checksum failed; no client changes made' 11
+    ZSETUP_BIN=$(installer_output bootstrap_zsetup_path) || fail 'zsetup stable bootstrap download/checksum failed; no client changes made' 11
 }
 printf 'DDNSTO：安装器固定版本 %s，未查询推荐版本。\n' "$VERSION" >&2
+if [ "$ACTION" != repair ] && [ "$ACTION" != configure ]; then
+    diagnostic_event installing
+    # Bootstrap before taking the DDNSTO transaction lock. The shared
+    # bootstrap owns temporary signal traps while it verifies the core.
+    ensure_zsetup
+fi
 mkdir -p "$CONFIG_DIR"
 mkdir "$CONFIG_DIR/.install-lock" 2>/dev/null || fail 'another installation is active'
 locked=1
 if [ "$ACTION" != repair ] && [ "$ACTION" != configure ]; then
-    diagnostic_event installing
-    ensure_zsetup
     installer_command "$ZSETUP_BIN" download -o "$work/client.tar.gz" --sha256 "$archive_sha" \
         "https://fw.koolcenter.com/binary/ddnsto/macOS/ddnsto_darwin_cli_${VERSION}.tar.gz"
     installer_command tar -xzf "$work/client.tar.gz" -C "$work" "$member"

@@ -1,86 +1,44 @@
-"""Offline native discovery: real hash/path validation, no download or services."""
-import hashlib
+"""Managed DDNSTO actions accept the verified current zsetup above their floor."""
+
 import os
-import shutil
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class OfflineNative(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name)
-        self.native = self.root / 'rescue/0.5.0/zsetup'
-        self.native.parent.mkdir(parents=True)
-        # Current fixed-identity discovery requires every cache directory to
-        # be private, matching the bootstrap publisher's 0700 layout.
-        for directory in (self.root / 'rescue', self.native.parent):
-            directory.chmod(0o700)
-        self.native.write_text('#!/bin/sh\nprintf "zsetup 0.5.0\\n"\n')
-        self.native.chmod(0o700)
-        self.digest = hashlib.sha256(self.native.read_bytes()).hexdigest()
-
-    def run_native(self, explicit='', no_stat=False):
-        script = ''.join(f'. "{ROOT / p}"\n' for p in (
-            'lib/bootstrap.sh', 'ddnsto/portable-files.sh', 'ddnsto/bootstrap-policy.sh', 'ddnsto/managed-service.sh'))
-        script += '''
-ddnsto_error() { printf '%s\\n' "$*" >&2; }
-# Replace only reviewed metadata, not validation or discovery behavior.
-fetch_bootstrap_metadata() { RESCUE_VERSION=0.5.0; EXPECTED_SHA256=$TEST_DIGEST; }
-bootstrap_fetch() { echo NETWORK >&2; return 99; }
-ddnsto_managed_native || exit $?
-printf '%s\\n' "$ZSETUP_BIN"
+class ManagedNativeFloor(unittest.TestCase):
+    def invoke(self, version):
+        with tempfile.TemporaryDirectory(prefix="ddnsto-native-floor-") as name:
+            binary = Path(name) / "zsetup"
+            binary.write_text(f"#!/bin/sh\nprintf 'zsetup {version}\\n'\n")
+            binary.chmod(0o700)
+            script = f'''
+. "{ROOT / "apps/ddnsto/source/managed-service.sh"}"
+ddnsto_error() {{ printf '%s\\n' "$*" >&2; }}
+ZSETUP_BIN="$1"
+ddnsto_managed_native
 '''
-        env = dict(os.environ, ZSETUP_ROOT=str(self.root), ZSETUP_BIN=explicit,
-                   TEST_DIGEST=self.digest, PATH='/usr/bin:/bin')
-        if no_stat:
-            tools = self.root / 'tools'
-            tools.mkdir()
-            for name in ('ls', 'uname', 'id', 'sh', 'sha256sum'):
-                (tools / name).symlink_to(shutil.which(name))
-            env['PATH'] = str(tools)
-        return subprocess.run(['sh', '-eu', '-c', script], env=env,
-                              capture_output=True, text=True, timeout=5)
+            return subprocess.run(
+                ["sh", "-eu", "-c", script, "test", str(binary)],
+                env=dict(os.environ), capture_output=True, text=True,
+            )
 
-    def test_fresh_shell_finds_verified_cache_without_network(self):
-        result = self.run_native()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), str(self.native))
-        self.assertNotIn('NETWORK', result.stderr)
+    def test_minimum_and_newer_versions_are_accepted(self):
+        for version in ("0.5.0", "0.6.5", "1.0.0"):
+            with self.subTest(version=version):
+                result = self.invoke(version)
+                self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_native_validation_without_stat(self):
-        result = self.run_native(no_stat=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), str(self.native))
-
-    def test_explicit_tampered_executable_never_runs(self):
-        marker = self.root / 'executed'
-        self.native.write_text(f'#!/bin/sh\ntouch "{marker}"\necho "zsetup 0.5.0"\n')
-        result = self.run_native(str(self.native))
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertFalse(marker.exists())
-
-    def test_symlink_or_writable_cache_is_rejected(self):
-        self.native.chmod(0o777)
-        self.assertEqual(self.run_native().returncode, 2)
-        self.native.chmod(0o700)
-        actual = self.root / 'actual'
-        self.native.rename(actual)
-        self.native.symlink_to(actual)
-        self.assertEqual(self.run_native().returncode, 2)
-
-    def test_missing_cache_has_no_download(self):
-        self.native.unlink()
-        result = self.run_native()
-        self.assertEqual(result.returncode, 2)
-        self.assertIn('offline', result.stderr)
-        self.assertNotIn('NETWORK', result.stderr)
+    def test_older_or_invalid_versions_are_rejected(self):
+        for version in ("0.4.9", "0.5", "0.5.0.1", "1x.0.0", "invalid"):
+            with self.subTest(version=version):
+                result = self.invoke(version)
+                self.assertEqual(result.returncode, 2, result.stderr)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

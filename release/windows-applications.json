@@ -13,7 +13,7 @@
   "applications": {
     "scoop": {
       "minimum_runtime": "0.6.5",
-      "source_directory": "scoop",
+      "source_directory": "apps/scoop/0.1.2",
       "public_entries": [
         "scoop/scoop-install.ps1"
       ]

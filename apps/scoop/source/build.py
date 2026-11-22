@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Generate the one canonical PowerShell Scoop public entry."""
 import argparse
+import json
 from pathlib import Path
 import tempfile
 
-ROOT = Path(__file__).resolve().parents[1]
+SOURCE = Path(__file__).resolve().parent
+APP = SOURCE.parent
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def render():
@@ -15,8 +18,8 @@ def render():
         "[Console]::OutputEncoding = $script:ScoopUtf8NoBom\n",
         "$OutputEncoding = $script:ScoopUtf8NoBom\n\n",
         (ROOT / "lib/bootstrap.ps1").read_text(encoding="utf-8").rstrip() + "\n\n",
-        (ROOT / "scoop/business.ps1").read_text(encoding="utf-8").rstrip() + "\n\n",
-        (ROOT / "scoop/main.ps1").read_text(encoding="utf-8").rstrip() + "\n",
+        (SOURCE / "business.ps1").read_text(encoding="utf-8").rstrip() + "\n\n",
+        (SOURCE / "main.ps1").read_text(encoding="utf-8").rstrip() + "\n",
     ]
     content = "".join(parts)
     if len(content.encode("utf-8")) > 131072:
@@ -26,10 +29,16 @@ def render():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", type=Path, default=ROOT / "scoop")
+    parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    target = args.output_dir / "scoop-install.ps1"
+    output_dir = args.output_dir
+    name = "scoop-install.ps1"
+    if output_dir is None:
+        version = json.loads((APP / "app.json").read_text())["version"]
+        output_dir = APP / version
+        name = "installer.ps1"
+    target = output_dir / name
     content = render()
     if args.check:
         if not target.is_file() or target.read_text(encoding="utf-8") != content:

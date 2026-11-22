@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory(prefix="apps-powershell-") as name:
     assert len(config["installers"]) == 1
     record = config["installers"][0]
     assert record["path"] == "zsetup-scripts/apps/windows-demo/1.0.0/installer.ps1"
-    assert record["min_version"] == "0.6.5" and record["source_group"] == "release"
+    assert record["min_version"] == "0.6.4" and record["source_group"] == "release"
     assert json.loads((apps / "zsetup/config.json").read_text())["installers"] == []
     subprocess.run(command + ["--check"], check=True, stdout=subprocess.DEVNULL)
 

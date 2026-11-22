@@ -144,7 +144,8 @@ read_expected_sha256() {
 }
 
 have_hash_tool() {
-    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1
+    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
+        command -v shasum >/dev/null 2>&1
 }
 
 hash_matches() {
@@ -159,6 +160,9 @@ hash_matches() {
     elif command -v openssl >/dev/null 2>&1; then
         actual=$(openssl dgst -sha256 "$1")
         actual=${actual##*= }
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$1")
+        actual=${actual%% *}
     else
         echo "zsetup: bootstrap SHA-256 tool disappeared before verification" >&2
         return 1
@@ -253,3 +257,11 @@ bootstrap_zsetup() {
     rm -f "$stable_file" "$sums_file" 2>/dev/null || true
     [ "$metadata_scheme" = https ] || echo "zsetup: insecure HTTP bootstrap completed with user consent" >&2
 }
+
+# Return the verified native path while confining bootstrap's temporary signal
+# traps to a subprocess. Long-running installers can call this after installing
+# their own transaction cleanup traps without losing those handlers.
+bootstrap_zsetup_path() (
+    bootstrap_zsetup
+    printf '%s\n' "$ACTIVE_ZSETUP"
+)

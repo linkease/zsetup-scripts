@@ -1,16 +1,28 @@
 # DDNSTO actions use the shared protected service coordinator, never flat paths.
+ddnsto_zsetup_version_compatible() (
+    managed_version=${1#zsetup }
+    old_ifs=$IFS
+    IFS=.
+    set -- $managed_version
+    IFS=$old_ifs
+    [ "$#" = 3 ] || return 1
+    for managed_part in "$@"; do
+        [ -n "$managed_part" ] || return 1
+        case "$managed_part" in *[!0-9]*) return 1 ;; esac
+    done
+    [ "$1" -gt 0 ] || { [ "$1" = 0 ] && [ "$2" -ge 5 ]; }
+)
+
 ddnsto_managed_native() {
-    # Offline operations must use the same reviewed bytes as installation.
-    # This reads compiled-in pins only: no bootstrap, download or cache writes.
-    bootstrap_arch || return 2
-    fetch_bootstrap_metadata https '' '' || return 2
-    if [ -n "${ZSETUP_BIN:-}" ]; then
-        if is_expected_zsetup "$ZSETUP_BIN"; then return 0; fi
-    elif find_existing_zsetup; then
-        ZSETUP_BIN=$ACTIVE_ZSETUP
-        return 0
-    fi
-    ddnsto_error 'offline management requires the verified pinned zsetup in the installer cache, PATH or ZSETUP_BIN; restore it using the installer before retrying'
+    # Standalone actions bootstrap the platform stable before entering this
+    # function. Installer mode receives the already verified current zsetup.
+    [ -n "${ZSETUP_BIN:-}" ] && [ -x "$ZSETUP_BIN" ] || {
+        ddnsto_error 'managed action requires the verified zsetup selected by the shared bootstrap'
+        return 2
+    }
+    managed_version=$("$ZSETUP_BIN" --version 2>/dev/null) || managed_version=
+    ddnsto_zsetup_version_compatible "$managed_version" && return 0
+    ddnsto_error 'managed action requires zsetup >= 0.5.0'
     return 2
 }
 

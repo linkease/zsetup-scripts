@@ -46,7 +46,8 @@ with tempfile.TemporaryDirectory(prefix="storage-launchers-", dir=ROOT / "dist")
             key = "FASTNET_AMD64_SHA256" if app == "fastnet" else "FASTPVE_SHA256"
             Handler.bodies[f"/binary/{app}/version.txt"] = f"VERSION=1.2.3\n{key}={hashlib.sha256(product).hexdigest()}\n".encode()
             Handler.bodies[f"/binary/{app}/{filename}"] = product
-            script = ROOT / app / f"{app}-install.sh"
+            version = {"fastnet": "0.1.9", "fastpve": "0.1.9"}[app]
+            script = ROOT / "apps" / app / version / "installer.sh"
             entry = f"{app}/storage-test/{app}-install.sh"
             Handler.bodies[f"/binary/{entry}"] = script.read_bytes()
             config = folder / "config.json"

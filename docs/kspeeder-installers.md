@@ -1,10 +1,9 @@
 # KSpeeder 项目安装器
 
-KS-CLI 与 KSpeeder 的标准 apps 实现分别位于 `kspeeder/ks-cli` 和
-`kspeeder/kspeeder`，共享策略位于 `kspeeder/lib`。Shell 与 PowerShell 自包含入口
-由 `scripts/build-entrypoints.py` 生成；`scripts/build.py` 将同字节 payload 复制到
-`apps/` 的 0.1.2 不可变目录并生成平台配置和 `SHA256SUMS`。测试代码只位于
-`kspeeder/tests` 与 `tests/contracts`，不会进入发布的 `apps/`。
+KS-CLI 与 KSpeeder 的标准实现分别位于 `apps/ks-cli` 和 `apps/kspeeder`。Shell 与
+PowerShell 自包含 payload 位于各自的 `0.1.2/` 目录；`scripts/build.py` 生成标准入口、
+平台配置和 `SHA256SUMS`。测试代码只位于 `tests/apps/kspeeder` 与 `tests/contracts`，
+不会进入发布的 `apps/`。
 
 0.1.2 支持普通 Linux、macOS 和 Windows；OpenWrt 继续走包管理工作流。两个入口
 都只安装用户级二进制，不安装或启动服务，不执行调用者的业务命令。Linux/macOS

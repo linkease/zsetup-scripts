@@ -27,7 +27,7 @@
 ## 产品审核
 
 本次不改变客户端产品。4.2.8 各平台产品 URL、大小和摘要继续由
-`ddnsto/platform-releases.json` 与既有审核记录维护；没有用本地重打包文件替换线上证据。
+`apps/ddnsto/source/platform-releases.json` 与既有审核记录维护；没有用本地重打包文件替换线上证据。
 
 ## 本地验证与候选
 

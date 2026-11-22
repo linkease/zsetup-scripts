@@ -1,6 +1,6 @@
 # DDNSTO 分平台推荐安装包配置
 
-`ddnsto/platform-releases.json` 是原生一键安装的客户端推荐版本和产品摘要的唯一维护入口。
+`apps/ddnsto/source/platform-releases.json` 是原生一键安装的客户端推荐版本和产品摘要的唯一维护入口。
 覆盖 Linux、OpenWrt、macOS、Windows CLI、群晖和华硕。各平台可以使用不同版本。
 本次迁移保持原有 4.2.8 / 群晖 4.2.8-7 和全部已审核产品摘要，不代表新版本发布或设备验收。
 
@@ -14,9 +14,11 @@
 - 推荐清单仍选择安装器，不改为设备端下载并解析 JSON。JSON 只在维护者构建环境读取。
   设备不增加 Python、jq 或新的校验依赖，也不修改 zsetup 核心。
 - 配置是数据；严格限制版本、摘要、大小及字段，不使用 eval。缺失平台/字段/模板、非法值和无消费者字段均拒绝生成。
-- 有 `ddnsto/templates/<文件名>.in` 的文件，其维护源码是模板；`ddnsto/<文件名>` 是生成副本。
+- 有 `apps/ddnsto/source/templates/<文件名>.in` 的文件，其维护源码是模板；
+  `apps/ddnsto/source/<文件名>` 是生成副本。
   生成脚本开头有提示，不应直接修改生成副本。`install-rules.json` 也由模板生成。
-  其他没有模板的模块继续直接维护，`ddnsto-install.sh` 仍由统一入口构建器生成。
+  其他没有模板的模块继续直接维护；当前版本自包含入口位于
+  `apps/ddnsto/0.2.4/installer.sh`。
 - 包命名、路径布局、架构映射、解包方式继续由平台模板负责；本次不支持通过配置任意改变安装协议。
   常规版本更新不需修改模板；上游改变包布局或启动参数时仍需要适配代码。
 - Linux 与 OpenWrt 已拆开目标版本；OpenWrt standard/lite 当前共用该平台推荐版本。

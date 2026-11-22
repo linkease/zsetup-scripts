@@ -1,6 +1,8 @@
 task_owner_digest() {
     local file
-    for file in "$task_root"/*.sh "$task_root/releases.lock.json" "$task_root/../jq/jq-install.sh" "$task_root/../jq/artifacts.lock.json"; do
+    for file in "$task_root"/*.sh "$task_root/releases.lock.json" \
+        "$task_root/../apps/jq/0.1.0/installer.sh" \
+        "$task_root/../apps/jq/source/artifacts.lock.json"; do
         [ -f "$file" ] && [ ! -L "$file" ] || return 2
         task_digest "$file" || return $?
     done | task_hash_input
@@ -63,7 +65,7 @@ task_observe() {
 }
 task_owner_artifact() {
     local raw key value artifact= digest= size= url= version= code
-    raw=$(ZSETUP_INSTALLER_MODE=1 sh "$task_root/../jq/jq-install.sh" --plan); code=$?
+    raw=$(ZSETUP_INSTALLER_MODE=1 sh "$task_root/../apps/jq/0.1.0/installer.sh" --plan); code=$?
     [ "$code" = 0 ] || task_stop blocked owner-plan-failed "$code"
     while IFS='=' read -r key value; do
         case "$key" in artifact) artifact=$value ;; sha256) digest=$value ;; size) size=$value ;; url) url=$value ;; version) version=$value ;; esac
@@ -210,7 +212,8 @@ task_apply_plan() {
         set -- --installer-prefix "$prefix" --installer-command "$command"
         [ "$("$task_jq" -r .intent <<< "$expected")" != remove ] || set -- "$@" --remove
         TASK_EFFECTS='["managed-installation-attempt"]'
-        ZSETUP_BIN="$zsetup" ZSETUP_INSTALLER_MODE=1 "$zsetup" run -- sh "$task_root/../jq/jq-install.sh" "$@" >&2 || code=$?
+        ZSETUP_BIN="$zsetup" ZSETUP_INSTALLER_MODE=1 "$zsetup" run -- \
+            sh "$task_root/../apps/jq/0.1.0/installer.sh" "$@" >&2 || code=$?
         [ "$code" = 0 ] || task_stop failed owner-install-failed "$code"
         if [ "$("$task_jq" -r .intent <<< "$expected")" = remove ]; then
             [ ! -e "$command" ] && [ ! -L "$command" ] || task_stop failed removal-verification-failed 11

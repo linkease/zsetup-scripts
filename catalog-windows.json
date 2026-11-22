@@ -7,7 +7,7 @@
       "os": "windows",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "scoop/scoop-install.ps1",
+      "script": "apps/scoop/0.1.2/installer.ps1",
       "path": "scoop/0.1.2/scoop-install.ps1",
       "background": false
     },
@@ -16,7 +16,7 @@
       "os": "windows",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kai-skills/kai-skills-install.ps1",
+      "script": "apps/kai-skills/1.2.6/installer.ps1",
       "path": "kai/kai-skills/installers/1.2.6/kai-skills-install.ps1",
       "background": false
     }

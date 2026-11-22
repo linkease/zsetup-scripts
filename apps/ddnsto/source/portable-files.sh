@@ -56,3 +56,33 @@ ddnsto_stat() (
         *) return 1 ;;
     esac
 )
+
+# Validate storage ancestors before privileged DDNSTO adapters create or
+# replace files.  These are filesystem-safety primitives, not zsetup version
+# policy, so they live with the portable metadata implementation.
+ddnsto_bootstrap_safe_ancestors() (
+    case "$1" in /*) ;; *) return 1 ;; esac
+    case "$1/" in *//*|*/./*|*/../*) [ "$1" = / ] || return 1 ;; esac
+    directory=$1
+    while :; do
+        [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
+        owner=$(ddnsto_stat -c %u "$directory") || return 1
+        mode=$(ddnsto_stat -c %a "$directory") || return 1
+        [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
+        if [ "$((0$mode & 0022))" -ne 0 ]; then
+            [ "$owner" = 0 ] && [ "$((0$mode & 01000))" -ne 0 ] || return 1
+        fi
+        [ "$directory" != / ] || break
+        directory=${directory%/*}
+        [ -n "$directory" ] || directory=/
+    done
+)
+
+ddnsto_bootstrap_private_dir() (
+    [ ! -L "$1" ] || return 1
+    if [ ! -e "$1" ]; then
+        (umask 077; mkdir "$1") || return 1
+    fi
+    [ -d "$1" ] && [ "$(ddnsto_stat -c %u "$1")" = "$(id -u)" ] &&
+        [ "$(ddnsto_stat -c %a "$1")" = 700 ]
+)

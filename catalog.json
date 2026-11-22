@@ -7,7 +7,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "*",
-      "script": "kai-skills/kai-skills-install.sh",
+      "script": "apps/kai-skills/1.2.6/installer.sh",
       "path": "kai/kai-skills/installers/1.2.6/kai-skills-install.sh",
       "background": false
     },
@@ -16,7 +16,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "*",
-      "script": "kai-skills/kai-skills-install.sh",
+      "script": "apps/kai-skills/1.2.6/installer.sh",
       "path": "kai/kai-skills/installers/1.2.6/kai-skills-install.sh",
       "background": false
     },
@@ -25,7 +25,7 @@
       "os": "*",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "fastnet/fastnet-install.sh",
+      "script": "apps/fastnet/0.1.9/installer.sh",
       "path": "fastnet/0.1.9/fastnet-install.sh",
       "background": false
     },
@@ -34,7 +34,7 @@
       "os": "*",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "fastnet/fastnet-install.sh",
+      "script": "apps/fastnet/0.1.9/installer.sh",
       "path": "fastnet/0.1.9/fastnet-install.sh",
       "background": false
     },
@@ -43,7 +43,7 @@
       "os": "*",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "fastnet/fastnet-install.sh",
+      "script": "apps/fastnet/0.1.9/installer.sh",
       "path": "fastnet/0.1.9/fastnet-install.sh",
       "background": false
     },
@@ -52,7 +52,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -61,7 +61,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -70,7 +70,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "armv7",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -79,7 +79,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "mipsel",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -88,7 +88,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -97,7 +97,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -106,7 +106,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "armv7",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -115,7 +115,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "mipsel",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -124,7 +124,7 @@
       "os": "ubuntu",
       "package_manager": "apt",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -133,7 +133,7 @@
       "os": "ubuntu",
       "package_manager": "apt",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -142,7 +142,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -151,7 +151,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -160,7 +160,7 @@
       "os": "centos",
       "package_manager": "yum",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -169,7 +169,7 @@
       "os": "centos",
       "package_manager": "yum",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -178,7 +178,7 @@
       "os": "centos",
       "package_manager": "dnf",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -187,7 +187,7 @@
       "os": "centos",
       "package_manager": "dnf",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -196,7 +196,7 @@
       "os": "rhel",
       "package_manager": "yum",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -205,7 +205,7 @@
       "os": "rhel",
       "package_manager": "yum",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -214,7 +214,7 @@
       "os": "rhel",
       "package_manager": "dnf",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -223,7 +223,7 @@
       "os": "rhel",
       "package_manager": "dnf",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -232,7 +232,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -241,7 +241,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "ddnsto/ddnsto-install.sh",
+      "script": "apps/ddnsto/0.2.4/installer.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -250,7 +250,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -259,7 +259,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -268,7 +268,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -277,7 +277,7 @@
       "os": "ubuntu",
       "package_manager": "apt",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -286,7 +286,7 @@
       "os": "ubuntu",
       "package_manager": "apt",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -295,7 +295,7 @@
       "os": "ubuntu",
       "package_manager": "apt",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -304,7 +304,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -313,7 +313,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -322,7 +322,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -331,7 +331,7 @@
       "os": "centos",
       "package_manager": "yum",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -340,7 +340,7 @@
       "os": "centos",
       "package_manager": "yum",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -349,7 +349,7 @@
       "os": "centos",
       "package_manager": "yum",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -358,7 +358,7 @@
       "os": "centos",
       "package_manager": "dnf",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -367,7 +367,7 @@
       "os": "centos",
       "package_manager": "dnf",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -376,7 +376,7 @@
       "os": "centos",
       "package_manager": "dnf",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -385,7 +385,7 @@
       "os": "rhel",
       "package_manager": "yum",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -394,7 +394,7 @@
       "os": "rhel",
       "package_manager": "yum",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -403,7 +403,7 @@
       "os": "rhel",
       "package_manager": "yum",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -412,7 +412,7 @@
       "os": "rhel",
       "package_manager": "dnf",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -421,7 +421,7 @@
       "os": "rhel",
       "package_manager": "dnf",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -430,7 +430,7 @@
       "os": "rhel",
       "package_manager": "dnf",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -439,7 +439,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -448,7 +448,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -457,7 +457,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkease/linkease-install.sh",
+      "script": "apps/linkease/0.1.9/installer.sh",
       "path": "linkease/0.1.9/linkease-install.sh",
       "background": false
     },
@@ -466,7 +466,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "x86_64",
-      "script": "fastpve/fastpve-install.sh",
+      "script": "apps/fastpve/0.1.9/installer.sh",
       "path": "fastpve/0.1.9/fastpve-install.sh",
       "background": false
     },
@@ -475,7 +475,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -484,7 +484,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -493,7 +493,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -502,7 +502,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -511,7 +511,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -520,7 +520,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -529,7 +529,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -538,7 +538,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -547,7 +547,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -556,7 +556,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -565,7 +565,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -574,7 +574,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -583,7 +583,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -592,7 +592,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -601,7 +601,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -610,7 +610,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -619,7 +619,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -628,7 +628,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -637,7 +637,7 @@
       "os": "asuswrt",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -646,7 +646,7 @@
       "os": "asuswrt",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -655,7 +655,7 @@
       "os": "asuswrt",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "linkspace/linkspace-install.sh",
+      "script": "apps/linkspace/0.1.1/installer.sh",
       "path": "linkspace/0.1.1/linkspace-install.sh",
       "background": false
     },
@@ -664,7 +664,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -673,7 +673,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -682,7 +682,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -691,7 +691,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -700,7 +700,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -709,7 +709,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -718,7 +718,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -727,7 +727,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -736,7 +736,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -745,7 +745,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -754,7 +754,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -763,7 +763,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -772,7 +772,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -781,7 +781,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -790,7 +790,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -799,7 +799,7 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -808,7 +808,7 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "script": "apps/ks-cli/0.1.2/installer.sh",
       "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
@@ -817,7 +817,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -826,7 +826,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -835,7 +835,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -844,7 +844,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -853,7 +853,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -862,7 +862,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -871,7 +871,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -880,7 +880,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -889,7 +889,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -898,7 +898,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -907,7 +907,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -916,7 +916,7 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -925,7 +925,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -934,7 +934,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -943,7 +943,7 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -952,7 +952,7 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -961,7 +961,7 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "script": "apps/kspeeder/0.1.2/installer.sh",
       "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
@@ -970,7 +970,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -979,7 +979,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -988,7 +988,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -997,7 +997,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "mipsel",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1006,7 +1006,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1015,7 +1015,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1024,7 +1024,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1033,7 +1033,7 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "mipsel",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1042,7 +1042,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1051,7 +1051,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1060,7 +1060,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1069,7 +1069,7 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "mipsel",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1078,7 +1078,7 @@
       "os": "istoreos",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1087,7 +1087,7 @@
       "os": "istoreos",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1096,7 +1096,7 @@
       "os": "istoreos",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1105,7 +1105,7 @@
       "os": "istoreos",
       "package_manager": "*",
       "arch": "mipsel",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1114,7 +1114,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1123,7 +1123,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1132,7 +1132,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "armv7",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1141,7 +1141,7 @@
       "os": "openwrt",
       "package_manager": "*",
       "arch": "mipsel",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1150,7 +1150,7 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1159,7 +1159,7 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "jq/jq-install.sh",
+      "script": "apps/jq/0.1.0/installer.sh",
       "path": "jq/0.1.0/jq-install.sh",
       "background": false
     },
@@ -1168,7 +1168,7 @@
       "os": "windows",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "jq/jq-install.ps1",
+      "script": "apps/jq/0.1.0/installer.ps1",
       "path": "jq/0.1.0/jq-install.ps1",
       "background": false
     },
@@ -1177,7 +1177,7 @@
       "os": "windows",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "jq/jq-install.ps1",
+      "script": "apps/jq/0.1.0/installer.ps1",
       "path": "jq/0.1.0/jq-install.ps1",
       "background": false
     },
@@ -1186,7 +1186,7 @@
       "os": "windows",
       "package_manager": "*",
       "arch": "x86",
-      "script": "jq/jq-install.ps1",
+      "script": "apps/jq/0.1.0/installer.ps1",
       "path": "jq/0.1.0/jq-install.ps1",
       "background": false
     }

@@ -1,36 +1,33 @@
 #!/usr/bin/env python3
-"""Business ownership and generated entries match the formal server namespaces."""
-import json
+"""Application ownership lives only in apps; tests and history remain separate."""
+
 import hashlib
+import json
 from pathlib import Path
 import subprocess
 
+
 ROOT = Path(__file__).resolve().parents[1]
-for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_test.py")), ("ddnsto", ("ddnsto_test.py",)), ("linkease", ("linkease_test.py",)), ("fastpve", ("fastpve_test.py",)), ("linkspace", ("linkspace_test.py",))):
-    module = ROOT / app
-    for filename in ("business.sh", "main.sh", f"{app}-install.sh", "README.md"):
-        assert (module / filename).is_file(), f"missing {app}/{filename}"
-    assert not (module / "install.sh").exists(), "one maintained installer filename per business"
-    for filename in tests:
-        assert (module / "tests" / filename).is_file(), f"missing {app}/tests/{filename}"
-    # The legacy module remains executable during the migration window, while
-    # apps/ is the canonical, directly publishable server tree.
-    public = ROOT / "apps" / app
-    assert (public / "app.json").is_file(), f"missing apps/{app}/app.json"
-    assert (public / "install.sh").is_file(), f"missing apps/{app}/install.sh"
-public_ids = {path.parent.name for path in (ROOT / "apps").glob("*/app.json")}
-assert public_ids == {
+IDS = {
     "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli",
     "kspeeder", "linkease", "linkspace", "scoop",
 }
-for app in public_ids:
-    assert not (ROOT / "apps" / app / "tests").exists(), "tests must stay outside the public tree"
-assert (ROOT / "ddnsto/release.py").is_file()
-for filename, app in (("fastnet-install.sh", "fastnet"), ("install_ddnsto.sh", "ddnsto"), ("install_ddnsto_linux.sh", "ddnsto"), ("install_ddnsto_business.sh", "ddnsto"), ("setup_ddnsto.sh", "ddnsto")):
-    assert not (ROOT / filename).exists() and not (ROOT / filename).is_symlink(), "legacy names must not occupy the root"
-    archived = ROOT / "legacy" / filename
-    assert archived.is_file() and not archived.is_symlink(), "archive actual historical source"
-expected = {
+OUTER = IDS - {"ks-cli"}
+
+assert not [name for name in sorted(OUTER) if (ROOT / name).exists()]
+assert {path.parent.name for path in (ROOT / "apps").glob("*/app.json")} == IDS
+for app in IDS:
+    directory = ROOT / "apps" / app
+    manifest = json.loads((directory / "app.json").read_text(encoding="utf-8"))
+    version = manifest["version"]
+    for extension in manifest["entrypoints"]:
+        assert (directory / version / f"installer.{extension}").is_file()
+        assert (directory / f"install.{extension}").is_file()
+    assert not (directory / "tests").exists()
+    assert ((ROOT / "tests/apps" / app).is_dir()
+            or app == "ks-cli" and (ROOT / "tests/apps/kspeeder").is_dir())
+
+expected_history = {
     "fastpve-install.sh": "5a8babfcfe46c341cde7c35ebda47bafaa19b5b72d95653843e7d595f2445a97",
     "fastnet-install.sh": "21aa238f92e491887e9b7d3e7f2845796891844fce035cf4da4cdb8fe5cbc2a1",
     "install_ddnsto.sh": "1f137a4f5ec0f76aadbf3d3dbdc8193ec93eb71f095e9110ce3881d5ef3e7707",
@@ -40,22 +37,17 @@ expected = {
     "install_linkease_openwrt.sh": "efdf86db8947790ce64af67d475916d68416aed9eeb627f976089b5b9b1c0d6c",
     "setup_ddnsto.sh": "53b69f9d7a6d287405c6ba88fb891f78ab362cdbb964dbf73c62d0bc83a8ff52",
 }
-for filename, digest in expected.items():
-    assert hashlib.sha256((ROOT / "legacy" / filename).read_bytes()).hexdigest() == digest
-catalog = json.loads((ROOT / "catalog.json").read_text())
-script_version = catalog["config_version"].removeprefix("scripts-")
-for record in catalog["installers"]:
-    app = record["application"]
-    if app == "kai-skills":
-        assert record["script"] == "kai-skills/kai-skills-install.sh"
-        assert record["path"] == "kai/kai-skills/installers/1.2.6/kai-skills-install.sh"
-        continue
-    directory = f"kspeeder/{app}" if app in {"ks-cli", "kspeeder"} else app
-    extension = 'ps1' if app == 'jq' and record['os'] == 'windows' else 'sh'
-    assert record["script"] == f"{directory}/{app}-install.{extension}"
-    version = ("0.2.4" if app == "ddnsto" else "0.1.0" if app == "jq"
-               else "0.1.2" if app in {"ks-cli", "kspeeder"}
-               else "0.1.1" if app == "linkspace" else "0.1.9")
-    assert record["path"] == f"{app}/{version}/{app}-install.{extension}"
+# Preserve exact historical fixtures without making them current sources.
+for filename, digest in expected_history.items():
+    path = ROOT / "legacy" / filename
+    assert path.is_file() and not path.is_symlink()
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
+
+for catalog_name in ("catalog.json", "catalog-windows.json"):
+    catalog = json.loads((ROOT / catalog_name).read_text(encoding="utf-8"))
+    for record in catalog["installers"]:
+        assert record["script"].startswith("apps/")
+        assert (ROOT / record["script"]).is_file()
+
 subprocess.run(["python3", "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True)
-print("Module layout: business ownership, canonical paths, historical snapshots and generated entries passed")
+print("Module layout: apps-only ownership, external tests, history and generated entries passed")

@@ -3,6 +3,7 @@
   "applications": {
     "fastnet": {
       "minimum_runtime": "0.5.0",
+      "source_directory": "apps/fastnet/0.1.9",
       "public_entries": [
         "fastnet/fastnet-install.sh",
         "fastnet/install.sh"
@@ -10,16 +11,17 @@
     },
     "ks-cli": {
       "minimum_runtime": "0.5.0",
-      "source_directory": "kspeeder/ks-cli",
+      "source_directory": "apps/ks-cli/0.1.2",
       "public_entries": ["ks-cli/ks-cli-install.sh"]
     },
     "kspeeder": {
       "minimum_runtime": "0.5.0",
-      "source_directory": "kspeeder/kspeeder",
+      "source_directory": "apps/kspeeder/0.1.2",
       "public_entries": ["kspeeder/kspeeder-install.sh"]
     },
     "linkspace": {
       "minimum_runtime": "0.5.0",
+      "source_directory": "apps/linkspace/0.1.1",
       "public_entries": [
         "linkspace/linkspace-install.sh"
       ]

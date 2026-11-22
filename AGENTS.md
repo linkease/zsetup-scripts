@@ -6,17 +6,23 @@
   read `docs/ddnsto-release-sop.md` and create/update its linked release record. Follow its stage gates;
   the SOP does not authorize commits, device mutations or deployments.
 
-- Native DDNSTO product versions/digests are maintained only in `ddnsto/platform-releases.json`.
-- If `ddnsto/templates/NAME.in` exists, edit that template for behavior, not generated `ddnsto/NAME`.
+- Native DDNSTO product versions/digests are maintained only in `apps/ddnsto/source/platform-releases.json`.
+- If `apps/ddnsto/source/templates/NAME.in` exists, edit that template for behavior, not the generated
+  `apps/ddnsto/source/NAME`.
   This includes desktop standalone installers and `install-rules.json`. Other modules remain directly maintained.
-- `python3 -B scripts/build-entrypoints.py` compiles product metadata before composing the standalone entry;
-  `--check` rejects drift. Run `python3 -B tests/ddnsto_release_config_test.py` after changes.
+- `python3 -B scripts/build-ddnsto-products.py` compiles DDNSTO product metadata and `--check` rejects
+  drift. Then run `python3 -B scripts/build.py` for the apps tree. Run
+  `python3 -B tests/ddnsto_release_config_test.py` after changes.
 - Preserve version-specific compatibility gates; a new recommended version is not proof of a new health protocol.
   See `docs/ddnsto-platform-releases.md` for publication and GUI/Docker boundaries.
 
-- Business installation belongs to `APP/business.sh`; zsetup owns download/context/run/install and its existing configuration schema. Do not copy runtime-zig or invent a second downloader.
+- Business installation belongs to its owning `apps/APP/` tree (normally `business.sh`, or `source/`
+  for complex apps); zsetup owns download/context/run/install and its existing configuration schema.
+  Do not copy runtime-zig or invent a second downloader.
 - Read `docs/inventory.md`, `docs/release.md`, `docs/ai-contract.md`, and the owning zsetup product principles/config/lifecycle/release documents before changing behavior.
-- `lib/bootstrap.sh` is the shared shell bootstrap source extracted from tested FastNet. `scripts/build-entrypoints.py` embeds it; generated `APP/APP-install.sh` is the only public entry. Edit maintained sources, regenerate, then use `--check`.
+- `lib/bootstrap.sh` is the shared shell bootstrap source. `scripts/build.py` embeds it in generated
+  `apps/APP/install.sh` and compatibility aliases. The catalog references the versioned
+  `apps/APP/VERSION/installer.*`; edit the owning apps source, regenerate, then use `--check`.
 - Historical source snapshots live in legacy/ with source commit and SHA256 documented in legacy/README.md. Keep old script names out of the root; never build, index or publish the snapshots as current installers. The source DDNSTO repository and existing live URLs must remain until explicit migration verification.
 - Scripts 0.1.6 require zsetup >=0.2.4 for native metadata/memory, preserving the 0.2.3 Race/DNS fixes, three HTTPS primaries and the final fallback. Only shell bootstrap may prompt for HTTP after exhausting HTTPS. Do not add unattended downgrade or external SHA dependencies to normal installation.
 - Test with local HTTPS fixtures, fake package managers and isolated work/install paths. Never execute a real OpenWrt package or change a host service as a test.
@@ -24,9 +30,14 @@
 - Do not rewrite a running shell script in place. Generated entries and package pointers must be installed atomically.
 - Product binaries/packages and their version/SHA256 metadata are published ahead of installation by the business server release process. Do not collect, cache or bundle them in this repository's release. Package only installer scripts, canonical zsetup release and the unified configuration. Preserve immutable paths and matching config/size/SHA256; server metadata and device canary remain deployment checks. Local package success is not server availability or publication evidence.
 
-- Each root business folder owns its scripts, tests and business release rules. Public files live under binary/APP/; never publish internal main/business sources, Python tools or tests. Root catalog and packaging remain the complete shared index/release.
+- `apps/APP/` is the sole business source and aggregate publication owner. Tests and fixtures live under
+  `tests/apps/` and must never be copied into `apps/`. The complete apps release publishes the full
+  `apps/` tree under `/binary/zsetup-scripts/apps/`; independent product namespaces remain separate.
 
-- LinkEase owns its Linux multi-file/service transaction and OpenWrt opkg workflow in linkease/business.sh. Reference bytes in legacy/install_linkease_{linux,openwrt}.sh remain unchanged. APK is unproven; do not claim it in the index. Linux recovery copies are retained if rollback fails; tests never touch host services.
+- LinkEase owns its Linux multi-file/service transaction and OpenWrt opkg workflow in
+  `apps/linkease/business.sh`. Reference bytes in legacy/install_linkease_{linux,openwrt}.sh remain
+  unchanged. APK is unproven; do not claim it in the index. Linux recovery copies are retained if
+  rollback fails; tests never touch host services.
 
 - FastPVE owns only its PVE preflight and verified binary launcher; PVE actions/menus belong to FastPVE. Do not infer PVE major-version support or noninteractive flags from the legacy launcher. Keep the user-supplied Bash snapshot unchanged and syntax-check it with bash -n.
 
@@ -96,13 +107,12 @@
   aarch64 and armv7, reusing the user launcher with native SHA/size cache checks.
 - Production changes remain per application; do not upload the aggregate package.
   Use fresh live config, immutable staging, four-site HTTPS and isolated real
-  product canaries before locked activation. See linkspace/README.md.
+  product canaries before locked activation. See `apps/linkspace/README.md`.
 
 ## KSpeeder binary installer release (2026-10-26)
 
-- Canonical product directories are `kspeeder/ks-cli` and `kspeeder/kspeeder`,
-  sharing `kspeeder/lib`. Keep public application ids/namespaces `ks-cli` and
-  `kspeeder`; the catalog records the nested source paths.
+- Canonical application directories are `apps/ks-cli` and `apps/kspeeder`. Keep public application
+  ids/namespaces `ks-cli` and `kspeeder`; their versioned installers are the catalog sources.
 - Installer0.1.0 is Linux binary deployment only: official product metadata,
   native SHA verification, selectable persistent user prefix, exact version,
   current/previous. Never automatically register/start a service or invoke the

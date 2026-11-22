@@ -5,7 +5,6 @@ import importlib.util
 import gzip
 import json
 from pathlib import Path
-import runpy
 import re
 import shutil
 import subprocess
@@ -15,9 +14,6 @@ import tempfile
 from release_common import digest, copy_immutable
 
 ROOT = Path(__file__).resolve().parents[1]
-DDNSTO = runpy.run_path(str(ROOT / "ddnsto/release.py"))
-
-
 def copy_desktop_candidates(binary, include=False):
     if not include:
         return
@@ -26,8 +22,22 @@ def copy_desktop_candidates(binary, include=False):
     if len(versions) != 1:
         raise ValueError('DDNSTO needs one candidate version')
     directory = binary / 'ddnsto' / ('desktop-candidate-' + versions.pop())
-    for name in ('install.ps1', 'install-macos.sh'):
-        copy_immutable(ROOT / 'ddnsto' / name, directory / name)
+    sources = {
+        'install.ps1': ROOT / 'apps/ddnsto/source/install.ps1',
+        'install-macos.sh': ROOT / 'apps/ddnsto/0.2.4/installer.sh',
+    }
+    for name, source in sources.items():
+        copy_immutable(source, directory / name)
+
+
+def copy_ddnsto_compat_installers(installer, destination):
+    for relative in (
+        "openwrt/install_ddnsto.sh", "openwrt/install_ddnsto_business.sh",
+        "openwrt/setup_ddnsto.sh", "linux-binary/install_ddnsto_linux.sh",
+    ):
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(installer, target)
 
 
 def git_commit(root):
@@ -104,22 +114,25 @@ def main():
         for app in sorted(applications):
             scripts = {record["script"] for record in catalog["installers"] if record["application"] == app}
             if app == 'jq':
-                expected={'jq/jq-install.sh','jq/jq-install.ps1'}
+                expected={'apps/jq/0.1.0/installer.sh','apps/jq/0.1.0/installer.ps1'}
                 if scripts != expected:
                     raise ValueError('jq requires exactly one shell entry and one native Windows bridge')
                 for source in sorted(scripts):
                     installer=ROOT/source
-                    shutil.copy2(installer,binary/app/installer.name)
-                shutil.copy2(ROOT/'jq/jq-install.sh',binary/app/'install.sh')
+                    suffix = installer.suffix
+                    shutil.copy2(installer, binary/app/f'jq-install{suffix}')
+                shutil.copy2(ROOT/'apps/jq/0.1.0/installer.sh',binary/app/'install.sh')
                 continue
             if len(scripts) != 1:
                 raise ValueError("application must have one canonical entry")
             installer = ROOT / scripts.pop()
-            shutil.copy2(installer, binary / app / installer.name)
+            shutil.copy2(installer, binary / app / f"{app}-install{installer.suffix}")
             shutil.copy2(installer, binary / app / "install.sh")  # Existing public URL.
         # Candidate inclusion never activates desktop aliases or catalog rows.
         copy_desktop_candidates(binary, args.include_desktop_candidates)
-        DDNSTO["copy_compat_installers"](ROOT / "ddnsto/ddnsto-install.sh", binary / "ddnsto")
+        copy_ddnsto_compat_installers(
+            ROOT / "apps/ddnsto/0.2.4/installer.sh", binary / "ddnsto"
+        )
         subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(package), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
         if is_rust:
             for pointer in (package / "pointers/zsetup").iterdir():

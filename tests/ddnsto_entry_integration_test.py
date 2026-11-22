@@ -20,19 +20,20 @@ class EntryIntegration(unittest.TestCase):
             before = {p: (repo / p).read_bytes() for p in paths}
             result = subprocess.run([sys.executable, '-B', str(repo / 'scripts/build-entrypoints.py')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            entry = (repo / 'ddnsto/ddnsto-install.sh').read_text()
+            entry = (repo / 'apps/ddnsto/0.2.4/installer.sh').read_text()
             self.assertIn('Darwin', entry)
-            self.assertIn('ddnsto_bootstrap_zsetup', entry)
+            self.assertIn('bootstrap_zsetup_path', entry)
+            self.assertNotIn('ddnsto_bootstrap_zsetup', entry)
             self.assertIn('ddnsto_pinned_sha', entry)
             self.assertIn('installer_service_prepare', entry)
-            self.assertFalse((repo / 'ddnsto/install.sh').exists(), 'only one canonical source entry')
+            self.assertFalse((repo / 'ddnsto').exists(), 'outer business directories stay removed')
             for path, data in before.items():
                 self.assertEqual((repo / path).read_bytes(), data, path)
             check = subprocess.run([sys.executable, '-B', str(repo / 'scripts/build-entrypoints.py'), '--check'], capture_output=True, text=True)
             self.assertEqual(check.returncode, 0, check.stderr)
 
     def test_canary_executes_verified_file_not_shell_argument(self):
-        script = (ROOT / 'ddnsto/tests/github_linux_canary.sh').read_text()
+        script = (ROOT / 'tests/apps/ddnsto/internal/github_linux_canary.sh').read_text()
         self.assertNotIn('sh -c "$entry"', script)
         self.assertIn('sh /tmp/github-entry.sh', script)
 

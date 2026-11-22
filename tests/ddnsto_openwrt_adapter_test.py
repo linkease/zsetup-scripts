@@ -7,7 +7,7 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'ddnsto/tests'))
+sys.path.insert(0, str(ROOT / 'tests/apps/ddnsto/internal'))
 import openwrt_lifecycle_test as fixtures
 
 ORIGINAL = fixtures.ORIGINAL
@@ -27,8 +27,10 @@ class Adapter(unittest.TestCase):
                     target.symlink_to(shutil.which(tool))
             test_path = str(self.tools)
         script = '\n'.join('. "' + str(ROOT / p) + '"' for p in (
-            'ddnsto/business.sh', 'ddnsto/managed-cli.sh',
-            'ddnsto/openwrt-lifecycle.sh', 'ddnsto/portable-files.sh', 'ddnsto/openwrt-adapter.sh'))
+            'apps/ddnsto/source/business.sh', 'apps/ddnsto/source/managed-cli.sh',
+            'apps/ddnsto/source/openwrt-lifecycle.sh',
+            'apps/ddnsto/source/portable-files.sh',
+            'apps/ddnsto/source/openwrt-adapter.sh'))
         script += '''
 binary=$DDNSTO_OPENWRT_BIN_PATH; config=$DDNSTO_CONFIG_PATH
 service_path=$DDNSTO_SERVICE_PATH; package_manager=opkg

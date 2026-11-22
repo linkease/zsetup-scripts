@@ -24,7 +24,7 @@ class PortableFiles(unittest.TestCase):
         self.file.write_text('fixture')
 
     def run_probe(self, body, path=None):
-        script = f'. "{ROOT / "ddnsto/portable-files.sh"}"\n' + body
+        script = f'. "{ROOT / "apps/ddnsto/source/portable-files.sh"}"\n' + body
         return subprocess.run(['/bin/sh', '-eu', '-c', script, 'probe', str(path or self.file)],
                               env=os.environ | {'PATH': str(self.tools)},
                               text=True, capture_output=True)
@@ -80,11 +80,11 @@ print(f'{s.st_uid} {mode:o} {s.st_nlink}')
         parent = self.root / 'unsafe'
         parent.mkdir(mode=0o777)
         parent.chmod(0o777)
-        body = f'. "{ROOT / "ddnsto/bootstrap-policy.sh"}"\nddnsto_bootstrap_safe_ancestors "$1"'
+        body = 'ddnsto_bootstrap_safe_ancestors "$1"'
         self.assertNotEqual(self.run_probe(body, parent).returncode, 0)
 
     def test_protected_bootstrap_parent_passes_without_stat(self):
-        body = f'. "{ROOT / "ddnsto/bootstrap-policy.sh"}"\nddnsto_bootstrap_safe_ancestors "$1"'
+        body = 'ddnsto_bootstrap_safe_ancestors "$1"'
         result = self.run_probe(body, self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
 

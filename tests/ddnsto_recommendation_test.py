@@ -136,15 +136,16 @@ class Recommendation(unittest.TestCase):
         release = self.site / 'release'
         entry = (release / 'recommended-entry.sh').read_text()
         self.assertIn('ddnsto_recommend_native_prepare\n', entry)
-        self.assertIn('RESCUE_VERSION=0.5.0', entry)
+        self.assertIn('ZSETUP_STABLE_PATH=zsetup/stable', entry)
+        self.assertNotIn('RESCUE_VERSION=0.5.0', entry)
         self.assertNotIn('@@NATIVE_FIRST@@', entry)
         review = json.loads((release / 'review.json').read_text())
         self.assertEqual(review['shell_bootstrap'], 'native-first-candidate')
         self.assertFalse(review['published'])
 
     def test_stale_product_configuration_cannot_be_packaged(self):
-        shutil.copytree(ROOT / 'ddnsto/templates', self.source / 'ddnsto/templates')
-        shutil.copyfile(ROOT / 'ddnsto/platform-releases.json',
+        shutil.copytree(ROOT / 'apps/ddnsto/source/templates', self.source / 'ddnsto/templates')
+        shutil.copyfile(ROOT / 'apps/ddnsto/source/platform-releases.json',
                         self.source / 'ddnsto/platform-releases.json')
         result = self.package()
         self.assertNotEqual(result.returncode, 0)
@@ -158,20 +159,21 @@ class Recommendation(unittest.TestCase):
         self.assertNotIn('ddnsto_recommend_native_prepare\n', entry)
 
     def test_stale_combined_entry_cannot_be_packaged(self):
-        shutil.copytree(ROOT / 'ddnsto/templates', self.source / 'ddnsto/templates')
-        shutil.copyfile(ROOT / 'ddnsto/platform-releases.json', self.source / 'ddnsto/platform-releases.json')
-        for template in (ROOT / 'ddnsto/templates').glob('*.in'):
+        shutil.copytree(ROOT / 'apps/ddnsto/source/templates', self.source / 'ddnsto/templates')
+        shutil.copyfile(ROOT / 'apps/ddnsto/source/platform-releases.json', self.source / 'ddnsto/platform-releases.json')
+        for template in (ROOT / 'apps/ddnsto/source/templates').glob('*.in'):
             name = template.name[:-3]
-            shutil.copyfile(ROOT / 'ddnsto' / name, self.source / 'ddnsto' / name)
+            shutil.copyfile(ROOT / 'apps/ddnsto/source' / name,
+                            self.source / 'ddnsto' / name)
         result = self.package()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('stale generated product bundle', result.stderr)
         self.assertFalse((self.site / 'release').exists())
 
     def test_native_first_real_core_chain_and_rejections(self):
-        native = os.environ.get('DDNSTO_TEST_NATIVE')
+        native = os.environ.get('ZSETUP_TEST_NATIVE')
         if not native:
-            self.skipTest('DDNSTO_TEST_NATIVE required for real 0.5.0 integration')
+            self.skipTest('ZSETUP_TEST_NATIVE required for current published zsetup integration')
         data = Path(native).read_bytes()
         self.assertEqual(sha(data), '9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617')
         from tls_fixture import generate_certificate
@@ -421,7 +423,7 @@ class Recommendation(unittest.TestCase):
 
     def test_asus_recommendation_does_not_require_id_stat_mktemp(self):
         self.prepare()
-        template = (ROOT / 'ddnsto/recommended-entry.sh').read_text()
+        template = (ROOT / 'apps/ddnsto/source/recommended-entry.sh').read_text()
         self.assertIn('@@ASUS_STORAGE@@', template)
         fixtures = '''
 ddnsto_asus_storage() { ASUS_STATE="$ASUS_FIXTURE"; mkdir -m 700 "$ASUS_STATE"; }
@@ -433,7 +435,7 @@ stat() { return 99; }
 mktemp() { return 99; }
 '''
         template = template.replace('@@ASUS_STORAGE@@', fixtures)
-        template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'ddnsto/portable-files.sh').read_text())
+        template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'apps/ddnsto/source/portable-files.sh').read_text())
         template = template.replace('[ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]', 'true')
         template = template.replace('@@SOURCE_URL@@', self.base + '/release').replace('@@CACHE_KEY@@', 'fixture')
         path = self.work / 'asus-entry.sh'
@@ -602,15 +604,18 @@ mktemp() { return 99; }
         self.assertFalse((self.work / 'native-ran').exists())
 
     def test_canonical_sources_package_without_regeneration(self):
-        before = {name: (ROOT / 'ddnsto' / name).read_bytes()
-                  for name in ['ddnsto-install.sh', 'install.ps1']}
+        canonical = {
+            'ddnsto-install.sh': ROOT / 'apps/ddnsto/0.2.4/installer.sh',
+            'install.ps1': ROOT / 'apps/ddnsto/source/install.ps1',
+        }
+        before = {name: path.read_bytes() for name, path in canonical.items()}
         self.source = ROOT
         self.shell, self.ps = before['ddnsto-install.sh'], before['install.ps1']
         self.prepare()
         self.assertEqual(self.installer.read_bytes(), self.shell)
         self.assertEqual((self.release / 'immutable' / sha(self.ps) / 'install.ps1').read_bytes(), self.ps)
         for name, data in before.items():
-            self.assertEqual((ROOT / 'ddnsto' / name).read_bytes(), data)
+            self.assertEqual(canonical[name].read_bytes(), data)
 
 
 @unittest.skipUnless(PWSH, 'set DDNSTO_TEST_PWSH to a PowerShell runtime')
@@ -621,7 +626,7 @@ class PowerShellReview(Recommendation):
     These tests do not claim Windows filesystem ACL enforcement coverage.
     """
     def ps_run(self, body, *, acl=False, args=()):
-        source = (ROOT / 'ddnsto/recommended-entry.ps1').read_text()
+        source = (ROOT / 'apps/ddnsto/source/recommended-entry.ps1').read_text()
         # Definitions only: never enter the Windows installer main function.
         definitions = source.split('\ntry {\n', 1)[0]
         if acl:
@@ -694,7 +699,7 @@ catch { 'rejected' }
         shutil.copyfile(self.release / 'recommended-powershell.txt', cache / 'recommended.txt')
         cached = cache / (sha(self.ps) + '.ps1')
         cached.write_bytes(self.ps)
-        source = (ROOT / 'ddnsto/recommended-entry.ps1').read_text()
+        source = (ROOT / 'apps/ddnsto/source/recommended-entry.ps1').read_text()
         # Exercise the real fallback control flow, stopping before cache commit
         # and installer execution. Only ACL checks are unavailable on Linux.
         fallback = source[source.index('    $online = Receive-Bounded'):source.index('    # File.Replace')]

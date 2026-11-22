@@ -8,15 +8,16 @@ DDNSTO 安装站点由本仓库单独打包；控制台固定引用 install.ddns
 测试参数只切换客户端业务环境，不切换脚本推荐渠道。域名尚未部署。
 
 DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
-[`ddnsto/platform-releases.json`](ddnsto/platform-releases.json)，支持各平台独立版本。
-修改后执行 `python3 -B scripts/build-entrypoints.py`，再审核发布；设备端不增加配置解析依赖。
-带有对应 `ddnsto/templates/*.in` 的文件为生成副本，维护规则见
+[`apps/ddnsto/source/platform-releases.json`](apps/ddnsto/source/platform-releases.json)，支持各平台独立版本。
+修改后执行 `python3 -B scripts/build-ddnsto-products.py` 和 `python3 -B scripts/build.py`，
+再审核发布；设备端不增加配置解析依赖。带有对应
+`apps/ddnsto/source/templates/*.in` 的文件为生成副本，维护规则见
 [分平台推荐配置](docs/ddnsto-platform-releases.md)。以下旧版平台表中的固定版本不是当前推荐配置。
 
-FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.9 本地候选的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
+FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。应用分别声明 zsetup 能力最低版本；安装入口读取平台最新 stable，较新的兼容核心不会被旧配置降级。规则和提升门禁见 [zsetup 兼容策略](docs/zsetup-compatibility.md)。
 
-[`kspeeder/ks-cli`](kspeeder/ks-cli/README.md) 与
-[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md) 的 0.1.2 已支持 Linux、macOS
+[`apps/ks-cli`](apps/ks-cli/README.md) 与
+[`apps/kspeeder`](apps/kspeeder/README.md) 的 0.1.2 已支持 Linux、macOS
 和 Windows。它们从四站点的不可变 KSpeeder 发布 ID 目录下载并校验产品，只安装
 用户级二进制，不自动注册或启动服务。全平台产品镜像和完整 apps 已于 2026-11-22
 发布并通过四站点校验；未来最新版发现、资产锁定、apps 验证及产品发布统一使用
@@ -59,8 +60,8 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 | `fastnet` | Linux/OpenWrt；启动后由 FastNet 管理菜单 | x86_64、aarch64、armv7 | 参数逐项原样传给 FastNet；菜单交互由业务程序决定 |
 | `ddnsto` | OpenWrt opkg/apk | x86_64、aarch64、armv7、mipsel | `--token TOKEN` 可选；`--force-version lite\|standard` 可选；低于 900 MB 自动选 Lite；`--verify-status` 检查服务 |
 | `ddnsto` | Ubuntu/Debian apt、CentOS/RHEL yum/dnf、其他已识别 Linux | x86_64、aarch64 | 默认 Standard 4.2.3；`DDNSTO_VERSION` 可覆盖已发布版本；无终端必须传 `--token` |
-| `ddnsto` | Windows 10 x64 WOW64 / PowerShell 5.1 | x86_64 CLI | `ddnsto/install.ps1`；固定校验的 CLI 4.2.1；使用计划任务随系统启动；必须提供 `-Token` |
-| `ddnsto` | macOS | x86_64、arm64 | `ddnsto/install-macos.sh`；固定校验的 CLI 4.2.1；使用用户级 launchd；必须提供 `--token` |
+| `ddnsto` | Windows 10 x64 WOW64 / PowerShell 5.1 | x86_64 CLI | 标准入口 `apps/ddnsto/ddnsto-install.ps1`；使用计划任务随系统启动；必须提供 `-Token` |
+| `ddnsto` | macOS | x86_64、arm64 | 标准入口 `apps/ddnsto/ddnsto-install.sh`；使用用户级 launchd；必须提供 `--token` |
 | `linkease` | OpenWrt opkg、Ubuntu/Debian、CentOS/RHEL、通用 Linux | x86_64、aarch64、armv7 | `--version VERSION` 可选；Linux 默认 1.7.5；无菜单/token 交互 |
 | `fastpve` | PVE 宿主机（Debian / apt），root、pveversion 必需 | x86_64 | 默认前台菜单；参数原样传给 FastPVE；PVE 大版本兼容性待设备验证 |
 | `ks-cli` | Linux、macOS、Windows | Linux x86_64/aarch64/armv7；macOS/Windows x86_64/arm64 | 只安装用户级 CLI，不执行业务命令或安装服务 |
@@ -68,23 +69,31 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
 
-业务按根目录模块组织：[fastnet/](fastnet/README.md)、[ddnsto/](ddnsto/README.md)、[linkease/](linkease/README.md)、[fastpve/](fastpve/README.md) 各自拥有业务脚本、测试和说明；DDNSTO 的兼容入口发布规则也位于 ddnsto/。公共 lib/scripts/tests/docs 仅保留共享 bootstrap、统一构建、跨模块验证与协议文档。
+`apps/` 是唯一业务源码树，也是整体发布时原样复制到服务器的目录。每个应用由
+`apps/<id>/app.json` 声明身份和当前版本，`apps/<id>/<version>/installer.*` 是配置索引引用的
+版本化安装器；复杂应用的可维护源码放在 `apps/<id>/source/`。所有测试和测试夹具位于
+`tests/`，不会随 `apps/` 发布。公共 `lib/`、`scripts/`、`tests/`、`docs/` 只保留共享能力、
+发布工具、验收和协议文档。
 
 ```text
 zsetup-scripts/
-  fastnet/          # fastnet-install.sh、business.sh、main.sh、README、tests/
-  ddnsto/           # ddnsto-install.sh、Windows/macOS 入口、业务源码、测试、release.py
-  linkease/         # linkease-install.sh、business.sh、main.sh、README、tests/
-  fastpve/          # fastpve-install.sh、business.sh、main.sh、README、tests/
+  apps/             # 唯一业务源码和完整发布树
+    APP/app.json    # 应用身份、当前版本、平台和兼容别名
+    APP/VERSION/    # 配置索引引用的不可变 installer.sh / installer.ps1
+    APP/source/     # 可选的复杂应用维护源码；不含测试
   legacy/           # 原仓库旧脚本快照与来源说明，仅供历史参考
   lib/              # 共享 shell bootstrap
   scripts/          # 统一生成、打包与验收
-  tests/            # 仓库布局与统一发布包测试
+  tests/apps/       # 应用测试和夹具，不复制到服务器
+  tests/contracts/  # 目录、构建和发布契约
   docs/             # 发布、扩展、AI 协议与验证证据
   catalog.json      # 统一安装索引的构建输入
 ```
 
-共享 bootstrap 构建时嵌入各模块的唯一 APP-install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh、linkease/linkease-install.sh、fastpve/fastpve-install.sh 或 zsetup install。FastNet仓库仅同步本仓库的生成入口，其他业务仓库保持原状。
+共享 bootstrap 只用于生成 `apps/APP/install.*` 及兼容别名；真正被索引和校验的是版本化
+`apps/APP/VERSION/installer.*`。业务逻辑只在所属 `apps/APP/` 内维护，运行中的入口不会下载自身。
+旧脚本集中归档到 [legacy/](legacy/README.md)，根目录不再保留业务目录或旧别名。日常调用使用
+`apps/APP/APP-install.*` 或 `zsetup install APP`。
 
 既有生产部署使用 [FastNet 独立发布](docs/fastnet-independent-release.md) 等历史流程，映射到
 `/binary/APP/` 和共享 `/binary/zsetup/config.json`；这些路径继续保留，不能用完整 aggregate
@@ -97,13 +106,16 @@ zsetup-scripts/
 ```sh
 python3 -B scripts/build-entrypoints.py
 sh scripts/check.sh /path/to/linkease-tunnel/zsetup-rust /path/to/RUST-RELEASE-PACKAGE
+scripts/check-zsetup-candidate.sh /absolute/path/to/zsetup
 python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup-rust \
   --zsetup-release /path/to/RUST-RELEASE-PACKAGE --require-clean
 ```
 
 第三条在干净提交后生成安装脚本、zsetup 和配置候选，不访问产品服务器、不需要本地产品文件。dist/release 是本仓库的发布输出，dist/evidence 是验证日志；不再生成 ddnsto-artifacts。新增业务步骤见 [接入约定](docs/extension.md)，迁移归属和测试基线见 [盘点](docs/inventory.md)。
 
-跨平台 DDNSTO 入口的当前边界见 [ddnsto/README.md](ddnsto/README.md)。Windows/macOS 入口使用客户端业务发布目录中的 CLI 归档，不把客户端二进制复制进本仓库；归档版本和 SHA256 必须随业务发布物同步更新。
+跨平台 DDNSTO 入口的当前边界见 [DDNSTO 应用说明](apps/ddnsto/README.md)。Windows/macOS
+入口使用客户端业务发布目录中的 CLI 归档，不把客户端二进制复制进本仓库；归档版本和
+SHA256 必须随业务发布物同步更新。
 
 维护者和 AI 使用的共享编译工具链位于 `/projects/workspace-linkease-ubuntu/toolchains/`，
 由原生 zsetup 仓库锁定版本、准备和复用，设置 `LINKEASE_TOOLCHAIN_ROOT` 即可指定。

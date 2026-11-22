@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "apps-4e37810cf447",
+  "config_version": "apps-624b00f659c9",
   "source_groups": [
     {
       "id": "release",
@@ -35,7 +35,7 @@
       "source_group": "release",
       "sha256": "198693a06c38e815a0457751892c81aeb9d23a99739704b7c0c79bf29c3c0b4d",
       "size": 34450,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -47,7 +47,7 @@
       "source_group": "release",
       "sha256": "198693a06c38e815a0457751892c81aeb9d23a99739704b7c0c79bf29c3c0b4d",
       "size": 34450,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -59,7 +59,7 @@
       "source_group": "release",
       "sha256": "198693a06c38e815a0457751892c81aeb9d23a99739704b7c0c79bf29c3c0b4d",
       "size": 34450,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "kai-skills",
@@ -71,7 +71,7 @@
       "source_group": "release",
       "sha256": "1f2384ee35412832370969eb98dbc6b04cfa1230530dba950ca06db1ca2a86a8",
       "size": 8137,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -83,7 +83,7 @@
       "source_group": "release",
       "sha256": "e0e83c10b4577c71cc00cb8c8247be51bae62cd23875d5bb390383f5730dafe5",
       "size": 24482,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -95,7 +95,7 @@
       "source_group": "release",
       "sha256": "e0e83c10b4577c71cc00cb8c8247be51bae62cd23875d5bb390383f5730dafe5",
       "size": 24482,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -107,7 +107,7 @@
       "source_group": "release",
       "sha256": "d976b0ca9cadf205b38dc7ea2a911aeccdfe0b6b8fa99dd51c9a9fa57ed52b7f",
       "size": 24486,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -119,7 +119,7 @@
       "source_group": "release",
       "sha256": "d976b0ca9cadf205b38dc7ea2a911aeccdfe0b6b8fa99dd51c9a9fa57ed52b7f",
       "size": 24486,
-      "min_version": "0.6.5"
+      "min_version": "0.5.0"
     },
     {
       "application": "scoop",

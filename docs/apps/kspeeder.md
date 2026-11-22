@@ -1,0 +1,31 @@
+# KSpeeder 项目安装器
+
+两个独立软件共用同一个产品发布分组，标准实现位于
+[`apps/ks-cli`](../../apps/ks-cli/README.md) 与
+[`apps/kspeeder`](../../apps/kspeeder/README.md)。安装器负责正确二进制、版本校验和
+可选持久目录；不安装或启动系统服务。两个Linux脚本0.1.0已于2026-10-26公开发布。
+公共命令分别是`zsetup install ks-cli`和`zsetup install kspeeder`。
+产品二进制统一镜像到版本化 `/binary/kspeeder/VERSION/`，发布与回滚见
+[安装器发布说明](../kspeeder-installers.md)。
+
+## Windows 接入准备（已有工作与未完成项）
+
+当前仅交付共享 `../lib/bootstrap.ps1` 和 `tests/windows_bootstrap_test.py`；还没有公开 Windows 业务入口或 catalog 映射，不宣称真实业务安装已经验收。非 Windows 四业务入口及 legacy 原样保留。
+
+bootstrap 在 PowerShell 5.1 获取 win32 Rust：`zsetup/stable-windows` → `zsetup/<完整版本>/SHA256SUMS` → `zsetup/<完整版本>/zsetup-windows-i686.exe`。三 HTTPS primary 顺序尝试，fw.koolcenter.com 最后 fallback。Windows 首期最低 Rust 版本0.3.0（开发 fixture 可为0.3.0-dev）；完整 --version 文本必须精确匹配，不以数值兼容代替身份。SHA 必须存在、匹配，PE 必须 I386，验证后原子激活 `<ZSETUP_ROOT>/rescue/<完整版本>/zsetup.exe`，不覆盖系统 PATH 中的 zsetup。既有匹配 SHA/完整版本的实例复用，损坏缓存重取；失败保留旧文件。
+
+`ZSETUP_ROOT` 必须绝对路径，默认 TEMP 下 zsetup；`ZSETUP_BIN` 是可复用候选，仍需校验。`ZSETUP_BOOTSTRAP_BASES` 是 HTTPS 测试/部署来源覆盖；正常业务下载不使用 PowerShell transport。`ZSETUP_CA_FILE` 提供测试或私有 CA 时仅用于当前请求的链及主机名校验，不修改系统根证书；Rust 后续下载继续 canonical webpki/显式 CA 协议。metadata 最大64KiB、stable最大128字节、依赖文件最大16MiB，OutFile 流式落盘；版本探测等待最多5秒并显式等待子进程结束。
+
+全部 HTTPS 获取失败后，bootstrap 才能询问是否允许首次依赖的 HTTP；默认拒绝，无交互时拒绝。与既有 POSIX 同名的 `ZSETUP_CONFIRM_FILE` 可提供一个明确答复，文件最大1KiB。HTTP 不能传给 Rust 下载器，业务下载也没有 HTTP 例外。重定向不自动跟随。
+
+原生安全测试（已有 Python/OpenSSL 放入 PATH、TEMP 指向隔离 D 盘目录）：
+
+```powershell
+python -B kspeeder/tests/windows_bootstrap_test.py D:\tests\zsetup.exe --report D:\tests\bootstrap.json
+```
+
+测试只运行 zsetup --version、隔离 TLS/HTTP 和临时文件；不执行 KSpeeder 安装、服务或修改机器 PATH。测试必须在 Windows 运行，交叉编译不算通过。Windows10 x64 WOW64/PS5.1 已通过8组，原生 Windows11 仍缺环境。
+
+业务接入前置：实际 Windows amd64 产品须由业务服务器提供不可变版本路径、真实 SHA256/size；当前官方 ks-cli-version.txt 缺 Windows 摘要。用户已选择保留默认菜单并等待业务方修正。参考 ks-cli 默认菜单的安装动作即使管理员启动仍会 UAC，业务发布者须修正当前进程有效管理员识别、验证菜单不再跨权限启动，并提供修正提交及包身份。新入口不默认改为 installer install --elevated。此库不构建/打包 Go 业务产物、不撤销旧入口、不切公网配置指针。
+
+M6完整业务验收等待上述修正版及资源，当前共享bootstrap通过不等于KSpeeder业务已经接入。到位后重新核对源码/版本/SHA/size，先补测试，再接入唯一Windows入口及管理员预检，验证直接入口/install、字面参数、失败保留、缓存以及原生进程树。普通用户业务修改前退出2，基础zsetup CLI不新增管理员要求。非管理员及Windows11环境缺失分别记录，不用交叉编译或管理员fixture替代。

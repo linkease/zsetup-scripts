@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix="apps-config-") as name:
         "application": "demo", "os": "linux", "package_manager": "*", "arch": "aarch64",
         "path": "zsetup-scripts/apps/demo/1.2.3/installer.sh", "background": False,
         "source_group": "koolcenter", "sha256": expected_sha,
-        "size": len(payload), "min_version": "0.6.4",
+        "size": len(payload), "min_version": "0.5.0",
     }
     assert all(record["path"] != "demo/install.sh" for record in config["installers"])
     first = config_path.read_bytes()

@@ -73,7 +73,7 @@ case "$1" in
          'ZSETUP_OS=ubuntu','ZSETUP_PACKAGE_MANAGER=apt','ZSETUP_ARCH=x86_64',
          'ZSETUP_SOURCE_BASES='+base,'ZSETUP_SOURCE_FALLBACK=','ZSETUP_CA_FILE='+str(fixture/'ca.crt')]
     config=home/'config.json'
-    script_body=(ROOT/'ddnsto/ddnsto-install.sh').read_bytes()
+    script_body=(ROOT/'apps/ddnsto/0.2.4/installer.sh').read_bytes()
     Handler.bodies['/ddnsto/storage-native/install.sh']=script_body
     native_version=subprocess.check_output(['/tools/zsetup','--version'],text=True).strip().removeprefix('zsetup ')
     config.write_text(json.dumps({'schema_version':1,'config_version':'sudo-native',

@@ -33,7 +33,7 @@ class Redirects(unittest.TestCase):
         self.assertFalse((self.work / 'args').exists())
 
     def fetch(self, path, wget=False, trust=True):
-        source = (ROOT / 'ddnsto/recommended-entry.sh').read_text()
+        source = (ROOT / 'apps/ddnsto/source/recommended-entry.sh').read_text()
         function = source[source.index('ddnsto_https_fetch() ('):source.index('\nfetch() (')]
         prefix = ''
         if wget:
@@ -92,13 +92,13 @@ class Redirects(unittest.TestCase):
             self.assertIn('请安装 curl 后重试', result.stderr)
 
     def test_powershell_parameters_are_validated_and_forwarded(self):
-        source = (ROOT / 'ddnsto/recommended-entry.ps1').read_text()
+        source = (ROOT / 'apps/ddnsto/source/recommended-entry.ps1').read_text()
         self.assertIn("[ValidateSet('test', 'production')][string]$Environment", source)
         self.assertIn('[switch]$SwitchEnvironment', source)
         self.assertIn('$forward = @{} + $PSBoundParameters', source)
 
     def test_powershell_redirect_guards_exist_without_runtime(self):
-        source = (ROOT / 'ddnsto/recommended-entry.ps1').read_text()
+        source = (ROOT / 'apps/ddnsto/source/recommended-entry.ps1').read_text()
         self.assertIn('$request.AllowAutoRedirect = $false', source)
         self.assertIn('$redirects -ge 5', source)
         self.assertIn("$target.Scheme -ne 'https'", source)

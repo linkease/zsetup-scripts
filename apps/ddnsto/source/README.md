@@ -8,6 +8,9 @@
 ## 分平台产品版本维护
 
 原生安装器的版本和产品摘要统一维护在 `platform-releases.json`；不同平台可以独立推荐版本。
+zsetup 核心不在 DDNSTO 中固定版本：Linux/OpenWrt、macOS、Windows 分别跟随平台 stable，
+并要求能力最低版本 0.5.0。历史记录中的 0.3.0/0.4.0/0.5.0 只描述当时验收对象，
+不再是当前安装策略。
 有 `templates/*.in` 的脚本和 `install-rules.json` 为生成文件，请修改模板中的安装逻辑或 JSON 中的产品数据，
 再从仓库根目录运行 `python3 -B scripts/build-entrypoints.py`。不要直接修改这些生成文件。
 更新流程与边界见 [分平台推荐配置](../docs/ddnsto-platform-releases.md)。设备端不增加 JSON 解析依赖。

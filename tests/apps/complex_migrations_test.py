@@ -9,12 +9,11 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
-    "ddnsto": {"version": "0.2.4", "sh": "ddnsto/ddnsto-install.sh", "linux": 22, "windows": 0},
-    "linkease": {"version": "0.1.9", "sh": "linkease/linkease-install.sh", "linux": 24, "windows": 0},
-    "jq": {"version": "0.1.0", "sh": "jq/jq-install.sh", "ps1": "jq/jq-install.ps1", "linux": 22, "windows": 3},
-    "kai-skills": {"version": "1.2.6", "sh": "kai-skills/kai-skills-install.sh",
-                   "ps1": "kai-skills/kai-skills-install.ps1", "linux": 2, "windows": 1},
-    "scoop": {"version": "0.1.2", "ps1": "scoop/scoop-install.ps1", "linux": 0, "windows": 1},
+    "ddnsto": {"version": "0.2.4", "entrypoints": ["sh"], "linux": 22, "windows": 0},
+    "linkease": {"version": "0.1.9", "entrypoints": ["sh"], "linux": 24, "windows": 0},
+    "jq": {"version": "0.1.0", "entrypoints": ["sh", "ps1"], "linux": 22, "windows": 3},
+    "kai-skills": {"version": "1.2.6", "entrypoints": ["sh", "ps1"], "linux": 2, "windows": 1},
+    "scoop": {"version": "0.1.2", "entrypoints": ["ps1"], "linux": 0, "windows": 1},
 }
 
 subprocess.run([sys.executable, "-B", str(ROOT / "scripts/build.py"), "--check"], check=True)
@@ -25,10 +24,10 @@ for app_id, expected in EXPECTED.items():
     manifest = json.loads((app / "app.json").read_text())
     assert manifest["version"] == expected["version"]
     for extension in ("sh", "ps1"):
-        if extension not in expected:
+        if extension not in expected["entrypoints"]:
             continue
         payload = app / expected["version"] / f"installer.{extension}"
-        assert payload.read_bytes() == (ROOT / expected[extension]).read_bytes()
+        assert payload.is_file() and not payload.is_symlink()
         assert (app / f"install.{extension}").is_file()
         assert (app / f"{app_id}-install.{extension}").read_bytes() == (app / f"install.{extension}").read_bytes()
     assert not (app / "tests").exists()

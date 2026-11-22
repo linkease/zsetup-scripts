@@ -3,8 +3,7 @@
 ddnsto_synology_entry() (
     if [ "${PLAN_ONLY:-0}" = 1 ]; then ddnsto_synology_download "$@"; exit $?; fi
     if [ "${ZSETUP_INSTALLER_MODE:-0}" != 1 ]; then
-        ddnsto_bootstrap_zsetup || exit $?
-        ZSETUP_BIN=$ACTIVE_ZSETUP
+        ZSETUP_BIN=$(bootstrap_zsetup_path) || exit $?
     fi
     ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}
     ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}

@@ -10,19 +10,13 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 
-subprocess.run(
-    [sys.executable, "-B", str(ROOT / "scripts/build-kspeeder-powershell.py"), "--check"],
-    check=True,
-)
 subprocess.run([sys.executable, "-B", str(ROOT / "scripts/build.py"), "--check"], check=True)
 
 config = json.loads((ROOT / "apps/zsetup/config-windows.json").read_text(encoding="utf-8"))
 for app in ("ks-cli", "kspeeder"):
-    canonical = ROOT / "kspeeder" / app / f"{app}-install.ps1"
     manifest = json.loads((ROOT / "apps" / app / "app.json").read_text(encoding="utf-8"))
     payload = ROOT / "apps" / app / manifest["version"] / "installer.ps1"
-    assert canonical.read_bytes().startswith(b"\xef\xbb\xbf")
-    assert payload.read_bytes() == canonical.read_bytes()
+    assert payload.read_bytes().startswith(b"\xef\xbb\xbf")
     assert (ROOT / "apps" / app / "install.ps1").read_bytes() == (
         ROOT / "apps" / app / f"{app}-install.ps1"
     ).read_bytes()
@@ -33,7 +27,7 @@ for app in ("ks-cli", "kspeeder"):
         hashlib.sha256(payload.read_bytes()).hexdigest()
     }
 
-policy = (ROOT / "kspeeder/lib/binary.ps1").read_text(encoding="utf-8")
+policy = (ROOT / "apps/ks-cli/0.1.2/installer.ps1").read_text(encoding="utf-8-sig")
 for required in (
     "ks-cli-win-$arch.exe",
     "iStoreEnhance-win.exe.$arch",

@@ -153,10 +153,6 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-workflow-") as folder:
 
     fixture = work / "repo"
     for relative in (
-        "kspeeder/ks-cli/ks-cli-install.sh", "kspeeder/ks-cli/ks-cli-install.ps1",
-        "kspeeder/kspeeder/kspeeder-install.sh", "kspeeder/kspeeder/kspeeder-install.ps1",
-        "kspeeder/lib/binary.sh", "kspeeder/lib/binary.ps1",
-        "apps/_shared/kspeeder-binary.sh", "apps/_shared/kspeeder-binary.ps1",
         "apps/ks-cli/app.json", "apps/ks-cli/0.1.2/installer.sh",
         "apps/ks-cli/0.1.2/installer.ps1", "apps/ks-cli/ks-cli-install.sh",
         "apps/ks-cli/ks-cli-install.ps1", "apps/ks-cli/install.sh", "apps/ks-cli/install.ps1",

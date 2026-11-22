@@ -10,13 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def shell(body, *args):
-    sources = ['lib/bootstrap.sh', 'ddnsto/portable-files.sh', 'ddnsto/bootstrap-policy.sh',
-               'lib/install-storage.sh', 'lib/install-bounds.sh',
-               'lib/install-transaction.sh', 'lib/install-service.sh',
-               'ddnsto/product-pins.sh', 'ddnsto/docker-probe.sh',
-               'ddnsto/business.sh']
-    sources += [str(p.relative_to(ROOT)) for p in sorted((ROOT / 'ddnsto').glob('managed-*.sh'))]
-    script = 'set -eu\n' + ''.join('. "' + str(ROOT / p) + '"\n' for p in sources)
+    source = ROOT / 'apps/ddnsto/source'
+    sources = [ROOT / 'lib/bootstrap.sh', source / 'portable-files.sh',
+               ROOT / 'lib/install-storage.sh',
+               ROOT / 'lib/install-bounds.sh', ROOT / 'lib/install-transaction.sh',
+               ROOT / 'lib/install-service.sh', source / 'product-pins.sh',
+               source / 'docker-probe.sh', source / 'business.sh']
+    sources += sorted(source.glob('managed-*.sh'))
+    script = 'set -eu\n' + ''.join('. "' + str(path) + '"\n' for path in sources)
     return subprocess.run(['sh', '-c', script + body, 'test', *args],
                           text=True, capture_output=True, timeout=10)
 
@@ -97,21 +98,21 @@ ddnsto_register
         self.assertEqual(result.stdout, 'rewrite')
 
     def test_help_precedes_native_bootstrap(self):
-        result = shell('bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'ddnsto/main.sh') + '"', '--help')
+        result = shell('bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"', '--help')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--action', result.stdout)
 
     def test_shared_options_reach_readonly_plan(self):
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
-                       'bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'ddnsto/main.sh') + '"',
+                       'bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"',
                        '--installer-prefix', '/opt/example-ddnsto', '--plan')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('installation_performed=false', result.stdout)
 
-    def test_offline_missing_native_is_explicit(self):
+    def test_missing_shared_bootstrap_selection_is_explicit(self):
         result = shell('ZSETUP_BIN=/missing/native; ddnsto_managed_native')
         self.assertEqual(result.returncode, 2)
-        self.assertIn('offline', result.stderr)
+        self.assertIn('shared bootstrap', result.stderr)
 
     def test_health_failure_prevents_commit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -209,7 +210,7 @@ ddnsto_managed_health_probe
     def test_installer_mode_uses_native_platform_facts(self):
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                        'ZSETUP_INSTALLER_MODE=1; ZSETUP_OS=openwrt; ZSETUP_PACKAGE_MANAGER=opkg; ZSETUP_ARCH=mipsel\n'
-                       'ddnsto_install() { printf "platform=%s" "$detected_platform"; }; . "' + str(ROOT / 'ddnsto/main.sh') + '"',
+                       'ddnsto_install() { printf "platform=%s" "$detected_platform"; }; . "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"',
                        '--action', 'install', '--platform', 'openwrt', '--force-version', 'lite')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'platform=openwrt')
@@ -217,7 +218,7 @@ ddnsto_managed_health_probe
     def test_docker_write_uses_separate_locked_adapter(self):
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                        'ddnsto_docker_locked() { printf DOCKER; };\n'
-                       '. "' + str(ROOT / 'ddnsto/main.sh') + '"', '--action', 'install', '--method', 'docker')
+                       '. "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"', '--action', 'install', '--method', 'docker')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'DOCKER')
 
@@ -227,7 +228,7 @@ ddnsto_managed_health_probe
             result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                            'ddnsto_local_platform() { detected_platform=synology; };\n'
                            'ddnsto_synology_entry() { printf SYNOLOGY; };\n'
-                           '. "' + str(ROOT / 'ddnsto/main.sh') + '"', '--action', 'download', '--output-dir', str(output))
+                           '. "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"', '--action', 'download', '--output-dir', str(output))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, 'SYNOLOGY')
             self.assertFalse(output.exists())
@@ -246,12 +247,12 @@ ddnsto_managed_health_probe
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn('OpenWrt local lifecycle is not yet ported', result.stderr)
 
-    @unittest.skipUnless(os.environ.get('DDNSTO_TEST_NATIVE'), 'set DDNSTO_TEST_NATIVE to published zsetup')
+    @unittest.skipUnless(os.environ.get('ZSETUP_TEST_NATIVE'), 'set ZSETUP_TEST_NATIVE to published zsetup')
     def test_published_native_offline_status_without_sources_or_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / 'absent'
             private_native = Path(tmp) / 'zsetup'
-            shutil.copyfile(os.environ['DDNSTO_TEST_NATIVE'], private_native)
+            shutil.copyfile(os.environ['ZSETUP_TEST_NATIVE'], private_native)
             private_native.chmod(0o700)
             result = shell('''ZSETUP_BIN=$1; installer_prefix=$2; detected_platform=linux; ACTION=status
 unset ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK

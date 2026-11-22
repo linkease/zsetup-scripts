@@ -47,7 +47,8 @@
       "executors": ["systemd", "openrc"],
       "requirements": ["root-or-sudo", "initialized-service-manager"],
       "client_versions": {"standard": "4.2.8"},
-      "zsetup_release": "linux-0.5.0",
+      "min_zsetup": "0.5.0",
+      "zsetup_channel": "linux-stable",
       "native_canary_verified": false
     },
     "openwrt": {
@@ -58,7 +59,8 @@
       "executors": ["opkg", "apk"],
       "requirements": ["root", "compatible-package-abi", "little-endian-mips-only"],
       "client_versions": {"standard": "4.2.8", "lite": "4.2.8"},
-      "zsetup_release": "linux-0.5.0",
+      "min_zsetup": "0.5.0",
+      "zsetup_channel": "linux-stable",
       "native_canary_verified": false
     },
     "macos": {
@@ -68,7 +70,8 @@
       "executors": ["launchd-user"],
       "requirements": ["logged-in-user-launchd-domain"],
       "client_versions": {"standard": "4.2.8"},
-      "zsetup_release": "macos-0.3.0",
+      "min_zsetup": "0.5.0",
+      "zsetup_channel": "macos-stable",
       "native_canary_verified": false
     },
     "windows": {
@@ -78,7 +81,8 @@
       "executors": ["scheduled-task-system"],
       "requirements": ["administrator", "windows-x64", "i686-bootstrap-execution"],
       "client_versions": {"standard": "4.2.8"},
-      "zsetup_release": "windows-0.4.0",
+      "min_zsetup": "0.5.0",
+      "zsetup_channel": "windows-stable",
       "native_canary_verified": false
     },
     "synology": {
@@ -134,37 +138,14 @@
       "native_canary_verified": false
     }
   },
-  "zsetup_releases": {
-    "linux-0.5.0": {
-      "version": "0.5.0",
-      "pin_source": "bootstrap-policy.sh",
-      "checksum_provenance": "https://fw.koolcenter.com/binary/zsetup/0.5.0/SHA256SUMS",
-      "runtime_metadata": "embedded-only",
-      "http_bootstrap": false,
-      "hash_tool_required": true,
-      "artifacts": {
-        "zsetup-linux-x86_64": "9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617",
-        "zsetup-linux-aarch64": "70cc54fcfdc6c6516965485879f0929e7dc9aabc1bd0fe09cbab099dd4619020",
-        "zsetup-linux-armv7": "16eca14c00167ef45dac13e536c5ef2880f682ec48c70661044ee453724a66aa",
-        "zsetup-linux-mipsel": "4821bbeae11fdcdfa9eb5e0b46b63e9751e069c21b1e0e598c5658eb73383a7b"
-      }
-    },
-    "macos-0.3.0": {
-      "version": "0.3.0",
-      "pin_source": "install-macos.sh",
-      "policy": "existing-desktop-policy-unchanged",
-      "artifacts": {
-        "zsetup-macos-x86_64": "608323145bcd8f083c0845b4bd0481eabccf0d74b99aa2aa6a88e59b34ce5b31",
-        "zsetup-macos-aarch64": "06ec453f851bd0395cf9ea8539de168f80a9628d1a25597dd598c85f9dc633b0"
-      }
-    },
-    "windows-0.4.0": {
-      "version": "0.4.0",
-      "pin_source": "install.ps1",
-      "policy": "existing-desktop-policy-unchanged",
-      "artifacts": {
-        "zsetup-windows-i686.exe": "858633b03f4808417bc4724f28e8ab0cb17c9f09fe4e665c9532f488cc1f83a3"
-      }
+  "zsetup_policy": {
+    "selection": "latest-platform-stable",
+    "minimum_version": "0.5.0",
+    "exact_version_pins": false,
+    "channels": {
+      "linux-stable": "zsetup/stable",
+      "macos-stable": "zsetup/stable-macos",
+      "windows-stable": "zsetup/stable-windows"
     }
   }
 }

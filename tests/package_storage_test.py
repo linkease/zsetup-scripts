@@ -92,10 +92,11 @@ exit 0
                             Handler.bodies[f'/binary/{remote}/{relative}']=data
                             if app == 'ddnsto': fixture_pins[relative]=hashlib.sha256(data).hexdigest()
                         Handler.bodies[f'/binary/{remote}/{folder}/SHA256SUMS']=''.join(f'{hashlib.sha256(data).hexdigest()}  {filename}\n' for filename,data in files.items()).encode()
-                    script=ROOT/app/f'{app}-install.sh'
+                    version={'ddnsto':'0.2.4','linkease':'0.1.9'}[app]
+                    script=ROOT/'apps'/app/version/'installer.sh'
                     if app == 'ddnsto':
                         source=script.read_text()
-                        pins=(ROOT/'ddnsto/product-pins.sh').read_text()
+                        pins=(ROOT/'apps/ddnsto/source/product-pins.sh').read_text()
                         for relative,digest in fixture_pins.items():
                             match=re.search(re.escape(relative)+r"\) printf '%s\\n' ([0-9a-f]{64})",pins)
                             assert match,relative

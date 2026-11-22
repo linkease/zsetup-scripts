@@ -11,6 +11,8 @@ import re
 import sys
 import tempfile
 
+import build_ddnsto_installer
+
 
 APP_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?\Z")
@@ -174,33 +176,6 @@ def stat_mode(path: Path):
     return path.stat().st_mode & 0o777
 
 
-def generate_kspeeder_payloads(root: Path, apps: Path, *, check: bool):
-    found = False
-    for app in ("ks-cli", "kspeeder"):
-        if not (apps / app / "app.json").is_file():
-            continue
-        found = True
-        manifest = json.loads((apps / app / "app.json").read_bytes())
-        version = manifest.get("version")
-        require(isinstance(version, str) and VERSION.fullmatch(version),
-                f"invalid apps/{app} version")
-        for extension in manifest.get("entrypoints", []):
-            require(extension in ENTRYPOINTS, f"invalid apps/{app} entrypoint")
-            source = root / "kspeeder" / app / f"{app}-install.{extension}"
-            require(source.is_file() and not source.is_symlink(),
-                    f"missing canonical KSpeeder source: {source}")
-            install_file(apps / app / version / f"installer.{extension}", source.read_bytes(),
-                         executable=extension == "sh", check=check,
-                         label=f"{app} immutable {extension} payload")
-    if not found:
-        return
-    for extension in ("sh", "ps1"):
-        source = root / "kspeeder/lib" / f"binary.{extension}"
-        install_file(apps / "_shared" / f"kspeeder-binary.{extension}", source.read_bytes(),
-                     executable=False, check=check,
-                     label=f"KSpeeder shared {extension} policy")
-
-
 def generate_entries(root: Path, applications, *, check: bool):
     for application in applications:
         entrypoints = application.manifest["entrypoints"]
@@ -304,9 +279,7 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
                 "source_group": release_group,
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "size": len(raw),
-                # The native schema uses an exact runtime identity.  The
-                # manifest value is a capability floor checked above.
-                "min_version": stable_version,
+                "min_version": minimum,
             })
     records.sort(key=lambda item: (item["application"], item["os"], item["package_manager"], item["arch"], item["path"]))
     identity = hashlib.sha256(json.dumps({
@@ -349,7 +322,7 @@ def main():
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     try:
-        generate_kspeeder_payloads(root, args.apps, check=args.check)
+        build_ddnsto_installer.generate(root=root, apps=args.apps, check=args.check)
         applications = discover(args.apps)
         if not args.validate_only:
             generate_entries(root, applications, check=args.check)

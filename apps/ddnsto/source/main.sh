@@ -47,6 +47,10 @@ ddnsto_entry_install() {
                 else ddnsto_machine_locked ddnsto_openwrt_local; fi
                 return $?
             fi
+            if [ "${ZSETUP_INSTALLER_MODE:-0}" != 1 ]; then
+                bootstrap_and_run "$@"
+                return $?
+            fi
             ddnsto_managed_native || return $?
             ddnsto_managed_action
             return $? ;;

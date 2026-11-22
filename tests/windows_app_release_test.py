@@ -124,16 +124,18 @@ class WindowsAppRelease(unittest.TestCase):
 
     def test_generator_check_rejects_manual_power_shell_edit(self):
         output = self.root / "generated"
-        subprocess.run([sys.executable, "-B", str(ROOT / "scoop/build.py"), "--output-dir", str(output)], check=True)
+        subprocess.run([sys.executable, "-B", str(ROOT / "apps/scoop/source/build.py"),
+                        "--output-dir", str(output)], check=True)
         entry = output / "scoop-install.ps1"
         entry.write_text(entry.read_text() + "# manual edit\n", encoding="utf-8")
         result = subprocess.run([
-            sys.executable, "-B", str(ROOT / "scoop/build.py"), "--output-dir", str(output), "--check",
+            sys.executable, "-B", str(ROOT / "apps/scoop/source/build.py"),
+            "--output-dir", str(output), "--check",
         ], capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
 
     def test_generated_entry_declares_utf8_for_redirected_json(self):
-        entry = (ROOT / "scoop/scoop-install.ps1").read_text(encoding="utf-8")
+        entry = (ROOT / "apps/scoop/0.1.2/installer.ps1").read_text(encoding="utf-8-sig")
         self.assertIn("[Console]::OutputEncoding = $script:ScoopUtf8NoBom", entry)
         self.assertIn("$OutputEncoding = $script:ScoopUtf8NoBom", entry)
 

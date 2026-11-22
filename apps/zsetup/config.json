@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "apps-c88292d257d2",
+  "config_version": "apps-7031e60b6a6f",
   "source_groups": [
     {
       "id": "koolcenter",
@@ -51,9 +51,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -63,9 +63,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -75,9 +75,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -87,9 +87,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -99,9 +99,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -111,9 +111,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -123,9 +123,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -135,9 +135,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -147,9 +147,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -159,9 +159,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -171,9 +171,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -183,9 +183,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -195,9 +195,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -207,9 +207,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -219,9 +219,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -231,9 +231,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -243,9 +243,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -255,9 +255,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -267,9 +267,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -279,9 +279,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -291,9 +291,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "ddnsto",
@@ -303,9 +303,9 @@
       "path": "zsetup-scripts/apps/ddnsto/0.2.4/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2",
-      "size": 538075,
-      "min_version": "0.6.4"
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "min_version": "0.5.0"
     },
     {
       "application": "fastnet",
@@ -317,7 +317,7 @@
       "source_group": "koolcenter",
       "sha256": "4788bfd7f3fc3e1fda48f54e676c829dd81845e4b519d44fdcb11e8046bb5d9e",
       "size": 34018,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "fastnet",
@@ -329,7 +329,7 @@
       "source_group": "koolcenter",
       "sha256": "4788bfd7f3fc3e1fda48f54e676c829dd81845e4b519d44fdcb11e8046bb5d9e",
       "size": 34018,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "fastnet",
@@ -341,7 +341,7 @@
       "source_group": "koolcenter",
       "sha256": "4788bfd7f3fc3e1fda48f54e676c829dd81845e4b519d44fdcb11e8046bb5d9e",
       "size": 34018,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "fastpve",
@@ -353,7 +353,7 @@
       "source_group": "koolcenter",
       "sha256": "ce50fa9866e1fdd1498397fef78e180ef0835704567f62e687fa63364e4c53d4",
       "size": 34403,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -365,7 +365,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -377,7 +377,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -389,7 +389,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -401,7 +401,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -413,7 +413,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -425,7 +425,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -437,7 +437,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -449,7 +449,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -461,7 +461,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -473,7 +473,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -485,7 +485,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -497,7 +497,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -509,7 +509,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -521,7 +521,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -533,7 +533,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -545,7 +545,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -557,7 +557,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -569,7 +569,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -581,7 +581,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -593,7 +593,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -605,7 +605,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "jq",
@@ -617,7 +617,7 @@
       "source_group": "koolcenter",
       "sha256": "5b0fa3bf551bd17c07b5a9dbcf8a7f7f56484c3fb53a56ba81679f1d6ec663db",
       "size": 23653,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kai-skills",
@@ -629,7 +629,7 @@
       "source_group": "koolcenter",
       "sha256": "bfd17730e82fcc57fe8ff9936570a9c6714831d86db07380f0f5a4110514d764",
       "size": 7878,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kai-skills",
@@ -641,7 +641,7 @@
       "source_group": "koolcenter",
       "sha256": "bfd17730e82fcc57fe8ff9936570a9c6714831d86db07380f0f5a4110514d764",
       "size": 7878,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -653,7 +653,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -665,7 +665,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -677,7 +677,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -689,7 +689,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -701,7 +701,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -713,7 +713,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -725,7 +725,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -737,7 +737,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -749,7 +749,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -761,7 +761,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -773,7 +773,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -785,7 +785,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -797,7 +797,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -809,7 +809,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -821,7 +821,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -833,7 +833,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "ks-cli",
@@ -845,7 +845,7 @@
       "source_group": "koolcenter",
       "sha256": "c1e786c360a2f94165aec9382276aee6f03e97db49fd31c5b22a709c44afb961",
       "size": 39675,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -857,7 +857,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -869,7 +869,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -881,7 +881,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -893,7 +893,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -905,7 +905,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -917,7 +917,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -929,7 +929,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -941,7 +941,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -953,7 +953,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -965,7 +965,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -977,7 +977,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -989,7 +989,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -1001,7 +1001,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -1013,7 +1013,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -1025,7 +1025,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -1037,7 +1037,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "kspeeder",
@@ -1049,7 +1049,7 @@
       "source_group": "koolcenter",
       "sha256": "32507dac7cea72cc83303c1565b840cb2072e7ec4251e8e22b97bbd0a0f29f7e",
       "size": 39689,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1061,7 +1061,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1073,7 +1073,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1085,7 +1085,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1097,7 +1097,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1109,7 +1109,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1121,7 +1121,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1133,7 +1133,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1145,7 +1145,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1157,7 +1157,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1169,7 +1169,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1181,7 +1181,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1193,7 +1193,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1205,7 +1205,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1217,7 +1217,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1229,7 +1229,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1241,7 +1241,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1253,7 +1253,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1265,7 +1265,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1277,7 +1277,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1289,7 +1289,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1301,7 +1301,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1313,7 +1313,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1325,7 +1325,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkease",
@@ -1337,7 +1337,7 @@
       "source_group": "koolcenter",
       "sha256": "fd075b1f2dddc93733def9116a2cdf4b61b599cbda4e767270b1cf4c4ff39edb",
       "size": 126650,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1349,7 +1349,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1361,7 +1361,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1373,7 +1373,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1385,7 +1385,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1397,7 +1397,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1409,7 +1409,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1421,7 +1421,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1433,7 +1433,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1445,7 +1445,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1457,7 +1457,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1469,7 +1469,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1481,7 +1481,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1493,7 +1493,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1505,7 +1505,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1517,7 +1517,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1529,7 +1529,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1541,7 +1541,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1553,7 +1553,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1565,7 +1565,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1577,7 +1577,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     },
     {
       "application": "linkspace",
@@ -1589,7 +1589,7 @@
       "source_group": "koolcenter",
       "sha256": "52c13d10c0cf07fdc02928a778638fb2cdcae66e8326e9fd3ad02d2e14509b5a",
       "size": 34589,
-      "min_version": "0.6.4"
+      "min_version": "0.5.0"
     }
   ]
 }

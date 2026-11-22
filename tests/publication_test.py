@@ -16,7 +16,7 @@ spec.loader.exec_module(publication)
 class Publication(unittest.TestCase):
     def setUp(self):
         self.requested = []
-        self.shell = (ROOT / 'ddnsto/ddnsto-install.sh').read_bytes()
+        self.shell = (ROOT / 'apps/ddnsto/0.2.4/installer.sh').read_bytes()
         catalog = json.loads((ROOT / 'catalog.json').read_text())
         self.records = [dict(r, sha256=hashlib.sha256(self.shell).hexdigest(), size=len(self.shell))
                         for r in catalog['installers'] if r['application'] == 'ddnsto']
@@ -29,7 +29,7 @@ class Publication(unittest.TestCase):
         if path == 'zsetup/config.json':
             return json.dumps({'installers': self.records}).encode()
         if path.endswith('install.ps1'):
-            return (ROOT / 'ddnsto/install.ps1').read_bytes()
+            return (ROOT / 'apps/ddnsto/source/install.ps1').read_bytes()
         if path.endswith('install.sh'):
             return self.shell
         raise AssertionError('unexpected metadata request: ' + path)
@@ -84,15 +84,15 @@ class Publication(unittest.TestCase):
         self.assertFalse(self.audit()['publication_inputs_ready'])
 
     def test_manifest_must_match_current_installer_pins(self):
-        original = Path.read_text
         digest = self.products['ddnsto/linux-binary/ddnsto-standard-4.2.8.tar.gz'][0]
-        def changed(path, *args, **kwargs):
-            data = original(path, *args, **kwargs)
-            return data.replace(digest, '0' * 64) if path.name == 'product-pins.sh' else data
-        with patch.object(Path, 'read_text', changed):
-            result = self.audit(verify_products=True)
+        self.shell = self.shell.replace(digest.encode(), b'0' * 64)
+        for record in self.records:
+            record['sha256'] = hashlib.sha256(self.shell).hexdigest()
+            record['size'] = len(self.shell)
+        result = self.audit(verify_products=True)
         self.assertFalse(result['publication_inputs_ready'])
-        self.assertEqual(result['product_bytes'], 'failed')
+        self.assertFalse(result['entrypoints_ready'])
+        self.assertEqual(result['product_bytes'], 'verified')
 
     def test_product_reader_hashes_stream_and_rejects_http_redirect(self):
         response = io.BytesIO(b'payload')

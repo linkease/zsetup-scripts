@@ -9,7 +9,7 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'ddnsto/tests'))
+sys.path.insert(0, str(ROOT / 'tests/apps/ddnsto/internal'))
 import macos_behavior_test as mac
 import openwrt_lifecycle_test as ow
 import asus_transaction_test as asus
@@ -146,7 +146,7 @@ class UnsupportedUpgrade(unittest.TestCase):
         for platform in ('qnap', 'unraid', 'windows'):
             with self.subTest(platform=platform):
                 result = subprocess.run(['sh', '-c',
-                    f'. "{ROOT}/ddnsto/auto-install.sh"\n'
+                    f'. "{ROOT}/apps/ddnsto/source/auto-install.sh"\n'
                     'detected_platform=$1\nddnsto_ensure_preflight', 'test', platform],
                     capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)
@@ -154,7 +154,7 @@ class UnsupportedUpgrade(unittest.TestCase):
 
     def test_docker_selection_does_not_migrate_running_native_install(self):
         result = subprocess.run(['sh', '-c',
-            f'. "{ROOT}/ddnsto/auto-install.sh"\n'
+            f'. "{ROOT}/apps/ddnsto/source/auto-install.sh"\n'
             'detected_platform=linux; TOKEN=fixture; REQUESTED_METHOD=docker\n'
             'ddnsto_ensure_preflight'], capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)

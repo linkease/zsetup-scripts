@@ -65,7 +65,7 @@ ddnsto_synology_version() {
 ddnsto_synology_fetch() (
     ddnsto_synology_storage || exit $?
     WORK_ROOT="$syno_storage/native"
-    ddnsto_bootstrap_zsetup || { ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载或校验失败' '请检查 HTTPS 下载和缓存权限'; exit 2; }
+    ACTIVE_ZSETUP=$(bootstrap_zsetup_path) || { ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载或校验失败' '请检查 HTTPS 下载和缓存权限'; exit 2; }
     ddnsto_synology_select || exit 2
     "$ACTIVE_ZSETUP" download -o "$1" --sha256 "$digest" --max-bytes 33554432 --min-free-bytes 8388608 \
         "https://fw.koolcenter.com/binary/ddnsto/$relative" \

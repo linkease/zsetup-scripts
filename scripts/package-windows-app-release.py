@@ -87,7 +87,7 @@ def prepare(args):
     core = (args.core_release / "zsetup-windows-i686.exe").resolve(strict=True)
     require(core.stat().st_size == core_record["size"] and digest(core) == core_record["sha256"], "Windows core size or SHA256 mismatch")
     owner = (ROOT / settings["source_directory"]).resolve(strict=True)
-    require(owner.is_relative_to(ROOT) and owner == (ROOT / app).resolve(), "application source owner mismatch")
+    require(owner.is_relative_to(ROOT), "application source owner mismatch")
     subprocess.run([sys.executable, "-B", str(ROOT / "scripts/build-entrypoints.py"), "--check"], check=True, capture_output=True)
     spec = importlib.util.spec_from_file_location("canonical_product_config", args.zsetup_root / "scripts/generate-product-config.py")
     generator = importlib.util.module_from_spec(spec)
@@ -100,7 +100,11 @@ def prepare(args):
     require(immutable_path not in public_entries and len(immutable_path.split("/")) == 3, "immutable Windows path required")
     script_version = immutable_path.split("/")[1]
     require(script_version not in {"stable", "latest"}, "mutable application version refused")
-    source = (ROOT / "scoop/scoop-install.ps1").resolve(strict=True)
+    sources = {item["script"] for item in json.loads(
+        (ROOT / "catalog-windows.json").read_text(encoding="utf-8")
+    )["installers"] if item["application"] == app}
+    require(len(sources) == 1, "Windows application needs one canonical payload")
+    source = (ROOT / sources.pop()).resolve(strict=True)
     require(source.parent == owner and record["min_version"] == stable, "entry owner or minimum runtime mismatch")
     cli = args.native_cli.resolve(strict=True)
     cli_version = subprocess.check_output([str(cli), "--version"], text=True, timeout=10).strip()

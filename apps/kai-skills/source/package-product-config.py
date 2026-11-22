@@ -8,7 +8,8 @@ from pathlib import Path
 import re
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
+APP_ROOT = Path(__file__).resolve().parents[1]
 BASES = [
     "https://dl.istoreos.com/binary",
     "https://fw.d4ctech.com/binary",
@@ -20,6 +21,8 @@ KAI_SOURCE_GROUP = {
     "primary_bases": [base + "/kai/kai-skills" for base in BASES],
     "fallback_base": FALLBACK + "/kai/kai-skills",
 }
+KAI_MIN_ZSETUP = json.loads((APP_ROOT / "app.json").read_text())["min_zsetup"]
+KAI_VERSION = json.loads((APP_ROOT / "app.json").read_text())["version"]
 
 
 def require(condition, message):
@@ -81,8 +84,8 @@ def windows_candidate(args, live_raw, config, measurements):
     require(len(kai) == 1 and kai[0]["os"] == "windows",
             "canonical Windows kai-skills selector is missing")
     kai[0]["source_group"] = source_id
-    for item in existing:
-        item["min_version"] = version
+    for item in kai:
+        item["min_version"] = KAI_MIN_ZSETUP
     config["installers"] = existing + kai
     config["stable_zsetup"] = {
         "version": version,
@@ -95,8 +98,7 @@ def windows_candidate(args, live_raw, config, measurements):
         }],
     }
     release = re.search(rb"\$script:KaiSkillsRelease = '([^']+)'",
-                        (Path(__file__).resolve().parent /
-                         "kai-skills-install.ps1").read_bytes())
+                        (APP_ROOT / KAI_VERSION / "installer.ps1").read_bytes())
     require(release is not None, "Windows release-bound installer identity is missing")
     skill_version = release.group(1).decode("ascii")
     config["config_version"] = (
@@ -162,8 +164,8 @@ def main():
         item["path"] = item["path"][len(prefix):]
     if not kai_groups:
         config["source_groups"].append(KAI_SOURCE_GROUP)
-    for item in existing:
-        item["min_version"] = version
+    for item in kai:
+        item["min_version"] = KAI_MIN_ZSETUP
     config["installers"] = existing + kai
     config["stable_zsetup"] = {
         "version": version,
@@ -179,7 +181,7 @@ def main():
         ],
     }
     release = re.search(rb"KAI_SKILLS_RELEASE='([^']+)'",
-                        (Path(__file__).resolve().parent / "kai-skills-install.sh").read_bytes())
+                        (APP_ROOT / KAI_VERSION / "installer.sh").read_bytes())
     require(release is not None, "release-bound installer identity is missing")
     skill_version = release.group(1).decode("ascii")
     config["config_version"] = (

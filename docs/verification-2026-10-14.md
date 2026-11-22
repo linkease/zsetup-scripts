@@ -40,7 +40,7 @@ python3 -B scripts/build-entrypoints.py --check
 python3 -B scripts/package-entrypoints.py --output dist/ddnsto-entrypoints-0.1.5
 ```
 
-本轮实际生成了 `dist/ddnsto-entrypoints-0.1.5/`，属于忽略的本地构建产物，readiness 明确为 `candidate-not-published`。正式用户命令见 [DDNSTO 使用说明](../ddnsto/README.md)，其中 URL 尚不能作为已发布承诺。
+本轮实际生成了 `dist/ddnsto-entrypoints-0.1.5/`，属于忽略的本地构建产物，readiness 明确为 `candidate-not-published`。当前正式用户命令见 [DDNSTO 使用说明](../apps/ddnsto/README.md)；该记录中的 URL 在当时尚不能作为已发布承诺。
 
 ## 仍需完成
 

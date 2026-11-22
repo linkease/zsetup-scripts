@@ -59,7 +59,8 @@ esac
    Handler.bodies[folder+'/SHA256SUMS']=''.join(hashlib.sha256(v).hexdigest()+'  '+k+'\n' for k,v in files.items()).encode()
    env=os.environ|{'ZSETUP_INSTALLER_MODE':'1','ZSETUP_BIN':native,'ZSETUP_OS':'ubuntu','ZSETUP_PACKAGE_MANAGER':'apt','ZSETUP_ARCH':'x86_64','ZSETUP_SOURCE_BASES':f'https://127.0.0.1:{server.server_port}','ZSETUP_SOURCE_FALLBACK':'','ZSETUP_CA_FILE':str(root/'ca.crt'),'DDNSTO_VERSION':'1.0.0','HOME':'/root'}
    args=['--token','isolated test'] if app=='ddnsto' else ['--version','1.0.0']
-   command=['sh',str(ROOT/app/f'{app}-install.sh'),'--installer-prefix',str(prefix),'--',*args]
+   version={'ddnsto':'0.2.4','linkease':'0.1.9'}[app]
+   command=['sh',str(ROOT/'apps'/app/version/'installer.sh'),'--installer-prefix',str(prefix),'--',*args]
    result=subprocess.run(command,env=env,text=True,capture_output=True,timeout=30)
    assert result.returncode==0,result
    assert subprocess.check_output(['systemctl','is-active',unit],text=True).strip()=='active'

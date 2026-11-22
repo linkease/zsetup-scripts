@@ -22,7 +22,9 @@ class DesktopPackage(unittest.TestCase):
             copy(binary, True)
             for name in ('install.ps1', 'install-macos.sh'):
                 path = binary / 'ddnsto/desktop-candidate-0.2.4' / name
-                self.assertEqual(path.read_bytes(), (ROOT / 'ddnsto' / name).read_bytes())
+                source = (ROOT / 'apps/ddnsto/source/install.ps1' if name == 'install.ps1'
+                          else ROOT / 'apps/ddnsto/0.2.4/installer.sh')
+                self.assertEqual(path.read_bytes(), source.read_bytes())
                 self.assertFalse((binary / 'ddnsto' / name).exists())
             copy(binary, True)
             path.write_text('different immutable bytes')

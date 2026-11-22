@@ -25,8 +25,12 @@ class ReleaseOwner(unittest.TestCase):
         self.root = Path(self.temp.name).resolve()
         self.owner = self.root / 'owner'
         self.owner.mkdir()
-        for folder in ['software', 'jq']:
-            shutil.copytree(ROOT / folder, self.owner / folder, ignore=shutil.ignore_patterns('tests', '__pycache__'))
+        shutil.copytree(
+            ROOT / 'software',
+            self.owner / 'software',
+            ignore=shutil.ignore_patterns('tests', '__pycache__'),
+        )
+        shutil.copytree(ROOT / 'apps' / 'jq', self.owner / 'apps' / 'jq')
         self.base = self.root / 'apps'
         self.base.mkdir()
         generate_certificate(self.root)

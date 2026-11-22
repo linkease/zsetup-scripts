@@ -1,6 +1,6 @@
 # 2026-10-26 KSpeeder 项目二进制安装验收
 
-范围：`kspeeder/ks-cli`和`kspeeder/kspeeder`的Linux安装器0.1.0；
+范围：当时位于外层、现已迁入`apps/ks-cli`和`apps/kspeeder`的Linux安装器0.1.0；
 未来kai-skills可使用相同应用标识、指定持久目录和四字段安装结果。
 未发布公网入口或配置、未启动业务服务。原官方脚本和legacy字节未修改。
 

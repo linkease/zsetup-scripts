@@ -1,7 +1,7 @@
 """Isolated native lifecycle contract. Run ONLY in a dedicated disposable container.
 
 Set DDNSTO_LIFECYCLE_SANDBOX=1 and create /ddnsto-lifecycle-sandbox there.
-DDNSTO_TEST_NATIVE points at the published 0.5.0 executable. No product runs.
+ZSETUP_TEST_NATIVE points at the current published executable. No product runs.
 """
 import json
 import os
@@ -16,7 +16,7 @@ PREFIX = Path('/opt/linkease/ddnsto')
 UNIT = Path('/etc/systemd/system/com.linkease.ddnstoshell.service')
 CONFIG = Path('/etc/ddnsto/ddnsto-config.json')
 FIXTURE = Path('/ddnsto-lifecycle-sandbox')
-NATIVE = os.environ.get('DDNSTO_TEST_NATIVE', '/fixture/zsetup')
+NATIVE = os.environ.get('ZSETUP_TEST_NATIVE', '/fixture/zsetup')
 ENABLED = os.environ.get('DDNSTO_LIFECYCLE_SANDBOX') == '1' and FIXTURE.is_dir()
 
 SYSTEMCTL = '#!' + sys.executable + '\n' + r'''
@@ -93,7 +93,8 @@ class ManagedLifecycle(unittest.TestCase):
     def run_action(self, action, setup='', health=0):
         sources = ['lib/install-storage.sh', 'lib/install-bounds.sh',
                    'lib/install-transaction.sh', 'lib/install-service.sh',
-                   'ddnsto/product-pins.sh', 'ddnsto/managed-service.sh']
+                   'apps/ddnsto/source/product-pins.sh',
+                   'apps/ddnsto/source/managed-service.sh']
         script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in sources)
         script += f'''
 ZSETUP_BIN='{NATIVE}'; detected_platform=linux; ACTION=$1; TOKEN='new-token'

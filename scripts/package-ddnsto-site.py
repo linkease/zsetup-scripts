@@ -33,7 +33,7 @@ def package_site(args):
             candidate_version='0.2.4', native_first=args.native_first))
         for alias, entry in [('i', 'recommended-entry.sh'), ('i.ps1', 'recommended-entry.ps1')]:
             shutil.copyfile(current / entry, stage / alias)
-        guide = (ROOT / 'ddnsto/agent/install.md').read_bytes()
+        guide = (ROOT / 'apps/ddnsto/source/agent/install.md').read_bytes()
         if b'installer.invalid' in guide or ORIGIN.encode() not in guide:
             raise ValueError('agent guide must use the published installation origin')
         guide_root = stage / 'ddnsto-install/agent'

@@ -1,5 +1,9 @@
 # 构建、配置与发布
 
+当前整体业务发布以完整 `apps/` 为唯一候选，固定目标为
+`/binary/zsetup-scripts/apps/`，流程见 [apps 发布协调器](apps-release.md)。本文保留独立
+应用、产品依赖和历史 aggregate 发布约定；不得据此把外层业务目录重新引入仓库。
+
 2026-10-17：已获单独明确授权并上线Linux核心0.5.0和FastNet脚本0.1.8。
 FastNet两个公开入口与不可变脚本为同一33259字节；最终配置只登记FastNet。
 DDNSTO/LinkEase/FastPVE等线上文件、Windows/macOS指针不变。
@@ -29,9 +33,13 @@ DDNSTO/LinkEase/FastPVE等线上文件、Windows/macOS指针不变。
 
 业务变动不要求重编同版本 zsetup，复用已验证的不可变 release；若需要新 native 版本，在 zsetup 仓库执行既有 release-targets.sh、check-release-artifacts.sh、run-target-smoke.sh。无需下载任何 DDNSTO 产品来构建安装脚本发布包。
 
+`min_zsetup` 是能力最低版本，平台 stable 是默认选择而不是应用精确钉死。提升 stable 前必须以
+候选核心执行 `scripts/check-zsetup-candidate.sh /absolute/path/to/zsetup`；新核心若破坏旧应用，
+先更新应用并通过门禁再提升 stable。详见 [zsetup 兼容策略](zsetup-compatibility.md)。
+
 ```sh
 cd /path/to/zsetup-scripts
-python3 -B scripts/build-entrypoints.py
+python3 -B scripts/build.py
 sh scripts/check.sh /path/to/linkease-tunnel/zsetup
 python3 -B scripts/package-release.py --zsetup-root /path/to/linkease-tunnel/zsetup --require-clean
 (cd dist/release && sha256sum -c PACKAGE-SHA256SUMS)
@@ -57,7 +65,10 @@ manifest 的 business_artifacts 标记业务服务器发布所有权及 included
 | binary/ddnsto/openwrt/install_ddnsto.sh、install_ddnsto_business.sh、setup_ddnsto.sh | 相同 DDNSTO 入口字节的兼容副本 |
 | binary/ddnsto/linux-binary/install_ddnsto_linux.sh | 相同 DDNSTO 入口字节的兼容副本 |
 
-APP/business.sh、main.sh、lib/、legacy/、Python 工具、测试和 README 均不上传网站。旧脚本历史源码归档在 legacy/；根目录没有旧别名。服务器兼容 URL 由 ddnsto/release.py 从当前 ddnsto/ddnsto-install.sh 生成实际文件，不依赖历史快照或符号链接。Windows/macOS 原生入口由打包器显式复制；脚本字节变更必须递增不可变版本/config_version；旧版本不得覆写。
+完整 apps 发布会原样复制 `apps/`，因此其中的应用源码和 README 都属于公共树；测试、
+仓库级 Python 工具、`lib/`、`legacy/` 和 `docs/` 不上传。独立兼容发布由当前打包脚本从
+`apps/APP/VERSION/installer.*` 复制实际文件，不依赖外层业务目录或符号链接。脚本字节
+变更必须递增不可变版本/config_version；旧版本不得覆写。
 
 ## 服务器提前提供的产品
 
@@ -83,9 +94,9 @@ opkg 使用 ipk，apk 使用带 -apk 的目录和 apk 包。OpenWrt 主包、LuC
 
 旧 CDN 已有产品的历史检查记录位于 docs/verification-2026-10-08.md。当时部分 checksum 元数据尚未提供，LuCI 包位于可变根目录；新入口上线时业务发布者应补齐上面的版本目录及元数据。已有产品无需搬回本仓库，不把“缺少元数据”等同于“缺少产品”。历史摘要记录仅供核对，当前打包器不读取或发布它们。
 
-LinkEase：产品位于大小写保留的 /binary/LinkEase/，安装脚本位于 /binary/linkease/。LinuxStorage/<VERSION>/ 提供原 tar、各架构 linkmount ZIP 和 SHA256SUMS；Openwrt/<VERSION>/ 提供主包、UI/语言及支持架构的依赖包和 SHA256SUMS，全部完成后更新 Openwrt/VERSION。具体文件名与归档布局见 [LinkEase 发布约定](../linkease/README.md)。现有产品可由业务发布流程组成不可变快照，本仓库只引用服务器文件，不采集或重打包。
+LinkEase：产品位于大小写保留的 /binary/LinkEase/，安装脚本位于 /binary/linkease/。LinuxStorage/<VERSION>/ 提供原 tar、各架构 linkmount ZIP 和 SHA256SUMS；Openwrt/<VERSION>/ 提供主包、UI/语言及支持架构的依赖包和 SHA256SUMS，全部完成后更新 Openwrt/VERSION。具体文件名与归档布局见 [LinkEase 发布约定](../apps/linkease/README.md)。现有产品可由业务发布流程组成不可变快照，本仓库只引用服务器文件，不采集或重打包。
 
-FastPVE：fastpve/version.txt 提供 VERSION 与 FASTPVE_SHA256；同目录提供不可变 FastPVE-<VERSION>（x86_64，无架构后缀），先完成产品再更新 version.txt。原参考站点 fw.kspeeder.com 不替代统一来源组；业务发布流程需在三个 primary/最终 fallback 上提前部署相同产品与元数据。PVE 大版本兼容性和真实菜单操作需 PVE canary；详细契约见 [FastPVE](../fastpve/README.md)。
+FastPVE：fastpve/version.txt 提供 VERSION 与 FASTPVE_SHA256；同目录提供不可变 FastPVE-<VERSION>（x86_64，无架构后缀），先完成产品再更新 version.txt。原参考站点 fw.kspeeder.com 不替代统一来源组；业务发布流程需在三个 primary/最终 fallback 上提前部署相同产品与元数据。PVE 大版本兼容性和真实菜单操作需 PVE canary；详细契约见 [FastPVE](../apps/fastpve/README.md)。
 
 ## 正式服务器切换
 

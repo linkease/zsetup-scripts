@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--check', action='store_true')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
-apps = {'linkspace': 'linkspace/backup-release.lock.json'}
+apps = {'linkspace': 'apps/linkspace/backup-release.lock.json'}
 value = {'schemaVersion': 1, 'software': {}}
 for name, source in apps.items():
     recipe = json.loads((root / source).read_text())

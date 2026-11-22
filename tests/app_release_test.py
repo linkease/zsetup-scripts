@@ -67,7 +67,7 @@ class AppRelease(unittest.TestCase):
         paths = {r["path"] for r in plan["files"]}
         self.assertEqual(paths, {"immutable/fastnet/0.1.9/fastnet-install.sh", "pointers/fastnet/fastnet-install.sh",
                                 "pointers/fastnet/install.sh", "pointers/zsetup/config.json"})
-        script = (ROOT / "fastnet/fastnet-install.sh").read_bytes()
+        script = (ROOT / "apps/fastnet/0.1.9/installer.sh").read_bytes()
         for record in config["installers"]:
             if record["application"] == "fastnet":
                 self.assertEqual(record["min_version"], "0.5.0")
@@ -152,7 +152,8 @@ class AppRelease(unittest.TestCase):
         self.run_plan(); server = self.server()
         self.transaction("stage", server); self.assert_original(server)
         self.transaction("activate", server)
-        self.assertEqual((server / "fastnet/install.sh").read_bytes(), (ROOT / "fastnet/fastnet-install.sh").read_bytes())
+        self.assertEqual((server / "fastnet/install.sh").read_bytes(),
+                         (ROOT / "apps/fastnet/0.1.9/installer.sh").read_bytes())
         self.assertEqual((server / "fastnet/fastnet-install.sh").read_bytes(), (server / "fastnet/install.sh").read_bytes())
         self.assertEqual((server / "ddnsto/openwrt/install_ddnsto.sh").read_bytes(), self.original["ddnsto/openwrt/install_ddnsto.sh"][0])
         self.transaction("rollback", server); self.assert_original(server)
@@ -228,7 +229,8 @@ class AppRelease(unittest.TestCase):
         self.transaction("stage", server); self.assert_original(server)
         self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
         self.transaction("activate", server)
-        self.assertEqual((server / "linkspace/linkspace-install.sh").read_bytes(), (ROOT / "linkspace/linkspace-install.sh").read_bytes())
+        self.assertEqual((server / "linkspace/linkspace-install.sh").read_bytes(),
+                         (ROOT / "apps/linkspace/0.1.1/installer.sh").read_bytes())
         self.transaction("rollback", server); self.assert_original(server)
         self.assertFalse((server / "linkspace/linkspace-install.sh").exists())
         self.assertTrue((server / "linkspace/0.1.1/linkspace-install.sh").is_file())
@@ -239,7 +241,7 @@ class AppRelease(unittest.TestCase):
         immutable.parent.mkdir(parents=True); immutable.write_text("conflict")
         self.transaction("stage", server, False); self.assert_original(server)
         self.assertEqual(immutable.read_text(), "conflict")
-        immutable.write_bytes((ROOT / "linkspace/linkspace-install.sh").read_bytes())
+        immutable.write_bytes((ROOT / "apps/linkspace/0.1.1/installer.sh").read_bytes())
         self.transaction("stage", server)
         (server / "zsetup/config.json").write_text("new publisher")
         self.transaction("activate", server, False)
@@ -252,8 +254,8 @@ class AppRelease(unittest.TestCase):
                 self.run_plan(app=app)
                 plan = json.loads((self.output / "app-release-manifest.json").read_text())
                 self.assertEqual({f["destination"] for f in plan["files"]}, {
-                    f"{app}/0.1.0/{app}-install.sh", f"{app}/{app}-install.sh", "zsetup/config.json"})
-                source = ROOT / "kspeeder" / app / f"{app}-install.sh"
+                    f"{app}/0.1.2/{app}-install.sh", f"{app}/{app}-install.sh", "zsetup/config.json"})
+                source = ROOT / "apps" / app / "0.1.2/installer.sh"
                 self.assertEqual((self.output / f"pointers/{app}/{app}-install.sh").read_bytes(), source.read_bytes())
                 server = self.server()
                 self.transaction("stage", server)

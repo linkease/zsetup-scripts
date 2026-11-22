@@ -7,7 +7,7 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'ddnsto/tests'))
+sys.path.insert(0, str(ROOT / 'tests/apps/ddnsto/internal'))
 import openwrt_lifecycle_test as fixtures
 
 
@@ -16,9 +16,11 @@ class AutoOpenWrt(unittest.TestCase):
 
     def invoke(self, token='old-secret', pending='', body='ddnsto_ensure_ow_account'):
         script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in (
-            'ddnsto/business.sh', 'ddnsto/auto-install.sh',
-            'ddnsto/openwrt-lifecycle.sh', 'ddnsto/portable-files.sh', 'ddnsto/openwrt-adapter.sh'))
-        path = ROOT / 'ddnsto/auto-openwrt.sh'
+            'apps/ddnsto/source/business.sh', 'apps/ddnsto/source/auto-install.sh',
+            'apps/ddnsto/source/openwrt-lifecycle.sh',
+            'apps/ddnsto/source/portable-files.sh',
+            'apps/ddnsto/source/openwrt-adapter.sh'))
+        path = ROOT / 'apps/ddnsto/source/auto-openwrt.sh'
         if path.exists(): script += f'. "{path}"\n'
         script += '''
 ddnsto_openwrt_paths

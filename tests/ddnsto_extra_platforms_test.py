@@ -10,12 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ExtraPlatforms(unittest.TestCase):
     def run_adapter(self, body, *args):
-        source = ROOT / 'ddnsto/extra-platforms.sh'
+        source = ROOT / 'apps/ddnsto/source/extra-platforms.sh'
         self.assertTrue(source.is_file(), 'missing safe platform adapter')
         return subprocess.run(['sh', '-eu', '-c', '. "$1"; shift; ' + body, 'adapter', str(source), *args], capture_output=True, text=True)
 
     def test_synology_plan_never_bootstraps(self):
-        result = self.run_adapter('PLAN_ONLY=1; ddnsto_bootstrap_zsetup() { echo BAD; return 99; }; ddnsto_synology_download() { echo PLAN; }; ddnsto_synology_entry')
+        result = self.run_adapter('PLAN_ONLY=1; bootstrap_zsetup_path() { echo BAD; return 99; }; ddnsto_synology_download() { echo PLAN; }; ddnsto_synology_entry')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'PLAN\n')
 
@@ -37,7 +37,7 @@ ddnsto_synology_entry ignored "$2"
 
     def test_synology_download_failure_is_returned(self):
         result = self.run_adapter('''PLAN_ONLY=0; ZSETUP_INSTALLER_MODE=0
-ddnsto_bootstrap_zsetup() { return 11; }
+bootstrap_zsetup_path() { return 11; }
 ddnsto_synology_download() { echo UNEXPECTED; }
 ddnsto_synology_entry
 ''')
