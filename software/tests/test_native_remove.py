@@ -114,6 +114,21 @@ class NativeRemoval(unittest.TestCase):
         self.assertFalse(planned['details']['packageAlreadyInstalled'])
         self.assertFalse(self.log.exists())
 
+    def test_update_never_downgrades_a_newer_registered_version(self):
+        self.state.write_text('9.0.0');self.req['intent']='update'
+        result,planned=self.call('plan')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(planned['details']['version'],'9.0.0')
+        self.assertTrue(planned['details']['packageAlreadyInstalled'])
+        self.assertFalse(self.log.exists())
+
+    def test_explicit_older_update_is_refused_before_any_write(self):
+        self.state.write_text('9.0.0');self.req.update(intent='update',version='1.2.3')
+        result,body=self.call('plan')
+        self.assertEqual(result.returncode,21,result.stdout+result.stderr)
+        self.assertEqual(body['reason'],'native-downgrade-refused')
+        self.assertFalse(self.log.exists())
+
 
 if __name__ == '__main__':
     unittest.main()
