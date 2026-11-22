@@ -18,6 +18,9 @@ class InspectTests(unittest.TestCase):
         self.bin = self.root / 'bin'; self.bin.mkdir()
         self.system = self.root / 'system'; (self.system / 'etc').mkdir(parents=True)
         (self.system / 'etc/openwrt_release').write_text("DISTRIB_ID='iStoreOS'\n")
+        (self.system / 'etc/opkg.conf').write_text('lists_dir ext /var/opkg-lists\nsrc/gz fixture https://fixture.invalid/feed\n')
+        self.feed=self.system/'var/opkg-lists/fixture';self.feed.parent.mkdir(parents=True)
+        self.feed.write_text('Package: sample-agent\nVersion: 2.0.0-r1\nArchitecture: all\n\nPackage: luci-app-sample-agent\nVersion: 2.0.0-r1\nArchitecture: all\n')
         db=self.system / 'usr/lib/opkg'; db.mkdir(parents=True); (db/'status').write_text('')
         self.meta = self.system / 'tmp/run/istore-meta/meta'; self.meta.mkdir(parents=True)
         self.log = self.root / 'calls'
@@ -47,6 +50,7 @@ a=sys.argv[1:]
 with open(os.environ['TEST_LOG'],'a') as log: log.write(' '.join(a)+'\\n')
 if a[0]=='status':
  print('Package: '+a[1]+'\\nVersion: '+os.environ['TEST_INSTALLED']+'\\nStatus: install ok installed');sys.exit(0)
+if a[0]=='print-architecture': print('arch all 1\\narch aarch64 10');sys.exit(0)
 if a[0]=='list':
  v=os.environ.get('TEST_CANDIDATE','')
  if v: print(a[1]+' - '+v+' - sample')
@@ -60,6 +64,7 @@ sys.exit(37)
         p = self.bin / name; p.write_text(body); p.chmod(0o755)
 
     def call(self, operation='inspect', **env):
+        if 'TEST_CANDIDATE' in env and not env['TEST_CANDIDATE']:self.feed.write_text('')
         request = self.root / 'request.json'
         request.write_text('{"software":"sample-agent","targetId":"local","method":"native-package"}')
         r = subprocess.run(['bash', str(ROOT / 'software/task.sh'), operation, str(request)],
@@ -108,6 +113,13 @@ sys.exit(37)
         self.assertEqual(body['details']['candidateVersion'], '')
         self.assertEqual(body['details']['installedVersion'], '2.0.0-r1')
         self.assertNotIn('info ', self.log.read_text())
+
+    def test_installed_only_list_row_is_not_an_available_feed_candidate(self):
+        self.feed.write_text('')
+        r,body=self.call('query')
+        self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        self.assertEqual(body['details']['candidateVersion'],'')
+        self.assertEqual(body['details']['installedVersion'],'2.0.0-r1')
 
 
 if __name__ == '__main__':
