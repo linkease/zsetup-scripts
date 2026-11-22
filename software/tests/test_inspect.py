@@ -121,6 +121,16 @@ sys.exit(37)
         self.assertEqual(body['details']['candidateVersion'],'')
         self.assertEqual(body['details']['installedVersion'],'2.0.0-r1')
 
+    def test_same_version_different_source_bytes_require_a_decision(self):
+        self.installed_meta()
+        self.feed.write_text('Package: sample-agent\nVersion: 2.0.0-r1\nArchitecture: all\nSHA256sum: '+'a'*64+'\n')
+        (self.system/'etc/opkg.conf').write_text((self.system/'etc/opkg.conf').read_text()+'src/gz other https://other.invalid/feed\n')
+        (self.feed.parent/'other').write_text('Package: sample-agent\nVersion: 2.0.0-r1\nArchitecture: all\nSHA256sum: '+'b'*64+'\n')
+        r,body=self.call()
+        self.assertEqual(r.returncode,20,r.stderr+r.stdout)
+        self.assertEqual(body['reason'],'native-source-conflict')
+        self.assertNotIn('unexpected-store-mutation',self.log.read_text())
+
 
 if __name__ == '__main__':
     unittest.main()
