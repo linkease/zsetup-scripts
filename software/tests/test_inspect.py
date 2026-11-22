@@ -107,6 +107,17 @@ sys.exit(37)
         self.assertEqual(body['reason'], 'store-catalog-unavailable')
         self.assertEqual(body['nativeExitCode'], 7)
 
+    def test_native_network_categories_are_bounded_and_do_not_expose_download_details(self):
+        for code, category in [(13, 'dns'), (14, 'tls'), (15, 'timeout')]:
+            with self.subTest(code=code):
+                self.script('zsetup', '#!/bin/sh\nif [ "$1" = --version ]; then echo "zsetup 0.5.1"; exit; fi\necho "private-device-and-url-sentinel" >&2\nexit '+str(code)+'\n')
+                r, body = self.call()
+                self.assertEqual(r.returncode, 22, r.stderr+r.stdout)
+                self.assertEqual(body['nativeExitCode'], code)
+                self.assertEqual(body['details']['failureCategory'], category)
+                self.assertNotIn('private-device-and-url-sentinel', r.stdout+r.stderr)
+                self.assertNotIn('decision', body['details'])
+
     def test_native_query_never_uses_installed_info_as_candidate(self):
         r, body = self.call('query', TEST_CANDIDATE='')
         self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
