@@ -56,7 +56,12 @@ atomic_copy() {
     parent=$(dirname -- "$to")
     mkdir -p "$parent" || return 1
     temporary="$to.apps-tmp-$$"
-    cp -p "$from" "$temporary" || return 1
+    # Detached release archives may carry the build host's numeric owner and
+    # group-write bits.  Create the destination as the publication account and
+    # retain executable bits while ensuring public files are not writable by
+    # group/other users.
+    cp "$from" "$temporary" || return 1
+    chmod go-w "$temporary" || return 1
     mv -f "$temporary" "$to" || return 1
 }
 
@@ -97,6 +102,8 @@ trap cleanup 0
 trap 'exit 1' 1 2 15
 
 if [ "$mode" = verify ]; then
+    [ -f "$dst/SHA256SUMS" ] && [ ! -L "$dst/SHA256SUMS" ] || die 'published file missing: SHA256SUMS'
+    cmp "$src/SHA256SUMS" "$dst/SHA256SUMS" >/dev/null || die 'published file differs: SHA256SUMS'
     while IFS=' ' read -r digest relative; do
         [ -n "$relative" ] || continue
         [ -f "$dst/$relative" ] && [ ! -L "$dst/$relative" ] || die "published file missing: $relative"
@@ -119,6 +126,17 @@ if [ "$mode" = stage ]; then
     mkdir "$snapshot"
     chmod 0700 "$snapshot"
     : > "$snapshot/mutable-list"
+    relative=SHA256SUMS
+    safe_destination "$relative" || die 'mutable target has a symlink ancestor: SHA256SUMS'
+    printf '%s\n' "$relative" >> "$snapshot/mutable-list"
+    if [ -e "$dst/$relative" ]; then
+        [ -f "$dst/$relative" ] || die 'mutable target is not a regular file: SHA256SUMS'
+        mkdir -p "$snapshot/previous"
+        cp -p "$dst/$relative" "$snapshot/previous/$relative"
+    else
+        mkdir -p "$snapshot/missing"
+        : > "$snapshot/missing/$relative"
+    fi
     while IFS=' ' read -r digest relative; do
         [ -n "$relative" ] || continue
         if is_immutable "$relative"; then

@@ -44,6 +44,7 @@ with tempfile.TemporaryDirectory(prefix="apps-full-preflight-") as folder:
 
     activated = publish("activate", live)
     assert activated.returncode == 0, activated.stderr
+    assert (live / "SHA256SUMS").read_bytes() == (APPS / "SHA256SUMS").read_bytes()
     verified = publish("verify", live)
     assert verified.returncode == 0, verified.stderr
     assert (live / "server-owned/product.bin").read_bytes() == unrelated
@@ -53,6 +54,7 @@ with tempfile.TemporaryDirectory(prefix="apps-full-preflight-") as folder:
     assert rolled_back.returncode == 0, rolled_back.stderr
     assert (live / "zsetup/config.json").read_bytes() == old_config
     assert (live / "ddnsto/install.sh").read_bytes() == old_entry
+    assert not (live / "SHA256SUMS").exists()
     assert (live / "ddnsto/0.2.4/installer.sh").is_file()
     assert (live / "server-owned/product.bin").read_bytes() == unrelated
 

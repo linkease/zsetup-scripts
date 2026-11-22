@@ -1,6 +1,6 @@
 # DDNSTO 推荐版本发布记录：2026-11-22 apps 标准化
 
-状态：正式发布准备中（本地候选已验证；生产 Web 根已只读确认）
+状态：标准 apps 公共树已激活并验证；DDNSTO 真机业务验收未执行
 
 ## 范围与授权
 
@@ -9,7 +9,8 @@
 - Linux/OpenWrt 固定 zsetup 0.5.0；标准 apps 入口使用站点 stable zsetup，Linux 0.6.4、Windows 0.6.5。
 - 目标平台：当前 `app.json` 声明的 Linux/OpenWrt 目标；DDNSTO Windows 独立 CLI 不进入本次 Windows apps 索引。
 - 不变平台：macOS、Windows CLI、Synology、Asus 的 DDNSTO 产品版本和安装包元数据均不变。
-- 源分支：`main`；准备基线 `1f26f2c173311b585afd51815efa62c9dc60c38a`；提交号待生成。
+- 源分支：`main`；准备基线 `1f26f2c173311b585afd51815efa62c9dc60c38a`；
+  apps 发布提交 `6e9899ab1f64c77e518919fa912ecd7a64f9f79e`。
 - 用户于 2026-11-22 同意继续发布流程，并确认生产 Server 为
   `root@192.168.3.1`，服务器内容自动同步到 `fw.koolcenter.com` 下载站。
 - 只读 SSH 核验确认 `/mnt/sata3-1/istore-data/public_html/binary/zsetup/config.json`
@@ -44,17 +45,35 @@
 
 ## 真机与公网验收
 
-- 四个现有 `/binary/zsetup/config.json` 只读摘要一致，仍为
+- 发布前四个 `/binary/zsetup/config.json` 只读摘要一致，为
   `2a5813f9b367fb437453f3bfa0fb77b989918e555f369104bba7a87e6e1f4ce0`，stable 0.6.4。
-- `/binary/ddnsto/ddnsto-install.sh`、`/binary/ddnsto/install.sh` 和
-  `/binary/ddnsto/0.2.4/installer.sh` 当前均返回 404。
+- 生产 release id 为
+  `67112af8c8ea5a7cbc03a0affe6f93ffd9b1cba94bffc81f922cfa91a2c76e32`；
+  服务器端完整 138 文件逐字节验证通过。
+- 不可变阶段先对 12 个版本文件在四个下载域执行 48 次 HTTPS 摘要校验，
+  全部通过后才激活配置与入口。
+- 激活后四个下载域对 138 个清单文件完成 552 次 HTTPS 摘要校验；最终又对
+  `SHA256SUMS`、Linux/Windows 配置、DDNSTO 两个入口和版本安装器执行 24 次
+  关键回读，全部通过。
+- `/binary/SHA256SUMS` 已发布，摘要等于 release id；Linux 配置版本为
+  `apps-fccce07c051a`，Windows 配置版本为 `apps-ee17d0f7b511`。
+- 公开 DDNSTO 路径现为 `/binary/ddnsto/install.sh`、
+  `/binary/ddnsto/ddnsto-install.sh` 和 `/binary/ddnsto/0.2.4/installer.sh`。
 - `install.ddnsto.com/i` 与推荐长入口当前返回 503。
-- 未执行公网写入、真机安装或业务连通验收，不能写为已上线。
+- 本次没有获准操作真实 DDNSTO 设备，未执行空白新装、保留 Token/固定身份升级、
+  重复安装或服务连通验收。因此这里只确认标准公共树上线，不宣称 DDNSTO
+  客户端全平台业务验收完成。
 
 ## 激活与回滚
 
 - 本地沙箱已验证 mutable snapshot、失败恢复和 rollback；不可变版本文件在回滚后保留。
-- 正式目标已确认为 `root@192.168.3.1` 的
-  `/mnt/sata3-1/istore-data/public_html/binary`；激活采用不可变文件先行、
-  可变配置和入口最后切换、HTTPS 回读及摘要校验。
+- 正式目标为 `root@192.168.3.1` 的
+  `/mnt/sata3-1/istore-data/public_html/binary`。已采用不可变文件先行、可变配置和
+  入口最后切换、HTTPS 回读及摘要校验。
+- 可回滚发布包保存在服务器私有目录
+  `/mnt/sata3-1/istore-data/.zsetup-scripts-releases/67112af8c8ea5a7cbc03a0affe6f93ffd9b1cba94bffc81f922cfa91a2c76e32`；
+  mutable 快照 phase 为 `activated`。回滚前仍须先对比线上摘要，防止覆盖后续发布。
+- 发布工具经过三次封闭优化：精确 release id 的无 Python 目标模式、发布账户所有权及
+  去除组/其他写权限、`SHA256SUMS` 自身纳入快照/激活/验证/回滚。最终 139 个公开文件
+  均为 `root:root`，本次清单文件无组/其他写权限。
 - 回滚只恢复本次可变入口和配置，不删除不可变版本，不代表客户端降级。

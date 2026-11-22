@@ -24,4 +24,20 @@ Read-only HTTPS checks found all four existing Linux public sources on stable
 `dl.istoreos.com` redirects to `fw.koolcenter.com`; redirects were restricted
 to HTTPS. This confirms the candidate differs and therefore requires an
 explicit production rollout decision. No upload, activation or remote mutation
-was attempted.
+was attempted during the local preflight.
+
+## Production activation
+
+Later on 2026-11-22, the committed `apps/` tree from
+`6e9899ab1f64c77e518919fa912ecd7a64f9f79e` was activated at the confirmed
+`/binary/` Web root with release id
+`67112af8c8ea5a7cbc03a0affe6f93ffd9b1cba94bffc81f922cfa91a2c76e32`.
+The server verified all 138 manifest entries. Four public download domains
+then passed 552 complete-file digest checks; 24 final critical checks covered
+the public manifest, both generated configs and the DDNSTO entries/payload.
+
+The transaction retains its private release bundle and activated rollback
+snapshot. Public files were normalized to the publisher owner and had
+group/other write bits removed. No real DDNSTO device was mutated, so product
+installation/service canary evidence remains outside this M10 publication
+acceptance result.

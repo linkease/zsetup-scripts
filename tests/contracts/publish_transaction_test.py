@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
@@ -29,7 +30,9 @@ def make_apps(root: Path):
     (root / "zsetup/base.json").write_text(json.dumps(BASE) + "\n")
     app = root / "demo"
     (app / "1.0.0").mkdir(parents=True)
-    (app / "1.0.0/installer.sh").write_text("#!/bin/sh\nprintf 'new payload\\n'\n")
+    installer = app / "1.0.0/installer.sh"
+    installer.write_text("#!/bin/sh\nprintf 'new payload\\n'\n")
+    installer.chmod(0o775)
     (app / "app.json").write_text(json.dumps({
         "schema_version": 1, "id": "demo", "name": "Demo", "version": "1.0.0",
         "min_zsetup": "0.5.0", "entrypoints": ["sh"],
@@ -47,6 +50,7 @@ def make_live(root: Path):
     (root / "demo/install.sh").write_bytes(b"old entry\n")
     (root / "products").mkdir()
     (root / "products/product.bin").write_bytes(b"server-owned")
+    (root / "SHA256SUMS").write_bytes(b"old manifest\n")
 
 
 def run(mode, apps, live, extra=None):
@@ -78,7 +82,9 @@ with tempfile.TemporaryDirectory(prefix="apps-publish-") as name:
     staged = run("stage", apps, live)
     assert staged.returncode == 0, staged.stderr
     assert (live / "demo/1.0.0/installer.sh").read_bytes() == (apps / "demo/1.0.0/installer.sh").read_bytes()
+    assert not ((live / "demo/1.0.0/installer.sh").stat().st_mode & (stat.S_IWGRP | stat.S_IWOTH))
     assert (live / "demo/install.sh").read_bytes() == b"old entry\n"
+    assert (live / "SHA256SUMS").read_bytes() == b"old manifest\n"
     snapshot = live / f"zsetup/.apps-rollback-{release_id}"
     assert (snapshot / "phase").read_text().strip() == "staged"
     assert run("stage", apps, live).returncode != 0
@@ -87,6 +93,8 @@ with tempfile.TemporaryDirectory(prefix="apps-publish-") as name:
     assert active.returncode == 0, active.stderr
     assert (snapshot / "phase").read_text().strip() == "activated"
     assert (live / "demo/install.sh").read_bytes() == (apps / "demo/install.sh").read_bytes()
+    assert (live / "SHA256SUMS").read_bytes() == (apps / "SHA256SUMS").read_bytes()
+    assert not ((live / "demo/install.sh").stat().st_mode & (stat.S_IWGRP | stat.S_IWOTH))
     assert (live / "zsetup/config.json").read_bytes() == (apps / "zsetup/config.json").read_bytes()
     assert (live / "products/product.bin").read_bytes() == b"server-owned"
     verified = run("verify", apps, live)
@@ -95,6 +103,7 @@ with tempfile.TemporaryDirectory(prefix="apps-publish-") as name:
     rolled = run("rollback", apps, live)
     assert rolled.returncode == 0, rolled.stderr
     assert (live / "demo/install.sh").read_bytes() == b"old entry\n"
+    assert (live / "SHA256SUMS").read_bytes() == b"old manifest\n"
     assert (live / "zsetup/config.json").read_bytes() == b"old config\n"
     assert (live / "demo/1.0.0/installer.sh").is_file(), "immutable version must remain"
     assert (live / "products/product.bin").read_bytes() == b"server-owned"
