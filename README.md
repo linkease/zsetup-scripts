@@ -15,7 +15,11 @@ DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
 
 FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.9 本地候选的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
 
-新增[`kspeeder/ks-cli`](kspeeder/ks-cli/README.md)与[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md)两个Linux二进制安装器：按官方版本/SHA256下载，支持持久目录与版本切换，不自动安装或启动服务。脚本0.1.0已于2026-10-26分别公开发布；服务器同步和回滚方案见[发布说明](docs/kspeeder-installers.md)。
+[`kspeeder/ks-cli`](kspeeder/ks-cli/README.md) 与
+[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md) 两个 Linux 二进制安装器已升级到
+0.1.1：从四站点版本化 `/binary/kspeeder/0.9.1/` 镜像下载并校验产品，不自动安装
+或启动服务。产品镜像、完整 apps 和真实公开入口 canary 已于 2026-11-22 发布通过；
+服务器同步和回滚方案见[发布说明](docs/kspeeder-installers.md)。
 
 既有全局配置已经收录的应用仍可直接使用 zsetup：
 

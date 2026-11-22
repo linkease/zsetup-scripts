@@ -152,3 +152,10 @@
   cleanup scope. Never delete them as an implicit side effect of product or
   apps publication. Website changelog deployment belongs to its website repo,
   which is not present here.
+- Product release
+  `480817559978b120aa1538f47f0ef8b6ca3d3b0b5f6e9c2dc41771f95378f593`
+  and apps release
+  `11b13925c02d0f0775f33657b4a9eaaf33a0cf7470f89a3c964635b500765956`
+  are live. Both transaction phases are `activated`; public KSpeeder and KS-CLI
+  canaries report 0.9.1. Use the verification record for rollback paths and
+  exact evidence before any later change.

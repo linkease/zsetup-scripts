@@ -1,5 +1,9 @@
 # KSpeeder 0.9.1 product mirror
 
+Status: published on 2026-11-22. Production identities and canary evidence are
+recorded in
+[`verification/2026-11-22-kspeeder-0.9.1-mirror.md`](verification/2026-11-22-kspeeder-0.9.1-mirror.md).
+
 The authoritative input is the ten assets attached to
 `kspeeder/docker_kspeeder` release `v0.9.1`. Their names, sizes and GitHub
 SHA256 digests are locked in `release/kspeeder-products.json`. The release
