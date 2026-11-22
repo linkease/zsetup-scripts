@@ -6,7 +6,8 @@ task_store_catalog() {
     [ -n "$core" ] || { [ ! -x "$HOME/.local/bin/zsetup" ] || core=$HOME/.local/bin/zsetup; }
     [ -n "$core" ] && [ -x "$core" ] || task_stop blocked missing-zsetup 127
     version=$("$core" --version) || task_stop blocked invalid-zsetup 11
-    [[ "$version" =~ ^zsetup\ ([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || task_stop blocked invalid-zsetup 11
+    local core_pattern='^zsetup ([0-9]+)\.([0-9]+)\.([0-9]+)$'
+    [[ "$version" =~ $core_pattern ]] || task_stop blocked invalid-zsetup 11
     [ "${BASH_REMATCH[1]}" -gt 0 ] || [ "${BASH_REMATCH[2]}" -ge 5 ] || task_stop blocked bounded-download-core-required 18
     if command -v uci >/dev/null 2>&1; then
         super_arch=$(uci -q get istore.istore.super_arch 2>/dev/null || true)
