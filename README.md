@@ -16,11 +16,10 @@ DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
 FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.9 本地候选的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
 
 [`kspeeder/ks-cli`](kspeeder/ks-cli/README.md) 与
-[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md) 的 0.1.2 候选支持 Linux、macOS
+[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md) 的 0.1.2 已支持 Linux、macOS
 和 Windows。它们从四站点的不可变 KSpeeder 发布 ID 目录下载并校验产品，只安装
-用户级二进制，不自动注册或启动服务。当前生产仍保留已发布的 Linux-only 0.1.1；
-新版产品镜像发布通过后才能切换完整 apps。未来最新版发现、资产锁定、apps 验证
-及产品发布统一使用
+用户级二进制，不自动注册或启动服务。全平台产品镜像和完整 apps 已于 2026-11-22
+发布并通过四站点校验；未来最新版发现、资产锁定、apps 验证及产品发布统一使用
 [`scripts/release-kspeeder.py`](scripts/release-kspeeder.py)，服务器同步和回滚方案见
 [产品镜像说明](docs/kspeeder-product-mirror.md)。
 
@@ -46,7 +45,7 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastpve
 
 **完整 `apps/` 已于 2026-11-22 通过统一协调器发布到
 `/binary/zsetup-scripts/apps/`。当前 Release ID 为
-`f0bdc493992caa7d2fc61a9c4ec7ceb5996f0adec2534a01e3490cb0e8943e0d`。**
+`417dbd781529dffbbf41f638d7871fa2c8ed7d35da589c0f9a35babb7a9c4902`。**
 FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余实现，不再作为整体发布状态的判定依据。
 产品包继续由各业务发布流程提前放在现有 `/binary/APP/` 目录，安装时由 zsetup 下载和校验；
 本仓库只把完整 `apps/` 目录作为一个 zsetup-scripts 业务命名空间发布，不采集或复制产品包。

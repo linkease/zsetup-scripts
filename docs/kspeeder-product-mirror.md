@@ -1,5 +1,11 @@
 # KSpeeder 0.9.1 全平台产品镜像
 
+状态：已于 2026-11-22 发布。产品 Release ID 为
+`307a8814882ae13660d824a22d18f94acbcec84d59e846befc1ef58e78e0a9e4`；完整 apps
+Release ID 为 `417dbd781529dffbbf41f638d7871fa2c8ed7d35da589c0f9a35babb7a9c4902`。
+验收证据见
+[`verification/2026-11-22-kspeeder-0.9.1-cross-platform.md`](verification/2026-11-22-kspeeder-0.9.1-cross-platform.md)。
+
 当前候选把两个可信来源合并成一个精确锁：GitHub
 `kspeeder/docker_kspeeder v0.9.1` 的 10 个 Linux/OpenWrt 资产，以及
 `https://kspeeder.com/bin/` 当前提供的 8 个 macOS/Windows 二进制。每个文件的

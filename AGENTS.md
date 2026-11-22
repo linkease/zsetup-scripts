@@ -167,3 +167,9 @@
   are live. Both transaction phases are `activated`; public KSpeeder and KS-CLI
   canaries report 0.9.1. Use the verification record for rollback paths and
   exact evidence before any later change.
+- The cross-platform successor product release
+  `307a8814882ae13660d824a22d18f94acbcec84d59e846befc1ef58e78e0a9e4`
+  and complete apps release
+  `417dbd781529dffbbf41f638d7871fa2c8ed7d35da589c0f9a35babb7a9c4902`
+  were activated on 2026-11-22. All 96 product and 600 final apps public checks
+  passed. The earlier Linux-only releases and immutable directory remain intact.

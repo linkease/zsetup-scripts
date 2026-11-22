@@ -14,6 +14,7 @@ KS-CLI 与 KSpeeder 的标准 apps 实现分别位于 `kspeeder/ks-cli` 和
 产品镜像由 `scripts/release-kspeeder.py` 维护，完整来源、不可变发布 ID 布局、
 四站点校验和回滚规则见 [产品镜像合同](kspeeder-product-mirror.md)。产品必须先发布
 并通过公网验证，之后才能通过完整 [apps 发布协调器](apps-release.md) 发布安装入口。
+0.9.1 全平台产品和 0.1.2 apps 已按该顺序于 2026-11-22 发布通过。
 
 历史 0.1.0/0.1.1 入口、旧 `/binary/kspeeder/0.9.1/` 目录和其他官网文件不在此次
 事务的删除范围。任何清理都必须作为独立、明确授权的操作进行。
