@@ -26,7 +26,7 @@ to HTTPS. This confirms the candidate differs and therefore requires an
 explicit production rollout decision. No upload, activation or remote mutation
 was attempted during the local preflight.
 
-## Production activation
+## Incorrect production activation and rollback
 
 Later on 2026-11-22, the committed `apps/` tree from
 `6e9899ab1f64c77e518919fa912ecd7a64f9f79e` was activated at the confirmed
@@ -36,8 +36,11 @@ The server verified all 138 manifest entries. Four public download domains
 then passed 552 complete-file digest checks; 24 final critical checks covered
 the public manifest, both generated configs and the DDNSTO entries/payload.
 
-The transaction retains its private release bundle and activated rollback
-snapshot. Public files were normalized to the publisher owner and had
-group/other write bits removed. No real DDNSTO device was mutated, so product
-installation/service canary evidence remains outside this M10 publication
-acceptance result.
+This target interpretation was incorrect: zsetup-scripts must be released as
+one business namespace, with DDNSTO as an application inside it. The complete
+mutable transaction was therefore rolled back after checking that no later
+release had changed its files. The previous `/binary/zsetup/config.json` was
+restored. The newly uploaded DDNSTO entry, manifest, source tree and immutable
+`0.2.4` installer were removed explicitly; all four public domains returned
+404 for those paths and the previous config digest. The private release bundle
+and rolled-back snapshot remain as audit evidence.

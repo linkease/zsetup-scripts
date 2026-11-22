@@ -1,6 +1,6 @@
 # DDNSTO 推荐版本发布记录：2026-11-22 apps 标准化
 
-状态：标准 apps 公共树已激活并验证；DDNSTO 真机业务验收未执行
+状态：误用 `/binary/` 根目录的发布已完整回滚；等待按 zsetup-scripts 整体业务重新设计
 
 ## 范围与授权
 
@@ -16,8 +16,9 @@
 - 只读 SSH 核验确认 `/mnt/sata3-1/istore-data/public_html/binary/zsetup/config.json`
   与公网 `/binary/zsetup/config.json` 摘要一致，故生产 Web 根为
   `/mnt/sata3-1/istore-data/public_html/binary`。
-- 标准发布模型为 `apps/` 的内容直接映射到 `/binary/`；不额外套
-  `zsetup-scripts/` 目录，否则配置内 `ddnsto/...`、`zsetup/...` 等路径会错位。
+- 2026-11-22 曾错误地把 `apps/` 内容直接映射到现有 `/binary/` 根。用户随后明确：
+  zsetup-scripts 必须作为整体业务发布，DDNSTO 只是其中一个应用，不能单独发布到
+  既有 `/binary/ddnsto/`。该错误映射已回滚，不再作为目标模型。
 - `install.ddnsto.com` 独立安装站不在本次标准 `apps/` 发布范围内。
 
 ## 产品审核
@@ -55,25 +56,27 @@
 - 激活后四个下载域对 138 个清单文件完成 552 次 HTTPS 摘要校验；最终又对
   `SHA256SUMS`、Linux/Windows 配置、DDNSTO 两个入口和版本安装器执行 24 次
   关键回读，全部通过。
-- `/binary/SHA256SUMS` 已发布，摘要等于 release id；Linux 配置版本为
-  `apps-fccce07c051a`，Windows 配置版本为 `apps-ee17d0f7b511`。
-- 公开 DDNSTO 路径现为 `/binary/ddnsto/install.sh`、
-  `/binary/ddnsto/ddnsto-install.sh` 和 `/binary/ddnsto/0.2.4/installer.sh`。
+- 上述激活属于错误目标验证，不是最终发布结果。随后执行同一事务的受保护回滚，
+  `/binary/zsetup/config.json` 已恢复为发布前摘要
+  `2a5813f9b367fb437453f3bfa0fb77b989918e555f369104bba7a87e6e1f4ce0`。
+- 本次新增的 `/binary/ddnsto/install.sh`、`ddnsto-install.sh`、`app.json`、
+  `source/`、`0.2.4/installer.sh` 及空目录均已删除；四个下载域回读均为 404。
+- 本次新增的根 `/binary/SHA256SUMS` 已由回滚删除。
 - `install.ddnsto.com/i` 与推荐长入口当前返回 503。
 - 本次没有获准操作真实 DDNSTO 设备，未执行空白新装、保留 Token/固定身份升级、
-  重复安装或服务连通验收。因此这里只确认标准公共树上线，不宣称 DDNSTO
-  客户端全平台业务验收完成。
+  重复安装或服务连通验收。因此不宣称 DDNSTO 客户端全平台业务验收完成；
+  错误目标也已回滚，不能记为标准公共树上线。
 
 ## 激活与回滚
 
 - 本地沙箱已验证 mutable snapshot、失败恢复和 rollback；不可变版本文件在回滚后保留。
-- 正式目标为 `root@192.168.3.1` 的
-  `/mnt/sata3-1/istore-data/public_html/binary`。已采用不可变文件先行、可变配置和
-  入口最后切换、HTTPS 回读及摘要校验。
+- 错误发布目标曾为 `root@192.168.3.1` 的
+  `/mnt/sata3-1/istore-data/public_html/binary`。该目标上的事务 phase 现为
+  `rolled-back`；现有 `/binary/*` 业务已经恢复。
 - 可回滚发布包保存在服务器私有目录
   `/mnt/sata3-1/istore-data/.zsetup-scripts-releases/67112af8c8ea5a7cbc03a0affe6f93ffd9b1cba94bffc81f922cfa91a2c76e32`；
-  mutable 快照 phase 为 `activated`。回滚前仍须先对比线上摘要，防止覆盖后续发布。
+  mutable 快照 phase 为 `rolled-back`，用于保留这次误发布和恢复的审计证据。
 - 发布工具经过三次封闭优化：精确 release id 的无 Python 目标模式、发布账户所有权及
-  去除组/其他写权限、`SHA256SUMS` 自身纳入快照/激活/验证/回滚。最终 139 个公开文件
-  均为 `root:root`，本次清单文件无组/其他写权限。
+  去除组/其他写权限、`SHA256SUMS` 自身纳入快照/激活/验证/回滚。误激活期间的 139 个
+  公开文件均通过权限检查；回滚后不保留这些错误目标文件。
 - 回滚只恢复本次可变入口和配置，不删除不可变版本，不代表客户端降级。
