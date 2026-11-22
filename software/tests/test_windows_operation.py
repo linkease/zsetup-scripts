@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -18,6 +19,11 @@ class WindowsOperation(unittest.TestCase):
         (self.root/'resources').mkdir();(self.root/'resources/scoop.lock.json').write_text('{}')
         self.script('uname','#!/bin/sh\necho MINGW64_NT\n')
         self.script('client','#!/bin/sh\necho 0.9.1\n')
+        self.script('native-jq',f'''#!/usr/bin/env python3
+import subprocess,sys
+p=subprocess.run([{shutil.which('jq')!r}]+[a for a in sys.argv[1:] if a!='--binary'],input=sys.stdin.buffer.read(),capture_output=True)
+sys.stdout.buffer.write(p.stdout);sys.stderr.buffer.write(p.stderr);sys.exit(p.returncode)
+''')
         self.script('powershell.exe','''#!/usr/bin/env python3
 import json,os,sys
 from pathlib import Path
@@ -33,6 +39,7 @@ print(json.dumps({'schemaVersion':1,'id':'scoop:main/sample-tool','installedVers
 ''')
         self.env={**os.environ,'PATH':str(self.bin)+os.pathsep+os.environ['PATH'],
             'ZSETUP_TASK_WINDOWS_ADAPTER_DIR':str(self.adapters),'KAI_KSCLI_BIN':str(self.bin/'client'),'KAI_ZSETUP_BIN':str(self.bin/'client'),
+            'ZSETUP_TASK_JQ':str(self.bin/'native-jq'),
             'SIM_ROOT':str(self.root),'SIM_STATE':str(self.state),'SIM_LOG':str(self.log)}
         self.request={'software':'sample-tool','targetId':'local','method':'native-package','provider':'scoop','intent':'update',
             'storage':{'reserveBytes':65536,'paths':[{'role':'system-package','path':str(self.root),'bytes':65536}]}}
@@ -43,6 +50,7 @@ print(json.dumps({'schemaVersion':1,'id':'scoop:main/sample-tool','installedVers
     def call(self,operation):
         p=self.root/'request.json';p.write_text(json.dumps(self.request))
         r=subprocess.run(['bash',str(ROOT/'software/task.sh'),operation,str(p)],env=self.env,capture_output=True,text=True,timeout=15)
+        self.assertTrue(r.stdout,r.stderr)
         return r,json.loads(r.stdout)
 
     def plan(self):
