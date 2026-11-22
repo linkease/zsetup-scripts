@@ -116,3 +116,20 @@
 - Actual release/readback/canary/rollback evidence is in
   `docs/verification/2026-10-26-kspeeder-publish.{md,json}`.
 - Server layout and subsequent sync procedure: `docs/kspeeder-installers.md`.
+
+## Complete zsetup-scripts apps candidate (2026-11-22)
+
+- The complete repository `apps/` directory is the public source tree and maps
+  only to `/binary/zsetup-scripts/apps/`. Existing `/binary/zsetup`,
+  `/binary/ddnsto`, `/binary/fastnet` and other product/core directories are
+  dependencies, never the destination of this aggregate business release.
+- Production coordination belongs to `scripts/publish-apps.py`. It fixes the
+  namespace, packages the full clean candidate by release ID, uses the bundled
+  `scripts/publish.sh` transaction, and verifies configured HTTPS mirrors. Do
+  not invoke the low-level transaction against a hand-written production path.
+- Tests and fixtures remain outside `apps/`. Regenerate and check the committed
+  entries, configs and `SHA256SUMS` with `scripts/build.py`.
+- The current complete candidate is development-complete but not published.
+  Preparation and `plan` are local/read-only; never run `stage`, `publish`,
+  `activate` or `rollback` without explicit production authorization for the
+  exact release ID. See `docs/apps-release.md` and the coordinator evidence.
