@@ -36,7 +36,7 @@ task_observe() {
     if [ -n "$executable" ] && [ -f "$executable" ]; then
         case "$TASK_SOFTWARE" in ks-cli|fastnet|linkspace) set -- version ;; *) set -- --version ;; esac
         raw=$("$executable" "$@" 2>/dev/null | head -c 8192) || probe_code=$?
-        [ "$probe_code" = 0 ] || task_stop failed existing-program-query-failed "$probe_code" "$("$task_jq" -cn --arg path "$executable" --arg observed "$raw" '{executable:$path,observedVersion:$observed}')"
+        [ "$probe_code" = 0 ] || task_stop failed existing-program-query-failed "$probe_code" "$("$task_jq" -cn --arg path "$executable" '{executable:$path}')"
         version=$("$task_jq" -r '(.version//.result.version//empty)|select(type=="string")' <<< "$raw" 2>/dev/null) || version=
         if [ -z "$version" ];then
             version=$("$task_jq" -rn --arg value "$raw" 'try ($value|capture("(?<v>[0-9]+\\.[0-9]+(?:\\.[0-9]+)?(?:[-+][A-Za-z0-9.-]+)?)").v) catch ""')
@@ -61,7 +61,7 @@ task_observe() {
             esac
         fi
     fi
-    TASK_OBSERVED=$("$task_jq" -cn --arg path "$executable" --arg version "$version" --arg raw "$raw" --argjson installed "$installed" --argjson valid "$valid" '{installed:$installed,executable:$path,version:$version,observedVersion:$raw,satisfies:$valid,functionalValidation:(if $valid then "passed" else "not-run" end),manager:"existing"}')
+    TASK_OBSERVED=$("$task_jq" -cn --arg path "$executable" --arg version "$version" --argjson installed "$installed" --argjson valid "$valid" '{installed:$installed,executable:$path,version:$version,observedVersion:$version,satisfies:$valid,functionalValidation:(if $valid then "passed" else "not-run" end),manager:"existing"}')
 }
 task_owner_artifact() {
     local raw key value artifact= digest= size= url= version= code

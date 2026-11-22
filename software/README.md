@@ -7,6 +7,12 @@
 协议 software-task/v1：stdout 单个 JSON，进度和原生诊断到 stderr。
 退出 0 success，20 needs-ai，21 blocked，22 failed，2 invalid；nativeExitCode
 保留实际子程序退出码。查询和计划只读，应用必须绑定计划，不自动启动服务。
+
+入口按 operation/method 只加载需要的模块。stdout 单条结果最多 64 KiB；
+过大返回 needs-ai/result-too-large（退出20），明确要求核实实际状态，不截断 JSON
+或把已发生的变更解释成未执行。版本探测只返回提取后的版本事实，不透传程序任意输出。
+前台截止时间与整个子进程树的取消仍由已选目标 Transport/zsetup 的现有 owner 负责；
+本模块不再建立进程监督器，也不把退出码0当作业务效果的充分证据。
 未知规则不猜下载地址，不将网络、完整性、权限错误解释成无软件候选。
 
 本模块由 kai-skills 以精确摘要的 owner 资源消费，不新增下载器或 zsetup 核心命令。
