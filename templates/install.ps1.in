@@ -4,10 +4,28 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $AppId = '@APP_ID@'
+$ConfigPrimaryUrls = @(@CONFIG_PRIMARY_URLS@)
+$ConfigFallbackUrl = '@CONFIG_FALLBACK_URL@'
 
 @BOOTSTRAP@
 
 $active = Get-ZsetupBootstrap
+$work = if ($env:ZSETUP_ROOT) { $env:ZSETUP_ROOT } else { Join-Path ([IO.Path]::GetTempPath()) 'zsetup' }
+$configDirectory = Join-Path $work 'zsetup-scripts'
+$config = Join-Path $configDirectory 'config-windows.json'
+$candidate = $config + '.candidate-' + [Guid]::NewGuid().ToString('N')
+New-Item -ItemType Directory -Path $configDirectory -Force -ErrorAction Stop | Out-Null
+try {
+    $downloadArguments = @('download', '--quiet', '-o', $candidate, '--max-bytes', '131072')
+    $downloadArguments += $ConfigPrimaryUrls
+    $downloadArguments += @('--fallback-url', $ConfigFallbackUrl)
+    & $active @downloadArguments
+    if ($LASTEXITCODE -ne 0) { throw "zsetup config download failed with exit code $LASTEXITCODE" }
+    Move-Item -LiteralPath $candidate -Destination $config -Force -ErrorAction Stop
+} finally {
+    Remove-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
+}
+$env:ZSETUP_CONFIG = $config
 & $active install $AppId --foreground -- @InstallerArguments
 exit $LASTEXITCODE
 

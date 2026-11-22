@@ -9,8 +9,8 @@ relative to the `apps/` publication root.
 `tests/contracts/publication_tree_test.py` creates 100 applications without
 changing the generator, builds 100 standard entries and installer records,
 verifies all checksums, proves a second build is byte-identical, copies the
-tree onto a target containing a server-owned product and proves that product is
-unchanged.  Tampering is detected.  The first aggregate self-check invoked the
+complete directory to `/binary/zsetup-scripts/apps/` beside a server-owned
+product and proves that product is unchanged. Tampering is detected. The first aggregate self-check invoked the
 relative checksum list from the repository root; rerunning it from the actual
 publication root passed, matching production semantics.
 

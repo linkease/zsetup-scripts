@@ -17,6 +17,7 @@ PUBLISH = ROOT / "scripts/publish.sh"
 
 BASE = {
     "schema_version": 1,
+    "public_path_prefix": "zsetup-scripts/apps",
     "source_groups": [{"id": "koolcenter", "primary_bases": ["https://one.invalid/binary"],
                        "fallback_base": "https://fallback.invalid/binary"}],
     "stable_zsetup": {"version": "0.6.4", "source_group": "koolcenter",

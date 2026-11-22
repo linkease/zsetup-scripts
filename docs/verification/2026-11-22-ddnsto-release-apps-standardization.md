@@ -1,6 +1,6 @@
 # DDNSTO 推荐版本发布记录：2026-11-22 apps 标准化
 
-状态：误用 `/binary/` 根目录的发布已完整回滚；等待按 zsetup-scripts 整体业务重新设计
+状态：误发布已完整回滚；zsetup-scripts 整体业务候选开发完成，明确暂不发布
 
 ## 范围与授权
 
@@ -10,7 +10,8 @@
 - 目标平台：当前 `app.json` 声明的 Linux/OpenWrt 目标；DDNSTO Windows 独立 CLI 不进入本次 Windows apps 索引。
 - 不变平台：macOS、Windows CLI、Synology、Asus 的 DDNSTO 产品版本和安装包元数据均不变。
 - 源分支：`main`；准备基线 `1f26f2c173311b585afd51815efa62c9dc60c38a`；
-  apps 发布提交 `6e9899ab1f64c77e518919fa912ecd7a64f9f79e`。
+  错误目标的 apps 提交为 `6e9899ab1f64c77e518919fa912ecd7a64f9f79e`；
+  修正后的整体业务候选提交待本地验收完成后记录。
 - 用户于 2026-11-22 同意继续发布流程，并确认生产 Server 为
   `root@192.168.3.1`，服务器内容自动同步到 `fw.koolcenter.com` 下载站。
 - 只读 SSH 核验确认 `/mnt/sata3-1/istore-data/public_html/binary/zsetup/config.json`
@@ -19,6 +20,8 @@
 - 2026-11-22 曾错误地把 `apps/` 内容直接映射到现有 `/binary/` 根。用户随后明确：
   zsetup-scripts 必须作为整体业务发布，DDNSTO 只是其中一个应用，不能单独发布到
   既有 `/binary/ddnsto/`。该错误映射已回滚，不再作为目标模型。
+- 用户确认最终目录语义为完整复制 `apps/` 目录，即公开目标
+  `/binary/zsetup-scripts/apps/`；本阶段只完成全部 apps 开发和验证，不上传。
 - `install.ddnsto.com` 独立安装站不在本次标准 `apps/` 发布范围内。
 
 ## 产品审核
@@ -39,10 +42,12 @@
 
 - DDNSTO Shell：`d35a332d1c901b175e1c60a5895468ad1d58649a4b287d5aa83718b91bc284f2`。
 - DDNSTO PowerShell：`917d6eee6de2d8a555864cf0253956f61825b29a0cf698cebe9f7b7833b0a46d`。
-- 标准 DDNSTO entry：`911a00891a3b627bb1c9c2b0ab636182a15eb888383dda4abe9abfa599b33d19`。
-- Linux apps config：`ab2597b792c037f643208d6a74780b81212d0f013b2cb09201d743cf41e166d3`。
-- Windows apps config：`d01598737c4e07cdf0a6f78550b1a9d8321dc71a0ac03a430f468e3a68467012`。
-- `apps/SHA256SUMS`：`67112af8c8ea5a7cbc03a0affe6f93ffd9b1cba94bffc81f922cfa91a2c76e32`。
+- 标准 DDNSTO entry：`e41812133f9f4c073995523d3f63559721cd24ab4b8c7636a1286f808d525eec`。
+- Linux apps config：`dadc68f4ad46157a9a12518357052207caeb41ec424fc4510b67a0cebad23fb8`，
+  config version `apps-21d445da18b1`。
+- Windows apps config：`21dcbaa47c0a0af14c75164983d83c17d366a0bef44d6f08873dedc2858fd8c1`，
+  config version `apps-c779c40c7a27`。
+- `apps/SHA256SUMS`：`b448f9ea3fd2b45b7035159bc7141b843ddea80a39fa8ff8d7a70d205c811e09`。
 
 ## 真机与公网验收
 

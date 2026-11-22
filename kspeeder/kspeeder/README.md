@@ -6,7 +6,7 @@ zsetup 0.5.0。Linux入口已于2026-10-26独立发布：
 
 ```sh
 zsetup install kspeeder --foreground
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/kspeeder/kspeeder-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/kspeeder/kspeeder-install.sh)"
 ```
 
 默认安装到 `~/.local/lib/linkease/kspeeder/versions/VERSION/bin/kspeeder`，

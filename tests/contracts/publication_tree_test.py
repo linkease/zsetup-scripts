@@ -15,6 +15,7 @@ PUBLIC_CHECK = ROOT / "scripts/check-public-tree.py"
 
 BASE = {
     "schema_version": 1,
+    "public_path_prefix": "zsetup-scripts/apps",
     "source_groups": [{
         "id": "koolcenter", "primary_bases": ["https://one.invalid/binary"],
         "fallback_base": "https://fallback.invalid/binary",
@@ -67,12 +68,13 @@ with tempfile.TemporaryDirectory(prefix="apps-publication-") as name:
     assert bytes_by_path(apps) == first
     subprocess.run(command + ["--check"], check=True, stdout=subprocess.DEVNULL)
 
-    public = work / "binary"
-    public.mkdir()
-    existing = public / "fastnet/FastNet-product.bin"
+    binary = work / "binary"
+    binary.mkdir()
+    existing = binary / "fastnet/FastNet-product.bin"
     existing.parent.mkdir()
     existing.write_bytes(b"server-owned product")
-    shutil.copytree(apps, public, dirs_exist_ok=True)
+    public = binary / "zsetup-scripts/apps"
+    shutil.copytree(apps, public)
     assert existing.read_bytes() == b"server-owned product"
     assert all((public / relative).read_bytes() == content for relative, content in first.items())
     assert not list(public.rglob("tests")) and not list(public.rglob("fixtures"))

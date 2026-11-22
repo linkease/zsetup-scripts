@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "public_path_prefix": "zsetup-scripts/apps",
   "source_groups": [
     {
       "id": "release",

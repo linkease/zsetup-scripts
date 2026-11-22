@@ -2,18 +2,18 @@
 # Publish the apps tree only.  Connection and target selection remain external.
 set -eu
 
-[ "$#" -eq 3 ] || { echo 'usage: publish.sh stage|activate|rollback|verify APPS BINARY_ROOT' >&2; exit 2; }
+[ "$#" -eq 3 ] || { echo 'usage: publish.sh stage|activate|rollback|verify APPS PUBLIC_APPS_ROOT' >&2; exit 2; }
 mode=$1
 src=${2%/}
 dst=${3%/}
 case "$mode" in stage|activate|rollback|verify) ;; *) exit 2 ;; esac
 case "$src:$dst" in /*:/*) ;; *) echo 'apps publish: absolute paths required' >&2; exit 2 ;; esac
-case "$dst" in /|*/../*|*/..|*/./*|*/.|*\\*) echo 'apps publish: unsafe binary root' >&2; exit 2 ;; esac
+case "$dst" in /|*/../*|*/..|*/./*|*/.|*\\*) echo 'apps publish: unsafe public apps root' >&2; exit 2 ;; esac
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 die() { printf 'apps publish: %s\n' "$1" >&2; exit 1; }
 [ -d "$src" ] && [ ! -L "$src" ] || die 'apps source must be a real directory'
-[ -d "$dst" ] && [ ! -L "$dst" ] || die 'binary root must be a real directory'
+[ -d "$dst" ] && [ ! -L "$dst" ] || die 'public apps root must be a real directory'
 [ -f "$src/SHA256SUMS" ] && [ ! -L "$src/SHA256SUMS" ] || die 'missing SHA256SUMS'
 (cd "$src" && sha256sum -c SHA256SUMS >/dev/null) || die 'source checksum failed'
 release_id=$(sha256sum "$src/SHA256SUMS")

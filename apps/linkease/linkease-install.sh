@@ -2,6 +2,8 @@
 set -eu
 
 APP_ID='linkease'
+CONFIG_PRIMARY_URLS='https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/config.json https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/config.json https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config.json'
+CONFIG_FALLBACK_URL='https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config.json'
 
 WORK_ROOT=${ZSETUP_ROOT:-/tmp/zsetup}
 DEFAULT_PRIMARY_BASES="https://dl.istoreos.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary"
@@ -258,5 +260,23 @@ bootstrap_zsetup() {
 
 
 bootstrap_zsetup
+
+config_dir=$WORK_ROOT/zsetup-scripts
+config_file=$config_dir/config.json
+config_candidate=$config_dir/.config.json.$$
+mkdir -p "$config_dir"
+trap 'rm -f "$config_candidate" 2>/dev/null || true' EXIT HUP INT TERM
+download_business_config() {
+    set -- download --quiet -o "$config_candidate" --max-bytes 131072
+    for config_url in $CONFIG_PRIMARY_URLS; do set -- "$@" "$config_url"; done
+    set -- "$@" --fallback-url "$CONFIG_FALLBACK_URL"
+    "$ACTIVE_ZSETUP" "$@"
+}
+download_business_config
+chmod 0600 "$config_candidate"
+mv -f "$config_candidate" "$config_file"
+trap - EXIT HUP INT TERM
+ZSETUP_CONFIG=$config_file
+export ZSETUP_CONFIG
 exec "$ACTIVE_ZSETUP" install "$APP_ID" --foreground -- "$@"
 

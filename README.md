@@ -17,7 +17,7 @@ FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一�
 
 新增[`kspeeder/ks-cli`](kspeeder/ks-cli/README.md)与[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md)两个Linux二进制安装器：按官方版本/SHA256下载，支持持久目录与版本切换，不自动安装或启动服务。脚本0.1.0已于2026-10-26分别公开发布；服务器同步和回滚方案见[发布说明](docs/kspeeder-installers.md)。
 
-设备已有 zsetup：
+既有全局配置已经收录的应用仍可直接使用 zsetup：
 
 ```sh
 zsetup install fastnet
@@ -26,18 +26,22 @@ zsetup install linkease
 zsetup install fastpve
 ```
 
-设备没有 zsetup，发布完成后的一条命令入口：
+zsetup-scripts 整体业务发布完成后，统一入口会自行取得 zsetup 核心和本项目配置：
 
 ```sh
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastnet/fastnet-install.sh)"
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ddnsto/ddnsto-install.sh)" -- --token 'YOUR_TOKEN'
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/linkease/linkease-install.sh)"
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastpve/fastpve-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastnet/fastnet-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/ddnsto-install.sh)" -- --token 'YOUR_TOKEN'
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/linkease/linkease-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastpve/fastpve-install.sh)"
 ```
 
 也可将 `curl -fsSL URL` 换成 `wget -qO- URL`。首先取得入口脚本依赖系统 curl/wget；脚本取得 zsetup 后，业务下载均使用 zsetup 内置 SHA256。HTTPS bootstrap 全部失败时才允许向交互用户询问 HTTP 风险，默认拒绝；zsetup 本身始终只接受 HTTPS。
 
-**当前发布范围：FastNet、Linkspace、ks-cli、KSpeeder 已有公网索引；其他业务的新入口仍为本地候选。** 产品包由各业务发布流程提前放到服务器，安装时由 zsetup 下载和校验。本仓库不采集、不缓存、不打包产品包；发布工具仅组装安装入口、权威 zsetup release 与完整配置。应用使用独立发布流程，不能用完整多业务候选覆盖线上；服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
+**当前整体 `apps/` 仍是本地候选，尚未发布到 `/binary/zsetup-scripts/apps/`。**
+FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余实现，不代表整体候选已经上线。
+产品包继续由各业务发布流程提前放在现有 `/binary/APP/` 目录，安装时由 zsetup 下载和校验；
+本仓库只把完整 `apps/` 目录作为一个 zsetup-scripts 业务命名空间发布，不采集或复制产品包。
+服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
 
 | 应用标识 | 支持平台 | 架构 | 业务参数与交互 |
 |---|---|---|---|

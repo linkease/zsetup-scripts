@@ -6,7 +6,7 @@
 
 ```sh
 zsetup install fastnet
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastnet/fastnet-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastnet/fastnet-install.sh)"
 ```
 
 支持 Linux/OpenWrt 的 x86_64、aarch64、armv7；FastNet 的菜单和非交互参数由业务程序定义，不在安装器中虚构。平台/不可变路径记录位于根目录 catalog.json。脚本0.1.8已于2026-10-17配合Linux核心0.5.0独立上线；其他业务未迁移。独立发布范围和实际服务器差异见 [FastNet 独立发布](../docs/fastnet-independent-release.md)。

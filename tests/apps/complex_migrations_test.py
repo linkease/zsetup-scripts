@@ -36,7 +36,9 @@ for app_id, expected in EXPECTED.items():
     windows_records = [record for record in windows["installers"] if record["application"] == app_id]
     assert len(linux_records) == expected["linux"]
     assert len(windows_records) == expected["windows"]
-    assert all(record["path"].startswith(f"{app_id}/{expected['version']}/installer.") for record in linux_records + windows_records)
+    assert all(record["path"].startswith(
+        f"zsetup-scripts/apps/{app_id}/{expected['version']}/installer.")
+        for record in linux_records + windows_records)
 
 assert len(linux["installers"]) == 125
 assert len(windows["installers"]) == 5

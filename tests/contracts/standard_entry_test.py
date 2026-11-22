@@ -30,6 +30,7 @@ def write_app(apps: Path):
     (apps / "zsetup").mkdir()
     (apps / "zsetup/base.json").write_text(json.dumps({
         "schema_version": 1,
+        "public_path_prefix": "zsetup-scripts/apps",
         "source_groups": [{
             "id": "koolcenter", "primary_bases": ["https://fixture.invalid/binary"],
             "fallback_base": "https://fixture.invalid/binary",
@@ -76,9 +77,21 @@ with tempfile.TemporaryDirectory(prefix="apps-entry-") as name:
 
     fake = work / "zsetup"
     log = work / "argv"
+    download_log = work / "download-argv"
     fake.write_text("""#!/bin/sh
 if [ "${1:-}" = --version ]; then printf '%s\\n' 'zsetup 0.6.4'; exit 0; fi
+if [ "${1:-}" = download ]; then
+ : > "$DOWNLOAD_LOG"
+ destination=
+ while [ "$#" -gt 0 ]; do
+  printf '%s\\n' "$1" >> "$DOWNLOAD_LOG"
+  case "$1" in -o) destination=$2; printf '%s\\n' "$2" >> "$DOWNLOAD_LOG"; shift 2 ;; *) shift ;; esac
+ done
+ cp "$ENTRY_CONFIG_SOURCE" "$destination"
+ exit 0
+fi
 : > "$ENTRY_LOG"
+printf '%s\\n' "$ZSETUP_CONFIG" > "$ENTRY_CONFIG_LOG"
 for value in "$@"; do printf '%s\\n' "$value" >> "$ENTRY_LOG"; done
 exit 37
 """)
@@ -89,6 +102,9 @@ exit 37
         "ZSETUP_BOOTSTRAP_BASES": "https://fixture.invalid/binary",
         "ZSETUP_ROOT": str(work / "state"),
         "ENTRY_LOG": str(log),
+        "DOWNLOAD_LOG": str(download_log),
+        "ENTRY_CONFIG_LOG": str(work / "config-path"),
+        "ENTRY_CONFIG_SOURCE": str(apps / "zsetup/config.json"),
     })
     tools = work / "tools"
     tools.mkdir()
@@ -116,6 +132,11 @@ esac
     assert log.read_text().splitlines() == [
         "install", "demo", "--foreground", "--", "literal value", "--flag=$dollar;not-shell",
     ]
+    download_arguments = download_log.read_text().splitlines()
+    assert "https://fixture.invalid/binary/zsetup-scripts/apps/zsetup/config.json" in download_arguments
+    selected_config = Path((work / "config-path").read_text().strip())
+    assert selected_config == work / "state/zsetup-scripts/config.json"
+    assert selected_config.read_bytes() == (apps / "zsetup/config.json").read_bytes()
 
 print("Standard entry: deterministic generation, aliases, bootstrap, argv and exit status passed")
 

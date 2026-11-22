@@ -14,6 +14,7 @@ BUILD = ROOT / "scripts/build.py"
 
 BASE = {
     "schema_version": 1,
+    "public_path_prefix": "zsetup-scripts/apps",
     "source_groups": [{
         "id": "koolcenter",
         "primary_bases": ["https://one.invalid/binary"],
@@ -65,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix="apps-config-") as name:
     expected_sha = hashlib.sha256(payload).hexdigest()
     assert config["installers"][0] == {
         "application": "demo", "os": "linux", "package_manager": "*", "arch": "aarch64",
-        "path": "demo/1.2.3/installer.sh", "background": False,
+        "path": "zsetup-scripts/apps/demo/1.2.3/installer.sh", "background": False,
         "source_group": "koolcenter", "sha256": expected_sha,
         "size": len(payload), "min_version": "0.6.4",
     }

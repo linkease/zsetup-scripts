@@ -14,6 +14,7 @@ BUILD = ROOT / "scripts/build.py"
 def base(version, group, artifact, arch):
     return {
         "schema_version": 1,
+        "public_path_prefix": "zsetup-scripts/apps",
         "source_groups": [{"id": group, "primary_bases": ["https://one.invalid/binary"],
                            "fallback_base": "https://fallback.invalid/binary"}],
         "stable_zsetup": {"version": version, "source_group": group,
@@ -47,12 +48,13 @@ with tempfile.TemporaryDirectory(prefix="apps-powershell-") as name:
     assert alias.read_bytes() == entry.read_bytes()
     text = entry.read_text(encoding="utf-8-sig")
     assert "$AppId = 'windows-demo'" in text
+    assert "binary/zsetup-scripts/apps/zsetup/config-windows.json" in text
     assert "& $active install $AppId --foreground -- @InstallerArguments" in text
     assert "exit $LASTEXITCODE" in text
     config = json.loads((apps / "zsetup/config-windows.json").read_text())
     assert len(config["installers"]) == 1
     record = config["installers"][0]
-    assert record["path"] == "windows-demo/1.0.0/installer.ps1"
+    assert record["path"] == "zsetup-scripts/apps/windows-demo/1.0.0/installer.ps1"
     assert record["min_version"] == "0.6.5" and record["source_group"] == "release"
     assert json.loads((apps / "zsetup/config.json").read_text())["installers"] == []
     subprocess.run(command + ["--check"], check=True, stdout=subprocess.DEVNULL)

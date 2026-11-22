@@ -6,7 +6,7 @@ zsetup 0.5.0。Linux入口已于2026-10-26独立发布，以下公网命令已�
 
 ```sh
 zsetup install ks-cli --foreground
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/ks-cli/ks-cli-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ks-cli/ks-cli-install.sh)"
 ```
 
 默认安装到 `~/.local/lib/linkease/ks-cli/versions/VERSION/bin/ks-cli`，

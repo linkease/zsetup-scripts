@@ -12,7 +12,7 @@ zsetup install linkease -- --version 1.7.5
 发布后的一条命令入口：
 
 ```sh
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/linkease/linkease-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/linkease/linkease-install.sh)"
 ```
 
 curl 可换为 wget -qO-。后续下载由 zsetup 执行，使用既有 HTTPS primary 竞速、最终 fallback 和内置 SHA256；不增加 shell 下载器，不调用 awk/sed。命令目前仅在本地 HTTPS fixture 验证，未发布公网。

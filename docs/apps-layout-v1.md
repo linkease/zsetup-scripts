@@ -32,14 +32,22 @@ Generated zsetup configuration may point only at a versioned `installer.sh` or
 
 ## Repository and public mapping
 
-The contents of `apps/`, not the directory name, map to the existing `/binary/`
-web root:
+The complete `apps/` directory maps to the zsetup-scripts business namespace.
+Existing `/binary/zsetup`, `/binary/ddnsto` and other product directories are
+dependencies, not publication targets of this repository:
 
 ```text
-apps/fastnet/install.sh              -> /binary/fastnet/install.sh
-apps/fastnet/0.1.9/installer.sh      -> /binary/fastnet/0.1.9/installer.sh
-apps/zsetup/config.json              -> /binary/zsetup/config.json
+apps/fastnet/install.sh         -> /binary/zsetup-scripts/apps/fastnet/install.sh
+apps/fastnet/0.1.9/installer.sh -> /binary/zsetup-scripts/apps/fastnet/0.1.9/installer.sh
+apps/zsetup/config.json         -> /binary/zsetup-scripts/apps/zsetup/config.json
 ```
+
+Generated configuration paths include the `zsetup-scripts/apps/` prefix while
+their source bases remain `/binary`. This lets zsetup fetch the versioned
+installer from the business namespace and lets that installer continue using
+existing product resources such as `/binary/fastnet/` and `/binary/ddnsto/`.
+Standard entries explicitly download the business configuration from the
+nested namespace; bootstrap zsetup binaries still come from `/binary/zsetup/`.
 
 `apps/zsetup/config.json`, generated standard entries, compatibility aliases
 and `apps/SHA256SUMS` are committed.  `scripts/build.py --check` detects drift.
@@ -57,7 +65,8 @@ tests live below `tests/contracts/`; their fixtures live below `tests/fixtures/`
 
 ## Publication and rollback
 
-The only publication input is `apps/`.  Test deployments may copy it directly.
+The only publication input is `apps/`. Test deployments copy that directory to
+`BINARY_ROOT/zsetup-scripts/apps` directly.
 Production copies the same bytes to a unique staging directory, verifies
 `SHA256SUMS`, stages immutable version files, snapshots current mutable entries
 and configuration, then activates the complete configuration and entries.

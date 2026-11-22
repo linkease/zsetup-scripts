@@ -1,13 +1,13 @@
 # Linkspace 安装模块
 
 唯一维护源为 business.sh、main.sh 与共享 lib；scripts/build-entrypoints.py
-生成 linkspace-install.sh。公开入口 /binary/linkspace/linkspace-install.sh，
+生成 linkspace-install.sh。公开入口 /binary/zsetup-scripts/apps/linkspace/linkspace-install.sh，
 脚本独立版本 0.1.0。产品版本由 apptunnel 的 linkspace/version.txt 决定，
 不跟随其他应用版本。只登记 Linux x86_64/aarch64/armv7，不登记 MIPS 或桌面。
 最低 runtime 能力版本 0.5.0；独立打包时 min_version 精确绑定实际 stable。
 
 ```sh
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/linkspace/linkspace-install.sh)" linkspace version
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/linkspace/linkspace-install.sh)" linkspace version
 zsetup install linkspace --foreground -- version
 ```
 

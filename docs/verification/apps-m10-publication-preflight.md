@@ -44,3 +44,27 @@ restored. The newly uploaded DDNSTO entry, manifest, source tree and immutable
 `0.2.4` installer were removed explicitly; all four public domains returned
 404 for those paths and the previous config digest. The private release bundle
 and rolled-back snapshot remain as audit evidence.
+
+## Corrected complete-business development candidate
+
+After rollback, the user selected the literal directory mapping
+`apps/` → `/binary/zsetup-scripts/apps/` and explicitly deferred publication.
+The generator now prefixes all 130 installer records with
+`zsetup-scripts/apps/`. Standard Shell and PowerShell entries download their
+platform configuration from the nested business namespace, while native
+zsetup and business product resources continue to use the existing `/binary`
+source group.
+
+Corrected candidate identities:
+
+- Linux: `apps-21d445da18b1`, 125 records, SHA256
+  `dadc68f4ad46157a9a12518357052207caeb41ec424fc4510b67a0cebad23fb8`.
+- Windows: `apps-c779c40c7a27`, 5 records, SHA256
+  `21dcbaa47c0a0af14c75164983d83c17d366a0bef44d6f08873dedc2858fd8c1`.
+- Complete `apps/SHA256SUMS` identity:
+  `b448f9ea3fd2b45b7035159bc7141b843ddea80a39fa8ff8d7a70d205c811e09`.
+
+All contract and application migration suites passed against the corrected
+layout. The standard `scripts/check.sh --native-bin ...` aggregate also exited
+0, including DDNSTO and LinkEase isolated service/package transactions. No
+production upload or activation is authorized by this result.

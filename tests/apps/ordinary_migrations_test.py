@@ -42,7 +42,9 @@ for app_id, expected in EXPECTED.items():
     assert not (app / "tests").exists()
     records = [record for record in config["installers"] if record["application"] == app_id]
     assert len(records) == expected["count"]
-    assert {record["path"] for record in records} == {f"{app_id}/{expected['version']}/installer.sh"}
+    assert {record["path"] for record in records} == {
+        f"zsetup-scripts/apps/{app_id}/{expected['version']}/installer.sh"
+    }
     assert {record["sha256"] for record in records} == {hashlib.sha256(payload.read_bytes()).hexdigest()}
     if "targets" in expected:
         assert {(record["os"], record["package_manager"], record["arch"]) for record in records} == set(expected["targets"])

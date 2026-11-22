@@ -6,6 +6,9 @@ Date: 2026-11-22 UTC.  No application or public server was changed.
 identity and canonical source group.  `scripts/build.py` expands application
 selectors and generates deterministic `apps/zsetup/config.json`; installer
 records point only to versioned payloads and contain measured SHA256 and size.
+Every installer path is prefixed with `zsetup-scripts/apps/`, while the source
+group stays at `/binary` so business installers continue to resolve existing
+product resources outside this repository namespace.
 Manifest `min_zsetup` is a capability floor, while native schema `min_version`
 is bound to the exact stable runtime identity as required by current zsetup.
 

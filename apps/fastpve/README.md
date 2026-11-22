@@ -9,7 +9,7 @@ zsetup install fastpve
 服务器部署完成后，在 PVE 宿主机以 root 执行：
 
 ```sh
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/fastpve/fastpve-install.sh)"
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastpve/fastpve-install.sh)"
 ```
 
 `wget -qO-` 可替代 curl。首次 bootstrap 使用共享 lib/bootstrap.sh；安装器不重新下载自身。直接入口和 install 都汇合到 fastpve_install，要求 zsetup >=0.2.4。

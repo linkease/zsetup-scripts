@@ -116,17 +116,39 @@ def posix_entry(root: Path, application: Application):
     if bootstrap_lines and bootstrap_lines[0] == "set -eu":
         bootstrap_lines.pop(0)
     bootstrap = "\n".join(bootstrap_lines).strip() + "\n"
-    require(template.count("@APP_ID@") == 1 and template.count("@BOOTSTRAP@") == 1,
+    primary_urls, fallback_url = config_urls(application.directory.parent, windows=False)
+    replacements = {
+        "@APP_ID@": application.id,
+        "@BOOTSTRAP@": bootstrap,
+        "@CONFIG_PRIMARY_URLS@": " ".join(primary_urls),
+        "@CONFIG_FALLBACK_URL@": fallback_url,
+    }
+    require(all(template.count(marker) == 1 for marker in replacements),
             "invalid standard POSIX entry template")
-    return template.replace("@APP_ID@", application.id).replace("@BOOTSTRAP@", bootstrap)
+    require(all("'" not in value for value in [application.id, *primary_urls, fallback_url]),
+            "unsafe POSIX entry value")
+    for marker, value in replacements.items():
+        template = template.replace(marker, value)
+    return template
 
 
 def powershell_entry(root: Path, application: Application):
     template = (root / "templates/install.ps1.in").read_text()
     bootstrap = (root / "lib/bootstrap.ps1").read_text().strip() + "\n"
-    require(template.count("@APP_ID@") == 1 and template.count("@BOOTSTRAP@") == 1,
+    primary_urls, fallback_url = config_urls(application.directory.parent, windows=True)
+    replacements = {
+        "@APP_ID@": application.id,
+        "@BOOTSTRAP@": bootstrap,
+        "@CONFIG_PRIMARY_URLS@": ", ".join(f"'{url}'" for url in primary_urls),
+        "@CONFIG_FALLBACK_URL@": fallback_url,
+    }
+    require(all(template.count(marker) == 1 for marker in replacements),
             "invalid standard PowerShell entry template")
-    text = template.replace("@APP_ID@", application.id).replace("@BOOTSTRAP@", bootstrap)
+    require(all("'" not in value for value in [application.id, *primary_urls, fallback_url]),
+            "unsafe PowerShell entry value")
+    text = template
+    for marker, value in replacements.items():
+        text = text.replace(marker, value)
     return b"\xef\xbb\xbf" + text.encode("utf-8")
 
 
@@ -182,9 +204,15 @@ def read_base(apps: Path, filename="base.json"):
     path = apps / "zsetup" / filename
     require(path.is_file() and not path.is_symlink(), f"missing zsetup/{filename}")
     data = json.loads(path.read_bytes())
-    require(isinstance(data, dict) and set(data) == {"schema_version", "source_groups", "stable_zsetup"},
+    require(isinstance(data, dict) and set(data) == {
+        "schema_version", "public_path_prefix", "source_groups", "stable_zsetup",
+    },
             "invalid zsetup/base.json fields")
     require(data["schema_version"] == 1, "invalid zsetup base schema_version")
+    prefix = data["public_path_prefix"]
+    require(isinstance(prefix, str) and re.fullmatch(
+        r"[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*", prefix),
+        "invalid public_path_prefix")
     groups = data["source_groups"]
     require(isinstance(groups, list) and groups, "zsetup base needs source groups")
     ids = [group.get("id") for group in groups if isinstance(group, dict)]
@@ -197,6 +225,28 @@ def read_base(apps: Path, filename="base.json"):
     require(isinstance(stable.get("artifacts"), list) and stable["artifacts"],
             "stable zsetup artifacts are required")
     return data
+
+
+def config_urls(apps: Path, *, windows: bool):
+    filename = "base-windows.json" if windows else "base.json"
+    config_name = "config-windows.json" if windows else "config.json"
+    base = read_base(apps, filename)
+    group_id = base["stable_zsetup"]["source_group"]
+    group = next(group for group in base["source_groups"] if group["id"] == group_id)
+    require(set(group) == {"id", "primary_bases", "fallback_base"},
+            "invalid source group fields")
+    primaries = group["primary_bases"]
+    fallback = group["fallback_base"]
+    require(isinstance(primaries, list) and primaries and
+            all(isinstance(url, str) and url.startswith("https://") and
+                not any(character.isspace() for character in url) for url in primaries),
+            "invalid source group primary_bases")
+    require(isinstance(fallback, str) and fallback.startswith("https://") and
+            not any(character.isspace() for character in fallback),
+            "invalid source group fallback_base")
+    relative = f"{base['public_path_prefix']}/zsetup/{config_name}"
+    return ([f"{url.rstrip('/')}/{relative}" for url in primaries],
+            f"{fallback.rstrip('/')}/{relative}")
 
 
 def generate_config(apps: Path, applications, *, check: bool, windows=False):
@@ -215,7 +265,7 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
                     f"{application.id} requires zsetup >= {minimum}; base is {stable_version}")
             extension = "ps1" if os_name == "windows" else "sh"
             payload = application.directory / application.manifest["version"] / f"installer.{extension}"
-            relative = payload.relative_to(apps).as_posix()
+            relative = f"{base['public_path_prefix']}/{payload.relative_to(apps).as_posix()}"
             raw = payload.read_bytes()
             records.append({
                 "application": application.id,
@@ -243,6 +293,8 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
         "installers": records,
     }
     content = (json.dumps(config, ensure_ascii=True, indent=2) + "\n").encode()
+    require(len(content) <= 131072,
+            f"zsetup {output} exceeds the standard entry download bound")
     install_file(apps / "zsetup" / output, content, executable=False,
                  check=check, label=f"zsetup {output}")
 

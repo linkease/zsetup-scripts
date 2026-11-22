@@ -36,7 +36,9 @@ config = json.loads((ROOT / "apps/zsetup/config.json").read_text())
 records = [record for record in config["installers"] if record["application"] == "fastnet"]
 assert len(records) == 3
 assert {record["arch"] for record in records} == {"x86_64", "aarch64", "armv7"}
-assert {record["path"] for record in records} == {"fastnet/0.1.9/installer.sh"}
+assert {record["path"] for record in records} == {
+    "zsetup-scripts/apps/fastnet/0.1.9/installer.sh"
+}
 assert {record["sha256"] for record in records} == {hashlib.sha256(payload.read_bytes()).hexdigest()}
 assert {record["size"] for record in records} == {payload.stat().st_size}
 assert {record["min_version"] for record in records} == {"0.6.4"}
