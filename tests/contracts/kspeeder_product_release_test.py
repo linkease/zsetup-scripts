@@ -3,6 +3,7 @@
 
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -129,5 +130,24 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-product-release-") as folder:
     public, remote = publisher.remote_paths("/srv/public_html/binary", identity)
     assert str(public) == "/srv/public_html/binary/kspeeder"
     assert str(remote) == f"/srv/.zsetup-scripts-releases/kspeeder-products/{identity}"
+
+    payload = b"retried release asset"
+    calls = []
+    original_urlopen = publisher.urlopen
+    class Response(io.BytesIO):
+        url = "https://github.com/fixture/asset"
+    def flaky_urlopen(*_args, **_kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError("transient TLS EOF")
+        return Response(payload)
+    publisher.urlopen = flaky_urlopen
+    try:
+        downloaded = work / "retried-asset"
+        publisher.default_fetch("https://github.com/fixture/asset", downloaded,
+                                len(payload), sha(payload))
+        assert downloaded.read_bytes() == payload and len(calls) == 2
+    finally:
+        publisher.urlopen = original_urlopen
 
 print("KSpeeder product release: locked assets, immutable stage, activation, verification, rollback and no-delete passed")

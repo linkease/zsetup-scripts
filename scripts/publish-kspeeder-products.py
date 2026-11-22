@@ -113,20 +113,30 @@ def release_identity(lock_path: Path = DEFAULT_LOCK) -> str:
 
 
 def default_fetch(url: str, destination: Path, expected_size: int, expected_sha: str) -> None:
-    request = Request(url, headers={"User-Agent": "zsetup-scripts-product-release/1"})
-    value = hashlib.sha256()
-    size = 0
-    with urlopen(request, timeout=60) as response, destination.open("wb") as output:
-        if urlsplit(response.url).scheme != "https":
-            raise ProductReleaseError("asset download followed a non-HTTPS redirect")
-        while block := response.read(1024 * 1024):
-            size += len(block)
-            if size > expected_size:
-                raise ProductReleaseError("asset exceeds locked size")
-            value.update(block)
-            output.write(block)
-    if size != expected_size or value.hexdigest() != expected_sha:
-        raise ProductReleaseError("asset size or SHA256 differs from lock")
+    last_error = None
+    for attempt in range(3):
+        request = Request(url, headers={"User-Agent": "zsetup-scripts-product-release/1"})
+        value = hashlib.sha256()
+        size = 0
+        try:
+            with urlopen(request, timeout=60) as response, destination.open("wb") as output:
+                if urlsplit(response.url).scheme != "https":
+                    raise ProductReleaseError("asset download followed a non-HTTPS redirect")
+                while block := response.read(1024 * 1024):
+                    size += len(block)
+                    if size > expected_size:
+                        raise ProductReleaseError("asset exceeds locked size")
+                    value.update(block)
+                    output.write(block)
+            if size != expected_size or value.hexdigest() != expected_sha:
+                raise ProductReleaseError("asset size or SHA256 differs from lock")
+            return
+        except Exception as error:
+            last_error = error
+            destination.unlink(missing_ok=True)
+            if attempt < 2:
+                time.sleep(attempt + 1)
+    raise ProductReleaseError(f"asset download failed after three attempts: {last_error}")
 
 
 def validate_metadata(directory: Path, lock: dict) -> None:
