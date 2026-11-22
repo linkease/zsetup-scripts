@@ -29,7 +29,20 @@ if($Operation -eq 'info'){
     if($r.installedVersion -cne '1.0.0' -or $r.candidateVersion -cne '2.0.0' -or $r.comparison -cne 'candidate-newer'){throw 'native selected version or comparison is wrong'}
     if($text.Contains('private-output-sentinel')){throw 'arbitrary native output escaped into result'}
     if($r.source.freshness -cne 'cache-unverified'){throw 'cache was mislabeled live'}
-    @{status='passed';cases=@('retained-versions-without-current-link','native-exit-isolation','native-version-comparison','bounded-selected-facts');businessMutation=$false}|ConvertTo-Json -Depth 4 -Compress
+    . (Join-Path $OwnerRoot 'windows-auto.ps1')
+    & {
+        function Task-QueryScoop($request){return @{manager='scoop';installedVersion='1.0.0';candidateVersion='2.0.0'}}
+        function Task-QueryWinGet($request){throw 'unavailable fixture'}
+        $auto=Task-QueryAutomaticWindows ([pscustomobject]@{software='sample-tool'})
+        if($auto.manager -cne 'scoop' -or $auto.selectionBasis -cne 'existing-native-registration'){throw 'existing manager was not retained'}
+    }
+    & {
+        function Task-QueryScoop($request){return @{manager='scoop';installedVersion='';candidateVersion='2.0.0'}}
+        function Task-QueryWinGet($request){return @{manager='winget';installedVersion='';candidateVersion='2.0.0'}}
+        $auto=Task-QueryAutomaticWindows ([pscustomobject]@{software='sample-tool'})
+        if($auto.reason -cne 'native-provider-required' -or $auto.choices.Count -ne 2){throw 'ambiguous sources were silently selected'}
+    }
+    @{status='passed';cases=@('retained-versions-without-current-link','native-exit-isolation','native-version-comparison','bounded-selected-facts','existing-manager-routing','ambiguous-new-source');businessMutation=$false}|ConvertTo-Json -Depth 4 -Compress
 } finally {
     $env:SCOOP=$originalScoop;$env:TEST_PREFIX=$originalPrefix
     if(Test-Path -LiteralPath $fixture){Remove-Item -LiteralPath $fixture -Recurse -Force}
