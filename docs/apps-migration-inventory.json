@@ -49,16 +49,16 @@
     {
       "id": "ks-cli", "records": 15, "source_directory": "kspeeder/ks-cli",
       "sources": ["kspeeder/ks-cli/ks-cli-install.sh"],
-      "paths": ["ks-cli/0.1.0/ks-cli-install.sh"],
+      "paths": ["ks-cli/0.1.1/ks-cli-install.sh"],
       "entrypoints": ["sh"], "online_indexed": true,
-      "online_path": "ks-cli/0.1.0/ks-cli-install.sh", "migration": "ordinary-posix"
+      "online_path": "ks-cli/0.1.1/ks-cli-install.sh", "migration": "ordinary-posix"
     },
     {
       "id": "kspeeder", "records": 15, "source_directory": "kspeeder/kspeeder",
       "sources": ["kspeeder/kspeeder/kspeeder-install.sh"],
-      "paths": ["kspeeder/0.1.0/kspeeder-install.sh"],
+      "paths": ["kspeeder/0.1.1/kspeeder-install.sh"],
       "entrypoints": ["sh"], "online_indexed": true,
-      "online_path": "kspeeder/0.1.0/kspeeder-install.sh", "migration": "ordinary-posix"
+      "online_path": "kspeeder/0.1.1/kspeeder-install.sh", "migration": "ordinary-posix"
     },
     {
       "id": "linkease", "records": 24, "source_directory": "linkease",

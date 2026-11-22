@@ -19,12 +19,12 @@ EXPECTED = {
         "arch": {"x86_64", "aarch64", "armv7"},
     },
     "ks-cli": {
-        "version": "0.1.0", "source": "kspeeder/ks-cli/ks-cli-install.sh", "count": 15,
+        "version": "0.1.1", "source": "kspeeder/ks-cli/ks-cli-install.sh", "count": 15,
         "os": {"centos", "debian", "linux", "rhel", "ubuntu"},
         "arch": {"x86_64", "aarch64", "armv7"},
     },
     "kspeeder": {
-        "version": "0.1.0", "source": "kspeeder/kspeeder/kspeeder-install.sh", "count": 15,
+        "version": "0.1.1", "source": "kspeeder/kspeeder/kspeeder-install.sh", "count": 15,
         "os": {"centos", "debian", "linux", "rhel", "ubuntu"},
         "arch": {"x86_64", "aarch64", "armv7"},
     },

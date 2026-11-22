@@ -33,11 +33,23 @@ kspeeder_binary_install() {
         echo 'KSpeeder products: use user scope; system service installation is a separate workflow.' >&2
         return 2
     }
-    # Installer sources and product sources have different owners. Product URLs
-    # are the existing business release, never inferred from bootstrap mirrors.
-    ZSETUP_SOURCE_BASES=${KSPEEDER_PRODUCT_BASES:-https://kspeeder.com}
-    ZSETUP_SOURCE_FALLBACK=${KSPEEDER_PRODUCT_FALLBACK:-}
-    INSTALLER_REMOTE_APP=bin
+    # Product bytes are mirrored as one versioned release below
+    # /binary/kspeeder. Explicit overrides retain the old flat layout for
+    # controlled tests or emergency source selection.
+    if [ "${KSPEEDER_PRODUCT_BASES+x}" = x ]; then
+        ZSETUP_SOURCE_BASES=$KSPEEDER_PRODUCT_BASES
+        ZSETUP_SOURCE_FALLBACK=${KSPEEDER_PRODUCT_FALLBACK:-}
+        kp_product_root=${KSPEEDER_PRODUCT_ROOT:-bin}
+        kp_versioned=${KSPEEDER_PRODUCT_VERSIONED:-0}
+    else
+        ZSETUP_SOURCE_BASES='https://dl.istoreos.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary'
+        ZSETUP_SOURCE_FALLBACK='https://fw.koolcenter.com/binary'
+        kp_product_root=kspeeder
+        kp_versioned=1
+    fi
+    case "$kp_product_root" in ''|/*|*..*|*\\*|*' '*) echo 'KSpeeder products: unsafe product source path' >&2; return 2 ;; esac
+    case "$kp_versioned" in 0|1) ;; *) echo 'KSpeeder products: invalid product layout' >&2; return 2 ;; esac
+    INSTALLER_REMOTE_APP=$kp_product_root
     INSTALLER_VERIFY_CACHE=1
     installer_launcher_prepare "$kp_app" user || return $?
     case "$kp_app" in
@@ -49,6 +61,9 @@ kspeeder_binary_install() {
     installer_download "$kp_metadata" "$transaction_dir/version" '' 1 || return $?
     kp_version=$("$ZSETUP_BIN" metadata version "$transaction_dir/version" VERSION) || return $?
     kp_sha=$("$ZSETUP_BIN" metadata sha256 "$transaction_dir/version" "SHA256_linux_$kp_arch") || return $?
+    if [ "$kp_versioned" = 1 ]; then
+        INSTALLER_REMOTE_APP=$kp_product_root/$kp_version
+    fi
     installer_launcher_activate "$kp_version" "$kp_filename" "$kp_sha" kspeeder_product_verify || return $?
     installer_transaction_finish || return $?
     status "[4/4] Installed $kp_app $kp_version"

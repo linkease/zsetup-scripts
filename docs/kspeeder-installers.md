@@ -1,5 +1,14 @@
 # KSpeeder 项目安装器与独立发布
 
+## 0.9.1 版本化产品镜像
+
+当前产品镜像合同已迁移到
+[`kspeeder-product-mirror.md`](kspeeder-product-mirror.md)：GitHub
+`docker_kspeeder v0.9.1` 的十个正式资产进入
+`/binary/kspeeder/0.9.1/`，根目录仅以两份版本元数据作为可变指针。
+安装器 0.1.1 默认从四站点读取该版本化镜像，不再直接依赖官网可变 `/bin`。
+历史文件不在本次发布事务中删除。
+
 ## 源码和发布空间
 
 2026-10-26已分别发布两个Linux二进制安装器0.1.0，公开入口和索引已生效，

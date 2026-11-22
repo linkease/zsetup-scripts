@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "apps-21d445da18b1",
+  "config_version": "apps-00f84d9f0630",
   "source_groups": [
     {
       "id": "koolcenter",
@@ -648,11 +648,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -660,11 +660,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -672,11 +672,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -684,11 +684,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -696,11 +696,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -708,11 +708,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -720,11 +720,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -732,11 +732,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -744,11 +744,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -756,11 +756,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -768,11 +768,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -780,11 +780,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -792,11 +792,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -804,11 +804,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -816,11 +816,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ks-cli/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "31e1beecb01e7e49ada1291c09aa3f186325e3463cf687b203e958bb679cddac",
-      "size": 36385,
+      "sha256": "4ff9b3ccb50567e50c184f506376da4f61a89cf9fbe5fe702dee3d2fcd867df4",
+      "size": 37178,
       "min_version": "0.6.4"
     },
     {
@@ -828,11 +828,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -840,11 +840,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -852,11 +852,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -864,11 +864,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -876,11 +876,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -888,11 +888,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -900,11 +900,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -912,11 +912,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -924,11 +924,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -936,11 +936,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -948,11 +948,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -960,11 +960,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -972,11 +972,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -984,11 +984,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {
@@ -996,11 +996,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/kspeeder/0.1.0/installer.sh",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.1/installer.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "b1c21c0f321eec6ea94f4e08c6cd890086ba9b608fad7bb5e154f438138f85ed",
-      "size": 36399,
+      "sha256": "8bf7f0325bf21d4fed97f3635460a94b9cb884b1aa82f47d3b2a7780a0ab904e",
+      "size": 37192,
       "min_version": "0.6.4"
     },
     {

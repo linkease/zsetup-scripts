@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "product_version": "0.9.1",
+  "source": {
+    "repository": "kspeeder/docker_kspeeder",
+    "tag": "v0.9.1",
+    "published_at": "2026-11-18T14:45:15Z",
+    "download_base": "https://github.com/kspeeder/docker_kspeeder/releases/download/v0.9.1"
+  },
+  "public": {
+    "prefix": "kspeeder",
+    "bases": [
+      "https://dl.istoreos.com/binary",
+      "https://fw.d4ctech.com/binary",
+      "https://fw20.koolcenter.com/binary",
+      "https://fw.koolcenter.com/binary"
+    ],
+    "root_pointers": [
+      "version.txt",
+      "ks-cli-version.txt"
+    ]
+  },
+  "assets": [
+    {
+      "name": "iStoreEnhance-binary-0.9.1.tar.gz",
+      "size": 13740495,
+      "sha256": "d117d3529ce4ae170f7ba284ce89112535337c97ce86997275b93dcf373b0ce9"
+    },
+    {
+      "name": "iStoreEnhance-linux.amd64",
+      "size": 11804856,
+      "sha256": "0c555344a635028ac38ad2ab3ef2d110855f7b7f60f39f8db990e70ae5e3ba1d"
+    },
+    {
+      "name": "iStoreEnhance-linux.arm",
+      "size": 11272376,
+      "sha256": "2e89dc19e08dc3f08f065c12693cb4b90445814d1c7963f6200f7d3efe7dbb74"
+    },
+    {
+      "name": "iStoreEnhance-linux.arm64",
+      "size": 11075768,
+      "sha256": "16745305ab021b2189a5eeb11bd02e5e0b9459f70c222ad7ca0f8500f476c5b7"
+    },
+    {
+      "name": "ks-cli-binary-0.9.1.tar.gz",
+      "size": 26092319,
+      "sha256": "1ec1474d59767d2d5feb48c39217b8409fa16831bd87c7c777d5359c2ceb05d6"
+    },
+    {
+      "name": "ks-cli-linux-amd64",
+      "size": 16654900,
+      "sha256": "5a79bb08814abdbb44b497f869796659061c372721b602c75d24dd4f840ad5d3"
+    },
+    {
+      "name": "ks-cli-linux-arm",
+      "size": 15675421,
+      "sha256": "e4610569ec0abba2f8e12988e05e7d928d211369a05ce086a48487d45799248f"
+    },
+    {
+      "name": "ks-cli-linux-arm64",
+      "size": 15765712,
+      "sha256": "9f6ad142b496a623b922fcfde9b705b2c8b04a3fbe3ee27a37d0b9078c68ad95"
+    },
+    {
+      "name": "ks-cli-version.txt",
+      "size": 351,
+      "sha256": "39508f4f9f217e3f05874b5b178a6f3a47ba8a4431b9a90c8fa93b049fc1bd47"
+    },
+    {
+      "name": "version.txt",
+      "size": 592,
+      "sha256": "0175e8b9de2f899f6f9e9c24775148cc1a6f6d94284a6e68b2cf11e909c47cad"
+    }
+  ]
+}

@@ -4,7 +4,8 @@
 [`kspeeder/`](kspeeder/README.md)。Linux薄安装器负责正确二进制、版本校验和
 可选持久目录；不安装或启动系统服务。两个Linux脚本0.1.0已于2026-10-26公开发布。
 公共命令分别是`zsetup install ks-cli`和`zsetup install kspeeder`。
-未来服务器同步与独立发布见[安装器发布说明](../docs/kspeeder-installers.md)。
+产品二进制统一镜像到版本化 `/binary/kspeeder/VERSION/`，发布与回滚见
+[安装器发布说明](../docs/kspeeder-installers.md)。
 
 ## Windows 接入准备（已有工作与未完成项）
 
