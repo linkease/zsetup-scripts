@@ -51,7 +51,8 @@ with tempfile.TemporaryDirectory(prefix="scripts-package-") as tmp:
         assert record["path"] == catalog_record["path"]
         assert len(record["path"].split("/")) == 3 and record["path"].split("/")[1] not in {"stable", "latest"}
         expected_version = ("0.2.4" if app == "ddnsto" else "0.1.0" if app == "jq"
-                            else "0.1.1" if app in {"ks-cli", "kspeeder", "linkspace"} else "0.1.9")
+                            else "0.1.2" if app in {"ks-cli", "kspeeder"}
+                            else "0.1.1" if app == "linkspace" else "0.1.9")
         assert record["path"] == f"{app}/{expected_version}/{app}-install.sh"
         current = binary / app / f"{app}-install.sh"
         assert (binary / record["path"]).read_bytes() == current.read_bytes()

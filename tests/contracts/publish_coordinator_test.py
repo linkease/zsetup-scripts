@@ -27,8 +27,8 @@ with tempfile.TemporaryDirectory(prefix="apps-coordinator-") as folder:
         "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli",
         "kspeeder", "linkease", "linkspace", "scoop",
     ]
-    assert metadata["linux_installer_records"] == 125
-    assert metadata["windows_installer_records"] == 5
+    assert metadata["linux_installer_records"] == 129
+    assert metadata["windows_installer_records"] == 9
     assert metadata["published"] is False
     assert (release / "apps/SHA256SUMS").read_bytes() == (ROOT / "apps/SHA256SUMS").read_bytes()
     assert not list((release / "apps").rglob("tests"))

@@ -1,11 +1,56 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "product_version": "0.9.1",
   "source": {
     "repository": "kspeeder/docker_kspeeder",
     "tag": "v0.9.1",
     "published_at": "2026-11-18T14:45:15Z",
     "download_base": "https://github.com/kspeeder/docker_kspeeder/releases/download/v0.9.1"
+  },
+  "official_bin": {
+    "base": "https://kspeeder.com/bin",
+    "assets": [
+      {
+        "name": "iStoreEnhance-mac.amd64",
+        "size": 12059952,
+        "sha256": "4cf7bffba32e399803abfe9b6bc4a8f14d9042951de2d1eba6ae83a8052ba45e"
+      },
+      {
+        "name": "iStoreEnhance-mac.arm64",
+        "size": 11398642,
+        "sha256": "a9594c3c2eb9f21fd40a377162f0800eb313a2e2c975f1dab9d3eeb2d37938fc"
+      },
+      {
+        "name": "iStoreEnhance-win.exe.amd64",
+        "size": 12168192,
+        "sha256": "1f87d9a81974c684bf1bb73587e4fbed6bbd5d14823068c663a50f2a999380c5"
+      },
+      {
+        "name": "iStoreEnhance-win.exe.arm64",
+        "size": 11289088,
+        "sha256": "3af1a955221851b53d018c6b87191aca5f7baff9d4f626f525344f3859063c6e"
+      },
+      {
+        "name": "ks-cli-mac-amd64",
+        "size": 16580000,
+        "sha256": "87bcf65a4ec2c45c1053ad44047d18489b21cbac9f330464d9b40b05748de404"
+      },
+      {
+        "name": "ks-cli-mac-arm64",
+        "size": 15784850,
+        "sha256": "617e4199bb7f26a499c2a0a9c2a3eb205b001e01f00bd8972a420bd225db8b3a"
+      },
+      {
+        "name": "ks-cli-win-amd64.exe",
+        "size": 17115136,
+        "sha256": "e338aac1f921aba792a4860a92a5cda8298cc68318dd6295675ead385bdcc42f"
+      },
+      {
+        "name": "ks-cli-win-arm64.exe",
+        "size": 16001024,
+        "sha256": "1ca9cb43330e6fbc81cfe5e66f0878470a97365d44fb0545176fd26ac193a54c"
+      }
+    ]
   },
   "public": {
     "prefix": "kspeeder",
@@ -16,6 +61,7 @@
       "https://fw.koolcenter.com/binary"
     ],
     "root_pointers": [
+      "release.txt",
       "version.txt",
       "ks-cli-version.txt"
     ]

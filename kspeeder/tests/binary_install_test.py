@@ -91,15 +91,34 @@ class BinaryInstall(unittest.TestCase):
                         KSPEEDER_PRODUCT_ROOT="kspeeder", KSPEEDER_PRODUCT_VERSIONED="1",
                         ZSETUP_CA_FILE=str(self.root / "ca.crt"), TEST_MARKER=str(self.marker))
 
-    def product(self, app, version="1.2.3", reported=None, arch="amd64", body=None):
+    def product(self, app, version="1.2.3", reported=None, arch="amd64", body=None,
+                platform="linux"):
         if body is None:
             body = (f'#!/bin/sh\nif [ "${{1:-}}" = version ]; then printf "%s\\n" "{reported or version} commit=fixture"; exit 0; fi\n'
                     'printf "%s\\n" "$*" > "$TEST_MARKER"\nexit 93\n').encode()
-        filename = f"ks-cli-linux-{arch}" if app == "ks-cli" else f"iStoreEnhance-linux.{arch}"
+        filename = (f"ks-cli-{platform}-{arch}" if app == "ks-cli"
+                    else f"iStoreEnhance-{platform}.{arch}")
         metadata = "ks-cli-version.txt" if app == "ks-cli" else "version.txt"
-        Handler.bodies[f"/kspeeder/{metadata}"] = f"VERSION={version}\nSHA256_linux_{arch}={hashlib.sha256(body).hexdigest()}\n".encode()
-        Handler.bodies[f"/kspeeder/{version}/{filename}"] = body
-        return filename, body
+        digest = hashlib.sha256(body).hexdigest()
+        release = hashlib.sha256(f"{version}:{app}:{filename}:{digest}".encode()).hexdigest()
+        Handler.bodies[f"/kspeeder/{metadata}"] = (
+            f"VERSION={version}\nSHA256_{platform}_{arch}={digest}\n"
+        ).encode()
+        Handler.bodies["/kspeeder/release.txt"] = (
+            f"VERSION={version}\nRELEASE={release}\n"
+        ).encode()
+        immutable = f"/kspeeder/releases/{release}"
+        Handler.bodies[f"{immutable}/SHA256SUMS"] = f"{digest}  {filename}\n".encode()
+        Handler.bodies[f"{immutable}/{filename}"] = body
+        return filename, body, release
+
+    def fake_uname(self):
+        fake = self.folder / "fake-bin"
+        fake.mkdir()
+        script = fake / "uname"
+        script.write_text("#!/bin/sh\n[ \"${1:-}\" = -s ] && { echo Darwin; exit; }; echo x86_64\n")
+        script.chmod(0o755)
+        return str(fake) + os.pathsep + self.env.get("PATH", "")
 
     def argv(self, app):
         return ["sh", str(ROOT / "kspeeder" / app / f"{app}-install.sh"),
@@ -119,7 +138,7 @@ class BinaryInstall(unittest.TestCase):
         for app in ("ks-cli", "kspeeder"):
             with self.subTest(app=app):
                 self.setUp()
-                _, body = self.product(app)
+                _, body, _ = self.product(app)
                 self.run_install(app)
                 binary = self.prefix / f"versions/1.2.3/bin/{app}"
                 self.assertEqual(binary.read_bytes(), body)
@@ -151,19 +170,20 @@ class BinaryInstall(unittest.TestCase):
         self.run_install("ks-cli", 11)
         self.assertEqual(self.current().resolve(), old)
         self.assertFalse((self.prefix / "versions/1.2.4").exists())
-        name, _ = self.product("ks-cli", "1.2.4")
-        Handler.bodies[f"/kspeeder/1.2.4/{name}"] = b"broken payload"
+        name, _, release = self.product("ks-cli", "1.2.4")
+        Handler.bodies[f"/kspeeder/releases/{release}/{name}"] = b"broken payload"
         self.run_install("ks-cli", 11)
         self.assertEqual(self.current().resolve(), old)
         self.assertFalse(list(self.work.iterdir()))
 
     def test_cache_is_rehashed_and_same_version_cannot_change_identity(self):
-        name, body = self.product("ks-cli")
+        name, body, release = self.product("ks-cli")
         self.run_install("ks-cli")
         binary = self.current().resolve()
-        count = Handler.counts[f"/kspeeder/1.2.3/{name}"]
+        product_path = f"/kspeeder/releases/{release}/{name}"
+        count = Handler.counts[product_path]
         self.run_install("ks-cli")
-        self.assertEqual(Handler.counts[f"/kspeeder/1.2.3/{name}"], count)
+        self.assertEqual(Handler.counts[product_path], count)
         binary.write_bytes(body.replace(b"commit=fixture", b"commit=corrupt"))
         self.run_install("ks-cli")
         self.assertEqual(binary.read_bytes(), body)
@@ -190,14 +210,26 @@ class BinaryInstall(unittest.TestCase):
         for arch, artifact in (("aarch64", "arm64"), ("armv7", "arm")):
             with self.subTest(arch=arch):
                 self.setUp()
-                name, _ = self.product("ks-cli", arch=artifact)
+                name, _, release = self.product("ks-cli", arch=artifact)
                 self.run_install("ks-cli", env={"ZSETUP_ARCH": arch})
-                self.assertEqual(Handler.counts[f"/kspeeder/1.2.3/{name}"], 1)
+                self.assertEqual(Handler.counts[f"/kspeeder/releases/{release}/{name}"], 1)
+
+    def test_macos_uses_release_mirror_for_both_architectures(self):
+        for app in ("ks-cli", "kspeeder"):
+            for context_arch, product_arch in (("x86_64", "amd64"), ("aarch64", "arm64")):
+                with self.subTest(app=app, arch=context_arch):
+                    self.setUp()
+                    name, _, release = self.product(app, arch=product_arch, platform="mac")
+                    self.run_install(app, env={"ZSETUP_OS": "macos", "ZSETUP_ARCH": context_arch,
+                                               "PATH": self.fake_uname()})
+                    self.assertEqual(
+                        Handler.counts[f"/kspeeder/releases/{release}/{name}"], 1
+                    )
 
     def test_explicit_flat_source_override_remains_available(self):
-        name, body = self.product("ks-cli")
+        name, body, release = self.product("ks-cli")
         metadata = Handler.bodies.pop("/kspeeder/ks-cli-version.txt")
-        Handler.bodies.pop(f"/kspeeder/1.2.3/{name}")
+        Handler.bodies.pop(f"/kspeeder/releases/{release}/{name}")
         Handler.bodies["/bin/ks-cli-version.txt"] = metadata
         Handler.bodies[f"/bin/{name}"] = body
         self.run_install("ks-cli", env={"KSPEEDER_PRODUCT_ROOT": "bin",
@@ -210,14 +242,16 @@ class BinaryInstall(unittest.TestCase):
                      "https://fw20.koolcenter.com/binary", "https://fw.koolcenter.com/binary"):
             self.assertIn(base, policy)
         self.assertNotIn("https://kspeeder.com", policy)
-        self.assertIn("INSTALLER_REMOTE_APP=$kp_product_root/$kp_version", policy)
+        self.assertIn("INSTALLER_REMOTE_APP=$kp_product_root/releases/$kp_release", policy)
 
     def test_missing_metadata_and_shell_text_are_not_executed(self):
-        Handler.bodies["/kspeeder/ks-cli-version.txt"] = b"VERSION=1.2.3\n"
+        Handler.bodies["/kspeeder/release.txt"] = b"VERSION=1.2.3\n"
         self.run_install("ks-cli", 11)
-        Handler.bodies["/kspeeder/ks-cli-version.txt"] = f'VERSION=$(touch {self.marker})\nSHA256_linux_amd64={"00" * 32}\n'.encode()
+        Handler.bodies["/kspeeder/release.txt"] = (
+            f'VERSION=$(touch {self.marker})\nRELEASE={"00" * 32}\n'
+        ).encode()
         self.run_install("ks-cli", 11)
-        self.assertEqual(set(Handler.counts), {"/kspeeder/ks-cli-version.txt"})
+        self.assertEqual(set(Handler.counts), {"/kspeeder/release.txt"})
 
     def test_foreign_command_is_preserved(self):
         command = self.home / ".local/bin/ks-cli"
@@ -233,8 +267,8 @@ class BinaryInstall(unittest.TestCase):
         self.run_install("ks-cli")
         old = self.current().resolve()
         body = b"#!/bin/sh\n" + b"#" * 262144
-        name, _ = self.product("ks-cli", "1.2.4", body=body)
-        Handler.slow = f"/kspeeder/1.2.4/{name}"
+        name, _, release = self.product("ks-cli", "1.2.4", body=body)
+        Handler.slow = f"/kspeeder/releases/{release}/{name}"
         proc = subprocess.Popen(self.argv("ks-cli"), env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             self.assertTrue(Handler.started.wait(10))

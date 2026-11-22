@@ -138,21 +138,24 @@
 
 ## KSpeeder 0.9.1 product mirror (2026-11-22)
 
-- `release/kspeeder-products.json` is the exact ten-asset lock for GitHub
-  `kspeeder/docker_kspeeder` release `v0.9.1`. Do not infer extra macOS,
-  Windows or installer artifacts from the mutable website directory.
+- `release/kspeeder-products.json` locks the exact ten GitHub assets for
+  `kspeeder/docker_kspeeder v0.9.1` plus the eight current macOS/Windows
+  binaries inspected from `kspeeder.com/bin`. Do not add the stale standalone
+  installer executables or any unlocked file from that mutable directory.
 - Product releases use `scripts/publish-kspeeder-products.py` and map only to
-  `/binary/kspeeder/VERSION/` plus root `version.txt` and
-  `ks-cli-version.txt`. Stage immutable bytes, verify four HTTPS sources, then
+  `/binary/kspeeder/releases/RELEASE_ID/` plus root `release.txt`, `version.txt`
+  and `ks-cli-version.txt`. This preserves the previously published Linux-only
+  `0.9.1/` directory. Stage immutable bytes, verify four HTTPS sources, then
   activate pointers. The low-level shell transaction never deletes history.
 - Future latest-version work starts with `scripts/release-kspeeder.py`: run
   `check`, use `update-lock` when GitHub advances, review and commit the exact
-  ten-asset lock, then use `prepare`, `plan` and exact-ID `publish`. The wrapper
+  eighteen-asset lock, then use `prepare`, `plan` and exact-ID `publish`. The wrapper
   must pass generated apps identity checks and the native KSpeeder HTTPS suite
   before it delegates any production mutation.
-- KSpeeder and KS-CLI app script 0.1.1 read the mirrored root metadata and
-  fetch from the versioned product directory. Publish and verify product bytes
-  before publishing the complete apps tree that references them.
+- KSpeeder and KS-CLI app script 0.1.2 read `release.txt`, verify the immutable
+  release checksum list, and support Linux, macOS and Windows without installing
+  a service. Publish and verify product bytes before publishing the complete apps
+  tree that references them. Production 0.1.1 remains valid until that switch.
 - Existing `0.1.0/`, historical tarballs and unversioned files are a separate
   cleanup scope. Never delete them as an implicit side effect of product or
   apps publication. Website changelog deployment belongs to its website repo,

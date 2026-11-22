@@ -33,11 +33,25 @@ bodies = {
     "ks-cli-linux-arm": b"ks-cli arm fixture",
     "ks-cli-linux-arm64": b"ks-cli arm64 fixture",
 }
+desktop_bodies = {
+    "iStoreEnhance-mac.amd64": b"kspeeder mac amd64 fixture",
+    "iStoreEnhance-mac.arm64": b"kspeeder mac arm64 fixture",
+    "iStoreEnhance-win.exe.amd64": b"kspeeder windows amd64 fixture",
+    "iStoreEnhance-win.exe.arm64": b"kspeeder windows arm64 fixture",
+    "ks-cli-mac-amd64": b"ks-cli mac amd64 fixture",
+    "ks-cli-mac-arm64": b"ks-cli mac arm64 fixture",
+    "ks-cli-win-amd64.exe": b"ks-cli windows amd64 fixture",
+    "ks-cli-win-arm64.exe": b"ks-cli windows arm64 fixture",
+}
 bodies["version.txt"] = (
     f"VERSION={version}\n"
     f"SHA256_linux_amd64={sha(bodies['iStoreEnhance-linux.amd64'])}\n"
     f"SHA256_linux_arm={sha(bodies['iStoreEnhance-linux.arm'])}\n"
     f"SHA256_linux_arm64={sha(bodies['iStoreEnhance-linux.arm64'])}\n"
+    f"SHA256_mac_amd64={sha(desktop_bodies['iStoreEnhance-mac.amd64'])}\n"
+    f"SHA256_mac_arm64={sha(desktop_bodies['iStoreEnhance-mac.arm64'])}\n"
+    f"SHA256_win_amd64={sha(desktop_bodies['iStoreEnhance-win.exe.amd64'])}\n"
+    f"SHA256_win_arm64={sha(desktop_bodies['iStoreEnhance-win.exe.arm64'])}\n"
 ).encode()
 bodies["ks-cli-version.txt"] = (
     f"VERSION={version}\n"
@@ -48,7 +62,7 @@ bodies["ks-cli-version.txt"] = (
 ).encode()
 
 lock = {
-    "schema_version": 1,
+    "schema_version": 2,
     "product_version": version,
     "source": {
         "repository": "kspeeder/docker_kspeeder",
@@ -56,13 +70,20 @@ lock = {
         "published_at": "2026-11-18T14:45:15Z",
         "download_base": f"https://github.com/kspeeder/docker_kspeeder/releases/download/v{version}",
     },
+    "official_bin": {
+        "base": "https://kspeeder.com/bin",
+        "assets": [
+            {"name": name, "size": len(body), "sha256": sha(body)}
+            for name, body in sorted(desktop_bodies.items())
+        ],
+    },
     "public": {
         "prefix": "kspeeder",
         "bases": [
             "https://one.invalid/binary", "https://two.invalid/binary",
             "https://three.invalid/binary", "https://four.invalid/binary",
         ],
-        "root_pointers": ["version.txt", "ks-cli-version.txt"],
+        "root_pointers": ["release.txt", "version.txt", "ks-cli-version.txt"],
     },
     "assets": [
         {"name": name, "size": len(body), "sha256": sha(body)}
@@ -78,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-product-release-") as folder:
 
     def fetch(url, destination, expected_size, expected_sha):
         name = url.rsplit("/", 1)[1]
-        body = bodies[name]
+        body = (bodies | desktop_bodies)[name]
         assert len(body) == expected_size and sha(body) == expected_sha
         destination.write_bytes(body)
 
@@ -89,8 +110,11 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-product-release-") as folder:
     manifest = publisher.validate_package(package, identity, lock)
     assert manifest["product_version"] == version
     assert manifest["deletes_existing_files"] is False
-    immutable = package / "immutable/kspeeder" / version
-    assert len(list(immutable.iterdir())) == 12
+    immutable = package / "immutable/kspeeder/releases" / identity
+    assert len(list(immutable.iterdir())) == 21
+    assert (package / "pointers/kspeeder/release.txt").read_text() == (
+        f"VERSION={version}\nRELEASE={identity}\n"
+    )
     assert (package / "pointers/kspeeder/version.txt").read_bytes() == bodies["version.txt"]
 
     binary = work / "binary"
@@ -108,7 +132,7 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-product-release-") as folder:
         return result
 
     action("stage")
-    assert (product / version / "version.txt").read_bytes() == bodies["version.txt"]
+    assert (product / "releases" / identity / "version.txt").read_bytes() == bodies["version.txt"]
     assert (product / "version.txt").read_bytes() == b"VERSION=0.8.2\n"
     assert (product / "historical-file.tar.gz").read_bytes() == b"must survive"
     action("activate")
@@ -116,7 +140,7 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-product-release-") as folder:
     assert (product / "version.txt").read_bytes() == bodies["version.txt"]
     action("rollback")
     assert (product / "version.txt").read_bytes() == b"VERSION=0.8.2\n"
-    assert (product / version).is_dir()
+    assert (product / "releases" / identity).is_dir()
     assert (product / "historical-file.tar.gz").read_bytes() == b"must survive"
 
     seen = []
@@ -124,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-product-release-") as folder:
         seen.append(url)
     checks = publisher.verify_public(package, lock, immutable_only=False, attempts=1,
                                      delay=0, workers=4, timeout=1, fetch=public_fetch)
-    assert checks == 14 * 4 and len(seen) == checks
+    assert checks == 24 * 4 and len(seen) == checks
     assert all("/binary/kspeeder/" in url for url in seen)
 
     public, remote = publisher.remote_paths("/srv/public_html/binary", identity)

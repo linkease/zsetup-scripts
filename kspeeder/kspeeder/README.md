@@ -1,29 +1,21 @@
-# KSpeeder 二进制安装器
+# KSpeeder 标准二进制安装器
 
-唯一源码是本目录的 `business.sh`、`main.sh` 及 `../lib`；根生成器输出
-`kspeeder-install.sh`。软件标识为 `kspeeder`，脚本版本 0.1.1，最低 Linux
-zsetup 0.5.0。Linux入口已于2026-10-26独立发布：
+脚本版本 0.1.2，最低 zsetup 0.5.0。支持 Linux x86_64/aarch64/armv7、
+macOS Intel/Apple Silicon、Windows x86_64/arm64。Shell 与 PowerShell 入口均由
+共享源码生成，并以同字节 payload 发布到 `apps/kspeeder/0.1.2/`。
+
+安装器从四站点 `/binary/kspeeder/release.txt` 读取业务版本和不可变发布 ID，
+再从 `releases/RELEASE_ID/` 获取 `SHA256SUMS` 与平台服务二进制。下载摘要和程序
+`version` 输出必须一致；同版本不同字节拒绝替换。
+
+这是用户级二进制部署入口：不安装 KS-CLI，不注册或启动系统服务，也不改变端口、
+缓存或 Docker 配置。POSIX 命令位于 `~/.local/bin/kspeeder`；Windows 命令位于
+`%LOCALAPPDATA%\KSpeeder\bin\kspeeder.exe`。服务生命周期属于独立工作流。
 
 ```sh
 zsetup install kspeeder --foreground
 sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/kspeeder/kspeeder-install.sh)"
 ```
 
-默认安装到 `~/.local/lib/linkease/kspeeder/versions/VERSION/bin/kspeeder`，
-命令链接为 `~/.local/bin/kspeeder`。支持 `--installer-prefix` 与
-`--installer-work-dir` 指定持久目录；与 ks-cli 共用所有权保护、下载校验、
-精确版本检查及 current/previous 切换。
-
-这是二进制部署入口，不安装 ks-cli、不注册或启动系统服务、不改变端口或
-缓存配置。安装成功不代表加速服务已就绪。未来服务工作流必须显式引用
-此处的最终命令路径；不能再运行会把产品复制到默认目录的官方安装器。
-
-版本与摘要默认从四个下载站的 `/binary/kspeeder/version.txt` 读取，Linux
-产品从不可变的 `/binary/kspeeder/VERSION/iStoreEnhance-linux.amd64/arm64/arm`
-下载，安装后的命令名为 `kspeeder`。
-原生 `.exe`/Mac 产品有自己的摘要，但本轮未接入桌面安装与服务管理。
-Linux 支持范围及来源覆盖与 [`../ks-cli/README.md`](../ks-cli/README.md) 一致。
-服务端实测约12MB；缺精确size字段时采用32MiB上限，不扩展为完整服务验收。
-
-测试见 `../tests/binary_install_test.py`，未来同步流程见
-[`../../docs/kspeeder-installers.md`](../../docs/kspeeder-installers.md)。
+产品同步、发布 ID 布局和回滚规则见
+[`../../docs/kspeeder-product-mirror.md`](../../docs/kspeeder-product-mirror.md)。

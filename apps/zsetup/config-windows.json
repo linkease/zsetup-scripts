@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "apps-c779c40c7a27",
+  "config_version": "apps-4e37810cf447",
   "source_groups": [
     {
       "id": "release",
@@ -71,6 +71,54 @@
       "source_group": "release",
       "sha256": "1f2384ee35412832370969eb98dbc6b04cfa1230530dba950ca06db1ca2a86a8",
       "size": 8137,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "ks-cli",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.2/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "e0e83c10b4577c71cc00cb8c8247be51bae62cd23875d5bb390383f5730dafe5",
+      "size": 24482,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "ks-cli",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "path": "zsetup-scripts/apps/ks-cli/0.1.2/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "e0e83c10b4577c71cc00cb8c8247be51bae62cd23875d5bb390383f5730dafe5",
+      "size": 24482,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "kspeeder",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.2/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "d976b0ca9cadf205b38dc7ea2a911aeccdfe0b6b8fa99dd51c9a9fa57ed52b7f",
+      "size": 24486,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "kspeeder",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "path": "zsetup-scripts/apps/kspeeder/0.1.2/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "d976b0ca9cadf205b38dc7ea2a911aeccdfe0b6b8fa99dd51c9a9fa57ed52b7f",
+      "size": 24486,
       "min_version": "0.6.5"
     },
     {

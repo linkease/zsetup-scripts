@@ -33,11 +33,25 @@ bodies = {
     "ks-cli-linux-arm": b"ks-cli arm",
     "ks-cli-linux-arm64": b"ks-cli arm64",
 }
+desktop_bodies = {
+    "iStoreEnhance-mac.amd64": b"kspeeder mac amd64",
+    "iStoreEnhance-mac.arm64": b"kspeeder mac arm64",
+    "iStoreEnhance-win.exe.amd64": b"kspeeder windows amd64",
+    "iStoreEnhance-win.exe.arm64": b"kspeeder windows arm64",
+    "ks-cli-mac-amd64": b"ks-cli mac amd64",
+    "ks-cli-mac-arm64": b"ks-cli mac arm64",
+    "ks-cli-win-amd64.exe": b"ks-cli windows amd64",
+    "ks-cli-win-arm64.exe": b"ks-cli windows arm64",
+}
 bodies["version.txt"] = (
     f"VERSION={version}\n"
     f"SHA256_linux_amd64={sha(bodies['iStoreEnhance-linux.amd64'])}\n"
     f"SHA256_linux_arm={sha(bodies['iStoreEnhance-linux.arm'])}\n"
     f"SHA256_linux_arm64={sha(bodies['iStoreEnhance-linux.arm64'])}\n"
+    f"SHA256_mac_amd64={sha(desktop_bodies['iStoreEnhance-mac.amd64'])}\n"
+    f"SHA256_mac_arm64={sha(desktop_bodies['iStoreEnhance-mac.arm64'])}\n"
+    f"SHA256_win_amd64={sha(desktop_bodies['iStoreEnhance-win.exe.amd64'])}\n"
+    f"SHA256_win_arm64={sha(desktop_bodies['iStoreEnhance-win.exe.arm64'])}\n"
 ).encode()
 bodies["ks-cli-version.txt"] = (
     f"VERSION={version}\n"
@@ -71,7 +85,14 @@ def metadata_fetch(url, size, expected):
     return body
 
 
-locked = workflow.lock_from_release(release, metadata_fetch=metadata_fetch)
+def official_inspect(url):
+    body = desktop_bodies[url.rsplit("/", 1)[1]]
+    return len(body), sha(body)
+
+
+locked = workflow.lock_from_release(
+    release, metadata_fetch=metadata_fetch, official_inspect=official_inspect
+)
 assert locked["product_version"] == version
 assert [item["name"] for item in locked["assets"]] == sorted(bodies)
 assert locked["public"]["bases"] == workflow.PUBLIC_BASES
@@ -84,7 +105,9 @@ for mutation, message in (
     invalid = copy.deepcopy(release)
     mutation(invalid)
     try:
-        workflow.lock_from_release(invalid, metadata_fetch=metadata_fetch)
+        workflow.lock_from_release(
+            invalid, metadata_fetch=metadata_fetch, official_inspect=official_inspect
+        )
     except workflow.WorkflowError:
         pass
     else:
@@ -95,7 +118,9 @@ invalid_metadata["version.txt"] = bodies["version.txt"].replace(b"VERSION=1.2.3"
 def wrong_metadata(url, _size, _expected):
     return invalid_metadata[url.rsplit("/", 1)[1]]
 try:
-    workflow.lock_from_release(release, metadata_fetch=wrong_metadata)
+    workflow.lock_from_release(
+        release, metadata_fetch=wrong_metadata, official_inspect=official_inspect
+    )
 except workflow.publisher.ProductReleaseError:
     pass
 else:
@@ -128,13 +153,18 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-workflow-") as folder:
 
     fixture = work / "repo"
     for relative in (
-        "kspeeder/ks-cli/ks-cli-install.sh", "kspeeder/kspeeder/kspeeder-install.sh",
-        "kspeeder/lib/binary.sh", "apps/_shared/kspeeder-binary.sh",
-        "apps/ks-cli/app.json", "apps/ks-cli/0.1.1/installer.sh",
-        "apps/ks-cli/ks-cli-install.sh", "apps/ks-cli/install.sh",
-        "apps/kspeeder/app.json", "apps/kspeeder/0.1.1/installer.sh",
-        "apps/kspeeder/kspeeder-install.sh", "apps/kspeeder/install.sh",
-        "apps/zsetup/config.json",
+        "kspeeder/ks-cli/ks-cli-install.sh", "kspeeder/ks-cli/ks-cli-install.ps1",
+        "kspeeder/kspeeder/kspeeder-install.sh", "kspeeder/kspeeder/kspeeder-install.ps1",
+        "kspeeder/lib/binary.sh", "kspeeder/lib/binary.ps1",
+        "apps/_shared/kspeeder-binary.sh", "apps/_shared/kspeeder-binary.ps1",
+        "apps/ks-cli/app.json", "apps/ks-cli/0.1.2/installer.sh",
+        "apps/ks-cli/0.1.2/installer.ps1", "apps/ks-cli/ks-cli-install.sh",
+        "apps/ks-cli/ks-cli-install.ps1", "apps/ks-cli/install.sh", "apps/ks-cli/install.ps1",
+        "apps/kspeeder/app.json", "apps/kspeeder/0.1.2/installer.sh",
+        "apps/kspeeder/0.1.2/installer.ps1", "apps/kspeeder/kspeeder-install.sh",
+        "apps/kspeeder/kspeeder-install.ps1", "apps/kspeeder/install.sh",
+        "apps/kspeeder/install.ps1", "apps/zsetup/config.json",
+        "apps/zsetup/config-windows.json",
     ):
         source = ROOT / relative
         destination = fixture / relative
@@ -142,7 +172,7 @@ with tempfile.TemporaryDirectory(prefix="kspeeder-workflow-") as folder:
         shutil.copy2(source, destination)
     result = workflow.validate_apps(root=fixture, command_runner=lambda _command: None)
     assert set(result["applications"]) == {"ks-cli", "kspeeder"}
-    (fixture / "apps/kspeeder/0.1.1/installer.sh").write_text("tampered\n")
+    (fixture / "apps/kspeeder/0.1.2/installer.sh").write_text("tampered\n")
     try:
         workflow.validate_apps(root=fixture, command_runner=lambda _command: None)
     except workflow.WorkflowError:

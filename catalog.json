@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "scripts-0.3.2",
+  "config_version": "scripts-0.3.3",
   "installers": [
     {
       "application": "kai-skills",
@@ -665,7 +665,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -674,7 +674,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -683,7 +683,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -692,7 +692,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -701,7 +701,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -710,7 +710,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -719,7 +719,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -728,7 +728,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -737,7 +737,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -746,7 +746,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -755,7 +755,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -764,7 +764,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -773,7 +773,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -782,7 +782,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -791,7 +791,25 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/ks-cli/ks-cli-install.sh",
-      "path": "ks-cli/0.1.1/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
+      "background": false
+    },
+    {
+      "application": "ks-cli",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
+      "background": false
+    },
+    {
+      "application": "ks-cli",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "kspeeder/ks-cli/ks-cli-install.sh",
+      "path": "ks-cli/0.1.2/ks-cli-install.sh",
       "background": false
     },
     {
@@ -800,7 +818,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -809,7 +827,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -818,7 +836,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -827,7 +845,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -836,7 +854,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -845,7 +863,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -854,7 +872,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -863,7 +881,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -872,7 +890,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -881,7 +899,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -890,7 +908,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -899,7 +917,7 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -908,7 +926,7 @@
       "package_manager": "*",
       "arch": "x86_64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -917,7 +935,7 @@
       "package_manager": "*",
       "arch": "aarch64",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {
@@ -926,7 +944,25 @@
       "package_manager": "*",
       "arch": "armv7",
       "script": "kspeeder/kspeeder/kspeeder-install.sh",
-      "path": "kspeeder/0.1.1/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
+      "background": false
+    },
+    {
+      "application": "kspeeder",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
+      "background": false
+    },
+    {
+      "application": "kspeeder",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "script": "kspeeder/kspeeder/kspeeder-install.sh",
+      "path": "kspeeder/0.1.2/kspeeder-install.sh",
       "background": false
     },
     {

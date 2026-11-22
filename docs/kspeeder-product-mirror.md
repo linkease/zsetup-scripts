@@ -1,109 +1,73 @@
-# KSpeeder 0.9.1 product mirror
+# KSpeeder 0.9.1 全平台产品镜像
 
-Status: published on 2026-11-22. Production identities and canary evidence are
-recorded in
-[`verification/2026-11-22-kspeeder-0.9.1-mirror.md`](verification/2026-11-22-kspeeder-0.9.1-mirror.md).
+当前候选把两个可信来源合并成一个精确锁：GitHub
+`kspeeder/docker_kspeeder v0.9.1` 的 10 个 Linux/OpenWrt 资产，以及
+`https://kspeeder.com/bin/` 当前提供的 8 个 macOS/Windows 二进制。每个文件的
+名称、字节数和 SHA256 都固定在 `release/kspeeder-products.json`。官网目录只用于
+取得锁中的桌面文件；设备安装始终从四个 koolcenter 镜像读取，不直接依赖官网。
 
-The authoritative input is the ten assets attached to
-`kspeeder/docker_kspeeder` release `v0.9.1`. Their names, sizes and GitHub
-SHA256 digests are locked in `release/kspeeder-products.json`. The release
-contains the Linux KSpeeder and KS-CLI binaries, their two archives and two
-metadata files; macOS, Windows and standalone installer executables visible in
-`kspeeder.com/bin/` are outside this Docker/Linux release asset set.
+没有同步旧的 `kspeeder-installer-*`：官网当前 Shell/PowerShell 安装入口实际先
+下载 `ks-cli`，再由 CLI 执行服务安装；这些旧安装器既不是 v0.9.1 GitHub 资产，也
+不是标准 apps 二进制安装入口需要的产品。
 
-## Public layout
+## 公共布局
+
+已有 `/binary/kspeeder/0.9.1/` 是已发布的 Linux-only 不可变目录，不能补写。
+新候选使用发布 ID 作为不可变边界，同时保留旧目录和旧安装器：
 
 ```text
 /binary/kspeeder/
-  0.9.1/                    # immutable
-    ten upstream assets
+  releases/RELEASE_ID/       # 不可变；18 个上游文件及本次清单
+    release.txt
     release-manifest.json
     SHA256SUMS
-  version.txt               # mutable pointer, activated last
-  ks-cli-version.txt        # mutable pointer, activated last
+  release.txt                # VERSION + RELEASE，最后切换
+  version.txt                # 上游元数据，最后切换
+  ks-cli-version.txt         # 上游元数据，最后切换
 ```
 
-Existing `0.1.0/`, historical tarballs, old unversioned binaries and installer
-entries are not deleted by this release. Cleanup is a separate, explicitly
-authorized operation after the versioned mirror and both public apps have
-passed production canaries.
+`release.txt` 将业务版本 `0.9.1` 与镜像发布 ID 分开，因此同一业务版本可以在不
+改写旧不可变目录的前提下补齐平台。低层事务只新增发布目录并原子切换三个根指针；
+rollback 恢复指针，历史目录和旧文件始终保留。
 
-## Standard latest-release workflow
+## 标准同步与发布
 
-`scripts/release-kspeeder.py` is the maintained operator entry point. It reads
-GitHub's latest stable release API, requires the exact ten Linux/Docker release
-assets and GitHub SHA256 digests, verifies both metadata files against the
-binary assets, and checks that the canonical KSpeeder sources and generated
-`apps/kspeeder` / `apps/ks-cli` payloads are identical.
-
-Check without changing the repository:
+`scripts/release-kspeeder.py` 是唯一维护入口。它读取 GitHub 最新稳定版，验证 10
+个 GitHub 资产，逐字节检查 8 个官网桌面资产，并验证官网服务二进制摘要与
+`version.txt` 一致。以后同步最新版：
 
 ```sh
-python3 -B scripts/release-kspeeder.py check \
-  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64
-```
-
-When GitHub has a newer stable release, update only the reviewed product lock:
-
-```sh
+python3 -B scripts/release-kspeeder.py check --native-bin /ABS/zsetup-linux-x86_64
 python3 -B scripts/release-kspeeder.py update-lock
 git diff -- release/kspeeder-products.json
 ```
 
-Review and commit the lock before preparing or publishing. Product upgrades do
-not require an apps installer version bump: the 0.1.1 installers deliberately
-read the activated root metadata and then download from
-`kspeeder/VERSION/`. Change and rebuild the apps only when installer behavior
-itself changes.
-
-After committing, prepare and inspect the exact deployment plan:
+锁和相关实现必须提交且工作树干净，才可准备、查看计划和发布：
 
 ```sh
-python3 -B scripts/release-kspeeder.py prepare \
-  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64
-python3 -B scripts/release-kspeeder.py plan \
-  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64 \
-  --server SSH_CONFIG_HOST --binary-root /ABSOLUTE/WEB/ROOT/binary
+python3 -B scripts/release-kspeeder.py prepare --native-bin /ABS/zsetup-linux-x86_64
+python3 -B scripts/release-kspeeder.py plan --native-bin /ABS/zsetup-linux-x86_64 \
+  --server SSH_HOST --binary-root /ABS/WEB_ROOT/binary
+python3 -B scripts/release-kspeeder.py publish --native-bin /ABS/zsetup-linux-x86_64 \
+  --server SSH_HOST --binary-root /ABS/WEB_ROOT/binary --approve RELEASE_ID
 ```
 
-Production mutation requires the exact Release ID printed by `prepare`:
+发布器先暂存不可变目录，经四个 HTTPS 站点逐字节验证后才切换根指针，再执行服务端
+和公网复验。`stage`、`verify-staged`、`activate`、`verify`、`rollback` 可用于分阶段
+操作；所有远程变更都要求精确 Release ID。
 
-```sh
-python3 -B scripts/release-kspeeder.py publish \
-  --native-bin /ABSOLUTE/PATH/zsetup-linux-x86_64 \
-  --server SSH_CONFIG_HOST --binary-root /ABSOLUTE/WEB/ROOT/binary \
-  --approve RELEASE_ID
-```
+## apps 安装语义
 
-The wrapper refuses publication when the lock is not GitHub latest, relevant
-sources are uncommitted, generated apps are stale, their catalog identities do
-not match, shell syntax fails, or the isolated native HTTPS/runtime suite fails.
-`GITHUB_TOKEN` may be set to avoid anonymous API rate limits; it is never stored
-in the lock.
+KS-CLI 与 KSpeeder 安装器 0.1.2 支持：
 
-## Transaction implementation
+- Linux：x86_64、aarch64、armv7；
+- macOS：Intel、Apple Silicon；
+- Windows：x86_64、arm64，PowerShell 5.1 兼容入口。
 
-`scripts/publish-kspeeder-products.py` owns preparation and production
-coordination. `prepare` downloads every locked GitHub asset over HTTPS, rejects
-any size/SHA mismatch, checks the Linux hashes inside both metadata files, and
-creates an independently checksummed package below
-`dist/kspeeder-products/RELEASE_ID/`.
+安装器先读根 `release.txt`，再从 `releases/RELEASE_ID/` 下载 `SHA256SUMS` 和对应
+二进制，强制摘要及 `version` 输出一致。它们只做用户级二进制安装，不注册或启动
+服务。OpenWrt 继续使用自身包工作流。生成文件、Linux/macOS HTTPS 运行夹具和
+Windows 静态合同必须全部通过后，才能发布完整 `apps/`。
 
-The coordinator uploads one private release package, stages the immutable
-version directory, verifies every byte through all four configured HTTPS
-sources, activates only the two root metadata pointers, verifies server bytes,
-then repeats the public checks. Separate `stage`, `verify-staged`, `activate`,
-`verify` and `rollback` actions are available. The bundled
-`install-kspeeder-product-release.sh` is a low-level server transaction and is
-not the production entry point.
-
-KSpeeder and KS-CLI app installers default to the four `/binary` source bases,
-read their root metadata pointer, then fetch the matching executable from
-`kspeeder/VERSION/`. Explicit `KSPEEDER_PRODUCT_*` overrides retain the old
-flat layout only for controlled tests or emergency source selection.
-
-The website changelog is a separate static documentation deployment. Its
-public page stopped at 0.8.2 even though GitHub and `kspeeder.com/bin` already
-served 0.9.1. Its source is not in this repository or the visible public
-KSpeeder organization repositories; updating that page must use its owning
-website repository and must not be simulated by editing download-server files.
+官网展示页停在 0.8.2 是网站内容未随 GitHub 产品发布更新；网站源码不在本仓库，
+不能通过改下载目录伪装更新展示页。

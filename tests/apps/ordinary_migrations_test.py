@@ -19,13 +19,13 @@ EXPECTED = {
         "arch": {"x86_64", "aarch64", "armv7"},
     },
     "ks-cli": {
-        "version": "0.1.1", "source": "kspeeder/ks-cli/ks-cli-install.sh", "count": 15,
-        "os": {"centos", "debian", "linux", "rhel", "ubuntu"},
+        "version": "0.1.2", "source": "kspeeder/ks-cli/ks-cli-install.sh", "count": 17,
+        "os": {"centos", "debian", "linux", "macos", "rhel", "ubuntu"},
         "arch": {"x86_64", "aarch64", "armv7"},
     },
     "kspeeder": {
-        "version": "0.1.1", "source": "kspeeder/kspeeder/kspeeder-install.sh", "count": 15,
-        "os": {"centos", "debian", "linux", "rhel", "ubuntu"},
+        "version": "0.1.2", "source": "kspeeder/kspeeder/kspeeder-install.sh", "count": 17,
+        "os": {"centos", "debian", "linux", "macos", "rhel", "ubuntu"},
         "arch": {"x86_64", "aarch64", "armv7"},
     },
 }
@@ -57,8 +57,9 @@ ordinary_ids = {"fastnet", "fastpve", "linkspace", "ks-cli", "kspeeder"}
 ordinary_records = [record for record in config["installers"]
                     if record["application"] in ordinary_ids]
 assert {record["application"] for record in ordinary_records} == ordinary_ids
-assert len(ordinary_records) == 55
+assert len(ordinary_records) == 59
 assert (ROOT / "apps/_shared/kspeeder-binary.sh").read_bytes() == (ROOT / "kspeeder/lib/binary.sh").read_bytes()
+assert (ROOT / "apps/_shared/kspeeder-binary.ps1").read_bytes() == (ROOT / "kspeeder/lib/binary.ps1").read_bytes()
 
-print("Ordinary apps migration: source identity, standard aliases and 55 runtime records passed")
+print("Ordinary apps migration: source identity, standard aliases and 59 runtime records passed")
 

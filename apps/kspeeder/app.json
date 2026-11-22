@@ -2,15 +2,25 @@
   "schema_version": 1,
   "id": "kspeeder",
   "name": "KSpeeder",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "min_zsetup": "0.5.0",
-  "entrypoints": ["sh"],
+  "entrypoints": ["sh", "ps1"],
   "targets": [
     {
       "os": ["centos", "debian", "linux", "rhel", "ubuntu"],
       "package_manager": ["*"],
       "arch": ["x86_64", "aarch64", "armv7"]
+    },
+    {
+      "os": ["macos"],
+      "package_manager": ["*"],
+      "arch": ["x86_64", "aarch64"]
+    },
+    {
+      "os": ["windows"],
+      "package_manager": ["*"],
+      "arch": ["x86_64", "aarch64"]
     }
   ],
-  "compatibility_aliases": ["kspeeder-install.sh"]
+  "compatibility_aliases": ["kspeeder-install.sh", "kspeeder-install.ps1"]
 }

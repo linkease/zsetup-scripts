@@ -1,42 +1,22 @@
-# ks-cli 二进制安装器
+# KS-CLI 标准二进制安装器
 
-唯一源码是本目录的 `business.sh`、`main.sh` 及 `../lib`；根生成器输出
-`ks-cli-install.sh`。软件标识为 `ks-cli`，脚本版本 0.1.1，最低 Linux
-zsetup 0.5.0。Linux入口已于2026-10-26独立发布，以下公网命令已生效。
+脚本版本 0.1.2，最低 zsetup 0.5.0。支持 Linux x86_64/aarch64/armv7、
+macOS Intel/Apple Silicon、Windows x86_64/arm64。Shell 与 PowerShell 入口均由
+共享源码生成，并以同字节 payload 发布到 `apps/ks-cli/0.1.2/`。
+
+安装器从四站点 `/binary/kspeeder/release.txt` 读取业务版本和不可变发布 ID，
+再从 `releases/RELEASE_ID/` 获取 `SHA256SUMS` 与平台二进制。下载摘要和程序
+`version` 输出必须一致；同版本不同字节拒绝替换。
+
+默认只做用户级二进制安装，不执行 KS-CLI 业务命令、不安装或启动 KSpeeder 服务。
+POSIX 命令位于 `~/.local/bin/ks-cli`；Windows 命令位于
+`%LOCALAPPDATA%\KSpeeder\bin\ks-cli.exe`。可用 `--installer-prefix` 和
+`--installer-work-dir` 指定持久目录。
 
 ```sh
 zsetup install ks-cli --foreground
 sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ks-cli/ks-cli-install.sh)"
 ```
 
-默认安装到 `~/.local/lib/linkease/ks-cli/versions/VERSION/bin/ks-cli`，
-命令链接为 `~/.local/bin/ks-cli`，已有其他来源命令会拒绝覆盖。
-指定持久目录：
-
-```sh
-sh ks-cli-install.sh --installer-prefix /persistent/software/ks-cli \
-  --installer-work-dir /persistent/staging/ks-cli
-```
-
-安装只接受共享的前置 `--installer-*` 参数；不转发或执行业务参数。
-安装完成后由调用者执行实际命令，不默认安装、启动或探测 KSpeeder 服务。
-stdout 为 `application/version/command/prefix` 四行字段，进度写 stderr；
-失败保留原退出码，不能将后台启动成功当作最终安装成功。
-
-元数据默认从四个下载站的 `/binary/kspeeder/ks-cli-version.txt` 读取；选择
-`SHA256_linux_amd64/arm64/arm`，产品来自不可变的
-`/binary/kspeeder/VERSION/ks-cli-linux-ARCH`。
-使用 zsetup 下载与 SHA256 复验、精确版本检查；同版本不同摘要拒绝替换。
-默认保留 current/previous，失败或取消保留旧入口。大小元数据尚缺，按实际
-约15MB产物设置32MiB下载上限及共享空间预算，不声称精确空间估计。
-
-首期索引为普通 Linux（linux/ubuntu/debian/centos/rhel），
-x86_64/aarch64/armv7；ARM 是命名/协议 fixture 覆盖，不是设备运行验收。
-OpenWrt 不套用普通 Linux 包，继续使用它自己的包管理路径。
-Windows/macOS 客户端缺发布摘要，未登记或生成可用安装入口。
-
-来源覆盖 `KSPEEDER_PRODUCT_BASES` 是以空格分隔的 HTTPS 根地址，配合
-`KSPEEDER_PRODUCT_ROOT` 和 `KSPEEDER_PRODUCT_VERSIONED=0|1` 仅用于受控部署、
-兼容回退和隔离测试；默认始终使用版本化 koolcenter 镜像。
-测试见 `../tests/binary_install_test.py`，未来同步流程见
-[`../../docs/kspeeder-installers.md`](../../docs/kspeeder-installers.md)。
+产品同步、发布 ID 布局和回滚规则见
+[`../../docs/kspeeder-product-mirror.md`](../../docs/kspeeder-product-mirror.md)。

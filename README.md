@@ -16,10 +16,11 @@ DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
 FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。当前 scripts0.1.9 本地候选的存储协议要求 zsetup **>=0.5.0**；安装入口动态读取线上 stable，索引绑定该核心的完整版本。
 
 [`kspeeder/ks-cli`](kspeeder/ks-cli/README.md) 与
-[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md) 两个 Linux 二进制安装器已升级到
-0.1.1：从四站点版本化 `/binary/kspeeder/0.9.1/` 镜像下载并校验产品，不自动安装
-或启动服务。产品镜像、完整 apps 和真实公开入口 canary 已于 2026-11-22 发布通过；
-未来最新版发现、资产锁定、apps 验证及产品发布统一使用
+[`kspeeder/kspeeder`](kspeeder/kspeeder/README.md) 的 0.1.2 候选支持 Linux、macOS
+和 Windows。它们从四站点的不可变 KSpeeder 发布 ID 目录下载并校验产品，只安装
+用户级二进制，不自动注册或启动服务。当前生产仍保留已发布的 Linux-only 0.1.1；
+新版产品镜像发布通过后才能切换完整 apps。未来最新版发现、资产锁定、apps 验证
+及产品发布统一使用
 [`scripts/release-kspeeder.py`](scripts/release-kspeeder.py)，服务器同步和回滚方案见
 [产品镜像说明](docs/kspeeder-product-mirror.md)。
 
@@ -63,6 +64,8 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 | `ddnsto` | macOS | x86_64、arm64 | `ddnsto/install-macos.sh`；固定校验的 CLI 4.2.1；使用用户级 launchd；必须提供 `--token` |
 | `linkease` | OpenWrt opkg、Ubuntu/Debian、CentOS/RHEL、通用 Linux | x86_64、aarch64、armv7 | `--version VERSION` 可选；Linux 默认 1.7.5；无菜单/token 交互 |
 | `fastpve` | PVE 宿主机（Debian / apt），root、pveversion 必需 | x86_64 | 默认前台菜单；参数原样传给 FastPVE；PVE 大版本兼容性待设备验证 |
+| `ks-cli` | Linux、macOS、Windows | Linux x86_64/aarch64/armv7；macOS/Windows x86_64/arm64 | 只安装用户级 CLI，不执行业务命令或安装服务 |
+| `kspeeder` | Linux、macOS、Windows | Linux x86_64/aarch64/armv7；macOS/Windows x86_64/arm64 | 只安装用户级二进制，不注册或启动服务 |
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
 

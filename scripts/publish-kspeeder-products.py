@@ -53,9 +53,11 @@ def canonical_json(value) -> bytes:
 def load_lock(path: Path = DEFAULT_LOCK) -> dict:
     raw = path.read_bytes()
     data = json.loads(raw)
-    if set(data) != {"schema_version", "product_version", "source", "public", "assets"}:
+    if set(data) != {
+        "schema_version", "product_version", "source", "official_bin", "public", "assets",
+    }:
         raise ProductReleaseError("KSpeeder product lock fields differ from schema")
-    if data["schema_version"] != 1 or not VERSION.fullmatch(data["product_version"]):
+    if data["schema_version"] != 2 or not VERSION.fullmatch(data["product_version"]):
         raise ProductReleaseError("invalid KSpeeder product lock version")
     version = data["product_version"]
     source = data["source"]
@@ -67,10 +69,13 @@ def load_lock(path: Path = DEFAULT_LOCK) -> dict:
         f"https://github.com/kspeeder/docker_kspeeder/releases/download/v{version}"
     ):
         raise ProductReleaseError("release download base is not canonical")
+    official = data["official_bin"]
+    if set(official) != {"base", "assets"} or official["base"] != "https://kspeeder.com/bin":
+        raise ProductReleaseError("invalid official desktop source")
     public = data["public"]
     if set(public) != {"prefix", "bases", "root_pointers"} or public["prefix"] != "kspeeder":
         raise ProductReleaseError("invalid public product namespace")
-    if public["root_pointers"] != ["version.txt", "ks-cli-version.txt"]:
+    if public["root_pointers"] != ["release.txt", "version.txt", "ks-cli-version.txt"]:
         raise ProductReleaseError("invalid mutable pointer set")
     if len(public["bases"]) != 4 or len(set(public["bases"])) != 4:
         raise ProductReleaseError("exactly four unique public bases are required")
@@ -78,11 +83,14 @@ def load_lock(path: Path = DEFAULT_LOCK) -> dict:
         parsed = urlsplit(base)
         if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment:
             raise ProductReleaseError("public bases must be plain HTTPS URLs")
-    assets = data["assets"]
-    if not isinstance(assets, list) or len(assets) != 10:
+    github_assets = data["assets"]
+    official_assets = official["assets"]
+    if not isinstance(github_assets, list) or len(github_assets) != 10:
         raise ProductReleaseError("KSpeeder release must contain exactly ten locked assets")
+    if not isinstance(official_assets, list) or len(official_assets) != 8:
+        raise ProductReleaseError("KSpeeder desktop source must contain exactly eight locked assets")
     seen = set()
-    for asset in assets:
+    for asset in [*github_assets, *official_assets]:
         if set(asset) != {"name", "size", "sha256"}:
             raise ProductReleaseError("invalid locked asset fields")
         name = asset["name"]
@@ -93,15 +101,33 @@ def load_lock(path: Path = DEFAULT_LOCK) -> dict:
         if not isinstance(asset["sha256"], str) or not SHA256.fullmatch(asset["sha256"]):
             raise ProductReleaseError("invalid locked asset digest")
         seen.add(name)
-    required = {
+    required_github = {
         f"iStoreEnhance-binary-{version}.tar.gz", "iStoreEnhance-linux.amd64",
         "iStoreEnhance-linux.arm", "iStoreEnhance-linux.arm64",
         f"ks-cli-binary-{version}.tar.gz", "ks-cli-linux-amd64",
         "ks-cli-linux-arm", "ks-cli-linux-arm64", "version.txt", "ks-cli-version.txt",
     }
-    if seen != required:
-        raise ProductReleaseError("locked asset inventory is incomplete")
+    if {asset["name"] for asset in github_assets} != required_github:
+        raise ProductReleaseError("locked GitHub asset inventory is incomplete")
+    required_official = {
+        "iStoreEnhance-mac.amd64", "iStoreEnhance-mac.arm64",
+        "iStoreEnhance-win.exe.amd64", "iStoreEnhance-win.exe.arm64",
+        "ks-cli-mac-amd64", "ks-cli-mac-arm64",
+        "ks-cli-win-amd64.exe", "ks-cli-win-arm64.exe",
+    }
+    if {asset["name"] for asset in official_assets} != required_official:
+        raise ProductReleaseError("locked official desktop asset inventory is incomplete")
     return data
+
+
+def asset_inventory(lock: dict) -> list[dict]:
+    return [*lock["assets"], *lock["official_bin"]["assets"]]
+
+
+def asset_url(lock: dict, name: str) -> str:
+    official_names = {asset["name"] for asset in lock["official_bin"]["assets"]}
+    base = lock["official_bin"]["base"] if name in official_names else lock["source"]["download_base"]
+    return f"{base}/{name}"
 
 
 def release_identity(lock_path: Path = DEFAULT_LOCK) -> str:
@@ -141,7 +167,7 @@ def default_fetch(url: str, destination: Path, expected_size: int, expected_sha:
 
 def validate_metadata(directory: Path, lock: dict) -> None:
     version = lock["product_version"]
-    by_name = {asset["name"]: asset for asset in lock["assets"]}
+    by_name = {asset["name"]: asset for asset in asset_inventory(lock)}
     values = {}
     for metadata in ("version.txt", "ks-cli-version.txt"):
         entries = {}
@@ -164,6 +190,11 @@ def validate_metadata(directory: Path, lock: dict) -> None:
             raise ProductReleaseError("KS-CLI Linux metadata digest differs from locked asset")
     if values["ks-cli-version.txt"].get("SHA256_openwrt_bundle") != by_name[f"ks-cli-binary-{version}.tar.gz"]["sha256"]:
         raise ProductReleaseError("KS-CLI bundle metadata digest differs from locked asset")
+    for arch in ("amd64", "arm64"):
+        if values["version.txt"].get(f"SHA256_mac_{arch}") != by_name[f"iStoreEnhance-mac.{arch}"]["sha256"]:
+            raise ProductReleaseError("KSpeeder macOS metadata digest differs from locked asset")
+        if values["version.txt"].get(f"SHA256_win_{arch}") != by_name[f"iStoreEnhance-win.exe.{arch}"]["sha256"]:
+            raise ProductReleaseError("KSpeeder Windows metadata digest differs from locked asset")
 
 
 def validate_package(package: Path, identity: str, lock: dict, *, require_name: bool = True) -> dict:
@@ -180,9 +211,9 @@ def validate_package(package: Path, identity: str, lock: dict, *, require_name: 
         match = re.fullmatch(r"([0-9a-f]{64})  ([^\s]+)", line)
         if not match or digest(package / match[2]) != match[1]:
             raise ProductReleaseError("product package checksum failed")
-    immutable = package / "immutable/kspeeder" / lock["product_version"]
+    immutable = package / "immutable/kspeeder/releases" / identity
     records = (immutable / "SHA256SUMS").read_text(encoding="utf-8").splitlines()
-    if len(records) != 11:
+    if len(records) != len(asset_inventory(lock)) + 2:
         raise ProductReleaseError("immutable product checksum set is incomplete")
     for line in records:
         match = re.fullmatch(r"([0-9a-f]{64})  ([^\s]+)", line)
@@ -215,12 +246,15 @@ def prepare_release(lock_path: Path = DEFAULT_LOCK, output_root: Path = DEFAULT_
         return destination
     temporary = Path(tempfile.mkdtemp(prefix=f".{identity}.", dir=output_root))
     try:
-        version_dir = temporary / "immutable/kspeeder" / lock["product_version"]
+        version_dir = temporary / "immutable/kspeeder/releases" / identity
         version_dir.mkdir(parents=True)
-        for asset in lock["assets"]:
-            fetch(f"{lock['source']['download_base']}/{asset['name']}", version_dir / asset["name"],
+        for asset in asset_inventory(lock):
+            fetch(asset_url(lock, asset["name"]), version_dir / asset["name"],
                   asset["size"], asset["sha256"])
         validate_metadata(version_dir, lock)
+        (version_dir / "release.txt").write_text(
+            f"VERSION={lock['product_version']}\nRELEASE={identity}\n", encoding="ascii"
+        )
         manifest = {
             "schema_version": 1,
             "release_id": identity,
@@ -228,7 +262,8 @@ def prepare_release(lock_path: Path = DEFAULT_LOCK, output_root: Path = DEFAULT_
             "source": lock["source"],
             "lock_sha256": digest(lock_path),
             "public_prefix": lock["public"]["prefix"],
-            "assets": lock["assets"],
+            "assets": asset_inventory(lock),
+            "sources": {"github_release": lock["source"], "official_bin": lock["official_bin"]["base"]},
             "source_commit": run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture=True).stdout.strip(),
             "deletes_existing_files": False,
         }
@@ -334,9 +369,9 @@ def fetch_public(url: str, expected: str, expected_size: int, *, timeout: float)
 
 
 def public_records(package: Path, lock: dict, *, immutable_only: bool) -> list[tuple[str, Path]]:
-    version = lock["product_version"]
-    immutable = package / "immutable/kspeeder" / version
-    records = [(f"kspeeder/{version}/{path.name}", path)
+    identity = package.name
+    immutable = package / "immutable/kspeeder/releases" / identity
+    records = [(f"kspeeder/releases/{identity}/{path.name}", path)
                for path in sorted(immutable.iterdir()) if path.is_file()]
     if not immutable_only:
         records.extend((f"kspeeder/{name}", package / "pointers/kspeeder" / name)

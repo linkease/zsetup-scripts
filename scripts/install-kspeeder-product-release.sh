@@ -23,9 +23,9 @@ case "$version" in [0-9]*.[0-9]*.[0-9]*) ;; *) die 'unsafe product version' ;; e
 case "$release_id" in *[!0-9a-f]*) die 'invalid release identity' ;; esac
 
 product=$binary/kspeeder
-immutable_src=$src/immutable/kspeeder/$version
-immutable_dst=$product/$version
-pointers='version.txt ks-cli-version.txt'
+immutable_src=$src/immutable/kspeeder/releases/$release_id
+immutable_dst=$product/releases/$release_id
+pointers='release.txt version.txt ks-cli-version.txt'
 snapshot=$product/.product-rollback-$release_id
 lock=$product/.product-publish-lock
 locked=0
@@ -34,6 +34,8 @@ stage_dir=
 
 mkdir -p "$product"
 [ -d "$product" ] && [ ! -L "$product" ] || die 'product root is invalid'
+mkdir -p "$product/releases"
+[ -d "$product/releases" ] && [ ! -L "$product/releases" ] || die 'product releases root is invalid'
 mkdir "$lock" 2>/dev/null || die 'publication lock is held'
 locked=1
 
@@ -75,6 +77,8 @@ trap cleanup 0
 trap 'exit 1' 1 2 15
 
 verify_immutable "$immutable_src" || die 'package immutable tree failed verification'
+[ "$(sed -n 's/^VERSION=//p' "$immutable_src/release.txt")" = "$version" ] || die 'release pointer version differs from state'
+[ "$(sed -n 's/^RELEASE=//p' "$immutable_src/release.txt")" = "$release_id" ] || die 'release pointer identity differs from state'
 for pointer in $pointers; do
     [ -f "$src/pointers/kspeeder/$pointer" ] && [ ! -L "$src/pointers/kspeeder/$pointer" ] || die "package pointer is missing: $pointer"
     cmp "$src/pointers/kspeeder/$pointer" "$immutable_src/$pointer" >/dev/null || die "pointer differs from immutable metadata: $pointer"

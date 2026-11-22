@@ -90,6 +90,22 @@ def fetch_small_asset(url: str, size: int, expected: str) -> bytes:
     return body
 
 
+def inspect_official_asset(url: str) -> tuple[int, str]:
+    value = hashlib.sha256()
+    size = 0
+    with urlopen(request(url), timeout=120) as response:
+        if urlsplit(response.url).scheme != "https":
+            raise WorkflowError("official desktop asset followed a non-HTTPS redirect")
+        while block := response.read(1024 * 1024):
+            size += len(block)
+            if size > 64 * 1024 * 1024:
+                raise WorkflowError("official desktop asset exceeds 64 MiB")
+            value.update(block)
+    if size <= 0:
+        raise WorkflowError("official desktop asset is empty")
+    return size, value.hexdigest()
+
+
 def expected_asset_names(version: str) -> set[str]:
     return {
         f"iStoreEnhance-binary-{version}.tar.gz",
@@ -105,7 +121,17 @@ def expected_asset_names(version: str) -> set[str]:
     }
 
 
-def lock_from_release(release: dict, *, metadata_fetch=fetch_small_asset) -> dict:
+def expected_official_names() -> set[str]:
+    return {
+        "iStoreEnhance-mac.amd64", "iStoreEnhance-mac.arm64",
+        "iStoreEnhance-win.exe.amd64", "iStoreEnhance-win.exe.arm64",
+        "ks-cli-mac-amd64", "ks-cli-mac-arm64",
+        "ks-cli-win-amd64.exe", "ks-cli-win-arm64.exe",
+    }
+
+
+def lock_from_release(release: dict, *, metadata_fetch=fetch_small_asset,
+                      official_inspect=inspect_official_asset) -> dict:
     tag = release.get("tag_name")
     version = tag[1:] if isinstance(tag, str) and tag.startswith("v") else ""
     if not VERSION.fullmatch(version):
@@ -141,7 +167,7 @@ def lock_from_release(release: dict, *, metadata_fetch=fetch_small_asset) -> dic
         raise WorkflowError("latest KSpeeder release asset inventory is incomplete or unexpected")
 
     value = {
-        "schema_version": 1,
+        "schema_version": 2,
         "product_version": version,
         "source": {
             "repository": REPOSITORY,
@@ -149,13 +175,23 @@ def lock_from_release(release: dict, *, metadata_fetch=fetch_small_asset) -> dic
             "published_at": published,
             "download_base": download_base,
         },
+        "official_bin": {
+            "base": "https://kspeeder.com/bin",
+            "assets": [],
+        },
         "public": {
             "prefix": "kspeeder",
             "bases": PUBLIC_BASES,
-            "root_pointers": ["version.txt", "ks-cli-version.txt"],
+            "root_pointers": ["release.txt", "version.txt", "ks-cli-version.txt"],
         },
         "assets": sorted(locked, key=lambda item: item["name"]),
     }
+
+    for name in sorted(expected_official_names()):
+        size, digest = official_inspect(f"https://kspeeder.com/bin/{name}")
+        if not isinstance(size, int) or size <= 0 or not SHA256.fullmatch(digest):
+            raise WorkflowError("official desktop asset inspection returned invalid identity")
+        value["official_bin"]["assets"].append({"name": name, "size": size, "sha256": digest})
 
     with tempfile.TemporaryDirectory(prefix="kspeeder-latest-metadata-") as folder:
         directory = Path(folder)
@@ -167,8 +203,10 @@ def lock_from_release(release: dict, *, metadata_fetch=fetch_small_asset) -> dic
     return value
 
 
-def latest_lock(*, release_fetch=fetch_json, metadata_fetch=fetch_small_asset) -> dict:
-    return lock_from_release(release_fetch(), metadata_fetch=metadata_fetch)
+def latest_lock(*, release_fetch=fetch_json, metadata_fetch=fetch_small_asset,
+                official_inspect=inspect_official_asset) -> dict:
+    return lock_from_release(release_fetch(), metadata_fetch=metadata_fetch,
+                             official_inspect=official_inspect)
 
 
 def version_tuple(value: str) -> tuple[int, int, int]:
@@ -200,7 +238,8 @@ def relevant_status() -> str:
         "release/kspeeder-products.json", "scripts/install-kspeeder-product-release.sh",
         "scripts/publish-kspeeder-products.py", "scripts/release-kspeeder.py",
         "kspeeder", "apps/kspeeder", "apps/ks-cli",
-        "apps/_shared/kspeeder-binary.sh", "apps/zsetup/config.json", "apps/SHA256SUMS",
+        "apps/_shared/kspeeder-binary.sh", "apps/_shared/kspeeder-binary.ps1",
+        "apps/zsetup/config.json", "apps/zsetup/config-windows.json", "apps/SHA256SUMS",
     ], capture=True).stdout
 
 
@@ -247,37 +286,51 @@ def validate_apps(*, root: Path = ROOT, native_bin: Path | None = None,
     for command in commands:
         command_runner(command)
 
-    config = json.loads((root / "apps/zsetup/config.json").read_text(encoding="utf-8"))
+    configs = {
+        "sh": json.loads((root / "apps/zsetup/config.json").read_text(encoding="utf-8")),
+        "ps1": json.loads((root / "apps/zsetup/config-windows.json").read_text(encoding="utf-8")),
+    }
     results = {}
     for app in ("ks-cli", "kspeeder"):
         manifest = json.loads((root / "apps" / app / "app.json").read_text(encoding="utf-8"))
         version = manifest.get("version")
         if not isinstance(version, str) or not VERSION.fullmatch(version):
             raise WorkflowError(f"apps/{app}/app.json has an invalid installer version")
-        source = root / "kspeeder" / app / f"{app}-install.sh"
-        payload = root / "apps" / app / version / "installer.sh"
-        alias = root / "apps" / app / f"{app}-install.sh"
-        standard = root / "apps" / app / "install.sh"
-        if not source.is_file() or payload.read_bytes() != source.read_bytes():
-            raise WorkflowError(f"apps/{app} immutable payload differs from canonical source")
-        if alias.read_bytes() != standard.read_bytes():
-            raise WorkflowError(f"apps/{app} standard aliases differ")
-        expected_sha = hashlib.sha256(payload.read_bytes()).hexdigest()
-        records = [entry for entry in config["installers"] if entry["application"] == app]
-        if not records or {entry["path"] for entry in records} != {
-            f"zsetup-scripts/apps/{app}/{version}/installer.sh"
-        } or {entry["sha256"] for entry in records} != {expected_sha}:
-            raise WorkflowError(f"apps/{app} config records do not identify its immutable payload")
-        for script in (source, payload, alias, standard):
-            command_runner(["sh", "-n", script])
-        results[app] = {"installer_version": version, "records": len(records), "sha256": expected_sha}
+        application_result = {"installer_version": version, "records": 0, "sha256": {}}
+        for extension in ("sh", "ps1"):
+            source = root / "kspeeder" / app / f"{app}-install.{extension}"
+            payload = root / "apps" / app / version / f"installer.{extension}"
+            alias = root / "apps" / app / f"{app}-install.{extension}"
+            standard = root / "apps" / app / f"install.{extension}"
+            if not source.is_file() or payload.read_bytes() != source.read_bytes():
+                raise WorkflowError(f"apps/{app} immutable {extension} payload differs from canonical source")
+            if alias.read_bytes() != standard.read_bytes():
+                raise WorkflowError(f"apps/{app} standard {extension} aliases differ")
+            expected_sha = hashlib.sha256(payload.read_bytes()).hexdigest()
+            records = [entry for entry in configs[extension]["installers"]
+                       if entry["application"] == app]
+            if not records or {entry["path"] for entry in records} != {
+                f"zsetup-scripts/apps/{app}/{version}/installer.{extension}"
+            } or {entry["sha256"] for entry in records} != {expected_sha}:
+                raise WorkflowError(
+                    f"apps/{app} {extension} config records do not identify its immutable payload"
+                )
+            if extension == "sh":
+                for script in (source, payload, alias, standard):
+                    command_runner(["sh", "-n", script])
+            application_result["records"] += len(records)
+            application_result["sha256"][extension] = expected_sha
+        results[app] = application_result
 
-    shared = root / "apps/_shared/kspeeder-binary.sh"
-    if shared.read_bytes() != (root / "kspeeder/lib/binary.sh").read_bytes():
-        raise WorkflowError("apps shared KSpeeder policy differs from canonical source")
-    policy = shared.read_text(encoding="utf-8")
-    if ("INSTALLER_REMOTE_APP=$kp_product_root/$kp_version" not in policy
-            or any(base not in policy for base in PUBLIC_BASES)):
+    for extension in ("sh", "ps1"):
+        shared = root / "apps/_shared" / f"kspeeder-binary.{extension}"
+        if shared.read_bytes() != (root / "kspeeder/lib" / f"binary.{extension}").read_bytes():
+            raise WorkflowError(f"apps shared KSpeeder {extension} policy differs from canonical source")
+    policy = (root / "apps/_shared/kspeeder-binary.sh").read_text(encoding="utf-8")
+    powershell_policy = (root / "apps/_shared/kspeeder-binary.ps1").read_text(encoding="utf-8")
+    if ("INSTALLER_REMOTE_APP=$kp_product_root/releases/$kp_release" not in policy
+            or '"kspeeder/releases/$($release.Release)"' not in powershell_policy
+            or any(base not in policy or base not in powershell_policy for base in PUBLIC_BASES)):
         raise WorkflowError("KSpeeder apps do not use the four-site versioned product mirror")
 
     runtime = False

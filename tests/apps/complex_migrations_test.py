@@ -40,12 +40,12 @@ for app_id, expected in EXPECTED.items():
         f"zsetup-scripts/apps/{app_id}/{expected['version']}/installer.")
         for record in linux_records + windows_records)
 
-assert len(linux["installers"]) == 125
-assert len(windows["installers"]) == 5
+assert len(linux["installers"]) == 129
+assert len(windows["installers"]) == 9
 assert {path.parent.name for path in (ROOT / "apps").glob("*/app.json")} == {
     "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli", "kspeeder",
     "linkease", "linkspace", "scoop",
 }
 
-print("Complex apps migration: all ten applications and 130 platform records passed")
+print("Complex apps migration: all ten applications and 138 platform records passed")
 
