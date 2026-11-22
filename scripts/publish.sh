@@ -1,5 +1,6 @@
 #!/bin/sh
-# Publish the apps tree only.  Connection and target selection remain external.
+# Low-level apps tree transaction bundled by publish-apps.py.
+# Production operators use publish-apps.py so the public namespace cannot vary.
 set -eu
 
 [ "$#" -eq 3 ] || { echo 'usage: publish.sh stage|activate|rollback|verify APPS PUBLIC_APPS_ROOT' >&2; exit 2; }

@@ -67,9 +67,13 @@ tests live below `tests/contracts/`; their fixtures live below `tests/fixtures/`
 
 The only publication input is `apps/`. Test deployments copy that directory to
 `BINARY_ROOT/zsetup-scripts/apps` directly.
-Production copies the same bytes to a unique staging directory, verifies
-`SHA256SUMS`, stages immutable version files, snapshots current mutable entries
-and configuration, then activates the complete configuration and entries.
+Production uses `scripts/publish-apps.py`; its full contract is documented in
+[`apps-release.md`](apps-release.md). It copies the same bytes to a private,
+release-ID staging directory, verifies `SHA256SUMS`, stages immutable version
+files, verifies them through every configured HTTPS source, snapshots current
+mutable entries and configuration, then activates and verifies the complete
+configuration and entries. The coordinator derives the destination as
+`BINARY_ROOT/zsetup-scripts/apps`; callers cannot substitute `/binary/` itself.
 Publication never uses delete synchronization and never removes business
 products, native zsetup releases or historical installers.
 

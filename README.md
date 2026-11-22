@@ -41,7 +41,10 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastpve
 FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余实现，不代表整体候选已经上线。
 产品包继续由各业务发布流程提前放在现有 `/binary/APP/` 目录，安装时由 zsetup 下载和校验；
 本仓库只把完整 `apps/` 目录作为一个 zsetup-scripts 业务命名空间发布，不采集或复制产品包。
-服务器产品文件及版本/SHA256 元数据要求见 [发布流程](docs/release.md)。
+整体候选以后只使用 [apps 发布协调器](docs/apps-release.md)：它强制从 `binary` 根派生
+`binary/zsetup-scripts/apps`，按 release ID 打包完整 `apps/`，执行暂存、切换、回滚和
+四站点逐字节回读，避免人工命令把目录映射到错误位置。服务器产品文件及版本/SHA256
+元数据要求见 [发布流程](docs/release.md)。
 
 | 应用标识 | 支持平台 | 架构 | 业务参数与交互 |
 |---|---|---|---|
@@ -73,7 +76,11 @@ zsetup-scripts/
 
 共享 bootstrap 构建时嵌入各模块的唯一 APP-install.sh，业务逻辑不复制维护；运行中的入口不会下载自身。旧脚本集中归档到 [legacy/](legacy/README.md)，保存原业务仓库的实际历史源码；根目录不保留旧别名。日常维护与调用使用 fastnet/fastnet-install.sh、ddnsto/ddnsto-install.sh、linkease/linkease-install.sh、fastpve/fastpve-install.sh 或 zsetup install。FastNet仓库仅同步本仓库的生成入口，其他业务仓库保持原状。
 
-当前生产部署只使用 [FastNet 独立发布](docs/fastnet-independent-release.md) 生成的明确文件清单，映射到站点 `/binary/fastnet/` 和共享索引 `/binary/zsetup/config.json`。完整 aggregate 包用于候选验收，不能批量激活其他业务。仓库源码、测试和维护工具不上传网站。版本化脚本与包保持不可变；核心升级使用 zsetup-rust 的独立 Linux 发布流程。
+既有生产部署使用 [FastNet 独立发布](docs/fastnet-independent-release.md) 等历史流程，映射到
+`/binary/APP/` 和共享 `/binary/zsetup/config.json`；这些路径继续保留，不能用完整 aggregate
+包覆盖。新的整体 `apps/` 候选使用独立 `/binary/zsetup-scripts/apps/` 命名空间，只能通过
+上述协调器发布。仓库测试和维护工具不会进入该公共树；版本化脚本保持不可变，核心升级仍
+使用 zsetup-rust 的独立发布流程。
 
 开发与验收：
 

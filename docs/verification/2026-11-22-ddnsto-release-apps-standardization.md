@@ -49,6 +49,11 @@
   config version `apps-c779c40c7a27`。
 - `apps/SHA256SUMS`：`b448f9ea3fd2b45b7035159bc7141b843ddea80a39fa8ff8d7a70d205c811e09`。
 
+后续整体发布协调器说明进入公共 `apps/README.md` 后，唯一变化是该说明文件及清单摘要；
+当前完整候选 `apps/SHA256SUMS` identity 为
+`f0bdc493992caa7d2fc61a9c4ec7ceb5996f0adec2534a01e3490cb0e8943e0d`。
+上述 DDNSTO 安装器、标准入口和两份配置摘要保持不变。
+
 ## 真机与公网验收
 
 - 发布前四个 `/binary/zsetup/config.json` 只读摘要一致，为

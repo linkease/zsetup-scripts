@@ -63,10 +63,19 @@ Corrected candidate identities:
   `dadc68f4ad46157a9a12518357052207caeb41ec424fc4510b67a0cebad23fb8`.
 - Windows: `apps-c779c40c7a27`, 5 records, SHA256
   `21dcbaa47c0a0af14c75164983d83c17d366a0bef44d6f08873dedc2858fd8c1`.
-- Complete `apps/SHA256SUMS` identity:
-  `b448f9ea3fd2b45b7035159bc7141b843ddea80a39fa8ff8d7a70d205c811e09`.
+- Complete `apps/SHA256SUMS` identity after documenting the canonical release
+  coordinator inside the public tree:
+  `f0bdc493992caa7d2fc61a9c4ec7ceb5996f0adec2534a01e3490cb0e8943e0d`.
 
 All contract and application migration suites passed against the corrected
 layout. The standard `scripts/check.sh --native-bin ...` aggregate also exited
 0, including DDNSTO and LinkEase isolated service/package transactions. No
 production upload or activation is authorized by this result.
+
+The repository now owns the production coordinator `scripts/publish-apps.py`.
+It accepts only a physical `binary` root and always derives the public target
+as `binary/zsetup-scripts/apps`; the earlier incorrect `/binary/` mapping is
+not expressible through its interface. The coordinator's local release,
+approval, remote transaction and HTTPS byte-verification contracts are covered
+by `tests/contracts/publish_coordinator_test.py`. This remains development
+evidence only; no production command was run.
