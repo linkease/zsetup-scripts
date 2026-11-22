@@ -19,6 +19,12 @@ class WindowsOperation(unittest.TestCase):
         (self.root/'resources').mkdir();(self.root/'resources/scoop.lock.json').write_text('{}')
         self.script('uname','#!/bin/sh\necho MINGW64_NT\n')
         self.script('client','#!/bin/sh\necho 0.9.1\n')
+        self.script('cygpath','''#!/usr/bin/env python3
+import sys
+p=sys.argv[2]
+if sys.argv[1]=='-w': print(p if len(p)>1 and p[1]==':' else 'C:'+p)
+else: print(p[2:] if len(p)>1 and p[1]==':' else p)
+''')
         self.script('native-jq',f'''#!/usr/bin/env python3
 import subprocess,sys
 p=subprocess.run([{shutil.which('jq')!r}]+[a for a in sys.argv[1:] if a!='--binary'],input=sys.stdin.buffer.read(),capture_output=True)
