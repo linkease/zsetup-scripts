@@ -104,6 +104,16 @@ class NativeRemoval(unittest.TestCase):
         self.assertEqual(body['details']['functionalValidation'],'not-run')
         self.assertFalse(self.log.exists())
 
+    def test_update_selects_new_candidate_instead_of_reusing_installed_version(self):
+        cache=self.bin/'apt-cache'
+        cache.write_text(cache.read_text().replace('Candidate: 1.2.3','Candidate: 9.0.0'))
+        self.req['intent']='update'
+        result,planned=self.call('plan')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(planned['details']['version'],'9.0.0')
+        self.assertFalse(planned['details']['packageAlreadyInstalled'])
+        self.assertFalse(self.log.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

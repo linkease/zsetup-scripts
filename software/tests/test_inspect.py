@@ -18,6 +18,7 @@ class InspectTests(unittest.TestCase):
         self.bin = self.root / 'bin'; self.bin.mkdir()
         self.system = self.root / 'system'; (self.system / 'etc').mkdir(parents=True)
         (self.system / 'etc/openwrt_release').write_text("DISTRIB_ID='iStoreOS'\n")
+        db=self.system / 'usr/lib/opkg'; db.mkdir(parents=True); (db/'status').write_text('')
         self.meta = self.system / 'tmp/run/istore-meta/meta'; self.meta.mkdir(parents=True)
         self.log = self.root / 'calls'
         self.catalog = self.root / 'catalog.json'
