@@ -67,5 +67,13 @@ with open(os.environ['TEST_STATE'],'w') as f:f.write('2.0.0-r1')
         self.assertEqual(b['nativeExitCode'],7)
         self.assertIn('native-package-operation-attempt',b['effects'])
 
+    def test_auto_selects_the_existing_store_integration(self):
+        self.request['method']='auto'
+        planned=self.plan()
+        self.assertEqual(planned['method'],'istore')
+        r,b=self.call('apply')
+        self.assertEqual(r.returncode,0,r.stderr+r.stdout)
+        self.assertEqual(b['details']['installedVersion'],'2.0.0')
+
 
 if __name__=='__main__':unittest.main()
