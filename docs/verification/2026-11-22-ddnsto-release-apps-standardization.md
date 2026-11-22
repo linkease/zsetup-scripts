@@ -11,7 +11,7 @@
 - 不变平台：macOS、Windows CLI、Synology、Asus 的 DDNSTO 产品版本和安装包元数据均不变。
 - 源分支：`main`；准备基线 `1f26f2c173311b585afd51815efa62c9dc60c38a`；
   错误目标的 apps 提交为 `6e9899ab1f64c77e518919fa912ecd7a64f9f79e`；
-  修正后的整体业务候选提交待本地验收完成后记录。
+  修正后的整体业务候选提交为 `527b3ceae26f79b9e3f97a2bc633e8a9902dbdc9`。
 - 用户于 2026-11-22 同意继续发布流程，并确认生产 Server 为
   `root@192.168.3.1`，服务器内容自动同步到 `fw.koolcenter.com` 下载站。
 - 只读 SSH 核验确认 `/mnt/sata3-1/istore-data/public_html/binary/zsetup/config.json`

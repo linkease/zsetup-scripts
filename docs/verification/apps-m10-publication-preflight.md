@@ -49,6 +49,8 @@ and rolled-back snapshot remain as audit evidence.
 
 After rollback, the user selected the literal directory mapping
 `apps/` → `/binary/zsetup-scripts/apps/` and explicitly deferred publication.
+The corrected complete-business source commit is
+`527b3ceae26f79b9e3f97a2bc633e8a9902dbdc9`.
 The generator now prefixes all 130 installer records with
 `zsetup-scripts/apps/`. Standard Shell and PowerShell entries download their
 platform configuration from the nested business namespace, while native
