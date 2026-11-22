@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "ddnsto",
+  "name": "DDNSTO",
+  "version": "0.2.4",
+  "min_zsetup": "0.5.0",
+  "entrypoints": ["sh"],
+  "targets": [
+    {"os": ["openwrt"], "package_manager": ["opkg", "apk"], "arch": ["x86_64", "aarch64", "armv7", "mipsel"]},
+    {"os": ["ubuntu", "debian"], "package_manager": ["apt"], "arch": ["x86_64", "aarch64"]},
+    {"os": ["centos", "rhel"], "package_manager": ["yum", "dnf"], "arch": ["x86_64", "aarch64"]},
+    {"os": ["linux"], "package_manager": ["*"], "arch": ["x86_64", "aarch64"]}
+  ],
+  "compatibility_aliases": ["ddnsto-install.sh"]
+}

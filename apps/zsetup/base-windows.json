@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "source_groups": [
+    {
+      "id": "release",
+      "primary_bases": [
+        "https://dl.istoreos.com/binary",
+        "https://fw.d4ctech.com/binary",
+        "https://fw20.koolcenter.com/binary"
+      ],
+      "fallback_base": "https://fw.koolcenter.com/binary"
+    }
+  ],
+  "stable_zsetup": {
+    "version": "0.6.5",
+    "source_group": "release",
+    "artifacts": [
+      {
+        "arch": "i686",
+        "path": "zsetup/0.6.5/zsetup-windows-i686.exe",
+        "sha256": "07d99ebcaae8739e95d92a510891dd729f7f9da52f898bb19a4360fe6f01ac06",
+        "size": 1879040
+      }
+    ]
+  }
+}

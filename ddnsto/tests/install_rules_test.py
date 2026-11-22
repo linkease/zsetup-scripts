@@ -41,14 +41,20 @@ class InstallRulesTest(unittest.TestCase):
     def test_synology_download_manual_handoff_and_pins(self):
         self.assertIn('synology', self.rules['platforms'])
         synology = self.rules['platforms']['synology']
-        self.assertEqual(synology['architectures'], ['x86_64', 'armv7'])
-        self.assertIn('aarch64', synology['unsupported_architectures'])
+        self.assertEqual(synology['architectures'], ['x86_64', 'armv7', 'aarch64'])
+        self.assertEqual(synology['architecture_constraints'], {
+            'aarch64': 'DSM7 DS220j only; ARM32 SPK compatibility'})
+        self.assertEqual(synology['arm64_compatibility_models'], ['DS220j'])
         self.assertEqual(synology['dsm_minimum_builds'], {'6': 5940, '7': 41890})
         self.assertEqual(synology['client_versions'], {'spk': '4.2.8-7'})
         self.assertEqual(synology['method'], 'download')
-        self.assertEqual(synology['executors'], ['spk-download-manual-handoff'])
-        self.assertEqual(synology['actions'], ['download', 'install'])
+        self.assertEqual(synology['executors'], [
+            'dsm7-package-api-fresh-install', 'synopkg-existing-package',
+            'spk-download-manual-handoff'])
+        self.assertEqual(synology['actions'], ['ensure', 'download', 'install'])
         self.assertEqual(synology['action_results'], {
+            'ensure': {'exit_code': 0, 'local_service_started': True,
+                       'cloud_online_checked': False},
             'download': {'exit_code': 0, 'installation_performed': False, 'manual_handoff_required': True},
             'install': {'exit_code': 20, 'installation_performed': False, 'manual_handoff_required': True},
         })

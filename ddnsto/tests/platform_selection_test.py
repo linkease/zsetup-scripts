@@ -14,13 +14,15 @@ class PlatformSelectionTest(unittest.TestCase):
         script = '''
 set -eu
 . "$BUSINESS"
+. "$CLI"
 ddnsto_appliance_platform() { printf '%s' "$APPLIANCE"; }
 ddnsto_parse_args "$@"
 os=$SYSTEM package_manager=$MANAGER device=$DEVICE
-ddnsto_select_platform
-printf 'SELECTED %s\n' "$business_platform"
+ddnsto_detect_platform
+ddnsto_validate_platform_options
+printf 'SELECTED %s\n' "$detected_platform"
 '''
-        env = os.environ | dict(BUSINESS=str(ROOT / 'ddnsto/business.sh'), SYSTEM=system,
+        env = os.environ | dict(BUSINESS=str(ROOT / 'ddnsto/business.sh'), CLI=str(ROOT / 'ddnsto/managed-cli.sh'), SYSTEM=system,
                                 MANAGER=manager, DEVICE=device, APPLIANCE=appliance)
         return subprocess.run(['sh', '-c', script, 'test', *args], env=env,
                               text=True, capture_output=True)
@@ -47,30 +49,28 @@ printf 'SELECTED %s\n' "$business_platform"
         for appliance in ('synology', 'qnap', 'unraid'):
             with self.subTest(appliance=appliance):
                 r = self.run_selection(appliance=appliance)
-                self.assertEqual(r.returncode, 2, r.stderr)
-                self.assertIn(appliance, r.stderr)
-                self.assertIn('not available', r.stderr)
-                self.assertNotIn('SELECTED', r.stdout)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.strip(), 'SELECTED ' + appliance)
 
     def test_context_device_blocks_generic_linux(self):
         r = self.run_selection(device='synology')
-        self.assertEqual(r.returncode, 2, r.stderr)
-        self.assertIn('synology', r.stderr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), 'SELECTED synology')
 
     def test_context_os_identifies_dsm(self):
         r = self.run_selection(system='dsm')
-        self.assertEqual(r.returncode, 2, r.stderr)
-        self.assertIn('synology', r.stderr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), 'SELECTED synology')
 
     def test_explicit_linux_cannot_override_appliance(self):
         r = self.run_selection(appliance='synology', args=('--platform', 'linux'))
         self.assertEqual(r.returncode, 2, r.stderr)
         self.assertIn('platform mismatch', r.stderr)
 
-    def test_docker_does_not_silently_install_native(self):
+    def test_method_selection_does_not_change_detected_platform(self):
         r = self.run_selection(args=('--method', 'docker'))
-        self.assertEqual(r.returncode, 2, r.stderr)
-        self.assertIn('Docker installer is not available', r.stderr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), 'SELECTED linux')
 
     def test_invalid_and_missing_selectors(self):
         for args in [('--platform',), ('--method',), ('--platform', 'typo'), ('--method', 'typo')]:
@@ -91,7 +91,7 @@ printf 'SELECTED %s\n' "$business_platform"
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('exit 99\n')
                 r = subprocess.run(['sh', '-eu', '-c', '. "$1"; ddnsto_appliance_platform "$2"',
-                                    'test', str(ROOT / 'ddnsto/business.sh'), tmp], capture_output=True, text=True)
+                                    'test', str(ROOT / 'ddnsto/managed-cli.sh'), tmp], capture_output=True, text=True)
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertEqual(r.stdout.strip(), expected)
 
@@ -100,7 +100,7 @@ printf 'SELECTED %s\n' "$business_platform"
             env = os.environ | dict(ZSETUP_INSTALLER_MODE='1', ZSETUP_BIN='/bin/false',
                 ZSETUP_SOURCE_BASES='https://example.invalid', ZSETUP_OS='linux',
                 ZSETUP_PACKAGE_MANAGER='unknown', ZSETUP_ARCH='x86_64', ZSETUP_WORK_DIR=tmp + '/work')
-            r = subprocess.run(['sh', str(ROOT / 'ddnsto/install.sh'), '--platform', 'openwrt'],
+            r = subprocess.run(['sh', str(ROOT / 'ddnsto/ddnsto-install.sh'), '--platform', 'openwrt'],
                                env=env, capture_output=True, text=True, timeout=5)
             self.assertEqual(r.returncode, 2, r.stderr)
             self.assertIn('platform mismatch', r.stderr)

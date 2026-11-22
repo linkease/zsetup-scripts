@@ -1,4 +1,36 @@
 # Only the installer owns these actions. Never infer ownership from a filename.
+ddnsto_linux_state_valid() (
+    state_path=$1
+    ddnsto_linux_lifecycle_safe_path "$state_path" || exit 1
+    [ -f "$state_path" ] && [ ! -L "$state_path" ] || exit 1
+    exec 3< "$state_path" || exit 1
+    state_fields=$(ddnsto_file_fields "$state_path") || exit 1
+    set -- $state_fields
+    [ "$#" = 3 ] && [ "$1" = 0 ] && [ "$3" = 1 ] || exit 1
+    [ "$((0$2 & 0022))" = 0 ] || exit 1
+    state_binary=${bin_path:-${binary:-${DDNSTO_BIN_PATH:-/usr/local/bin/ddnsto}}}
+    state_config=${linux_config_file:-${config:-${DDNSTO_LINUX_CONFIG_DIR:-/etc/ddnsto}/ddnsto-config.json}}
+    IFS= read -r state_schema <&3 &&
+        IFS= read -r state_binary_record <&3 &&
+        IFS= read -r state_config_record <&3 &&
+        ! IFS= read -r state_extra <&3
+    [ "$state_schema" = ddnsto-linux-v1 ] &&
+        [ "$state_binary_record" = "$state_binary" ] &&
+        [ "$state_config_record" = "$state_config" ]
+)
+
+ddnsto_linux_write_state() {
+    state_path=$1
+    ddnsto_linux_lifecycle_safe_path "$state_path" || return 2
+    [ ! -e "$state_path" ] && [ ! -L "$state_path" ] || return 2
+    state_candidate="$lifecycle_backup/state"
+    printf 'ddnsto-linux-v1\n%s\n%s\n' "$bin_path" "$linux_config_file" |
+        ddnsto_privileged tee "$state_candidate" >/dev/null || return 12
+    ddnsto_privileged chmod 0600 "$state_candidate" || return 12
+    # A hard link publishes without replacing a marker created after preflight.
+    ddnsto_privileged ln "$state_candidate" "$state_path" || return 12
+}
+
 ddnsto_linux_unit_exists() {
     case "$linux_service_manager" in
         systemd)

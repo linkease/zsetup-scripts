@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "linkease",
+  "name": "LinkEase",
+  "version": "0.1.9",
+  "min_zsetup": "0.5.0",
+  "entrypoints": ["sh"],
+  "targets": [
+    {"os": ["openwrt"], "package_manager": ["opkg"], "arch": ["x86_64", "aarch64", "armv7"]},
+    {"os": ["ubuntu", "debian"], "package_manager": ["apt"], "arch": ["x86_64", "aarch64", "armv7"]},
+    {"os": ["centos", "rhel"], "package_manager": ["yum", "dnf"], "arch": ["x86_64", "aarch64", "armv7"]},
+    {"os": ["linux"], "package_manager": ["*"], "arch": ["x86_64", "aarch64", "armv7"]}
+  ],
+  "compatibility_aliases": ["linkease-install.sh"]
+}

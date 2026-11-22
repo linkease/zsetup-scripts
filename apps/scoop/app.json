@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "scoop",
+  "name": "Scoop",
+  "version": "0.1.2",
+  "min_zsetup": "0.6.5",
+  "entrypoints": ["ps1"],
+  "targets": [
+    {"os": ["windows"], "package_manager": ["*"], "arch": ["x86_64"]}
+  ],
+  "compatibility_aliases": ["scoop-install.ps1"]
+}

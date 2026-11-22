@@ -1,6 +1,7 @@
 """Maintained-source CLI tests; never bootstrap or alter a host service."""
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -249,10 +250,13 @@ ddnsto_managed_health_probe
     def test_published_native_offline_status_without_sources_or_state(self):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / 'absent'
+            private_native = Path(tmp) / 'zsetup'
+            shutil.copyfile(os.environ['DDNSTO_TEST_NATIVE'], private_native)
+            private_native.chmod(0o700)
             result = shell('''ZSETUP_BIN=$1; installer_prefix=$2; detected_platform=linux; ACTION=status
 unset ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK
 ddnsto_managed_native; ddnsto_managed_action
-''', os.environ['DDNSTO_TEST_NATIVE'], str(prefix))
+''', str(private_native), str(prefix))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('not-installed', result.stdout)
             self.assertFalse(prefix.exists())

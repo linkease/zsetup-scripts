@@ -163,7 +163,9 @@ if tool in ('opkg', 'apk'):
         db.write_text(json.dumps(packages))
         if name == 'ddnsto':
             config = root / 'etc/config/ddnsto'
-            if not config.exists(): config.write_text("config ddnsto\n option enabled '0'\n option index '0'\n")
+            if not config.exists():
+                config.write_text("config ddnsto\n option enabled '0'\n option index '0'\n")
+                config.chmod(0o600)
             for path in (root / 'usr/sbin/ddnstod', root / 'etc/init.d/ddnsto'):
                 path.write_text(pathlib.Path(__file__).read_text()); path.chmod(0o755)
             # Actual pinned init checks enabled before procd_open_instance.

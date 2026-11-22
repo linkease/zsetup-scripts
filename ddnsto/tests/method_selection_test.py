@@ -26,14 +26,17 @@ class MethodSelection(unittest.TestCase):
             script = r'''
 set -eu
 . "$SOURCE/business.sh"
-business_platform=linux
-ddnsto_existing_policy() { INSTALL_SKIPPED=0; }
+. "$SOURCE/managed-cli.sh"
+ddnsto_detect_platform() { detected_platform=linux; }
+ddnsto_validate_platform_options() { :; }
+ddnsto_business_environment_preflight() { :; }
 ddnsto_linux() { echo UNEXPECTED_NATIVE; }
-ddnsto_cleanup() { :; }
-ddnsto_install_locked
+ddnsto_install --action install --token fixture-token
 '''
             r = subprocess.run(['sh', '-c', script], text=True, capture_output=True,
-                env=dict(os.environ, SOURCE=str(ROOT), DDNSTO_DOCKER_STATE_DIR=str(root / 'docker'), WORK_ROOT=tmp))
+                env=dict(os.environ, SOURCE=str(ROOT), DDNSTO_DOCKER_STATE_DIR=str(root / 'docker'),
+                    ZSETUP_BIN='/bin/false', ZSETUP_OS='linux', ZSETUP_PACKAGE_MANAGER='unknown',
+                    ZSETUP_ARCH='x86_64', ZSETUP_SOURCE_BASES='https://fixture.invalid'))
             self.assertEqual(r.returncode, 2, r.stderr)
             self.assertNotIn('UNEXPECTED_NATIVE', r.stdout)
 

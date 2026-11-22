@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "source_groups": [
+    {
+      "id": "koolcenter",
+      "primary_bases": [
+        "https://dl.istoreos.com/binary",
+        "https://fw.d4ctech.com/binary",
+        "https://fw20.koolcenter.com/binary"
+      ],
+      "fallback_base": "https://fw.koolcenter.com/binary"
+    }
+  ],
+  "stable_zsetup": {
+    "version": "0.6.4",
+    "source_group": "koolcenter",
+    "artifacts": [
+      {
+        "arch": "aarch64",
+        "path": "zsetup/0.6.4/zsetup-linux-aarch64",
+        "sha256": "0f444546224cdb6c9bd94687118651dd956b041a96ae0326d221bb45b6260e46",
+        "size": 1992184
+      },
+      {
+        "arch": "armv7",
+        "path": "zsetup/0.6.4/zsetup-linux-armv7",
+        "sha256": "fed34a7beab7bd247a456520a45c7b49ea8340f0d90eab68081e836b47dc25e8",
+        "size": 711340
+      },
+      {
+        "arch": "mipsel",
+        "path": "zsetup/0.6.4/zsetup-linux-mipsel",
+        "sha256": "5055d20faf691bc4100bd8303b29fe362c4679b45beb9908c11688558bf0b47b",
+        "size": 738980
+      },
+      {
+        "arch": "x86_64",
+        "path": "zsetup/0.6.4/zsetup-linux-x86_64",
+        "sha256": "9e87c8bf447cc14eb1a8d2ebfc5cfc2377bed4fcb99539c9175b644f5f10a237",
+        "size": 997436
+      }
+    ]
+  }
+}

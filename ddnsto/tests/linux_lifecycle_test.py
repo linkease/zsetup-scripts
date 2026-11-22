@@ -10,7 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 HARNESS = r'''
 set -eu
 . "$SOURCE/business.sh"
+. "$SOURCE/managed-cli.sh"
+. "$SOURCE/portable-files.sh"
 [ ! -f "$SOURCE/linux-lifecycle.sh" ] || . "$SOURCE/linux-lifecycle.sh"
+# The production marker is root-owned. This unprivileged fixture models only
+# that ownership fact while retaining the real mode and hard-link count.
+ddnsto_file_fields() {
+    set -- $(command stat -c '%u %a %h' "$1")
+    printf '0 %s %s\n' "$2" "$3"
+}
 id() { echo 0; }
 ddnsto_linux_preflight() {
     SUDO=; linux_service_manager=${MANAGER:-systemd}; linux_service_name=com.linkease.ddnstoshell
@@ -66,8 +74,17 @@ systemctl() {
 ddnsto_linux_stop() { systemctl stop "$linux_service_name"; }
 ddnsto_linux_running() { test -f "$FIXTURE/running"; }
 ddnsto_linux_wait_healthy() { [ "$BROKEN" = 0 ] && test -f "$FIXTURE/running"; }
+ddnsto_machine_locked() {
+    mkdir "$DDNSTO_LOCK_DIR" 2>/dev/null || return 16
+    set +e
+    ( "$@" )
+    lock_rc=$?
+    set -e
+    rmdir "$DDNSTO_LOCK_DIR" || return 16
+    return "$lock_rc"
+}
 ddnsto_parse_args --action "$TEST_ACTION" $EXTRA
-ddnsto_with_operation_lock ddnsto_linux_lifecycle
+ddnsto_machine_locked ddnsto_linux_lifecycle
 '''
 
 
@@ -90,6 +107,7 @@ esac
 ''')
         self.binary.chmod(0o755)
         self.marker.write_text(f'ddnsto-linux-v1\n{self.binary}\n{self.config}\n')
+        self.marker.chmod(0o600)
         (self.root / 'unit').write_text(f'[Service]\nExecStart={self.binary} run\n# preserve custom comment\n')
         (self.root / 'enabled').write_text('enabled\n')
         (self.root / 'running').touch()
@@ -155,12 +173,14 @@ esac
         self.assertNotEqual(r.returncode, 0)
         self.assertEqual(self.config.read_bytes(), old)
 
-    def test_retained_config_policy_uses_no_new_credentials(self):
-        self.binary.unlink()
-        self.marker.rename(self.retained)
-        script = '. "$SOURCE/business.sh"; business_platform=linux; ddnsto_parse_args; ddnsto_existing_policy; test "$RETAINED_CONFIG" = 1'
-        r = subprocess.run(['sh', '-eu', '-c', script], env=self.env, text=True, capture_output=True)
+    def test_update_policy_preserves_existing_credentials(self):
+        script = '. "$SOURCE/business.sh"; . "$SOURCE/managed-cli.sh"; ddnsto_parse_args "$@"; test -z "$TOKEN"'
+        r = subprocess.run(['sh', '-eu', '-c', script, 'test', '--action', 'update'],
+                           env=self.env, text=True, capture_output=True)
         self.assertEqual(r.returncode, 0, r.stderr)
+        rejected = subprocess.run(['sh', '-eu', '-c', script, 'test', '--action', 'update', '--token', 'replacement'],
+                                  env=self.env, text=True, capture_output=True)
+        self.assertEqual(rejected.returncode, 2, rejected.stderr)
 
     def test_retained_repeat_refuses_external_service_and_query_error(self):
         self.binary.unlink()

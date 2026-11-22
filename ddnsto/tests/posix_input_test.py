@@ -10,12 +10,14 @@ import tempfile
 import unittest
 
 BUSINESS = Path(__file__).resolve().parents[1] / 'business.sh'
+CLI = Path(__file__).resolve().parents[1] / 'managed-cli.sh'
 
 
 class InputContract(unittest.TestCase):
     def parse(self, *args):
-        return subprocess.run(['sh', '-eu', '-c', '. "$1"; shift; ddnsto_parse_args "$@"; printf "%s" "$TOKEN"',
-                               'test', str(BUSINESS), *args], capture_output=True, text=True)
+        script = 'ddnsto_error() { printf "%s\\n" "$1" >&2; }; . "$1"; shift; ddnsto_parse_args "$@"; printf "%s" "$TOKEN"'
+        return subprocess.run(['sh', '-eu', '-c', script, 'test', str(CLI), *args],
+                              capture_output=True, text=True)
 
     def test_file_input_and_conflicts(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -36,23 +38,36 @@ class InputContract(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertNotIn('private-value', result.stderr)
 
-    def test_openwrt_reuses_existing_token_before_package_changes(self):
-        script = '. "$1"; TOKEN=; business_platform=openwrt; uci() { printf saved-token; }; ddnsto_prepare_token; printf "%s" "$TOKEN"'
-        result = subprocess.run(['sh', '-eu', '-c', script, 'test', str(BUSINESS)], text=True, capture_output=True)
+    def test_explicit_openwrt_install_allows_missing_token(self):
+        result = self.parse('--action', 'install', '--platform', 'openwrt')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, 'saved-token')
+        self.assertEqual(result.stdout, '')
+
+    @staticmethod
+    def linux_metadata_script(command):
+        return f'''
+ddnsto_error() {{ printf '%s\n' "$1" >&2; }}
+status() {{ :; }}
+ddnsto_pinned_sha() {{ printf '%064d\n' 0; }}
+. "$1"
+. "$2"
+TOKEN= ACTION=install BUSINESS_ENV=production arch=x86_64 FORCE_VERSION= VERIFY_STATUS=0
+{command}
+'''
 
     def test_noninteractive_linux_requires_token_without_mutation(self):
-        script = '. "$1"; TOKEN=; business_platform=linux; ddnsto_prepare_token'
-        result = subprocess.run(['sh', '-eu', '-c', script, 'test', str(BUSINESS)], text=True, capture_output=True)
+        script = self.linux_metadata_script('ddnsto_linux_metadata')
+        result = subprocess.run(['sh', '-eu', '-c', script, 'test', str(CLI), str(BUSINESS)],
+                                text=True, capture_output=True)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn('token', result.stderr.lower())
 
     def test_interactive_first_install_reads_visible_token(self):
-        script = '. "$1"; TOKEN=; business_platform=linux; ddnsto_prepare_token; [ "$TOKEN" = private-fixture-token ]'
+        script = self.linux_metadata_script(
+            'ddnsto_linux_metadata; [ "$TOKEN" = private-fixture-token ]')
         pid, terminal = pty.fork()
         if pid == 0:
-            os.execv('/bin/sh', ['sh', '-eu', '-c', script, 'test', str(BUSINESS)])
+            os.execv('/bin/sh', ['sh', '-eu', '-c', script, 'test', str(CLI), str(BUSINESS)])
         output = b''
         sent = False
         deadline = time.monotonic() + 10

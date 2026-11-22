@@ -1,60 +1,48 @@
 #!/usr/bin/env python3
-"""Real installer transactions; replace only downloads and OS service boundaries."""
-import io
+"""Current Linux service adapter tests; never touch the host service manager."""
 import os
 from pathlib import Path
 import subprocess
-import tarfile
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-BINARY = '''#!/bin/sh
-case "${1:-}" in
-  -v) echo VERSION; exit 0 ;;
-  stop|uninstall) exit 0 ;;
-esac
-[ "${1:-}" != -u ] || printf 'new-token' > "$DDNSTO_LINUX_CONFIG_DIR/ddnsto-config.json"
-if [ "VERSION" = new ] && [ "${START_BROKEN:-0}" = 1 ]; then exit 0; fi
-if [ "VERSION" = old ] && [ "${RECOVERY_BROKEN:-0}" = 1 ]; then exit 0; fi
-touch "$SERVICE_ACTIVE"
-printf '{"addr":"127.0.0.1:18334","pid":111,"startedAt":"fixture"}' > "$DDNSTO_LINUX_CONFIG_DIR/.ddnsto_http_addr.json"
-'''
+
 HARNESS = r'''
-. "$BUSINESS"
-[ ! -f "$PRODUCT_PINS" ] || . "$PRODUCT_PINS"
-[ ! -f "$LINUX_SERVICE" ] || . "$LINUX_SERVICE"
-status() { printf '%s\n' "$*" >&2; }
-id() { printf 0; }
-ddnsto_download() { printf 'download\n' >> "$TEST_LOG"; case "$1" in *SHA256SUMS) : > "$2" ;; *) cp "$ARCHIVE" "$2" ;; esac; }
-ddnsto_checksum() { printf '%064d' 0; }
+set -u
+ddnsto_error() { printf '%s\n' "$1" >&2; }
+ddnsto_privileged() { "$@"; }
+id() { [ "${1:-}" = -u ] && { printf 0; return; }; command id "$@"; }
 systemctl() {
-  printf 'systemctl %s\n' "$*" >> "$TEST_LOG"
-  case "$1" in
-    show-environment) [ "${NO_MANAGER:-0}" = 0 ] ;;
-    is-active) test -f "$SERVICE_ACTIVE" ;;
-    stop) [ "${STOP_BROKEN:-0}" = 0 ] || return 25; rm -f "$SERVICE_ACTIVE" "$DDNSTO_LINUX_CONFIG_DIR/.ddnsto_http_addr.json" ;;
-    *) return 1 ;;
-  esac
+    printf 'systemctl %s\n' "$*" >> "$TEST_LOG"
+    case "$1" in
+        show-environment) [ "${NO_MANAGER:-0}" = 0 ] ;;
+        is-active) [ -f "$SERVICE_ACTIVE" ] ;;
+        stop) [ "${STOP_BROKEN:-0}" = 0 ] || return 25; rm -f "$SERVICE_ACTIVE" "$LINUX_CONFIG_DIR/.ddnsto_http_addr.json" ;;
+        *) return 1 ;;
+    esac
 }
 readlink() {
-  case "$*" in
-    /proc/111/exe) [ "${WRONG_PID:-0}" = 0 ] && printf '%s' "$DDNSTO_BIN_PATH" || printf '/unrelated-program' ;;
-    *) command readlink "$@" ;;
-  esac
+    case "$1" in
+        /proc/111/exe) [ "${WRONG_PID:-0}" = 0 ] && printf '%s\n' "$BIN_PATH" || printf '%s\n' /unrelated-program ;;
+        *) command readlink "$@" ;;
+    esac
 }
-curl() { printf 'health %s\n' "$*" >> "$TEST_LOG"; [ "${HEALTH_BROKEN:-0}" = 0 ] && printf ok; }
+curl() {
+    printf 'curl %s\n' "$*" >> "$TEST_LOG"
+    [ "${HEALTH_BROKEN:-0}" = 0 ] && printf ok
+}
 wget() { curl "$@"; }
 sleep() { :; }
-if [ "${TEST_ACTION:-update}" = install ]; then
-    ddnsto_install --token fixture-token
-elif [ "${TEST_ACTION:-update}" = retainedinstall ]; then
-    # Retained reinstall must never receive a credential or prompt for one.
-    ddnsto_prompt_token() { printf 'unexpected Token prompt\n' >&2; return 2; }
-    ddnsto_install --action install
-else
-    ddnsto_install --action update
-fi
+. "$CLI"
+. "$SERVICE"
+linux_service_name=com.linkease.ddnstoshell
+linux_service_manager=systemd
+linux_config_dir=$LINUX_CONFIG_DIR
+linux_config_file=$LINUX_CONFIG_DIR/ddnsto-config.json
+bin_path=$BIN_PATH
+export SERVICE_ACTIVE LINUX_CONFIG_DIR BIN_PATH RECOVERY_BROKEN
+eval "$TEST_BODY"
 '''
 
 
@@ -63,138 +51,107 @@ class LinuxService(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix='ddnsto-linux-service-')
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        (self.root / 'bin').mkdir()
-        (self.root / 'config').mkdir()
-        self.binary = self.root / 'bin/ddnsto'
-        self.config = self.root / 'config/ddnsto-config.json'
-        self.config.write_text('old-token')
-        self.config.chmod(0o600)
-        self.old = BINARY.replace('VERSION', 'old')
-        self.binary.write_text(self.old)
+        self.config_dir = self.root / 'config'
+        self.config_dir.mkdir()
+        self.binary = self.root / 'ddnsto'
+        self.binary.write_text('#!/bin/sh\nexit 0\n')
         self.binary.chmod(0o755)
-        (self.root / 'active').touch()
-        archive = self.root / 'archive.tar.gz'
-        payload = BINARY.replace('VERSION', 'new').encode()
-        with tarfile.open(archive, 'w:gz') as tar:
-            member = tarfile.TarInfo('ddnsto-standard-4.2.8/ddnsto.x86_64')
-            member.size = len(payload)
-            tar.addfile(member, io.BytesIO(payload))
+        self.active = self.root / 'active'
+        self.log = self.root / 'calls'
         self.env = os.environ | {
-            'BUSINESS': str(ROOT / 'business.sh'), 'LINUX_SERVICE': str(ROOT / 'linux-service.sh'),
-            'PRODUCT_PINS': str(ROOT / 'product-pins.sh'),
-            'ZSETUP_BIN': '/unused-native', 'ZSETUP_OS': 'linux', 'ZSETUP_ARCH': 'x86_64',
-            'ZSETUP_PACKAGE_MANAGER': 'unknown', 'ZSETUP_SOURCE_BASES': 'https://fixture.invalid',
-            'ZSETUP_WORK_DIR': str(self.root / 'work'), 'DDNSTO_BIN_PATH': str(self.binary),
-            'DDNSTO_LINUX_CONFIG_DIR': str(self.root / 'config'), 'ARCHIVE': str(archive),
-            'SERVICE_ACTIVE': str(self.root / 'active'), 'TEST_LOG': str(self.root / 'log'),
-            'DDNSTO_LOCK_DIR': str(self.root / 'installer.lock'),
+            'CLI': str(ROOT / 'managed-cli.sh'),
+            'SERVICE': str(ROOT / 'linux-service.sh'),
+            'LINUX_CONFIG_DIR': str(self.config_dir),
+            'BIN_PATH': str(self.binary),
+            'SERVICE_ACTIVE': str(self.active),
+            'TEST_LOG': str(self.log),
+            'RECOVERY_BROKEN': '0',
         }
 
-    def run_install(self, **env):
-        lock = self.root / 'installer.lock'
-        had_lock = lock.exists()
-        result = subprocess.run(['sh', '-eu', '-c', HARNESS], env=self.env | env,
-                                capture_output=True, text=True, timeout=10)
-        self.assertEqual(lock.exists(), had_lock, 'leaked lock or removed foreign lock')
-        return result
+    def healthy_state(self):
+        self.active.touch()
+        (self.config_dir / '.ddnsto_http_addr.json').write_text(
+            '{"addr":"127.0.0.1:18334","pid":111,"startedAt":"fixture"}')
 
-    def test_missing_manager_rejected_before_download_or_replace(self):
-        result = self.run_install(NO_MANAGER='1')
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertEqual(self.binary.read_text(), self.old)
-        self.assertNotIn('download', (self.root / 'log').read_text())
+    def run_body(self, body, **env):
+        return subprocess.run(
+            ['sh', '-eu', '-c', HARNESS], env=self.env | env | {'TEST_BODY': body},
+            capture_output=True, text=True, timeout=10)
 
-    def test_busy_management_lock_rejects_update_before_download(self):
-        lock = self.root / 'installer.lock'
-        lock.mkdir()
-        result = self.run_install()
-        self.assertEqual(result.returncode, 16, result.stderr)
-        self.assertTrue(lock.exists())
-        self.assertFalse((self.root / 'log').exists())
-        self.assertEqual(self.binary.read_text(), self.old)
-
-    def test_unpinned_linux_version_rejected_before_download_or_replace(self):
-        result = self.run_install(DDNSTO_VERSION='9.9.9')
-        self.assertEqual(result.returncode, 11, result.stderr)
-        self.assertEqual(self.binary.read_text(), self.old)
-        self.assertNotIn('download', (self.root / 'log').read_text())
-
-    def test_false_success_restores_binary_and_original_token(self):
-        result = self.run_install(START_BROKEN='1')
-        self.assertNotEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.binary.read_text(), self.old)
-        self.assertEqual(self.config.read_text(), 'old-token')
-        self.assertNotIn('DDNSTO installed;', result.stderr)
-        self.assertTrue((self.root / 'active').exists(), 'old service must restart')
-
-    def test_first_install_false_success_removes_failed_candidate(self):
-        self.binary.unlink()
-        self.config.unlink()
-        (self.root / 'active').unlink()
-        result = self.run_install(START_BROKEN='1', TEST_ACTION='install')
-        self.assertNotEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(self.binary.exists())
-        self.assertFalse(self.config.exists())
-
-    def test_healthy_service_checks_discovered_address(self):
-        result = self.run_install()
+    def test_preflight_accepts_running_systemd(self):
+        result = self.run_body('ddnsto_linux_preflight; printf "%s" "$linux_service_manager"')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('local_service=healthy', result.stderr)
-        self.assertIn('http://127.0.0.1:18334/healthz', (self.root / 'log').read_text())
-        self.assertIn('cloud_status=unverified', result.stderr)
-        self.assertEqual(self.config.read_text(), 'old-token', 'update must not pass -u or overwrite configuration')
-        self.assertFalse(list(self.binary.parent.glob('.ddnsto-backup.*')))
+        self.assertEqual(result.stdout, 'systemd')
 
-    def test_retained_install_without_token_preserves_config_and_identity(self):
-        self.binary.unlink()
-        (self.root / 'active').unlink()
-        # Exercise the complete install transaction, starting from uninstall's
-        # persisted state, rather than just checking the existing-policy flag.
-        config_bytes = b'{\r\n  "token": "retained-token", "routeridx": 7,\r\n  "custom": {"preserve": true}\r\n}\r\n'
-        self.config.write_bytes(config_bytes)
-        identity = self.config.parent / '.ddnsto_boot.cfg'
-        identity_bytes = b'retained-device-identity\x00\r\n'
-        identity.write_bytes(identity_bytes)
-        retained = self.config.parent / '.uninstalled-linux-v1'
-        installed = self.config.parent / '.installer-linux-v1'
-        marker_bytes = f'ddnsto-linux-v1\n{self.binary}\n{self.config}\n'.encode()
-        retained.write_bytes(marker_bytes)
+    def test_preflight_rejects_missing_manager_without_mutation(self):
+        result = self.run_body('ddnsto_linux_preflight', NO_MANAGER='1')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('systemd', result.stderr)
+        self.assertFalse(self.active.exists())
 
-        result = self.run_install(TEST_ACTION='retainedinstall')
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.binary.read_text(), BINARY.replace('VERSION', 'new'))
-        self.assertTrue((self.root / 'active').exists())
-        self.assertIn('local_service=healthy', result.stderr)
-        self.assertIn('cloud_status=unverified', result.stderr)
-        self.assertEqual(self.config.read_bytes(), config_bytes)
-        self.assertEqual(identity.read_bytes(), identity_bytes)
-        self.assertEqual(installed.read_bytes(), marker_bytes)
-        self.assertFalse(retained.exists())
-        self.assertIn('download', (self.root / 'log').read_text())
-        self.assertIn('http://127.0.0.1:18334/healthz', (self.root / 'log').read_text())
-        self.assertFalse(list(self.binary.parent.glob('.ddnsto-backup.*')))
-        self.assertNotIn('retained-token', result.stdout + result.stderr)
+    def test_healthy_service_checks_discovered_local_address(self):
+        self.healthy_state()
+        result = self.run_body('ddnsto_linux_wait_healthy')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('http://127.0.0.1:18334/healthz', self.log.read_text())
 
     def test_other_process_health_does_not_count_as_success(self):
-        result = self.run_install(WRONG_PID='1')
-        self.assertNotEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn('DDNSTO installed;', result.stderr)
+        self.healthy_state()
+        result = self.run_body('ddnsto_linux_wait_healthy', WRONG_PID='1')
+        self.assertEqual(result.returncode, 13, result.stderr)
+        self.assertIn('health check failed', result.stderr)
 
-    def test_health_failure_does_not_count_as_success(self):
-        result = self.run_install(HEALTH_BROKEN='1')
-        self.assertNotEqual(result.returncode, 0, result.stderr)
+    def test_failed_health_endpoint_does_not_count_as_success(self):
+        self.healthy_state()
+        result = self.run_body('ddnsto_linux_wait_healthy', HEALTH_BROKEN='1')
+        self.assertEqual(result.returncode, 13, result.stderr)
 
-    def test_stop_error_cannot_be_hidden_by_old_client_exit_zero(self):
-        result = self.run_install(STOP_BROKEN='1')
+    def test_stop_error_is_propagated(self):
+        self.healthy_state()
+        result = self.run_body('ddnsto_linux_stop', STOP_BROKEN='1')
         self.assertEqual(result.returncode, 25, result.stderr)
-        self.assertEqual(self.binary.read_text(), self.old)
+        self.assertTrue(self.active.exists())
 
-    def test_failed_recovery_keeps_backup_and_reports_manual_action(self):
-        result = self.run_install(START_BROKEN='1', RECOVERY_BROKEN='1')
-        self.assertNotEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(list(self.binary.parent.glob('.ddnsto-backup.*')))
-        self.assertIn('manual recovery', result.stderr)
+    def test_restore_reinstates_binary_config_and_healthy_service(self):
+        backup = self.root / 'backup'
+        backup.mkdir()
+        restored = '''#!/bin/sh
+[ "${RECOVERY_BROKEN:-0}" = 0 ] || exit 0
+touch "$SERVICE_ACTIVE"
+printf '%s' '{"addr":"127.0.0.1:18334","pid":111,"startedAt":"fixture"}' > "$LINUX_CONFIG_DIR/.ddnsto_http_addr.json"
+'''
+        (backup / 'binary').write_text(restored)
+        (backup / 'binary').chmod(0o755)
+        (backup / 'config').write_text('retained-token')
+        (self.config_dir / 'ddnsto-config.json').write_text('candidate-token')
+        self.healthy_state()
+        body = f'backup={backup}; had_old=1; had_config=1; replacement_started=1; ddnsto_linux_restore'
+        result = self.run_body(body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.binary.read_text(), restored)
+        self.assertEqual((self.config_dir / 'ddnsto-config.json').read_text(), 'retained-token')
+        self.assertTrue(self.active.exists())
+
+    def test_failed_recovery_keeps_reviewed_backup(self):
+        backup = self.root / 'backup'
+        backup.mkdir()
+        (backup / 'binary').write_text('#!/bin/sh\nexit 0\n')
+        (backup / 'binary').chmod(0o755)
+        (backup / 'config').write_text('retained-token')
+        (self.config_dir / 'ddnsto-config.json').write_text('candidate-token')
+        self.healthy_state()
+        body = f'backup={backup}; had_old=1; had_config=1; replacement_started=1; ddnsto_linux_restore'
+        result = self.run_body(body, RECOVERY_BROKEN='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((backup / 'binary').exists())
+        self.assertTrue((backup / 'config').exists())
+
+    def test_current_product_identity_is_fixed(self):
+        script = '. "$1"; printf "%s %s" "$(ddnsto_pinned_version standard linux)" "$(ddnsto_pinned_sha linux-binary/ddnsto-standard-4.2.8.tar.gz)"'
+        result = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'product-pins.sh')],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, '4.2.8 3bf7ada14448b5aa04afa171e497f85d0b8bb4adcf2209991e52ef5826d4e975')
 
 
 if __name__ == '__main__':

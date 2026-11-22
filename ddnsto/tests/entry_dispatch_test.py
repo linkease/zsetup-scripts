@@ -5,16 +5,18 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = '. "$BUSINESS"\n' + (ROOT / 'main.sh').read_text().removesuffix('main "$@"\n') + r'''
+SCRIPT = '. "$BUSINESS"\n. "$CLI"\n. "$LAUNCHER"\n' + (ROOT / 'main.sh').read_text().removesuffix('main "$@"\n') + r'''
 ddnsto_local_platform() { detected_platform=$TEST_PLATFORM; }
-ddnsto_offer_install_method() { :; }
+ddnsto_business_environment_preflight() { :; }
 id() { printf 0; }
-ddnsto_with_operation_lock() { printf 'LOCK\n'; "$@"; }
+ddnsto_machine_locked() { printf 'LOCK\n'; "$@"; }
+ddnsto_docker_locked() { printf 'LOCK\n'; ddnsto_docker_lifecycle; }
 ddnsto_docker_lifecycle() { printf 'DOCKER %s %s %s\n' "$ACTION" "$DEVICE_NAME" "$NETWORK"; }
 ddnsto_docker_plan() { printf 'DOCKER_PLAN\n'; }
-ddnsto_linux_lifecycle() { printf 'LINUX %s\n' "$ACTION"; }
-ddnsto_openwrt_lifecycle() { printf 'OPENWRT %s\n' "$ACTION"; }
-ddnsto_manage_service() { printf 'SERVICE %s\n' "$ACTION"; }
+ddnsto_managed_native() { :; }
+ddnsto_managed_action() { printf 'LOCK\nLINUX %s\n' "$ACTION"; }
+ddnsto_openwrt_local() { printf 'OPENWRT %s\n' "$ACTION"; }
+ddnsto_ensure_entry() { printf 'ENSURE\n'; }
 ddnsto_plan() { printf 'NATIVE_PLAN\n'; }
 bootstrap_and_run() { printf 'UNEXPECTED_BOOTSTRAP\n'; return 99; }
 status() { :; }
@@ -26,17 +28,19 @@ class EntryDispatch(unittest.TestCase):
     def test_help_lists_candidate_actions_and_limits(self):
         r = self.invoke('--help')
         self.assertEqual(r.returncode, 0)
-        for action in ['repair', 'configure', 'uninstall', 'download', '--device-name', '--network']:
+        for action in ['ensure', 'repair', 'configure', 'uninstall', 'download', '--env']:
             self.assertIn(action, r.stdout)
         self.assertIn('manual', r.stdout)
+        self.assertIn('Docker: explicit selection only', r.stdout)
 
     def invoke(self, *args, platform='linux'):
         return subprocess.run(['sh', '-eu', '-c', SCRIPT, 'entry', *args],
-            env=dict(os.environ, BUSINESS=str(ROOT / 'business.sh'), TEST_PLATFORM=platform),
+            env=dict(os.environ, BUSINESS=str(ROOT / 'business.sh'), CLI=str(ROOT / 'managed-cli.sh'),
+                     LAUNCHER=str(ROOT.parent / 'lib/install-launcher.sh'), TEST_PLATFORM=platform),
             text=True, capture_output=True)
 
     def test_explicit_docker_install_is_not_native_or_bootstrap(self):
-        r = self.invoke('--method', 'docker', '--device-name', 'test', '--network', 'bridge', '--token', 'fixture')
+        r = self.invoke('--action', 'install', '--method', 'docker', '--device-name', 'test', '--network', 'bridge', '--token', 'fixture')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout, 'LOCK\nDOCKER install test bridge\n')
 
@@ -58,16 +62,10 @@ class EntryDispatch(unittest.TestCase):
             self.assertEqual(r.returncode, 2, r.stderr)
             self.assertEqual(r.stdout, '')
 
-    def test_menu_action_revalidates_installation_options(self):
-        script = SCRIPT.rsplit('main "$@"', 1)[0] + '''
-ddnsto_existing_policy() { INSTALL_SKIPPED=0; ACTION=repair; }
-main "$@"
-'''
-        r = subprocess.run(['sh', '-eu', '-c', script, 'entry', '--force-version', 'standard'],
-            env=dict(os.environ, BUSINESS=str(ROOT / 'business.sh'), TEST_PLATFORM='linux', ZSETUP_INSTALLER_MODE='0'),
-            text=True, capture_output=True)
-        self.assertEqual(r.returncode, 2, r.stderr)
-        self.assertNotIn('LOCK', r.stdout)
+    def test_default_action_routes_to_current_ensure_entry(self):
+        r = self.invoke('--token', 'fixture')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, 'ENSURE\n')
         self.assertNotIn('UNEXPECTED_BOOTSTRAP', r.stdout)
 
 

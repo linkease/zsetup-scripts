@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+APP_ID='@APP_ID@'
+
+@BOOTSTRAP@
+
+bootstrap_zsetup
+exec "$ACTIVE_ZSETUP" install "$APP_ID" --foreground -- "$@"
+

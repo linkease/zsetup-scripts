@@ -1,0 +1,13 @@
+param(
+    [Parameter(ValueFromRemainingArguments=$true)]
+    [string[]]$InstallerArguments
+)
+$ErrorActionPreference = 'Stop'
+$AppId = '@APP_ID@'
+
+@BOOTSTRAP@
+
+$active = Get-ZsetupBootstrap
+& $active install $AppId --foreground -- @InstallerArguments
+exit $LASTEXITCODE
+

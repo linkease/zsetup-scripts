@@ -13,7 +13,18 @@ for app, tests in (("fastnet", ("fastnet_bootstrap_test.py", "fastnet_zsetup_tes
     assert not (module / "install.sh").exists(), "one maintained installer filename per business"
     for filename in tests:
         assert (module / "tests" / filename).is_file(), f"missing {app}/tests/{filename}"
-    assert not (ROOT / "apps" / app).exists(), "one canonical module directory required"
+    # The legacy module remains executable during the migration window, while
+    # apps/ is the canonical, directly publishable server tree.
+    public = ROOT / "apps" / app
+    assert (public / "app.json").is_file(), f"missing apps/{app}/app.json"
+    assert (public / "install.sh").is_file(), f"missing apps/{app}/install.sh"
+public_ids = {path.parent.name for path in (ROOT / "apps").glob("*/app.json")}
+assert public_ids == {
+    "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli",
+    "kspeeder", "linkease", "linkspace", "scoop",
+}
+for app in public_ids:
+    assert not (ROOT / "apps" / app / "tests").exists(), "tests must stay outside the public tree"
 assert (ROOT / "ddnsto/release.py").is_file()
 for filename, app in (("fastnet-install.sh", "fastnet"), ("install_ddnsto.sh", "ddnsto"), ("install_ddnsto_linux.sh", "ddnsto"), ("install_ddnsto_business.sh", "ddnsto"), ("setup_ddnsto.sh", "ddnsto")):
     assert not (ROOT / filename).exists() and not (ROOT / filename).is_symlink(), "legacy names must not occupy the root"

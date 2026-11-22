@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "fastpve",
+  "name": "FastPVE",
+  "version": "0.1.9",
+  "min_zsetup": "0.5.0",
+  "entrypoints": ["sh"],
+  "targets": [
+    {"os": ["debian"], "package_manager": ["apt"], "arch": ["x86_64"]}
+  ],
+  "compatibility_aliases": ["fastpve-install.sh"]
+}

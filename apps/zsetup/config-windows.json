@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "config_version": "apps-ee17d0f7b511",
+  "source_groups": [
+    {
+      "id": "release",
+      "primary_bases": [
+        "https://dl.istoreos.com/binary",
+        "https://fw.d4ctech.com/binary",
+        "https://fw20.koolcenter.com/binary"
+      ],
+      "fallback_base": "https://fw.koolcenter.com/binary"
+    }
+  ],
+  "stable_zsetup": {
+    "version": "0.6.5",
+    "source_group": "release",
+    "artifacts": [
+      {
+        "arch": "i686",
+        "path": "zsetup/0.6.5/zsetup-windows-i686.exe",
+        "sha256": "07d99ebcaae8739e95d92a510891dd729f7f9da52f898bb19a4360fe6f01ac06",
+        "size": 1879040
+      }
+    ]
+  },
+  "installers": [
+    {
+      "application": "jq",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "path": "jq/0.1.0/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "198693a06c38e815a0457751892c81aeb9d23a99739704b7c0c79bf29c3c0b4d",
+      "size": 34450,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "jq",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86",
+      "path": "jq/0.1.0/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "198693a06c38e815a0457751892c81aeb9d23a99739704b7c0c79bf29c3c0b4d",
+      "size": 34450,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "jq",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "path": "jq/0.1.0/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "198693a06c38e815a0457751892c81aeb9d23a99739704b7c0c79bf29c3c0b4d",
+      "size": 34450,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "kai-skills",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "path": "kai-skills/1.2.6/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "1f2384ee35412832370969eb98dbc6b04cfa1230530dba950ca06db1ca2a86a8",
+      "size": 8137,
+      "min_version": "0.6.5"
+    },
+    {
+      "application": "scoop",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "path": "scoop/0.1.2/installer.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "324ba6bd60bffba4af20eb136df839016a8d32c82f0f207684e3cda2eb27fc9c",
+      "size": 44417,
+      "min_version": "0.6.5"
+    }
+  ]
+}

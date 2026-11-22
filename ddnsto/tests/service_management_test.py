@@ -32,6 +32,8 @@ class ManagementTests(unittest.TestCase):
             script = r'''
 set -u
 . "$SOURCE/business.sh"
+. "$SOURCE/managed-cli.sh"
+. "$LAUNCHER"
 . "$SOURCE/docker-lifecycle.sh"
 . "$SOURCE/linux-lifecycle.sh"
 . "$SOURCE/openwrt-lifecycle.sh"
@@ -91,6 +93,19 @@ systemctl() {
 }
 sleep() { :; }
 bootstrap_and_run() { echo 'unexpected download' >&2; exit 99; }
+ddnsto_with_operation_lock() {
+    mkdir "$DDNSTO_LOCK_DIR" 2>/dev/null || return 16
+    "$@"; lock_rc=$?
+    rmdir "$DDNSTO_LOCK_DIR" || return 16
+    return "$lock_rc"
+}
+ddnsto_linux_state_valid() { [ -f "$1" ] && [ ! -L "$1" ]; }
+ddnsto_managed_native() { :; }
+ddnsto_managed_action() { ddnsto_manage_service; }
+ddnsto_machine_locked() { "$@"; }
+ddnsto_openwrt_local() { ddnsto_manage_service; }
+ddnsto_docker_locked() { ddnsto_error 'Docker management is not available'; return 2; }
+ddnsto_synology_entry() { ddnsto_error 'native service management is unavailable for this device'; return 2; }
 set -- --action "$ACTION" $EXTRA
 . "$SOURCE/main.sh"
 '''
@@ -111,6 +126,7 @@ set -- --action "$ACTION" $EXTRA
             rc_update.chmod(0o755)
             result = subprocess.run(['sh', '-c', script], text=True, capture_output=True,
                 env=dict(os.environ, SOURCE=str(ROOT), FIXTURE=folder, PLATFORM=platform,
+                    LAUNCHER=str(ROOT.parent / 'lib/install-launcher.sh'),
                     PATH=folder + os.pathsep + os.environ['PATH'],
                     MANAGER=manager, ACTION=action, FAIL=str(int(fail)), EXTRA=extra,
                     FOREIGN=str(int(foreign)), DROPINS=str(int(dropins)), SWAP_ON_ENABLE=str(int(swap_on_enable)),

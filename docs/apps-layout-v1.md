@@ -1,0 +1,70 @@
+# `apps/` publication layout v1
+
+Status: accepted implementation contract.  The repository `apps/` directory is
+the public release tree: every byte below it may be copied to the download
+server.  Tests, fixtures, build tools, credentials and production connection
+data live outside `apps/`.
+
+## Per-application contract
+
+Each application owns one directory:
+
+```text
+apps/APP/
+  app.json
+  install.sh                 # generated standard POSIX entry, when supported
+  install.ps1                # generated standard Windows entry, when supported
+  COMPATIBILITY-ALIAS        # optional generated or frozen legacy entry
+  VERSION/
+    installer.sh             # immutable POSIX payload, when supported
+    installer.ps1            # immutable Windows payload, when supported
+```
+
+`app.json` is the sole registration source.  The application id equals its
+directory name.  The current payload path is derived from the id, version and
+entrypoint type.  Published version directories are immutable; a byte change
+requires a new version.
+
+The standard entry bootstraps a verified zsetup and runs
+`zsetup install APP --foreground -- "$@"`.  It is never an installer payload.
+Generated zsetup configuration may point only at a versioned `installer.sh` or
+`installer.ps1`, preventing entry recursion.
+
+## Repository and public mapping
+
+The contents of `apps/`, not the directory name, map to the existing `/binary/`
+web root:
+
+```text
+apps/fastnet/install.sh              -> /binary/fastnet/install.sh
+apps/fastnet/0.1.9/installer.sh      -> /binary/fastnet/0.1.9/installer.sh
+apps/zsetup/config.json              -> /binary/zsetup/config.json
+```
+
+`apps/zsetup/config.json`, generated standard entries, compatibility aliases
+and `apps/SHA256SUMS` are committed.  `scripts/build.py --check` detects drift.
+No second release tree is generated.
+
+## Public-tree policy
+
+The tree may contain public application source and documentation.  It must not
+contain tests, fixtures, caches, logs, local overrides, tokens, private keys,
+authorization data, production SSH information, special files or symlinks.
+Production publication requires a clean reviewed Git commit.
+
+Tests mirror applications below `tests/apps/`.  Shared contract and deployment
+tests live below `tests/contracts/`; their fixtures live below `tests/fixtures/`.
+
+## Publication and rollback
+
+The only publication input is `apps/`.  Test deployments may copy it directly.
+Production copies the same bytes to a unique staging directory, verifies
+`SHA256SUMS`, stages immutable version files, snapshots current mutable entries
+and configuration, then activates the complete configuration and entries.
+Publication never uses delete synchronization and never removes business
+products, native zsetup releases or historical installers.
+
+Server resources and production rollout metadata do not belong in `apps/`.
+They are supplied to the publication command or owned by the production
+orchestration repository.
+

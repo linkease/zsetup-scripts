@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "baseline_date": "2026-11-22",
+  "repository_head": "1f26f2c173311b585afd51815efa62c9dc60c38a",
+  "origin_main": "111d29166eef472647837a7e6192ea9a23c9a1d2",
+  "online": {
+    "config_version": "kai-skills-1.2.6-core-0.6.4-b15c854d87ea",
+    "stable_zsetup": "0.6.4",
+    "config_size": 22345,
+    "config_sha256": "2a5813f9b367fb437453f3bfa0fb77b989918e555f369104bba7a87e6e1f4ce0",
+    "applications": ["fastnet", "kai-skills", "ks-cli", "kspeeder", "linkspace"]
+  },
+  "applications": [
+    {
+      "id": "ddnsto", "records": 22, "source_directory": "ddnsto",
+      "sources": ["ddnsto/ddnsto-install.sh"],
+      "paths": ["ddnsto/0.2.4/ddnsto-install.sh"],
+      "entrypoints": ["sh"], "online_indexed": false,
+      "migration": "complex-posix-and-desktop"
+    },
+    {
+      "id": "fastnet", "records": 3, "source_directory": "fastnet",
+      "sources": ["fastnet/fastnet-install.sh"],
+      "paths": ["fastnet/0.1.9/fastnet-install.sh"],
+      "entrypoints": ["sh"], "online_indexed": true,
+      "online_path": "fastnet/0.1.8/fastnet-install.sh", "migration": "pilot"
+    },
+    {
+      "id": "fastpve", "records": 1, "source_directory": "fastpve",
+      "sources": ["fastpve/fastpve-install.sh"],
+      "paths": ["fastpve/0.1.9/fastpve-install.sh"],
+      "entrypoints": ["sh"], "online_indexed": false,
+      "migration": "ordinary-posix"
+    },
+    {
+      "id": "jq", "records": 25, "source_directory": "jq",
+      "sources": ["jq/jq-install.sh", "jq/jq-install.ps1"],
+      "paths": ["jq/0.1.0/jq-install.sh", "jq/0.1.0/jq-install.ps1"],
+      "entrypoints": ["sh", "ps1"], "online_indexed": false,
+      "migration": "cross-platform"
+    },
+    {
+      "id": "kai-skills", "records": 3, "source_directory": "kai-skills",
+      "sources": ["kai-skills/kai-skills-install.sh", "kai-skills/kai-skills-install.ps1"],
+      "paths": ["kai/kai-skills/installers/1.2.6/kai-skills-install.sh", "kai/kai-skills/installers/1.2.6/kai-skills-install.ps1"],
+      "entrypoints": ["sh", "ps1"], "online_indexed": true,
+      "online_path": "installers/1.2.6/kai-skills-install.sh", "migration": "cross-platform"
+    },
+    {
+      "id": "ks-cli", "records": 15, "source_directory": "kspeeder/ks-cli",
+      "sources": ["kspeeder/ks-cli/ks-cli-install.sh"],
+      "paths": ["ks-cli/0.1.0/ks-cli-install.sh"],
+      "entrypoints": ["sh"], "online_indexed": true,
+      "online_path": "ks-cli/0.1.0/ks-cli-install.sh", "migration": "ordinary-posix"
+    },
+    {
+      "id": "kspeeder", "records": 15, "source_directory": "kspeeder/kspeeder",
+      "sources": ["kspeeder/kspeeder/kspeeder-install.sh"],
+      "paths": ["kspeeder/0.1.0/kspeeder-install.sh"],
+      "entrypoints": ["sh"], "online_indexed": true,
+      "online_path": "kspeeder/0.1.0/kspeeder-install.sh", "migration": "ordinary-posix"
+    },
+    {
+      "id": "linkease", "records": 24, "source_directory": "linkease",
+      "sources": ["linkease/linkease-install.sh"],
+      "paths": ["linkease/0.1.9/linkease-install.sh"],
+      "entrypoints": ["sh"], "online_indexed": false,
+      "migration": "complex-posix"
+    },
+    {
+      "id": "linkspace", "records": 21, "source_directory": "linkspace",
+      "sources": ["linkspace/linkspace-install.sh"],
+      "paths": ["linkspace/0.1.1/linkspace-install.sh"],
+      "entrypoints": ["sh"], "online_indexed": true,
+      "online_path": "linkspace/0.1.0/linkspace-install.sh", "migration": "ordinary-posix"
+    },
+    {
+      "id": "scoop", "records": 1, "source_directory": "scoop",
+      "sources": ["scoop/scoop-install.ps1"],
+      "paths": ["scoop/0.1.2/scoop-install.ps1"],
+      "entrypoints": ["ps1"], "online_indexed": false,
+      "migration": "windows"
+    }
+  ],
+  "compatibility_policy": {
+    "default": "generate legacy aliases from the standard entry",
+    "exception": "freeze a legacy entry only when its public behavior cannot yet use the standard entry",
+    "removal": "never remove a published URL during M0-M10"
+  }
+}
+

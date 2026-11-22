@@ -38,6 +38,14 @@ ZSETUP_TEST_NATIVE="$native_bin" TMPDIR="$software_test_tmp" python3 -B -m unitt
 rmdir "$software_test_tmp"
 for software_script in "$root"/software/*.sh; do bash -n "$software_script"; done
 python3 -B "$root/tests/module_layout_test.py"
+python3 -B "$root/scripts/build.py" --check
+python3 -B "$root/scripts/check-public-tree.py" "$root/apps"
+for contract_test in "$root"/tests/contracts/*_test.py; do
+    python3 -B "$contract_test"
+done
+python3 -B "$root/tests/apps/fastnet/migration_test.py"
+python3 -B "$root/tests/apps/ordinary_migrations_test.py"
+python3 -B "$root/tests/apps/complex_migrations_test.py"
 python3 -B "$root/scripts/build-ddnsto-products.py" --check
 python3 -B "$root/tests/ddnsto_release_config_test.py"
 python3 -B "$root/tests/ddnsto_shell_compat_test.py"
@@ -65,7 +73,7 @@ python3 -B "$root/tests/managed_remove_test.py" "$native_bin"
 python3 -B "$root/jq/tests/jq_install_test.py" "$native_bin"
 sh -n "$root/jq/business.sh"
 sh -n "$root/jq/jq-install.sh"
-for script in "$root"/kspeeder/ks-cli/*.sh "$root"/kspeeder/kspeeder/*.sh "$root"/kspeeder/lib/*.sh "$root"/linkspace/*.sh "$root"/fastnet/*.sh "$root"/ddnsto/*.sh "$root"/linkease/*.sh "$root"/fastpve/*.sh "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh; do
+for script in "$root"/kspeeder/ks-cli/*.sh "$root"/kspeeder/kspeeder/*.sh "$root"/kspeeder/lib/*.sh "$root"/linkspace/*.sh "$root"/fastnet/*.sh "$root"/ddnsto/*.sh "$root"/linkease/*.sh "$root"/fastpve/*.sh "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh "$root"/apps/*/*.sh "$root"/apps/*/*/*.sh; do
     sh -n "$script"
 done
 for script in "$root"/legacy/*.sh; do

@@ -103,19 +103,23 @@ case "$1" in
    if [ "$1" = --serviceControl ] && [ "$2" = uninstall ]; then rm -f "$TEST_UNIT"; exit 0; fi
    if [ "$1" = --serviceControl ] && [ "$2" = start ]; then exit "${{START_FAIL:-0}}"; fi
    printf '%s\\n' "$0" >> "$TEST_ACTIONS"
-   if [ '{app}' = ddnsto ]; then mkdir -p /etc/ddnsto; printf '%s\\n' "$2" > /etc/ddnsto/ddnsto-config.json; fi
+   if [ '{app}' = ddnsto ]; then
+     mkdir -p /etc/ddnsto
+     printf '{{"token":"%s","routeridx":0,"supplierCode":""}}\\n' "$2" > /etc/ddnsto/ddnsto-config.json
+     printf '%s' '{{"addr":"127.0.0.1:18334","pid":111,"startedAt":"fixture"}}' > /etc/ddnsto/.ddnsto_http_addr.json
+   fi
    [ "${{FALSE_SUCCESS:-0}}" = 0 ] || exit 0
    # Real DDNSTO reports OK without rewriting an existing service definition.
    if [ '{app}' = ddnsto ] && [ -f "$TEST_UNIT" ]; then exit 0; fi
    printf '[Unit]\\nConditionFileIsExecutable=%s\\n[Service]\\nExecStart=%s "run"\\n' "$0" "$0" > "$TEST_UNIT"
-   if [ '{version}' = 2.0.0 ] && [ "${{BLOCK_REGISTER:-0}}" = 1 ]; then
+   if [ "${{BLOCK_REGISTER:-0}}" = 1 ]; then
        sleep 60 &
        child=$!
        printf '%s\\n' "$child" > "$TEST_SLEEP_PID"
        : > "$TEST_READY"
        wait "$child"
    fi
-   [ '{version}' != 2.0.0 ] || exit "${{INSTALL_FAIL:-0}}"
+   exit "${{INSTALL_FAIL:-0}}"
    exit 0 ;;
 esac
 '''
@@ -141,20 +145,52 @@ def inside():
             executable(bindir / 'curl', '''#!/bin/sh
 out=; url=
 while [ "$#" -gt 0 ]; do
- [ "$1" != -o ] || { shift; out=$1; shift; continue; }
- case "$1" in https://*) url=$1 ;; esac
+ case "$1" in -o|--output) shift; out=$1; shift; continue ;; esac
+ case "$1" in https://*|http://*) url=$1 ;; esac
  shift
 done
-case "$url" in */zsetup/stable) cp "$TEST_STABLE" "$out" ;; *) exit 97 ;; esac
+case "$url" in
+ */zsetup/stable) cp "$TEST_STABLE" "$out"; printf 200 ;;
+ */zsetup/0.5.0/zsetup-linux-x86_64) cp "$TEST_NATIVE" "$out"; printf 200 ;;
+ http://127.0.0.1:18334/healthz) printf ok ;;
+ *) exit 97 ;;
+esac
 ''')
             executable(bindir / 'systemctl', '''#!/bin/sh
 printf 'manager %s\n' "$*" >> "$TEST_ACTIONS"
+if [ "${TEST_CURRENT_DDNSTO:-0}" != 1 ]; then
+ case "$1" in
+  is-active) exit "${HEALTH_FAIL:-0}" ;;
+  stop) exit "${STOP_FAIL:-0}" ;;
+  start) exit "${MANAGER_START_FAIL:-0}" ;;
+  show) [ ! -f "$TEST_UNIT" ] || printf '%s\n' "$TEST_UNIT" ;;
+ esac
+ exit 0
+fi
 case "$1" in
- is-active) exit "${HEALTH_FAIL:-0}" ;;
- stop) exit "${STOP_FAIL:-0}" ;;
- start) exit "${MANAGER_START_FAIL:-0}" ;;
- show) [ ! -f "$TEST_UNIT" ] || printf '%s\n' "$TEST_UNIT" ;;
+ is-active) [ ! -f "$TEST_STOPPED" ] && exit "${HEALTH_FAIL:-0}"; exit 3 ;;
+ stop) [ "${STOP_FAIL:-0}" = 0 ] || exit "$STOP_FAIL"; : > "$TEST_STOPPED" ;;
+ start) [ "${MANAGER_START_FAIL:-0}" = 0 ] || exit "$MANAGER_START_FAIL"; rm -f "$TEST_STOPPED" ;;
+ enable) rm -f "$TEST_DISABLED" ;;
+ disable) : > "$TEST_DISABLED" ;;
+ show)
+   case "$*" in
+    *MainPID*) if [ -f "$TEST_STOPPED" ]; then printf '0\n'; else printf '111\n'; fi ;;
+    *ActiveState*) if [ -f "$TEST_STOPPED" ]; then printf 'inactive\n'; else printf 'active\n'; fi ;;
+    *FragmentPath*) [ ! -f "$TEST_UNIT" ] || printf '%s\n' "$TEST_UNIT" ;;
+    *LoadState*) if [ -f "$TEST_UNIT" ]; then printf 'loaded\n'; else printf 'not-found\n'; fi ;;
+    *NeedDaemonReload*) printf 'no\n' ;;
+    *ExecCondition*|*ExecStartPre*|*ExecStartPost*) : ;;
+    *ExecStart*) [ ! -f "$TEST_UNIT" ] || printf '{ path=/bin/sh ; argv[]=/bin/sh %s/.service-run ; ignore_errors=no ; start_time=[n/a] ; }\n' "${TEST_EXPECTED_EXEC%/*}" ;;
+    *EnvironmentFiles*) : ;;
+    *Environment*) printf '%s\n' 'DDNSTO_TEST_SERVER_ASSIGNMENT_JSON={"serverDomain":"kooldns.cn","legacyControlAddr":"tunnel.kooldns.cn:4445"}' ;;
+    *UnitFileState*) [ ! -f "$TEST_UNIT" ] || { if [ -f "$TEST_DISABLED" ]; then printf 'disabled\n'; else printf 'enabled\n'; fi; } ;;
+    *) : ;;
+   esac ;;
 esac
+''')
+            executable(bindir / 'readlink', '''#!/bin/sh
+if [ "$1" = /proc/111/exe ]; then printf '%s\n' "$TEST_EXPECTED_EXEC"; else exec /usr/bin/readlink "$@"; fi
 ''')
             for app in ('ddnsto', 'linkease'):
                 if os.environ.get('ZSETUP_TEST_APP') not in ('', None, app): continue
@@ -162,24 +198,9 @@ esac
                 prefix = case / '程序 space %n $literal "quote" apostrophe\'' / app
                 home = case / 'home'; home.mkdir()
                 unit = Path('/etc/systemd/system') / f'com.linkease.{"ddnstoshell" if app == "ddnsto" else "linkeasedaemon"}.service'
-                script = ROOT / app / f'{app}-install.sh'
-                entry = f'{app}/storage-test/{app}-install.sh'
-                Handler.bodies[f'/binary/{entry}'] = script.read_bytes()
                 base = f'https://127.0.0.1:{server.server_address[1]}/binary'
-                config = case / 'config.json'
-                config.write_text(json.dumps({'schema_version':1,'config_version':'service-storage',
-                    'source_groups':[{'id':'fixture','primary_bases':[base]}],
-                    'stable_zsetup':{'version':native_version,'source_group':'fixture','artifacts':[{'arch':'x86_64','path':'unused','sha256':'00'*32,'size':1}]},
-                    'installers':[{'application':app,'os':'*','package_manager':'*','arch':'*','source_group':'fixture','path':entry,'sha256':hashlib.sha256(script.read_bytes()).hexdigest(),'size':script.stat().st_size,'background':False,'min_version':native_version}]}))
-                env = os.environ | {'HOME':str(home), 'PATH':f'{bindir}:/usr/bin:/bin',
-                    'ZSETUP_BIN':native, 'ZSETUP_INSTALLER_MODE':'1', 'ZSETUP_OS':'ubuntu',
-                    'ZSETUP_PACKAGE_MANAGER':'apt', 'ZSETUP_ARCH':'x86_64',
-                    'ZSETUP_SOURCE_BASES':f'https://127.0.0.1:{server.server_address[1]}/binary',
-                    'ZSETUP_SOURCE_FALLBACK':'', 'ZSETUP_CA_FILE':str(root / 'ca.crt'),
-                    'ZSETUP_CONFIG':str(config),'ZSETUP_CONFIG_CACHE':str(case / 'config-cache'),'ZSETUP_MANAGED_ROOT':str(case / 'managed'),
-                    'ZSETUP_ROOT':str(case / 'bootstrap'),'ZSETUP_BOOTSTRAP_BASES':base,'TEST_STABLE':str(stable),
-                    'ZSETUP_INSTALL_PREFIX':str(prefix), 'TEST_UNIT':str(unit), 'TEST_ACTIONS':str(case / 'actions'), 'TEST_RUN_PATH':str(case / 'run-path')}
-                for version in ('1.0.0', '2.0.0', '3.0.0'):
+                versions = ('4.2.8',) if app == 'ddnsto' else ('1.0.0', '2.0.0', '3.0.0')
+                for version in versions:
                     stream = io.BytesIO()
                     with tarfile.open(fileobj=stream, mode='w:gz') as tar:
                         for binary in ([app] if app == 'ddnsto' else [app, 'heif-converter', 'linkease-media']):
@@ -202,12 +223,45 @@ esac
                     sums = ''.join(f'{hashlib.sha256(body).hexdigest()}  {filename}\n' for filename, body in files.items()).encode()
                     if app == 'ddnsto': Handler.bodies[f'{folder}/SHA256SUMS'] = Handler.bodies.get(f'{folder}/SHA256SUMS', b'') + sums
                     else: Handler.bodies[f'{folder}/SHA256SUMS'] = sums
-                def run(version='1.0.0', changes=None, extra=(), mode='ready'):
-                    args = ['--token', (changes or {}).get('TEST_TOKEN', '令牌 space $literal')] if app == 'ddnsto' else ['--version', version]
+                script = ROOT / app / f'{app}-install.sh'
+                if app == 'ddnsto':
+                    fixture_archive = Handler.bodies['/binary/ddnsto/linux-binary/ddnsto-standard-4.2.8.tar.gz']
+                    source = script.read_text()
+                    official = '3bf7ada14448b5aa04afa171e497f85d0b8bb4adcf2209991e52ef5826d4e975'
+                    assert official in source
+                    script = case / 'ddnsto-install.sh'
+                    script.write_text(source.replace(official, hashlib.sha256(fixture_archive).hexdigest()))
+                    script.chmod(0o755)
+                entry = f'{app}/storage-test/{app}-install.sh'
+                Handler.bodies[f'/binary/{entry}'] = script.read_bytes()
+                config = case / 'config.json'
+                config.write_text(json.dumps({'schema_version':1,'config_version':'service-storage',
+                    'source_groups':[{'id':'fixture','primary_bases':[base]}],
+                    'stable_zsetup':{'version':native_version,'source_group':'fixture','artifacts':[{'arch':'x86_64','path':'unused','sha256':'00'*32,'size':1}]},
+                    'installers':[{'application':app,'os':'*','package_manager':'*','arch':'*','source_group':'fixture','path':entry,'sha256':hashlib.sha256(script.read_bytes()).hexdigest(),'size':script.stat().st_size,'background':False,'min_version':native_version}]}))
+                env = os.environ | {'HOME':str(home), 'PATH':f'{bindir}:/usr/bin:/bin',
+                    'ZSETUP_BIN':native, 'ZSETUP_INSTALLER_MODE':'1', 'ZSETUP_OS':'ubuntu',
+                    'ZSETUP_PACKAGE_MANAGER':'apt', 'ZSETUP_ARCH':'x86_64',
+                    'ZSETUP_SOURCE_BASES':f'https://127.0.0.1:{server.server_address[1]}/binary',
+                    'ZSETUP_SOURCE_FALLBACK':'', 'ZSETUP_CA_FILE':str(root / 'ca.crt'),
+                    'ZSETUP_CONFIG':str(config),'ZSETUP_CONFIG_CACHE':str(case / 'config-cache'),'ZSETUP_MANAGED_ROOT':str(case / 'managed'),
+                    'ZSETUP_ROOT':str(case / 'bootstrap'),'ZSETUP_BOOTSTRAP_BASES':base,
+                    'TEST_STABLE':str(stable), 'TEST_NATIVE':native,
+                    'ZSETUP_INSTALL_PREFIX':str(prefix), 'TEST_UNIT':str(unit), 'TEST_ACTIONS':str(case / 'actions'),
+                    'TEST_RUN_PATH':str(case / 'run-path'),
+                    'TEST_EXPECTED_EXEC':str(prefix / 'versions' / ('4.2.8' if app == 'ddnsto' else '1.0.0') / 'bin' / app),
+                    'TEST_STOPPED':str(case / 'stopped'), 'TEST_DISABLED':str(case / 'disabled'),
+                    'TEST_CURRENT_DDNSTO':'1' if app == 'ddnsto' else '0'}
+                default_version = '4.2.8' if app == 'ddnsto' else '1.0.0'
+                mutation_version = '4.2.8' if app == 'ddnsto' else '2.0.0'
+                latest_version = '4.2.8' if app == 'ddnsto' else '3.0.0'
+                def run(version=default_version, changes=None, extra=(), mode='ready'):
+                    args = ['--token', (changes or {}).get('TEST_TOKEN', 'fixture-token')] if app == 'ddnsto' else ['--version', version]
                     command = [native,'install',app,'--foreground','--'] if mode == 'indexed' else ['sh',str(script)]
                     return subprocess.run([*command, *extra, *args], env=env | {'DDNSTO_VERSION':version,'ZSETUP_INSTALLER_MODE':'0' if mode == 'direct' else '1'} | (changes or {}), text=True, capture_output=True, timeout=30)
                 first = run(mode='direct', extra=['--installer-prefix',str(prefix),'--'])
-                assert first.returncode == 0, first
+                actions = (case / 'actions').read_text() if (case / 'actions').exists() else ''
+                assert first.returncode == 0, (first, actions)
                 assert not Handler.counts.get(f'/binary/{entry}'), 'running script downloaded itself'
                 installed = prefix / 'current/bin' / app
                 assert installed.is_file(), installed
@@ -225,22 +279,26 @@ esac
                     library.chmod(0o755)
                 counts = dict(Handler.counts)
                 indexed = run(mode='indexed')
-                assert indexed.returncode == 0, indexed
+                actions = (case / 'actions').read_text() if (case / 'actions').exists() else ''
+                assert indexed.returncode == 0, (indexed, actions)
                 assert Handler.counts[f'/binary/{entry}'] == 1
                 assert all(Handler.counts[k] == count for k, count in counts.items() if not k.endswith('SHA256SUMS'))
-                wrong_arch=run(changes={'ZSETUP_ARCH':'aarch64'})
-                assert wrong_arch.returncode==2 and 'architecture' in wrong_arch.stderr,wrong_arch
+                wrong_arch_value = 'armv7' if app == 'ddnsto' else 'aarch64'
+                wrong_arch=run(changes={'ZSETUP_ARCH':wrong_arch_value})
+                assert wrong_arch.returncode==2 and ('E_ARCH' in wrong_arch.stderr or 'architecture' in wrong_arch.stderr),wrong_arch
                 old = installed.resolve()
                 old_config = Path('/etc/ddnsto/ddnsto-config.json').read_bytes() if app == 'ddnsto' else None
-                for failure in ('VERSION_FAIL', 'INSTALL_FAIL', 'HEALTH_FAIL'):
-                    bad = run('2.0.0', {failure:'37', 'TEST_TOKEN':'replacement token'})
+                failures = () if app == 'ddnsto' else ('VERSION_FAIL', 'INSTALL_FAIL', 'HEALTH_FAIL')
+                for failure in failures:
+                    bad = run(mutation_version, {failure:'37', 'TEST_TOKEN':'fixture-token'})
                     assert bad.returncode != 0 and installed.resolve() == old, (failure, bad)
                     assert (prefix / 'current/bin' / app).resolve() == old
                     if app == 'ddnsto': assert Path('/etc/ddnsto/ddnsto-config.json').read_bytes() == old_config
                 # Previously separate business regressions: stop-before-change,
                 # malformed arguments and archive traversal never mutate service.
-                stopped = run(changes={'STOP_FAIL':'38'})
-                assert stopped.returncode == 38 and installed.resolve() == old, stopped
+                if app == 'linkease':
+                    stopped = run(changes={'STOP_FAIL':'38'})
+                    assert stopped.returncode == 38 and installed.resolve() == old, stopped
                 for extra in (['--not-a-business-option'], ['--installer-scope','invalid']):
                     before=(case/'actions').read_bytes()
                     bad=run(extra=extra)
@@ -265,59 +323,63 @@ esac
                     assert traversal.returncode==11 and mutations((case/'actions').read_bytes())==mutations(before),traversal
                     assert not (root/'escape').exists()
                     Handler.bodies[zip_path],Handler.bodies[sum_path]=original_zip,original_sums
-                false = run('2.0.0', {'FALSE_SUCCESS':'1'})
-                assert false.returncode != 0 and installed.resolve() == old, false
-                # Root coordinator cancellation joins the native register tree,
-                # then restores service/config. Another staging root must not
-                # bypass the destination lock while registration is blocked.
-                ready = case / 'ready'; sleeper = case / 'sleep-pid'
-                blocked_args = ['--token','replacement token'] if app == 'ddnsto' else ['--version','2.0.0']
-                proc = subprocess.Popen(['sh',str(script),*blocked_args], env=env | {'DDNSTO_VERSION':'2.0.0', 'BLOCK_REGISTER':'1', 'TEST_READY':str(ready), 'TEST_SLEEP_PID':str(sleeper)}, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                try:
-                    deadline = time.monotonic() + 15
-                    while not ready.exists() and proc.poll() is None and time.monotonic() < deadline: time.sleep(.02)
-                    assert ready.exists(), proc.communicate(timeout=2)
-                    concurrent = run('2.0.0', extra=['--installer-work-dir',str(case / 'other-staging')])
-                    assert concurrent.returncode == 2 and proc.poll() is None, concurrent
-                    proc.send_signal(signal.SIGTERM)
-                    out, err = proc.communicate(timeout=15)
-                    assert proc.returncode == 143 and installed.resolve() == old, (proc.returncode, out, err)
-                    assert not Path('/proc',sleeper.read_text().strip()).exists()
-                    assert not list((prefix / '.staging').iterdir())
-                    assert not list((case / 'other-staging').iterdir())
-                    assert not (prefix / '.service-lock').exists()
-                    if app == 'ddnsto': assert Path('/etc/ddnsto/ddnsto-config.json').read_bytes() == old_config
-                finally:
-                    if proc.poll() is None: proc.terminate(); proc.communicate(timeout=15)
-                recovery=run('2.0.0',{'MANAGER_START_FAIL':'37'})
-                assert recovery.returncode==37 and 'recovery incomplete' in recovery.stderr,recovery
-                assert (prefix/'.service-lock').exists()
-                retained=list((prefix/'.staging').glob('.transaction.*'))
-                assert len(retained)==1 and (retained[0]/'old-unit').is_file()
-                assert installed.resolve()==old
-                # The test operator performs manual recovery only in this private
-                # fixture after all native children have returned/joined.
-                shutil.rmtree(prefix/'versions/2.0.0')
-                shutil.rmtree(retained[0]); shutil.rmtree(prefix/'.staging/.install-lock')
-                shutil.rmtree(prefix/'.service-lock')
-                second = run('2.0.0'); assert second.returncode == 0, second
-                third = run('3.0.0'); assert third.returncode == 0, third
-                assert sorted(p.name for p in (prefix / 'versions').iterdir()) == ['2.0.0', '3.0.0']
-                bg_args=['--token','background token'] if app=='ddnsto' else ['--version','3.0.0']
-                background=subprocess.run([native,'install',app,'--background','--',*bg_args],env=env|{'DDNSTO_VERSION':'3.0.0'},text=True,capture_output=True,timeout=10)
+                if app == 'linkease':
+                    false = run(mutation_version, {'FALSE_SUCCESS':'1'})
+                    assert false.returncode != 0 and installed.resolve() == old, false
+                    # Root coordinator cancellation joins the native register tree,
+                    # then restores service/config. Another staging root must not
+                    # bypass the destination lock while registration is blocked.
+                    ready = case / 'ready'; sleeper = case / 'sleep-pid'
+                    blocked_args = ['--version',mutation_version]
+                    proc = subprocess.Popen(['sh',str(script),*blocked_args], env=env | {'DDNSTO_VERSION':mutation_version, 'BLOCK_REGISTER':'1', 'TEST_READY':str(ready), 'TEST_SLEEP_PID':str(sleeper)}, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    try:
+                        deadline = time.monotonic() + 15
+                        while not ready.exists() and proc.poll() is None and time.monotonic() < deadline: time.sleep(.02)
+                        assert ready.exists(), proc.communicate(timeout=2)
+                        concurrent = run(mutation_version, extra=['--installer-work-dir',str(case / 'other-staging')])
+                        assert concurrent.returncode == 2 and proc.poll() is None, concurrent
+                        proc.send_signal(signal.SIGTERM)
+                        out, err = proc.communicate(timeout=15)
+                        assert proc.returncode == 143 and installed.resolve() == old, (proc.returncode, out, err)
+                        assert not Path('/proc',sleeper.read_text().strip()).exists()
+                        assert not list((prefix / '.staging').iterdir())
+                        assert not list((case / 'other-staging').iterdir())
+                        assert not (prefix / '.service-lock').exists()
+                    finally:
+                        if proc.poll() is None: proc.terminate(); proc.communicate(timeout=15)
+                    recovery=run(mutation_version,{'MANAGER_START_FAIL':'37'})
+                    assert recovery.returncode==37 and 'recovery incomplete' in recovery.stderr,recovery
+                    assert (prefix/'.service-lock').exists()
+                    retained=list((prefix/'.staging').glob('.transaction.*'))
+                    assert len(retained)==1 and (retained[0]/'old-unit').is_file()
+                    assert installed.resolve()==old
+                    # The test operator performs manual recovery only in this private
+                    # fixture after all native children have returned/joined.
+                    shutil.rmtree(prefix/'versions'/mutation_version)
+                    shutil.rmtree(retained[0]); shutil.rmtree(prefix/'.staging/.install-lock')
+                    shutil.rmtree(prefix/'.service-lock')
+                    second = run(mutation_version); assert second.returncode == 0, second
+                    third = run(latest_version); assert third.returncode == 0, third
+                    assert sorted(p.name for p in (prefix / 'versions').iterdir()) == ['2.0.0', '3.0.0']
+                else:
+                    assert sorted(p.name for p in (prefix / 'versions').iterdir()) == ['4.2.8']
+                bg_args=['--token','fixture-token'] if app=='ddnsto' else ['--version',latest_version]
+                background=subprocess.run([native,'install',app,'--background','--',*bg_args],env=env|{'DDNSTO_VERSION':latest_version},text=True,capture_output=True,timeout=10)
                 assert background.returncode==0,background
                 fields=dict(field.split('=',1) for field in shlex.split(background.stdout))
                 result=Path(fields['result']); deadline=time.monotonic()+15
                 while not result.exists() and time.monotonic()<deadline: time.sleep(.05)
-                assert result.read_text().strip()=='0',Path(fields['log']).read_text()
-                assert '[4/4]' in Path(fields['log']).read_text()
+                background_log = Path(fields['log']).read_text()
+                assert result.read_text().strip()=='0', background_log
+                assert ('安装成功' in background_log) if app == 'ddnsto' else ('[4/4]' in background_log)
                 assert run(extra=['--installer-scope','user']).returncode == 2
                 # Non-systemd is an explicitly deferred mapping, with no unit mutation.
                 actions = (case / 'actions').read_text()
                 Path('/run/systemd/system').rmdir()
                 try:
                     unsupported = run(mode='indexed')
-                    assert unsupported.returncode == 2 and 'legacy' in unsupported.stderr, unsupported
+                    expected_manager_error = 'E_SERVICE_MANAGER' if app == 'ddnsto' else 'legacy'
+                    assert unsupported.returncode == 2 and expected_manager_error in unsupported.stderr, unsupported
                     assert (case / 'actions').read_text() == actions
                 finally: Path('/run/systemd/system').mkdir()
                 # Unknown installation/service must never be stopped or overwritten.
@@ -331,7 +393,7 @@ esac
                 # First-install registration failure has no previous unit/version.
                 fresh_home=case/'fresh-home'; fresh_home.mkdir()
                 fresh_prefix=case/'fresh-install'
-                failed_first=run('2.0.0',{'HOME':str(fresh_home),'ZSETUP_INSTALL_PREFIX':str(fresh_prefix),'INSTALL_FAIL':'37'})
+                failed_first=run(mutation_version,{'HOME':str(fresh_home),'ZSETUP_INSTALL_PREFIX':str(fresh_prefix),'INSTALL_FAIL':'37'})
                 assert failed_first.returncode==37,failed_first
                 assert not unit.exists() and not (fresh_prefix/'current').exists()
                 assert not list((fresh_prefix/'versions').iterdir())

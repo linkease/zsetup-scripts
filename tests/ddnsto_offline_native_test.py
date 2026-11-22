@@ -17,6 +17,10 @@ class OfflineNative(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.native = self.root / 'rescue/0.5.0/zsetup'
         self.native.parent.mkdir(parents=True)
+        # Current fixed-identity discovery requires every cache directory to
+        # be private, matching the bootstrap publisher's 0700 layout.
+        for directory in (self.root / 'rescue', self.native.parent):
+            directory.chmod(0o700)
         self.native.write_text('#!/bin/sh\nprintf "zsetup 0.5.0\\n"\n')
         self.native.chmod(0o700)
         self.digest = hashlib.sha256(self.native.read_bytes()).hexdigest()

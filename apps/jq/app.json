@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "jq",
+  "name": "jq",
+  "version": "0.1.0",
+  "min_zsetup": "0.5.0",
+  "entrypoints": ["sh", "ps1"],
+  "targets": [
+    {"os": ["linux", "ubuntu", "debian", "istoreos", "openwrt"], "package_manager": ["*"], "arch": ["x86_64", "aarch64", "armv7", "mipsel"]},
+    {"os": ["macos"], "package_manager": ["*"], "arch": ["x86_64", "aarch64"]},
+    {"os": ["windows"], "package_manager": ["*"], "arch": ["x86_64", "aarch64", "x86"]}
+  ],
+  "compatibility_aliases": ["jq-install.sh", "jq-install.ps1"]
+}
