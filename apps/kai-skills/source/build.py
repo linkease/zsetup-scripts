@@ -9,8 +9,8 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parent
-BOOTSTRAP = ROOT.parent / "lib/bootstrap.sh"
-WINDOWS_BOOTSTRAP = ROOT.parent / "lib/bootstrap.ps1"
+BOOTSTRAP = ROOT.parents[2] / "lib/bootstrap.sh"
+WINDOWS_BOOTSTRAP = ROOT.parents[2] / "lib/bootstrap.ps1"
 
 
 def sha(path):
