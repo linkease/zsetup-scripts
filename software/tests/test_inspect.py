@@ -103,6 +103,29 @@ sys.exit(37)
         self.assertEqual(body['details']['packages'][0]['installedVersion'], '2.0.0-r1')
         self.assertNotIn('unexpected-store-mutation', self.log.read_text())
 
+    def test_read_query_resolves_unique_business_name_case_and_keeps_ownership_unknown(self):
+        request = self.root / 'case-query.json'
+        request.write_text(json.dumps({'software': 'SAMPLE-AGENT', 'targetId': 'local'}))
+        result = subprocess.run(['bash', str(ROOT / 'software/task.sh'), 'inspect', str(request)], env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        body = json.loads(result.stdout)
+        self.assertEqual(body['details']['canonicalSoftwareId'], 'sample-agent')
+        self.assertEqual(body['details']['packages'][0]['installedVersion'], '2.0.0-r1')
+        self.assertEqual(body['details']['decision'], 'unconfirmed')
+        self.assertNotIn('unexpected-store-mutation', self.log.read_text())
+        self.installed_meta()
+        result = subprocess.run(['bash', str(ROOT / 'software/task.sh'), 'inspect', str(request)], env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(json.loads(result.stdout)['details']['decision'], 'no-update')
+
+    def test_case_ambiguous_catalog_is_not_selected_arbitrarily(self):
+        data = json.loads(self.catalog.read_text())
+        data['result']['apps'].append({**data['result']['apps'][0], 'name': 'SAMPLE-AGENT'})
+        self.catalog.write_text(json.dumps(data))
+        result, body = self.call()
+        self.assertEqual(result.returncode, 20, result.stderr + result.stdout)
+        self.assertEqual(body['reason'], 'ambiguous-software-identity')
+        self.assertEqual(body['effects'], [])
+
     def test_catalog_failure_is_not_no_update(self):
         self.script('zsetup', '#!/bin/sh\nif [ "$1" = --version ]; then echo "zsetup 0.5.1"; exit; fi\nexit 7\n')
         r, body = self.call()
