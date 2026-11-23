@@ -95,8 +95,11 @@ sys.exit(37)
 
     def test_missing_store_ownership_is_not_implicitly_adopted(self):
         r, body = self.call()
-        self.assertEqual(r.returncode, 20, r.stderr + r.stdout)
-        self.assertEqual(body['reason'], 'store-ownership-unconfirmed')
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        self.assertEqual(body['status'], 'success')
+        self.assertEqual(body['details']['decision'], 'unconfirmed')
+        self.assertEqual(body['details']['missingEvidence'], ['store-ownership'])
+        self.assertEqual(body['reason'], 'inspected')
         self.assertEqual(body['details']['packages'][0]['installedVersion'], '2.0.0-r1')
         self.assertNotIn('unexpected-store-mutation', self.log.read_text())
 

@@ -39,6 +39,18 @@ with open(os.environ['TEST_STATE'],'w') as f:f.write('2.0.0-r1')
         r,b=self.call('plan');self.assertEqual(r.returncode,0,r.stderr+r.stdout)
         self.request['plan']=b['details'];return b['details']
 
+    def test_unknown_store_ownership_query_does_not_authorize_a_plan(self):
+        (self.meta / 'sample-agent.json').unlink()
+        result, body = self.call('inspect')
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertEqual(body['status'], 'success')
+        self.assertEqual(body['details']['decision'], 'unconfirmed')
+        result, body = self.call('plan')
+        self.assertEqual(result.returncode, 20, result.stderr + result.stdout)
+        self.assertEqual(body['reason'], 'store-ownership-unconfirmed')
+        self.assertEqual(body['effects'], [])
+        self.assertNotIn('store-write', self.log.read_text())
+
     def test_plan_declares_native_hooks_without_installing(self):
         planned=self.plan()
         self.assertEqual(planned['method'],'istore')
