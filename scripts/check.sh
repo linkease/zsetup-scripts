@@ -45,6 +45,7 @@ ZSETUP_TEST_NATIVE="$native_bin" TMPDIR="$software_test_tmp" python3 -B -m unitt
 rmdir "$software_test_tmp"
 for software_script in "$root"/software/*.sh; do bash -n "$software_script"; done
 python3 -B "$root/tests/module_layout_test.py"
+python3 -B "$root/tests/apps/kai-skills/test_builder_bootstrap.py"
 python3 -B "$root/scripts/build.py" --check
 python3 -B "$root/scripts/check-public-tree.py" "$root/apps"
 for contract_test in "$root"/tests/contracts/*_test.py; do
