@@ -39,19 +39,18 @@ apps/ddnsto/                  # run.ddnsto.com 的路径映射根
 
 | 用户地址 | 下载站地址 |
 |---|---|
-| `https://run.ddnsto.com/install.sh` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.sh` |
-| `https://run.ddnsto.com/install.ps1` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.ps1` |
-| `https://run.ddnsto.com/ddnsto-install/<路径>` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/ddnsto-install/<路径>` |
+| `https://run.ddnsto.com/install.sh` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/_sites/run.ddnsto.com/install.sh` |
+| `https://run.ddnsto.com/install.ps1` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/_sites/run.ddnsto.com/install.ps1` |
+| `https://run.ddnsto.com/ddnsto-install/<路径>` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/_sites/run.ddnsto.com/<路径>` |
 
 后缀路径逐项保留；未知路径返回 404。根 `/` 可选映射到 `install.sh`，控制台不依赖根路径。
-不能将所有请求重定向到旧 `install_ddnsto_linux.sh`。
-`ddnsto-install.sh` 保留为历史兼容的原生索引入口；控制台使用 `install.sh`、
-`install.ps1` 的跨平台推荐协议。本次不新增 DDNSTO 的原生 Windows 索引记录。
-先发布标准入口及其完整依赖、配置并回读上述映射，再发布引用新地址的控制台和官网。
-发布树不再生成 `i` / `i.ps1`；若要兼容已复制的命令，由运维将旧路径重定向至标准路径。
-这些路由需要单独上线；本地生成、测试通过不代表线上已经切换。
-维护源码、模板、推荐配置和 app.json 均在发布树外的 `sources/ddnsto/`。
-`apps/ddnsto/` 仅保留运行产物；说明和审核记录在 `docs/`，不部署。
+不能将所有请求重定向到旧 `install_ddnsto_linux.sh`。应用标准入口位于
+`apps/ddnsto/install.sh` 和 `install.ps1`；网站推荐协议位于
+`apps/_sites/run.ddnsto.com/`。Windows 已作为 DDNSTO v0.3.0 的标准索引目标。
+维护源码、模板和推荐配置位于 `sources/ddnsto/`，唯一注册清单位于
+`apps/ddnsto/app.json`；说明和审核记录在 `docs/`，不部署。
+发布树不生成 `i`、`i.ps1` 或 `ddnsto-install.sh` 兼容入口。这些路由需要单独上线；
+本地生成、测试通过不代表线上已经切换。
 
 短入口、推荐清单和指南应 `Cache-Control: no-store`，执行器的摘要路径可 immutable。资源缺失应返回真实 404，不回退 HTML。仅文本内容，不需要网关动态渲染。脚本代码更新不要求重新构建控制台；修改客户端推荐仍遵守 `platform-releases.json` 的唯一维护源约束。
 

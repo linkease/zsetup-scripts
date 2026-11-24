@@ -25,18 +25,19 @@ def package_site(args):
         spec = importlib.util.spec_from_file_location('recommendation', ROOT / 'scripts/package-ddnsto-recommendation.py')
         recommendation = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(recommendation)
-        current = stage / 'ddnsto-install/current'
+        current = stage / 'current'
         recommendation.package(argparse.Namespace(
             source_root=ROOT, source_url=ORIGIN + '/ddnsto-install/current',
             output=current, reviewed_shell_sha256=args.reviewed_shell_sha256,
             reviewed_powershell_sha256=args.reviewed_powershell_sha256,
-            candidate_version='0.2.4', native_first=args.native_first))
-        for alias, entry in [('install.sh', 'recommended-entry.sh'), ('install.ps1', 'recommended-entry.ps1')]:
-            shutil.copyfile(current / entry, stage / alias)
+            candidate_version='0.3.0', native_first=args.native_first))
+        for entry, target in [('recommended-entry.sh', 'install.sh'),
+                              ('recommended-entry.ps1', 'install.ps1')]:
+            shutil.copyfile(current / entry, stage / target)
         guide = (ROOT / 'sources/ddnsto/agent/install.md').read_bytes()
         if b'installer.invalid' in guide or ORIGIN.encode() not in guide:
             raise ValueError('agent guide must use the published installation origin')
-        guide_root = stage / 'ddnsto-install/agent'
+        guide_root = stage / 'agent'
         guide_root.mkdir(parents=True)
         (guide_root / 'install.md').write_bytes(guide)
         history = guide_root / 'versions' / hashlib.sha256(guide).hexdigest()

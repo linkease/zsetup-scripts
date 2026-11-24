@@ -1,5 +1,7 @@
 # 迁移盘点与任务树
 
+> 本文记录历史迁移库存；当前应用入口和目录规范以 [apps layout v2](apps-layout-v2.md) 为准。
+
 日期：2026-10-07。开始时目标仓库 `deef63b`、源业务仓库 `13bfb75` 都干净；zsetup 所在工作区 `ee0f11a` 仅有用户已有的 `SocksTun-iOS` 子模块改动，禁止覆盖。
 
 读取了三个仓库 README、适用 AGENTS、zsetup CONTEXT/需求/产品原则、S6 配置协议、生命周期、Roadmap/里程碑/实施计划、发布与 0.2.3 Race 修复证据。当前 stable 0.2.3，默认 Race 30 秒覆盖 DoH/UDP/system 解析链；此迁移不修改 Zig 下载内核、runtime 或解析行为。

@@ -18,7 +18,7 @@
   `sources/ddnsto/<文件名>` 是生成副本。
   生成脚本开头有提示，不应直接修改生成副本。`install-rules.json` 也由模板生成。
   其他没有模板的模块继续直接维护；当前版本自包含入口位于
-  `apps/ddnsto/0.2.4/installer.sh`。
+  `apps/ddnsto/versions/0.3.0/install.sh`。
 - 包命名、路径布局、架构映射、解包方式继续由平台模板负责；本次不支持通过配置任意改变安装协议。
   常规版本更新不需修改模板；上游改变包布局或启动参数时仍需要适配代码。
 - Linux 与 OpenWrt 已拆开目标版本；OpenWrt standard/lite 当前共用该平台推荐版本。

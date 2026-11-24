@@ -26,42 +26,22 @@
 
 群晖自动安装、升级和启动已发布至测试站 `/i`：DSM 7 原生 SPK，管理员 sudo 授权，保留配置且不降级。DS220j / DSM 7.1 已验证空白新装、4.2.7-7 升级到 4.2.8-7、停止后启动及重复执行。新装通过 DSM 本机套件中心 API 传递 Token，安装至默认卷；接受已校验摘要的 DDNSTO 第三方包，不改全局信任策略。发现卸载残留或账号不同会拒绝覆盖。其他机型及 DSM 6 尚未完成真机验收。ARM64 仅开放已验证的 DS220j ARM32 兼容路径，不代表全部 ARM64 群晖。正式环境未更新，详见 [群晖验证记录](../docs/verification/2026-11-09-synology-auto.md)。
 
-> 当前测试候选为 0.2.4，默认动作已改为无菜单的 `ensure`，客户端固定 4.2.8。请以 [默认流程说明与验收记录](../docs/verification/2026-11-09-ddnsto-autoinstall.md) 和 `install-rules.json` 为准。下面保留的是历史入口说明，其中版本、可选 Token、在线检查和动态 VERSION 描述不适用于新的默认流程。测试站部署不代表正式入口已更新。
+> 当前标准安装器版本为 0.3.0，默认动作是无菜单的 `ensure`。客户端产品版本由 `platform-releases.json` 独立维护；安装器版本不等于客户端版本。
 
-Linux/OpenWrt 的统一入口为 `ddnsto-install.sh`，由本目录 `business.sh`、`main.sh` 和共享 `../lib/bootstrap.sh` 生成；普通执行和 `zsetup install ddnsto` 使用同一业务实现。Windows 和 macOS 使用同目录的原生入口 `install.ps1` 与 `install-macos.sh`，安装已发布的 DDNSTO CLI 归档并注册平台服务。Linux/OpenWrt 入口依赖 zsetup >=0.2.4，不调用 awk/sed。
+Linux、OpenWrt 和 macOS 统一使用 `apps/ddnsto/install.sh`；Windows 使用 `apps/ddnsto/install.ps1`。两个标准入口都调用 zsetup，同一版本的不可变实现位于 `apps/ddnsto/versions/0.3.0/install.*`。维护源码位于 `sources/ddnsto/`。
 
 发布后用户入口：
 
 ```sh
 zsetup install ddnsto -- --token 'YOUR_TOKEN'
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/ddnsto-install.sh)" -- --token 'YOUR_TOKEN'
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.sh)" -- --token 'YOUR_TOKEN'
 ```
 
 OpenWrt 支持 opkg/apk × x86_64/aarch64/armv7/mipsel；总内存低于 900 MiB 自动选 Lite，可传 `--force-version lite|standard`。token 可选；`--verify-status` 请求服务检查。Linux 支持 x86_64/aarch64，默认 Standard 4.2.3，无终端时必须提供 token。Windows 入口支持 x86_64 CLI 4.2.1，在 Windows 10 x64 WOW64 / PowerShell 5.1 验证范围内使用计划任务启动；macOS 入口支持 Intel/Apple Silicon CLI 4.2.1，使用用户级 launchd。Windows/macOS 的 4.2.1 归档 SHA256 固定在入口脚本中，升级新版本前必须更新脚本、测试和发布配置。参数、退出码及交互详情见 [统一协议](../docs/ai-contract.md)。
 
-本模块包含：
+应用接口只包含 `app.json`、两个标准入口和 `versions/`。产品文件由 DDNSTO 业务发布流程提前部署到独立 `/binary/ddnsto/`；测试位于 `tests/apps/ddnsto/`，不会复制到服务器。
 
-- business.sh/main.sh/ddnsto-install.sh：维护源码与唯一生成入口。
-- release.py：将同一 ddnsto-install.sh 发布到旧兼容 URL；产品包不在本仓库构建或打包。
-- tests/：通过隔离 HTTPS 产品服务器验证双入口、平台、参数、缓存、进度和失败回收。
-
-服务器完整模块目录（产品文件由业务发布流程提前部署，本仓库仅发布 ddnsto-install.sh 及兼容入口）：
-
-```text
-binary/ddnsto/
-  0.1.4/ddnsto-install.sh
-  ddnsto-install.sh
-  install.sh          # 原 URL 的同字节兼容副本
-  openwrt/VERSION
-  openwrt/VERSION_LITE
-  openwrt/<standard|lite|standard-apk|lite-apk>/<VERSION>/包与 SHA256SUMS
-  linux-binary/ddnsto-standard-4.2.3.tar.gz
-  linux-binary/SHA256SUMS
-  openwrt/<install_ddnsto.sh|install_ddnsto_business.sh|setup_ddnsto.sh>
-  linux-binary/install_ddnsto_linux.sh
-```
-
-兼容 URL 发布为与 ddnsto-install.sh 相同的实际文件，无须服务器支持符号链接。旧源仓库与已上线旧文件不得在迁移验证前删除。仓库中的历史源码位于 [legacy/](../legacy/README.md)，不进入发布包；当前入口为 ddnsto/ddnsto-install.sh。business/main、Python 工具、测试和 README 不发布。
+DDNSTO 是 [apps layout v2](../apps-layout-v2.md) 标杆，不提供兼容别名。标准入口只有 `install.sh` 和 `install.ps1`，不可变实现位于 `versions/0.3.0/`。网站短入口属于 `_sites/run.ddnsto.com/`；business、Python 工具、测试和 README 不进入应用发布目录。
 
 模块命令（从仓库根目录执行）：
 

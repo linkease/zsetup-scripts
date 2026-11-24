@@ -224,8 +224,9 @@ if [ "$1" = /proc/111/exe ]; then printf '%s\n' "$TEST_EXPECTED_EXEC"; else exec
                     sums = ''.join(f'{hashlib.sha256(body).hexdigest()}  {filename}\n' for filename, body in files.items()).encode()
                     if app == 'ddnsto': Handler.bodies[f'{folder}/SHA256SUMS'] = Handler.bodies.get(f'{folder}/SHA256SUMS', b'') + sums
                     else: Handler.bodies[f'{folder}/SHA256SUMS'] = sums
-                version = {'ddnsto': '0.2.4', 'linkease': '0.1.9'}[app]
-                script = ROOT / 'apps' / app / version / 'installer.sh'
+                script = (ROOT / 'apps/ddnsto/versions/0.3.0/install.sh'
+                          if app == 'ddnsto'
+                          else ROOT / 'apps/linkease/0.1.9/installer.sh')
                 if app == 'ddnsto':
                     fixture_archive = Handler.bodies['/binary/ddnsto/linux-binary/ddnsto-standard-4.2.8.tar.gz']
                     source = script.read_text()

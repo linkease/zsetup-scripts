@@ -1,263 +1,240 @@
-﻿# Stable Windows PowerShell 5.1 template. No remote expressions or downloaded
-# native executable are used to establish trust. Lifecycle belongs to install.ps1.
-param([string]$Token, [string]$TokenFile, [string]$Version,
-      [string]$InstallDir, [string]$Platform, [string]$Method,
-      [switch]$Plan, [string]$Action,
-      [ValidateSet('test', 'production')][string]$Environment,
-      [switch]$SwitchEnvironment)
-Set-PSDebug -Off
+﻿param(
+    [Parameter(ValueFromRemainingArguments=$true)]
+    [string[]]$InstallerArguments
+)
 $ErrorActionPreference = 'Stop'
-$forward = @{} + $PSBoundParameters
-$base = 'https://run.ddnsto.com/ddnsto-install/current'
-$cacheKey = 'f921b355dad55be6d831d30e52d2af6e9a2c3c57bf9c41ee0f91ff28acdb27e6'
-$script:entryCode = 11
-$script:entryMessage = $null
-$work = $null
-$lease = $null
+$AppId = 'ddnsto'
+$ConfigPrimaryUrls = @('https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/config-windows.json', 'https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/config-windows.json', 'https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config-windows.json')
+$ConfigFallbackUrl = 'https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config-windows.json'
 
-function Stop-Recommendation([string]$Reason, [string]$Next, [int]$Code = 11) {
-    $script:entryCode = $Code
-    $script:entryMessage = "DDNSTO：$Reason；状态=推荐入口未执行安装；下一步=$Next；code=$Code"
-    throw $script:entryMessage
+# Shared first-dependency bootstrap. Business packages use canonical zsetup.
+# Kept separate from business functions and embedded by the entry generator.
+$script:BootstrapPrimaryBases = @('https://dl.istoreos.com/binary', 'https://fw.d4ctech.com/binary', 'https://fw20.koolcenter.com/binary')
+$script:BootstrapFallbackBase = 'https://fw.koolcenter.com/binary'
+if ($env:ZSETUP_BOOTSTRAP_BASES) {
+    $script:BootstrapPrimaryBases = @($env:ZSETUP_BOOTSTRAP_BASES -split '\s+' | Where-Object { $_ })
+    $script:BootstrapFallbackBase = ''
+}
+$script:BootstrapInsecureConfirmed = $false
+$script:BootstrapArtifact = 'zsetup-windows-i686.exe'
+
+function Get-BootstrapUri([string]$Base, [string]$Path, [string]$Scheme) {
+    $uri = [Uri]$Base
+    if (-not $uri.IsAbsoluteUri -or $uri.Scheme -ne 'https' -or $uri.UserInfo -or $uri.Query -or $uri.Fragment) {
+        throw 'zsetup: bootstrap bases must be HTTPS URLs without credentials, query or fragment'
+    }
+    $builder = [UriBuilder]::new($uri.AbsoluteUri.TrimEnd('/') + '/' + $Path)
+    $builder.Scheme = $Scheme
+    if ($uri.IsDefaultPort) { $builder.Port = -1 }
+    return $builder.Uri.AbsoluteUri
 }
 
-function Assert-SafePath([string]$Path, [switch]$Private) {
-    $item = Get-Item -LiteralPath $Path -Force
-    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-        Stop-Recommendation '缓存含重解析路径' '选择本人私有目录' 12
+function Initialize-BootstrapTrust {
+    if ('LinkeaseBootstrapTrust' -as [type]) { return }
+    # A constant delegate runs without a PowerShell runspace on TLS worker threads.
+    # Extra roots apply only to this process/request, never to the machine store.
+    Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
+public static class LinkeaseBootstrapTrust {
+    private static X509Certificate2Collection roots = new X509Certificate2Collection();
+    public static readonly RemoteCertificateValidationCallback Callback = Validate;
+    public static void Clear() {
+        foreach (X509Certificate2 root in roots) root.Dispose();
+        roots.Clear();
     }
-    $acl = Get-Acl -LiteralPath $Path
-    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    $trusted = @($sid, 'S-1-5-18', 'S-1-5-32-544') # user, SYSTEM, administrators
-    if (-not $Private) {
-        # Windows volume roots may be owned/maintained by TrustedInstaller.
-        # Trust its exact service SID only for ancestors, never private cache
-        # objects. Do not trust arbitrary service SIDs or localized names.
-        $trusted += 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464'
+    public static void Configure(string path) {
+        Clear();
+        if (new FileInfo(path).Length > 131072) throw new IOException("CA file exceeds bootstrap bound");
+        string pem = File.ReadAllText(path);
+        foreach (Match m in Regex.Matches(pem, "-----BEGIN CERTIFICATE-----([\\s\\S]*?)-----END CERTIFICATE-----")) {
+            roots.Add(new X509Certificate2(Convert.FromBase64String(m.Groups[1].Value)));
+        }
+        if (roots.Count == 0) throw new IOException("CA file contains no certificate");
     }
-    # An untrusted ancestor owner can rewrite its DACL even when no ACE grants
-    # write access today. Ownership is required at every level, not just cache.
-    if ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $trusted) {
-        Stop-Recommendation '缓存所有者不安全' '选择本人私有目录' 12
-    }
-    foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
-        # InheritOnly applies to descendants, not the object being inspected.
-        # Each existing descendant is checked separately along the path.
-        if ($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) { continue }
-        if ($rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow -or
-            $rule.IdentityReference.Value -in $trusted) { continue }
-        # Ancestors may permit creating new children (e.g. volume root), but
-        # must not permit deleting/replacing existing children or changing ACLs.
-        $mask = [Security.AccessControl.FileSystemRights]::Delete -bor
-                [Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
-                [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
-                [Security.AccessControl.FileSystemRights]::TakeOwnership
-        if ($Private) { $mask = $mask -bor [Security.AccessControl.FileSystemRights]::Write }
-        if ($rule.FileSystemRights -band $mask) {
-            Stop-Recommendation '缓存权限不安全' '移除其他用户的写入权限' 12
+    private static bool Validate(object sender, X509Certificate certificate, X509Chain supplied, SslPolicyErrors errors) {
+        if (certificate == null || (errors & (SslPolicyErrors.RemoteCertificateNameMismatch | SslPolicyErrors.RemoteCertificateNotAvailable)) != 0) return false;
+        using (X509Certificate2 leaf = new X509Certificate2(certificate))
+        using (X509Chain chain = new X509Chain()) {
+            chain.ChainPolicy.ExtraStore.AddRange(roots);
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority;
+            if (!chain.Build(leaf)) return false;
+            foreach (X509ChainStatus status in chain.ChainStatus) {
+                if ((status.Status & ~X509ChainStatusFlags.UntrustedRoot) != 0) return false;
+            }
+            if (chain.ChainElements.Count == 0) return false;
+            string thumbprint = chain.ChainElements[chain.ChainElements.Count - 1].Certificate.Thumbprint;
+            foreach (X509Certificate2 root in roots) if (root.Thumbprint == thumbprint) return true;
+            return false;
         }
     }
 }
-
-function New-PrivateDirectory([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) {
-        $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
-        $acl = New-Object Security.AccessControl.DirectorySecurity
-        $acl.SetOwner($sid)
-        $acl.SetAccessRuleProtection($true, $false)
-        $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl',
-            'ContainerInherit,ObjectInherit', 'None', 'Allow')
-        $acl.AddAccessRule($rule)
-        # Windows PowerShell/.NET Framework creates the directory with its ACL,
-        # avoiding a create-then-protect interval.
-        [IO.Directory]::CreateDirectory($Path, $acl) | Out-Null
-    }
-    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
-        Stop-Recommendation '缓存路径不是目录' '选择本人私有目录' 12
-    }
-    Assert-SafePath $Path -Private
+'@ -ErrorAction Stop
 }
 
-function Receive-Bounded([string]$Url, [string]$Path, [int]$Limit) {
-    $response = $null; $stream = $null; $file = $null
-    $timer = [Diagnostics.Stopwatch]::StartNew()
+function Get-BootstrapFile([string]$Base, [string]$Path, [string]$Scheme, [string]$Destination, [long]$Limit) {
+    $uri = Get-BootstrapUri $Base $Path $Scheme
+    $previous = [Net.ServicePointManager]::ServerCertificateValidationCallback
     try {
-        $target = [Uri]$Url
-        $redirects = 0
-        while ($true) {
-            # Validate BEFORE creating any request, including relative Location
-            # resolution. TLS validation remains the platform default.
-            if (-not $target.IsAbsoluteUri -or $target.Scheme -ne 'https' -or $target.UserInfo) {
-                Stop-Recommendation '重定向地址不安全' '只允许 HTTPS 下载地址' }
-            $remaining = 20000 - [int]$timer.ElapsedMilliseconds
-            if ($remaining -le 0) { return $false }
-            $request = [Net.HttpWebRequest]::Create($target)
-            $request.AllowAutoRedirect = $false
-            $request.Timeout = $remaining
-            $request.ReadWriteTimeout = [Math]::Min(5000, $remaining)
-            try { $response = $request.GetResponse() }
-            catch [Net.WebException] {
-                if ($_.Exception.Response) { $response = $_.Exception.Response }
-                elseif ($_.Exception.Status -in @([Net.WebExceptionStatus]::NameResolutionFailure,
-                            [Net.WebExceptionStatus]::ConnectFailure, [Net.WebExceptionStatus]::Timeout)) { return $false }
-                else { Stop-Recommendation 'HTTPS 校验失败' '检查证书和网络' }
-            }
-            $status = [int]$response.StatusCode
-            if ($status -notin @(301, 302, 303, 307, 308)) { break }
-            if ($redirects -ge 5) {
-                Stop-Recommendation '重定向次数超过限制' '检查发布地址，最多允许五次跳转' }
-            $location = $response.Headers['Location']
-            if ([string]::IsNullOrWhiteSpace($location)) {
-                Stop-Recommendation '重定向地址缺失' '检查发布配置' }
-            try { $target = [Uri]::new($target, $location) }
-            catch { Stop-Recommendation '重定向地址非法' '检查发布配置' }
-            $redirects++
-            $response.Close(); $response = $null
+        if ($env:ZSETUP_CA_FILE -and $Scheme -eq 'https') {
+            Initialize-BootstrapTrust
+            [LinkeaseBootstrapTrust]::Configure($env:ZSETUP_CA_FILE)
+            [Net.ServicePointManager]::ServerCertificateValidationCallback = [LinkeaseBootstrapTrust]::Callback
         }
-        if ($status -in @(404, 500, 502, 503, 504)) { return $false }
-        if ($status -ne 200 -or $response.ContentLength -gt $Limit) {
-            Stop-Recommendation '推荐源响应异常' '检查发布路径、大小及重定向' }
-        $stream = $response.GetResponseStream()
-        $file = [IO.File]::Open($Path, 'Create', 'Write', 'None')
-        $buffer = New-Object byte[] 8192
-        $total = 0
-        while ($true) {
-            try { $count = $stream.Read($buffer, 0, [Math]::Min($buffer.Length, $Limit - $total + 1)) }
-            catch {
-                # PowerShell wraps Read exceptions. .NET Framework and .NET
-                # may report timeout via WebException or IOException/SocketException.
-                # Classify typed timeouts only; integrity, TLS and other I/O
-                # failures must not turn into permission to use stale cache.
-                $readError = $_.Exception
-                while ($readError) {
-                    if ($readError -is [TimeoutException] -or
-                        ($readError -is [Net.WebException] -and $readError.Status -eq [Net.WebExceptionStatus]::Timeout) -or
-                        ($readError -is [Net.Sockets.SocketException] -and $readError.SocketErrorCode -eq [Net.Sockets.SocketError]::TimedOut)) {
-                        return $false
-                    }
-                    $readError = $readError.InnerException
-                }
-                throw
-            }
-            $total += $count
-            if ($total -gt $Limit) {
-                Stop-Recommendation '下载超过大小限制' '核对发布文件后重试' }
-            if ($timer.Elapsed.TotalSeconds -gt 20) { return $false }
-            if ($count -eq 0) { break }
-            $file.Write($buffer, 0, $count)
-        }
+        # Native PowerShell transport is only for the first dependency. OutFile
+        # streams bytes; installer packages never pass through this function.
+        Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $Destination -TimeoutSec 30 -MaximumRedirection 0 -ErrorAction Stop | Out-Null
+        $length = (Get-Item -LiteralPath $Destination -ErrorAction Stop).Length
+        if ($length -le 0 -or $length -gt $Limit) { throw 'bootstrap file exceeds size bound' }
         return $true
+    } catch {
+        Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
+        return $false
     } finally {
-        if ($file) { $file.Dispose() }
-        if ($stream) { $stream.Dispose() }
-        if ($response) { $response.Close() }
+        [Net.ServicePointManager]::ServerCertificateValidationCallback = $previous
+        if ('LinkeaseBootstrapTrust' -as [type]) { [LinkeaseBootstrapTrust]::Clear() }
     }
 }
 
-function Read-Recommendation([string]$Path) {
-    Assert-SafePath $Path -Private
-    $info = Get-Item -LiteralPath $Path
-    if ($info.PSIsContainer -or $info.Length -gt 128) { Stop-Recommendation '清单大小无效' '重新取得完整推荐' }
-    $bytes = [IO.File]::ReadAllBytes($Path)
-    # ASCII-only strict LF framing; no JSON duplicate keys, shell parsing or eval.
-    $text = [Text.Encoding]::ASCII.GetString($bytes)
-    $match = [regex]::Match($text, '\Addnsto-recommendation-v1-powershell\n([0-9a-f]{64})\n([1-9][0-9]{0,6})\n\z')
-    if (-not $match.Success -or [int]$match.Groups[2].Value -gt 8388608) {
-        Stop-Recommendation '推荐清单非法' '联系发布者核对清单' }
-    return @{ Digest = $match.Groups[1].Value; Size = [int]$match.Groups[2].Value }
+function Confirm-BootstrapHttp {
+    if ($script:BootstrapInsecureConfirmed) { return }
+    [Console]::Error.WriteLine('zsetup: all HTTPS bootstrap sources failed; HTTP and its checksum metadata can be replaced by an attacker.')
+    if ($env:ZSETUP_CONFIRM_FILE) {
+        $file = Get-Item -LiteralPath $env:ZSETUP_CONFIRM_FILE -ErrorAction Stop
+        if ($file.Length -gt 1024) { throw 'zsetup: invalid confirmation file' }
+        $answer = ([IO.File]::ReadAllText($file.FullName) -split '\r?\n')[0]
+    } else {
+        if ([Console]::IsInputRedirected) { throw 'zsetup: HTTP bootstrap refused because no interactive confirmation is available' }
+        try { $answer = Read-Host 'Continue with insecure HTTP bootstrap? [y/N]' }
+        catch { throw 'zsetup: HTTP bootstrap refused because no interactive confirmation is available' }
+    }
+    if (@('y', 'Y', 'yes', 'YES') -cnotcontains $answer) { throw 'zsetup: insecure HTTP bootstrap declined' }
+    $script:BootstrapInsecureConfirmed = $true
+    [Console]::Error.WriteLine('zsetup: user accepted insecure HTTP bootstrap')
 }
 
-function Test-Installer([string]$Path, $Metadata) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
-    Assert-SafePath $Path -Private
-    if ((Get-Item -LiteralPath $Path).Length -ne $Metadata.Size) { return $false }
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ieq $Metadata.Digest
+function Get-BootstrapBases { return @($script:BootstrapPrimaryBases) + @($script:BootstrapFallbackBase | Where-Object { $_ }) }
+
+function Get-BootstrapMetadata([string]$Scheme, [string]$Stable, [string]$Sums) {
+    foreach ($base in (Get-BootstrapBases)) {
+        if (-not (Get-BootstrapFile $base 'zsetup/stable-windows' $Scheme $Stable 128)) { continue }
+        $version = [IO.File]::ReadAllText($Stable).TrimEnd([char[]]"`r`n")
+        if ($version.Length -gt 64 -or $version -cnotmatch '^([0-9]+)\.([0-9]+)\.([0-9]+)([-+][A-Za-z0-9._+-]+)?$') { continue }
+        try { $compatible = [Version]::new([int]$Matches[1], [int]$Matches[2], [int]$Matches[3]) } catch { continue }
+        if ($compatible -lt [Version]'0.3.0') { continue }
+        if (-not (Get-BootstrapFile $base "zsetup/$version/SHA256SUMS" $Scheme $Sums 65536)) { continue }
+        $hashes = @()
+        foreach ($line in [IO.File]::ReadAllLines($Sums)) {
+            $fields = @($line -split '\s+' | Where-Object { $_ })
+            if ($fields.Count -eq 2 -and $fields[1].TrimStart('*') -ceq $script:BootstrapArtifact) { $hashes += $fields[0] }
+        }
+        if ($hashes.Count -ne 1 -or $hashes[0] -cnotmatch '^[0-9a-fA-F]{64}$') { continue }
+        return @{ Version = $version; Sha256 = $hashes[0] }
+    }
+    return $null
 }
 
-function Show-Offline {
-    [Console]::Error.WriteLine('DDNSTO：推荐源暂不可用；状态=离线使用已校验缓存（可能非最新）；下一步=联网后重试；code=0')
+function Test-BootstrapBinary([string]$Binary, [string]$Version, [string]$Sha256) {
+    if (-not (Test-Path -LiteralPath $Binary -PathType Leaf)) { return $false }
+    if ((Get-FileHash -LiteralPath $Binary -Algorithm SHA256 -ErrorAction Stop).Hash -ine $Sha256) { return $false }
+    $stream = [IO.File]::OpenRead($Binary)
+    try {
+        if ($stream.Length -lt 64 -or $stream.Length -gt 16777216) { return $false }
+        $head = New-Object byte[] 64
+        if ($stream.Read($head, 0, 64) -ne 64 -or $head[0] -ne 77 -or $head[1] -ne 90) { return $false }
+        $offset = [BitConverter]::ToUInt32($head, 60)
+        if ($offset -gt 4096 -or $offset + 6 -gt $stream.Length) { return $false }
+        $stream.Position = $offset
+        $pe = New-Object byte[] 6
+        if ($stream.Read($pe, 0, 6) -ne 6 -or [BitConverter]::ToUInt32($pe, 0) -ne 17744 -or [BitConverter]::ToUInt16($pe, 4) -ne 332) { return $false }
+    } finally { $stream.Dispose() }
+    $out = $Binary + '.stdout-' + [Guid]::NewGuid().ToString('N')
+    $err = $out + '.stderr'
+    $child = $null
+    try {
+        $child = Start-Process -FilePath $Binary -ArgumentList '--version' -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err -ErrorAction Stop
+        $ownedHandle = $child.Handle # PS5.1 retains the exit code after a fast process exits.
+        if (-not $child.WaitForExit(5000)) { $child.Kill(); $child.WaitForExit(); return $false }
+        $child.WaitForExit()
+        if ($child.ExitCode -ne 0 -or (Get-Item -LiteralPath $out).Length -gt 128 -or (Get-Item -LiteralPath $err).Length -gt 0) { return $false }
+        return [IO.File]::ReadAllText($out).TrimEnd([char[]]"`r`n") -ceq "zsetup $Version"
+    } catch { return $false }
+    finally {
+        if ($null -ne $child) {
+            if (-not $child.HasExited) { $child.Kill(); $child.WaitForExit() }
+            $child.Dispose()
+        }
+        Remove-Item -LiteralPath $out, $err -Force -ErrorAction SilentlyContinue
+    }
 }
 
+function Get-ZsetupBootstrap {
+    $work = if ($env:ZSETUP_ROOT) { $env:ZSETUP_ROOT } else { Join-Path ([IO.Path]::GetTempPath()) 'zsetup' }
+    if (-not [IO.Path]::IsPathRooted($work)) { throw 'zsetup: ZSETUP_ROOT must be absolute' }
+    $state = Join-Path $work 'bootstrap'
+    New-Item -ItemType Directory -Path $state -Force -ErrorAction Stop | Out-Null
+    $id = [Guid]::NewGuid().ToString('N')
+    $stable = Join-Path $state ('.stable-' + $id)
+    $sums = Join-Path $state ('.SHA256SUMS-' + $id)
+    $candidate = $null
+    try {
+        $metadata = Get-BootstrapMetadata 'https' $stable $sums
+        if ($null -eq $metadata) {
+            Confirm-BootstrapHttp
+            $metadata = Get-BootstrapMetadata 'http' $stable $sums
+        }
+        if ($null -eq $metadata) { throw 'zsetup: no source returned valid bootstrap metadata' }
+        $rescue = Join-Path (Join-Path $work 'rescue') $metadata.Version
+        $target = Join-Path $rescue 'zsetup.exe'
+        $existing = @($env:ZSETUP_BIN, $target)
+        $system = Get-Command zsetup.exe -CommandType Application -ErrorAction SilentlyContinue
+        if ($system) { $existing += $system.Source }
+        foreach ($file in $existing) {
+            if ($file -and (Test-BootstrapBinary $file $metadata.Version $metadata.Sha256)) { return $file }
+        }
+        New-Item -ItemType Directory -Path $rescue -Force -ErrorAction Stop | Out-Null
+        $candidate = Join-Path $rescue ('.zsetup.candidate-' + $id + '.exe')
+        $downloaded = $false
+        foreach ($base in (Get-BootstrapBases)) {
+            if (Get-BootstrapFile $base "zsetup/$($metadata.Version)/$script:BootstrapArtifact" 'https' $candidate 16777216) { $downloaded = $true; break }
+        }
+        if (-not $downloaded) {
+            Confirm-BootstrapHttp
+            foreach ($base in (Get-BootstrapBases)) {
+                if (Get-BootstrapFile $base "zsetup/$($metadata.Version)/$script:BootstrapArtifact" 'http' $candidate 16777216) { $downloaded = $true; break }
+            }
+        }
+        if (-not $downloaded -or -not (Test-BootstrapBinary $candidate $metadata.Version $metadata.Sha256)) { throw 'zsetup: bootstrap checksum, architecture or complete version mismatch' }
+        if (Test-Path -LiteralPath $target) { [IO.File]::Replace($candidate, $target, [NullString]::Value) }
+        else { [IO.File]::Move($candidate, $target) }
+        return $target
+    } finally {
+        foreach ($file in @($stable, $sums, $candidate)) { if ($file) { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue } }
+    }
+}
+
+
+$active = Get-ZsetupBootstrap
+$work = if ($env:ZSETUP_ROOT) { $env:ZSETUP_ROOT } else { Join-Path ([IO.Path]::GetTempPath()) 'zsetup' }
+$configDirectory = Join-Path $work 'zsetup-scripts'
+$config = Join-Path $configDirectory 'config-windows.json'
+$candidate = $config + '.candidate-' + [Guid]::NewGuid().ToString('N')
+New-Item -ItemType Directory -Path $configDirectory -Force -ErrorAction Stop | Out-Null
 try {
-    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-        Stop-Recommendation '不支持此系统' '使用对应平台入口' 2 }
-    if ($base -notmatch '^https://') { Stop-Recommendation '入口尚未打包' '使用已审核的发布入口' 2 }
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $root = $env:DDNSTO_RECOMMEND_CACHE
-    if (-not $root) { $root = Join-Path $env:LOCALAPPDATA 'DDNSTO-Recommendation' }
-    if (-not [IO.Path]::IsPathRooted($root) -or $root.StartsWith('\\') -or
-        $root -match '(^|[\\/])\.\.?([\\/]|$)') {
-        Stop-Recommendation '缓存路径无效' '使用本地绝对私有目录' 12 }
-    $root = [IO.Path]::GetFullPath($root)
-    $parent = [IO.Directory]::GetParent($root)
-    while ($parent) {
-        Assert-SafePath $parent.FullName
-        $parent = $parent.Parent
-    }
-    New-PrivateDirectory $root
-    $cache = Join-Path $root $cacheKey
-    New-PrivateDirectory $cache
-    $lockPath = Join-Path $cache 'lock'
-    if (Test-Path -LiteralPath $lockPath) { Assert-SafePath $lockPath -Private }
-    $lease = [IO.File]::Open($lockPath, 'OpenOrCreate', 'ReadWrite', 'None')
-    $work = Join-Path $cache ('attempt-' + [Guid]::NewGuid().ToString('N'))
-    New-PrivateDirectory $work
-    $manifest = Join-Path $work 'recommended.txt'
-    $scriptPath = Join-Path $work 'install.ps1'
-    $cachedManifest = Join-Path $cache 'recommended.txt'
-    $online = Receive-Bounded "$base/recommended-powershell.txt" $manifest 128
-    if ($online) {
-        $metadata = Read-Recommendation $manifest
-    } else {
-        $metadata = Read-Recommendation $cachedManifest
-        Copy-Item -LiteralPath $cachedManifest -Destination $manifest
-    }
-    $cachedScript = Join-Path $cache ($metadata.Digest + '.ps1')
-    if ($online) {
-        $received = Receive-Bounded "$base/immutable/$($metadata.Digest)/install.ps1" $scriptPath $metadata.Size
-    } else { $received = $false }
-    if (-not $received) {
-        if (-not (Test-Installer $cachedScript $metadata)) {
-            Stop-Recommendation '源不可用且无完整匹配缓存' '检查网络后重试' }
-        Copy-Item -LiteralPath $cachedScript -Destination $scriptPath
-        Show-Offline
-    }
-    if (-not (Test-Installer $scriptPath $metadata)) {
-        Stop-Recommendation '安装脚本校验失败' '联系发布者核对摘要和大小' }
-    # File.Replace is atomic for an existing target on the same volume.
-    # Windows PowerShell 5.1 coerces $null to an empty string for this .NET
-    # string argument; NullString passes a real null backup filename.
-    $stage = Join-Path $work 'cached.ps1'
-    Copy-Item -LiteralPath $scriptPath -Destination $stage
-    if (Test-Path -LiteralPath $cachedScript) { [IO.File]::Replace($stage, $cachedScript, [NullString]::Value) }
-    else { [IO.File]::Move($stage, $cachedScript) }
-    if (Test-Path -LiteralPath $cachedManifest) { [IO.File]::Replace($manifest, $cachedManifest, [NullString]::Value) }
-    else { [IO.File]::Move($manifest, $cachedManifest) }
-    $lease.Dispose(); $lease = $null
-    # Hashtable splatting binds named parameters without reinterpreting strings.
-    # Let explicit executor exit codes propagate; exceptions become a redacted
-    # error below. Do not dot-source or build a command with Invoke-Expression.
-    $script:entryCode = 1
-    $script:entryMessage = $null
-    $global:LASTEXITCODE = 0
-    # Run only the size/SHA-verified private file, using the same in-memory
-    # invocation as the public command. Do not change any execution policy.
-    $executor = [scriptblock]::Create([IO.File]::ReadAllText($scriptPath, (New-Object Text.UTF8Encoding($false, $true))))
-    & $executor @forward
-    $executorSucceeded = $?
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    if (-not $executorSucceeded) { Stop-Recommendation '安装执行失败' '检查本地服务状态后重试' 1 }
-    exit 0
-} catch {
-    # Never echo exception text/InvocationInfo from an installer or OS API:
-    # either may contain paths or a supplied token. Only our own fixed messages.
-    if ($script:entryMessage) {
-        [Console]::Error.WriteLine($script:entryMessage)
-    } else {
-        [Console]::Error.WriteLine("DDNSTO：推荐入口或执行器失败；状态=未确认本地服务运行；下一步=检查网络、私有缓存和服务状态；code=$script:entryCode")
-    }
-    exit $script:entryCode
+    $downloadArguments = @('download', '--quiet', '-o', $candidate, '--max-bytes', '131072')
+    $downloadArguments += $ConfigPrimaryUrls
+    $downloadArguments += @('--fallback-url', $ConfigFallbackUrl)
+    & $active @downloadArguments
+    if ($LASTEXITCODE -ne 0) { throw "zsetup config download failed with exit code $LASTEXITCODE" }
+    Move-Item -LiteralPath $candidate -Destination $config -Force -ErrorAction Stop
 } finally {
-    if ($lease) { $lease.Dispose() }
-    if ($work -and (Test-Path -LiteralPath $work)) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
+    Remove-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
 }
+$env:ZSETUP_CONFIG = $config
+& $active install $AppId --foreground -- @InstallerArguments
+exit $LASTEXITCODE
+

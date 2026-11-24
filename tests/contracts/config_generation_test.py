@@ -33,17 +33,17 @@ BASE = {
 
 def create(apps: Path):
     app = apps / "demo"
-    (app / "1.2.3").mkdir(parents=True)
+    (app / "versions/1.2.3").mkdir(parents=True)
     payload = b"#!/bin/sh\nexit 0\n"
-    (app / "1.2.3/installer.sh").write_bytes(payload)
+    (app / "versions/1.2.3/install.sh").write_bytes(payload)
     (app / "app.json").write_text(json.dumps({
-        "schema_version": 1, "id": "demo", "name": "Demo",
-        "version": "1.2.3", "min_zsetup": "0.5.0", "entrypoints": ["sh"],
+        "schema_version": 2, "id": "demo", "name": "Demo",
+        "version": "1.2.3", "min_zsetup": "0.5.0",
+        "entrypoints": {"posix": "install.sh"},
         "targets": [{
             "os": ["linux", "openwrt"], "package_manager": ["*"],
             "arch": ["x86_64", "aarch64"],
         }],
-        "compatibility_aliases": [],
     }) + "\n")
     (apps / "zsetup").mkdir()
     (apps / "zsetup/base.json").write_text(json.dumps(BASE) + "\n")
@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix="apps-config-") as name:
     expected_sha = hashlib.sha256(payload).hexdigest()
     assert config["installers"][0] == {
         "application": "demo", "os": "linux", "package_manager": "*", "arch": "aarch64",
-        "path": "zsetup-scripts/apps/demo/1.2.3/installer.sh", "background": False,
+        "path": "zsetup-scripts/apps/demo/versions/1.2.3/install.sh", "background": False,
         "source_group": "koolcenter", "sha256": expected_sha,
         "size": len(payload), "min_version": "0.5.0",
     }

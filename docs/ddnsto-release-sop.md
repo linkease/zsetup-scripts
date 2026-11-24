@@ -70,7 +70,7 @@ Shell 入口/生成器变更还必须通过 Bash 4.2 POSIX 模式验证，不能
 
 ## 5. 审核字节、生成本地候选
 
-控制台完整安装站点的正式交付路径已于 2026-11-24 切换为 `apps/ddnsto/`。
+控制台完整安装站点的正式交付路径是 `apps/_sites/run.ddnsto.com/`。
 步骤 3 的 `scripts/build.py` 同时生成 `install.sh`、`install.ps1`、推荐清单、摘要执行器和 AI 指南，
 随 `apps/SHA256SUMS` 一起审核、提交。运行 `tests/ddnsto_apps_site_test.py` 验证完整性及
 发布事务。完整 apps 交付使用 [现有发布协调器](apps-release.md)，不能只上传旧 dist。
@@ -79,7 +79,7 @@ Shell 入口/生成器变更还必须通过 Bash 4.2 POSIX 模式验证，不能
 先审查差异，再取得两个实际安装器的 SHA-256：
 
 ```sh
-sha256sum apps/ddnsto/0.2.5/installer.sh sources/ddnsto/install.ps1
+sha256sum apps/ddnsto/versions/0.3.0/install.sh apps/ddnsto/versions/0.3.0/install.ps1
 python3 -B scripts/package-ddnsto-recommendation.py --help
 ```
 

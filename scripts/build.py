@@ -18,11 +18,21 @@ import build_ddnsto_site
 APP_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?\Z")
 ENTRYPOINTS = {"sh", "ps1"}
-MANIFEST_KEYS = {
+MANIFEST_KEYS_V1 = {
     "schema_version", "id", "name", "version", "min_zsetup",
     "entrypoints", "targets", "compatibility_aliases",
 }
+MANIFEST_KEYS_V2 = {
+    "schema_version", "id", "name", "version", "min_zsetup",
+    "entrypoints", "targets",
+}
+V2_ENTRYPOINTS = {"posix": "install.sh", "windows": "install.ps1"}
 TARGET_KEYS = {"os", "package_manager", "arch"}
+RESERVED_DIRECTORIES = {"zsetup", "_shared", "_sites"}
+LEGACY_V1_APPLICATIONS = {
+    "fastnet", "fastpve", "jq", "kai-skills", "ks-cli",
+    "kspeeder", "linkease", "linkspace", "scoop",
+}
 
 
 def require(condition, message):
@@ -49,33 +59,86 @@ class Application:
     def id(self):
         return self.manifest["id"]
 
+    @property
+    def schema_version(self):
+        return self.manifest["schema_version"]
+
+    @property
+    def extensions(self):
+        if self.schema_version == 1:
+            return tuple(self.manifest["entrypoints"])
+        return tuple("sh" if name == "posix" else "ps1"
+                     for name in self.manifest["entrypoints"])
+
+    @property
+    def aliases(self):
+        return tuple(self.manifest.get("compatibility_aliases", ()))
+
+    def entry_path(self, extension):
+        return self.directory / f"install.{extension}"
+
+    def payload_path(self, extension):
+        version = self.manifest["version"]
+        if self.schema_version == 2:
+            return self.directory / "versions" / version / f"install.{extension}"
+        return self.directory / version / f"installer.{extension}"
+
+
+def validate_v2_layout(application: Application):
+    expected_root = {"app.json", "versions"}
+    expected_root.update(f"install.{extension}" for extension in application.extensions)
+    actual_root = {path.name for path in application.directory.iterdir()}
+    require(actual_root == expected_root,
+            f"{application.id} v2 root must contain only {sorted(expected_root)}")
+    versions = application.directory / "versions"
+    require(versions.is_dir() and not versions.is_symlink(),
+            f"{application.id} v2 versions directory is missing")
+    for directory in versions.iterdir():
+        require(directory.is_dir() and not directory.is_symlink()
+                and VERSION.fullmatch(directory.name),
+                f"{application.id} has an invalid v2 version directory")
+        expected = {f"install.{extension}" for extension in application.extensions}
+        actual = {path.name for path in directory.iterdir() if path.is_file()}
+        require(actual == expected and len(list(directory.iterdir())) == len(expected),
+                f"{application.id}/{directory.name} v2 payload set differs from {sorted(expected)}")
+
 
 def read_application(directory: Path):
     path = directory / "app.json"
-    external = directory.parent.parent / 'sources' / directory.name / 'app.json'
-    if directory.name == 'ddnsto' and external.is_file():
-        path = external
     require(path.is_file() and not path.is_symlink(), f"missing {directory.name}/app.json")
     raw = path.read_bytes()
     require(len(raw) <= 65536, f"{directory.name}/app.json is too large")
     data = json.loads(raw)
     require(isinstance(data, dict), f"{directory.name}/app.json must be an object")
-    require(set(data) == MANIFEST_KEYS, f"{directory.name}/app.json fields differ from schema")
-    require(data["schema_version"] == 1, "schema_version must be 1")
+    require(data.get("schema_version") in {1, 2}, "schema_version must be 1 or 2")
+    expected_keys = MANIFEST_KEYS_V1 if data["schema_version"] == 1 else MANIFEST_KEYS_V2
+    require(set(data) == expected_keys, f"{directory.name}/app.json fields differ from schema")
     require(isinstance(data["id"], str) and APP_ID.fullmatch(data["id"]), "invalid application id")
     require(data["id"] == directory.name, "application id must equal directory name")
     require(isinstance(data["name"], str) and 0 < len(data["name"]) <= 128, "invalid application name")
     require(isinstance(data["version"], str) and VERSION.fullmatch(data["version"]), "invalid version")
     require(isinstance(data["min_zsetup"], str) and VERSION.fullmatch(data["min_zsetup"]), "invalid min_zsetup")
-    entrypoints = string_list(data["entrypoints"], "entrypoints")
-    require(set(entrypoints) <= ENTRYPOINTS, "entrypoints contains an unsupported type")
-    aliases = data["compatibility_aliases"]
-    require(isinstance(aliases, list), "compatibility_aliases must be a list")
-    require(len(aliases) == len(set(aliases)), "compatibility_aliases contains a duplicate value")
-    for alias in aliases:
-        require(isinstance(alias, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", alias),
-                "invalid compatibility alias")
-        require(Path(alias).suffix.removeprefix(".") in entrypoints, "compatibility alias type is not enabled")
+    if data["schema_version"] == 1:
+        entrypoints = string_list(data["entrypoints"], "entrypoints")
+        require(set(entrypoints) <= ENTRYPOINTS, "entrypoints contains an unsupported type")
+        aliases = data["compatibility_aliases"]
+        require(isinstance(aliases, list), "compatibility_aliases must be a list")
+        require(len(aliases) == len(set(aliases)), "compatibility_aliases contains a duplicate value")
+        for alias in aliases:
+            require(isinstance(alias, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", alias),
+                    "invalid compatibility alias")
+            require(Path(alias).suffix.removeprefix(".") in entrypoints,
+                    "compatibility alias type is not enabled")
+    else:
+        require(isinstance(data["entrypoints"], dict) and data["entrypoints"],
+                "v2 entrypoints must be an object")
+        require(set(data["entrypoints"]) <= set(V2_ENTRYPOINTS),
+                "v2 entrypoints contains an unsupported runtime family")
+        require(all(data["entrypoints"][name] == V2_ENTRYPOINTS[name]
+                    for name in data["entrypoints"]),
+                "v2 entrypoint filenames are fixed by the standard")
+        entrypoints = ["sh" if name == "posix" else "ps1"
+                       for name in data["entrypoints"]]
 
     targets = data["targets"]
     require(isinstance(targets, list) and targets, "targets must be a non-empty list")
@@ -91,12 +154,12 @@ def read_application(directory: Path):
         require("ps1" in entrypoints, "windows target requires installer.ps1 entrypoint")
     if any(os_name != "windows" for os_name, _, _ in expanded):
         require("sh" in entrypoints, "non-Windows target requires installer.sh entrypoint")
-    version_dir = directory / data["version"]
-    require(version_dir.is_dir() and not version_dir.is_symlink(), "current version directory is missing")
+    application = Application(directory, data, tuple(expanded))
     for entrypoint in entrypoints:
-        payload = version_dir / f"installer.{entrypoint}"
-        require(payload.is_file() and not payload.is_symlink(), f"missing {directory.name}/{data['version']}/installer.{entrypoint}")
-    return Application(directory, data, tuple(expanded))
+        payload = application.payload_path(entrypoint)
+        require(payload.is_file() and not payload.is_symlink(),
+                f"missing v{data['schema_version']} payload: {payload}")
+    return application
 
 
 def discover(apps: Path):
@@ -104,10 +167,13 @@ def discover(apps: Path):
     applications = []
     ids = set()
     for directory in sorted(apps.iterdir(), key=lambda item: item.name):
-        if not directory.is_dir() or directory.name in {"zsetup", "_shared"}:
+        if not directory.is_dir() or directory.name in RESERVED_DIRECTORIES:
             continue
         require(APP_ID.fullmatch(directory.name), f"unsafe application directory: {directory.name}")
         application = read_application(directory)
+        if apps.resolve() == (Path(__file__).resolve().parents[1] / "apps"):
+            require(application.schema_version == 2 or application.id in LEGACY_V1_APPLICATIONS,
+                    f"new schema-v1 application is forbidden: {application.id}")
         require(application.id not in ids, f"duplicate application id: {application.id}")
         ids.add(application.id)
         applications.append(application)
@@ -182,16 +248,12 @@ def stat_mode(path: Path):
 
 def generate_entries(root: Path, applications, *, check: bool):
     for application in applications:
-        entrypoints = application.manifest["entrypoints"]
+        entrypoints = application.extensions
         if "sh" in entrypoints:
             content = posix_entry(root, application).encode()
-            # DDNSTO's standard entry is generated by build_ddnsto_site below.
-            # Keep its native bootstrap only under the compatibility alias.
-            if not (application.directory.name == "ddnsto" and
-                    (application.directory.parent.parent / "sources/ddnsto").is_dir()):
-                install_file(application.directory / "install.sh", content,
-                             executable=True, check=check, label="standard entry")
-            for alias in application.manifest["compatibility_aliases"]:
+            install_file(application.directory / "install.sh", content,
+                         executable=True, check=check, label="standard entry")
+            for alias in application.aliases:
                 if alias.endswith(".sh"):
                     install_file(application.directory / alias, content,
                                  executable=True, check=check, label="compatibility alias")
@@ -199,7 +261,7 @@ def generate_entries(root: Path, applications, *, check: bool):
             content = powershell_entry(root, application)
             install_file(application.directory / "install.ps1", content,
                          executable=False, check=check, label="standard PowerShell entry")
-            for alias in application.manifest["compatibility_aliases"]:
+            for alias in application.aliases:
                 if alias.endswith(".ps1"):
                     install_file(application.directory / alias, content,
                                  executable=False, check=check, label="PowerShell compatibility alias")
@@ -274,7 +336,7 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
             require(version_tuple(stable_version) >= version_tuple(minimum),
                     f"{application.id} requires zsetup >= {minimum}; base is {stable_version}")
             extension = "ps1" if os_name == "windows" else "sh"
-            payload = application.directory / application.manifest["version"] / f"installer.{extension}"
+            payload = application.payload_path(extension)
             relative = f"{base['public_path_prefix']}/{payload.relative_to(apps).as_posix()}"
             raw = payload.read_bytes()
             records.append({
@@ -334,12 +396,19 @@ def main():
         applications = discover(args.apps)
         if not args.validate_only:
             generate_entries(root, applications, check=args.check)
+            for application in applications:
+                if application.schema_version == 2:
+                    validate_v2_layout(application)
             generate_config(args.apps, applications, check=args.check, windows=False)
             has_windows = any(os_name == "windows" for app in applications for os_name, _, _ in app.expanded_targets)
             if has_windows or (args.apps / "zsetup/base-windows.json").exists():
                 generate_config(args.apps, applications, check=args.check, windows=True)
             build_ddnsto_site.generate(root, args.apps, check=args.check, install_file=install_file)
             generate_checksums(args.apps, check=args.check)
+        else:
+            for application in applications:
+                if application.schema_version == 2:
+                    validate_v2_layout(application)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"apps build: {error}", file=sys.stderr)
         return 1

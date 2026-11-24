@@ -3,7 +3,7 @@
 - 文档版本：1.2.2
 - 更新日期：2026-11-24
 - 脚本来源：固定安装域名，与控制台域名无关
-- 兼容入口：DDNSTO 推荐安装器 0.2.4，https://run.ddnsto.com/install.sh
+- 网站入口：DDNSTO 推荐安装器 0.3.0，https://run.ddnsto.com/install.sh
 - 能力：安装或更新 DDNSTO 并验证本地启动；不检查云端在线。
 
 ## 1. 读取与能力边界

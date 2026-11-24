@@ -1,587 +1,294 @@
 #!/bin/sh
-# Stable template. Package locally; do not source this file or pipe a manifest
-# into a shell. Only the immutable, size+SHA verified installer is executed.
-set +x
 set -eu
-umask 077
-base='https://run.ddnsto.com/ddnsto-install/current'
-fail() { printf 'DDNSTO：%s；状态=推荐入口未执行安装；下一步=%s；code=%s\n' "$1" "$2" "$3" >&2; exit "$3"; }
-case "$(uname -s)" in Linux|Darwin) ;; *) fail '不支持此系统' '使用对应平台入口' 2 ;; esac
-case "$base" in https://*) ;; *) fail '入口尚未打包' '使用已审核的发布入口' 2 ;; esac
-# Source-only ASUS storage helpers. No environment-selected trust roots.
-# Caller must supply a trusted shell/PATH and establish ASUS firmware identity.
-# Public predicates return 0 on success, nonzero on refusal/error. Only uid,
-# fields, hash and mktemp print results; storage sets ASUS_STATE in the caller.
-# Checks are not protection against concurrent root writers or mount changes:
-# callers must serialize transactions. This does not secure legacy /koolshare.
-_ddnsto_asus_status() { cat /proc/self/status; }
 
-# Print effective UID, or fail without output on malformed/duplicate records.
-ddnsto_asus_uid() (
-    status=$(_ddnsto_asus_status) || return 1
-    printf '%s\n' "$status" | LC_ALL=C awk '
-        $1 == "Uid:" {
-            count++
-            if (NF != 5) bad=1
-            for (i=2; i<=5; i++) if ($i !~ /^[0-9]+$/) bad=1
-            uid=$3
-        }
-        END { if (count != 1 || bad) exit 1; print uid }
-    '
-)
+APP_ID='ddnsto'
+CONFIG_PRIMARY_URLS='https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/config.json https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/config.json https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config.json'
+CONFIG_FALLBACK_URL='https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config.json'
 
-ddnsto_asus_has() { [ "$#" = 1 ] && type "$1" >/dev/null 2>&1; }
+WORK_ROOT=${ZSETUP_ROOT:-/tmp/zsetup}
+DEFAULT_PRIMARY_BASES="https://dl.istoreos.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary"
+DEFAULT_FALLBACK_BASE="https://fw.koolcenter.com/binary"
+if [ -n "${ZSETUP_BOOTSTRAP_BASES:-}" ]; then
+    BOOTSTRAP_BASES=$ZSETUP_BOOTSTRAP_BASES
+    DIRECT_PRIMARY_BASES=$ZSETUP_BOOTSTRAP_BASES
+    DIRECT_FALLBACK_BASE=
+else
+    BOOTSTRAP_BASES="$DEFAULT_PRIMARY_BASES $DEFAULT_FALLBACK_BASE"
+    DIRECT_PRIMARY_BASES=$DEFAULT_PRIMARY_BASES
+    DIRECT_FALLBACK_BASE=$DEFAULT_FALLBACK_BASE
+fi
+INSECURE_CONFIRMED=0
 
-_ddnsto_asus_ls() { LC_ALL=C ls -nd "$1"; }
-
-# Internal output adds the file type as a fourth field.
-# Restrict names and reject ACL/extra-line output, never eval it.
-_ddnsto_asus_metadata() (
-    [ "$#" = 1 ] || return 1
-    case "$1" in /*) ;; *) return 1 ;; esac
-    case "$1" in *[!a-zA-Z0-9_./-]*|*/|*//*|*/../*|*/..|*/./*|*/.) return 1 ;; esac
-    listing=$(_ddnsto_asus_ls "$1") || return 1
-    printf '%s\n' "$listing" | LC_ALL=C awk '
-        NR == 1 && NF == 9 &&
-        $1 ~ /^[-d][r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]$/ &&
-        $2 ~ /^[1-9][0-9]*$/ && $3 ~ /^[0-9]+$/ &&
-        $4 ~ /^[0-9]+$/ && $5 ~ /^[0-9]+$/ {
-            mode=0
-            for (i=2; i<=10; i++) {
-                c=substr($1,i,1)
-                mode=mode*2 + (c != "-" && c != "S" && c != "T")
-            }
-            if (substr($1,4,1) ~ /[sS]/) mode+=2048
-            if (substr($1,7,1) ~ /[sS]/) mode+=1024
-            if (substr($1,10,1) ~ /[tT]/) mode+=512
-            value=sprintf("%s %o %s %s", $3, mode, $2, substr($1,1,1)); ok=1
-        }
-        END { if (NR != 1 || !ok) exit 1; print value }
-    '
-)
-
-# Equivalent to stat -c "%u %a %h" for supported unambiguous paths.
-ddnsto_asus_fields() (
-    fields=$(_ddnsto_asus_metadata "$@") || return 1
-    set -- $fields
-    printf '%s %s %s\n' "$1" "$2" "$3"
-)
-
-_ddnsto_asus_mounts() { cat /proc/mounts; }
-_ddnsto_asus_mkdir() { mkdir -m 700 "$1"; }
-
-# Bounded ASUS compatibility exception: a live mount cannot be renamed or
-# unlinked by writers of /. Never extend this to ordinary writable ancestors.
-# Trust kernel /proc/mounts, not user-selected paths or source-device symlinks.
-# Approve local block ext2/3/4, MTD jffs2, and UBI ubifs sources only. These
-# records do not prove backing-media durability or protect against privileged
-# mount attackers; six-channel device acceptance remains a separate check.
-ddnsto_asus_anchor() (
-    [ "$(ddnsto_asus_uid)" = 0 ] || return 1
-    mounts=$(_ddnsto_asus_mounts) || return 1
-    printf '%s\n' "$mounts" | LC_ALL=C awk '
-        function approved_source(source, fs) {
-            if (fs == "ext2" || fs == "ext3" || fs == "ext4")
-                return source ~ /^\/dev\/[a-zA-Z0-9_-]+(\/[a-zA-Z0-9_-]+)*$/
-            if (fs == "jffs2")
-                return source ~ /^\/dev\/mtdblock([0-9]+|\/[0-9]+)$/
-            if (fs == "ubifs")
-                return source ~ /^\/dev\/ubi[0-9]+_[0-9]+$/ ||
-                       source ~ /^ubi[0-9]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/
-            return 0
-        }
-        $2 == "/jffs" {
-            count++
-            if (NF != 6 || !approved_source($1,$3)) bad=1
-            n=split($4,opts,","); rw=0
-            for (i=1;i<=n;i++) {
-                if (opts[i] == "rw") rw++
-                if (opts[i] == "ro" || opts[i] == "noexec" || opts[i] == "bind" || opts[i] == "rbind") bad=1
-            }
-            if (rw != 1) bad=1
-        }
-        index($2,"/jffs/") == 1 { bad=1 }
-        END { if (count != 1 || bad) exit 1 }
-    ' || return 1
-    fields=$(_ddnsto_asus_metadata /jffs) || return 1
-    set -- $fields
-    [ "$1" = 0 ] && [ "$4" = d ] || return 1
-    case "$2" in 700|750|755) ;; *) return 1 ;; esac
-)
-
-# Initialize only our own directory; never repair modes of existing objects.
-# On failure ASUS_STATE is empty, even if inherited from the environment.
-ddnsto_asus_storage() {
-    ASUS_STATE=
-    ddnsto_asus_anchor || return 1
-    if ! _ddnsto_asus_metadata /jffs/.ddnsto-installer >/dev/null 2>&1; then
-        (umask 077; _ddnsto_asus_mkdir /jffs/.ddnsto-installer) || return 1
-    fi
-    _ddnsto_asus_private_existing /jffs/.ddnsto-installer || return 1
-    ASUS_STATE=/jffs/.ddnsto-installer
+status() {
+    printf '%s\n' "$*" >&2
 }
 
-_ddnsto_asus_private_existing() (
-    fields=$(_ddnsto_asus_metadata "$1") || return 1
-    set -- $fields
-    [ "$1" = 0 ] && [ "$2" = 700 ] && [ "$4" = d ]
-)
-
-_ddnsto_asus_descendant() {
-    [ "$#" = 1 ] || return 1
-    case "$1" in /jffs/*) ;; *) return 1 ;; esac
-    case "$1" in *[!a-zA-Z0-9_./-]*|*/|*//*|*/../*|*/..|*/./*|*/.) return 1 ;; esac
+bootstrap_mips_byte_order() {
+    command -v od >/dev/null 2>&1 || return 1
+    set -- $(od -An -tu1 -N6 /bin/sh 2>/dev/null)
+    [ "$#" -eq 6 ] && [ "$1" = 127 ] && [ "$2" = 69 ] && [ "$3" = 76 ] && [ "$4" = 70 ] && [ "$6" = 1 ]
 }
 
-# Check parents of PATH (leaf may not exist); stop at the mounted /jffs.
-# The leaf is excluded: to validate directory DIR itself, pass "$DIR/probe".
-# No probe file is opened or created.
-# Walk top-down so metadata lookup never traverses an unverified symlink.
-ddnsto_asus_safe_ancestors() (
-    _ddnsto_asus_descendant "$@" || return 1
-    ddnsto_asus_anchor || return 1
-    rest=${1#/jffs/} parent=/jffs
-    while case "$rest" in */*) true;; *) false;; esac; do
-        parent=$parent/${rest%%/*}; rest=${rest#*/}
-        fields=$(_ddnsto_asus_metadata "$parent") || return 1
-        set -- $fields
-        [ "$1" = 0 ] && [ "$4" = d ] || return 1
-        case "$2" in 7[0145][0145]) ;; *) return 1 ;; esac
-    done
-)
-
-_ddnsto_asus_private_path() {
-    _ddnsto_asus_descendant "$@" || return 1
-    case "$1" in /jffs/.ddnsto-installer|/jffs/.ddnsto-installer/*) ;; *) return 1 ;; esac
-    ddnsto_asus_safe_ancestors "$1" || return 1
-    _ddnsto_asus_private_existing /jffs/.ddnsto-installer
+bootstrap_arch() {
+    case "$(uname -m 2>/dev/null || true)" in
+        x86_64|amd64) ZSETUP_ARCH=x86_64 ;;
+        aarch64|arm64) ZSETUP_ARCH=aarch64 ;;
+        armv7l|armv7) ZSETUP_ARCH=armv7 ;;
+        mipsel|mipsle) ZSETUP_ARCH=mipsel ;;
+        mips)
+            # uname alone does not identify byte order. ELF EI_DATA=1 is little endian.
+            bootstrap_mips_byte_order || { echo "zsetup: MIPS byte order is unsupported or unknown" >&2; return 2; }
+            ZSETUP_ARCH=mipsel ;;
+        *) echo "zsetup: unsupported architecture" >&2; return 2 ;;
+    esac
+    case "$(uname -s 2>/dev/null || true)" in
+        Darwin)
+            ZSETUP_ARTIFACT="zsetup-macos-$ZSETUP_ARCH"
+            ZSETUP_STABLE_PATH=zsetup/stable-macos ;;
+        Linux)
+            ZSETUP_ARTIFACT="zsetup-linux-$ZSETUP_ARCH"
+            ZSETUP_STABLE_PATH=zsetup/stable ;;
+        *) echo "zsetup: unsupported operating system" >&2; return 2 ;;
+    esac
 }
 
-# Idempotent mkdir of one leaf inside initialized state; no mkdir -p/chmod.
-ddnsto_asus_private_dir() (
-    _ddnsto_asus_private_path "$@" || return 1
-    if ! _ddnsto_asus_metadata "$1" >/dev/null 2>&1; then
-        (umask 077; _ddnsto_asus_mkdir "$1") || return 1
-    fi
-    _ddnsto_asus_private_existing "$1"
-)
+bootstrap_url() {
+    scheme=$1
+    base=$2
+    path=$3
+    authority_path=${base#*://}
+    printf '%s://%s/%s\n' "$scheme" "${authority_path%/}" "$path"
+}
 
-# Existing regular root-owned single-link file inside private state; readable
-# by root, no group/other writes or special bits. Never opens FIFOs/devices.
-ddnsto_asus_safe_file() (
-    _ddnsto_asus_private_path "$@" || return 1
-    fields=$(_ddnsto_asus_metadata "$1") || return 1
-    set -- $fields
-    [ "$1" = 0 ] && [ "$3" = 1 ] && [ "$4" = - ] || return 1
-    case "$2" in [4567][0145][0145]) ;; *) return 1 ;; esac
-)
-
-_ddnsto_asus_random() { openssl rand -hex 12; }
-
-# Print a fresh 0700 directory. Atomic mkdir claims ownership; an existing
-# name is never reused, removed, or repaired. Eight attempts bound collisions.
-# Caller owns cleanup and transaction locking; this helper acquires no lock.
-ddnsto_asus_mktemp() (
-    _ddnsto_asus_private_path "$@" || return 1
-    _ddnsto_asus_private_existing "$1" || return 1
-    parent=$1 attempt=0
-    umask 077
-    while [ "$attempt" -lt 8 ]; do
-        random=$(_ddnsto_asus_random) || return 1
-        [ "${#random}" = 24 ] || return 1
-        case "$random" in *[!0-9a-f]*) return 1 ;; esac
-        path=$parent/tmp.$random
-        if _ddnsto_asus_mkdir "$path" 2>/dev/null; then
-            _ddnsto_asus_private_existing "$path" || return 1
-            printf '%s\n' "$path"
+bootstrap_fetch_from_base() {
+    scheme=$1
+    base=$2
+    remote_path=$3
+    destination=$4
+    found=0
+    url=$(bootstrap_url "$scheme" "$base" "$remote_path")
+    if command -v curl >/dev/null 2>&1; then
+        found=1
+        rm -f "$destination" 2>/dev/null || true
+        if curl -fsSL --connect-timeout 10 --max-time 30 -o "$destination" "$url"; then
             return 0
         fi
-        attempt=$((attempt + 1))
+    fi
+    if command -v wget >/dev/null 2>&1; then
+        found=1
+        rm -f "$destination" 2>/dev/null || true
+        if wget -q -T 10 -O "$destination" "$url"; then
+            return 0
+        fi
+    fi
+    [ "$found" -eq 1 ] || echo "zsetup: curl or wget is required for first bootstrap" >&2
+    return 1
+}
+
+bootstrap_fetch() {
+    scheme=$1
+    remote_path=$2
+    destination=$3
+    for base in $BOOTSTRAP_BASES; do
+        if bootstrap_fetch_from_base "$scheme" "$base" "$remote_path" "$destination"; then
+            return 0
+        fi
     done
     return 1
-)
+}
 
-_ddnsto_asus_openssl_hash() { openssl dgst -sha256 < "$1"; }
-_ddnsto_asus_sha256_hash() { sha256sum < "$1"; }
-
-# Hash only a checked private-state file. stdin avoids filename-dependent
-# digest output. A present but failing backend is an error, not a fallback.
-ddnsto_asus_hash() (
-    ddnsto_asus_safe_file "$@" || return 1
-    if ddnsto_asus_has openssl; then
-        output=$(_ddnsto_asus_openssl_hash "$1") || return 1
-        backend=openssl
-    elif ddnsto_asus_has sha256sum; then
-        output=$(_ddnsto_asus_sha256_hash "$1") || return 1
-        backend=sha256sum
-    else
+confirm_insecure_http() {
+    [ "$INSECURE_CONFIRMED" -eq 0 ] || return 0
+    echo "zsetup: all HTTPS bootstrap sources failed." >&2
+    echo "WARNING: HTTP can be intercepted; both zsetup and checksum metadata may be replaced." >&2
+    printf 'Continue with insecure HTTP bootstrap? [y/N] ' >&2
+    confirm_file=${ZSETUP_CONFIRM_FILE:-/dev/tty}
+    answer=
+    if ! IFS= read -r answer < "$confirm_file"; then
+        echo >&2
+        echo "zsetup: HTTP bootstrap refused because no interactive confirmation is available" >&2
         return 1
     fi
-    printf '%s\n' "$output" | LC_ALL=C awk -v backend="$backend" '
-        NR == 1 && NF == 2 {
-            if (backend == "openssl" && ($1 == "SHA256(stdin)=" || $1 == "SHA2-256(stdin)=" || $1 == "(stdin)=")) digest=$2
-            if (backend == "sha256sum" && $2 == "-") digest=$1
-        }
-        END {
-            if (NR != 1 || length(digest) != 64 || digest ~ /[^0-9a-fA-F]/) exit 1
-            print tolower(digest)
-        }
-    '
-)
-
-# Metadata for DDNSTO only. Prefer native stat, but minimal OpenWrt firmware
-# may omit both stat and its BusyBox applet. Never replace checks with success.
-ddnsto_file_fields() (
-    [ "$#" = 1 ] && [ ! -L "$1" ] || return 1
-    if command -v stat >/dev/null 2>&1; then
-        # BSD stat L contains only rwx; M is required for sticky/set-ID bits.
-        if [ "$(uname -s)" = Darwin ]; then stat -f '%u %Mp%Lp %l' "$1"
-        else stat -c '%u %a %h' "$1"; fi
-        return $?
-    fi
-    # Only unambiguous paths and regular files/directories. Reject ACL markers,
-    # unexpected listing formats and symlinks rather than guessing permissions.
-    case "$1" in /*) ;; *) return 1 ;; esac
-    case "$1" in *[!a-zA-Z0-9_./-]*) return 1 ;; esac
-    expected_path=$1
-    listing=$(LC_ALL=C TIME_STYLE=locale ls -dn "$1") || return 1
-    set -f
-    IFS=$(printf ' \t\n_')
-    IFS=${IFS%_}
-    set -- $listing
-    [ "$#" = 9 ] && [ "$9" = "$expected_path" ] || return 1
-    permissions=$1 links=$2 owner=$3
-    case "$owner:$links" in *[!0-9:]*) return 1 ;; esac
-    [ -n "$owner" ] && [ -n "$links" ] && [ "$links" -gt 0 ] || return 1
-    case "$permissions" in
-        [-d][r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]) ;;
-        *) return 1 ;;
-    esac
-    bits=${permissions#?} mode=0 special=0 position=0
-    while [ -n "$bits" ]; do
-        character=${bits%"${bits#?}"}; bits=${bits#?}
-        position=$((position + 1))
-        case "$character" in -|S|T) bit=0 ;; *) bit=1 ;; esac
-        mode=$((mode * 2 + bit))
-        case "$position:$character" in
-            3:s|3:S) special=$((special + 2048)) ;;
-            6:s|6:S) special=$((special + 1024)) ;;
-            9:t|9:T) special=$((special + 512)) ;;
-        esac
-    done
-    printf '%s %o %s\n' "$owner" "$((mode + special))" "$links"
-)
-
-# Restricted interface used by Linux/OpenWrt protection checks. This is not a
-# replacement stat executable and is never installed into the system PATH.
-ddnsto_stat() (
-    [ "$#" = 3 ] && [ "$1" = -c ] || return 1
-    format=$2
-    fields=$(ddnsto_file_fields "$3") || return 1
-    set -- $fields
-    [ "$#" = 3 ] || return 1
-    case "$format" in
-        %u) printf '%s\n' "$1" ;;
-        %a) printf '%s\n' "$2" ;;
-        %h) printf '%s\n' "$3" ;;
-        *) return 1 ;;
-    esac
-)
-
-# Validate storage ancestors before privileged DDNSTO adapters create or
-# replace files.  These are filesystem-safety primitives, not zsetup version
-# policy, so they live with the portable metadata implementation.
-ddnsto_bootstrap_safe_ancestors() (
-    case "$1" in /*) ;; *) return 1 ;; esac
-    case "$1/" in *//*|*/./*|*/../*) [ "$1" = / ] || return 1 ;; esac
-    directory=$1
-    while :; do
-        [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
-        owner=$(ddnsto_stat -c %u "$directory") || return 1
-        mode=$(ddnsto_stat -c %a "$directory") || return 1
-        [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
-        if [ "$((0$mode & 0022))" -ne 0 ]; then
-            [ "$owner" = 0 ] && [ "$((0$mode & 01000))" -ne 0 ] || return 1
-        fi
-        [ "$directory" != / ] || break
-        directory=${directory%/*}
-        [ -n "$directory" ] || directory=/
-    done
-)
-
-ddnsto_bootstrap_private_dir() (
-    [ ! -L "$1" ] || return 1
-    if [ ! -e "$1" ]; then
-        (umask 077; mkdir "$1") || return 1
-    fi
-    [ -d "$1" ] && [ "$(ddnsto_stat -c %u "$1")" = "$(id -u)" ] &&
-        [ "$(ddnsto_stat -c %a "$1")" = 700 ]
-)
-
-asus_entry=0
-if [ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]; then
-    asus_entry=1
-    # Old ASUS ash omits the command builtin. Only -v is used by this entry.
-    if ! type command >/dev/null 2>&1; then
-        command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
-    fi
-    ddnsto_asus_storage || fail '华硕私有存储检查失败' '检查 /jffs 挂载及权限，不要修改系统目录权限' 12
-    required_tools='wc'
-else
-    required_tools='wc mktemp'
-fi
-# A hash backend is mandatory before any downloaded program can execute.
-# Also expose the BusyBox SHA applet to child bootstrap scripts.
-if ! command -v sha256sum >/dev/null 2>&1 && ! command -v openssl >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
-    required_tools="$required_tools sha256sum"
-fi
-missing_tools= busybox_tools= busybox_applets= busybox_checked=0
-for tool in $required_tools; do
-    command -v "$tool" >/dev/null 2>&1 && continue
-    if [ "$busybox_checked" = 0 ]; then
-        busybox_checked=1
-        if command -v busybox >/dev/null 2>&1; then
-            busybox_applets=$(busybox --list 2>/dev/null) || busybox_applets=
-        fi
-    fi
-    # Match complete applet names. BusyBox existing does not mean an applet was
-    # compiled in; never silently replace permission or integrity checks.
-    case "
-$busybox_applets
-" in
-        *"
-$tool
-"*)
-            busybox_tools="$busybox_tools $tool"
-            # Bootstrap the private workspace without modifying system links.
-            # Explicit functions avoid eval of command names or firmware output.
-            case "$tool" in
-                sha256sum) sha256sum() { busybox sha256sum "$@"; } ;;
-                wc) wc() { busybox wc "$@"; } ;;
-                mktemp) mktemp() { busybox mktemp "$@"; } ;;
-            esac ;;
-        *) missing_tools="${missing_tools}${missing_tools:+ }$tool" ;;
-    esac
-done
-[ -z "$missing_tools" ] || fail "缺少校验依赖：$missing_tools" "检查 PATH 或安装上述命令（BusyBox 也未提供对应功能），然后重试；不会跳过校验" 2
-if command -v sha256sum >/dev/null 2>&1; then hash_tool=sha256sum
-elif command -v shasum >/dev/null 2>&1; then hash_tool=shasum
-elif command -v openssl >/dev/null 2>&1; then hash_tool=openssl
-else fail '缺少 SHA256 工具' '安装系统 SHA256 工具后重试' 2; fi
-hash_file() {
-    case "$hash_tool" in
-        sha256sum) h=$(sha256sum "$1") || return 1; printf '%s\n' "${h%% *}" ;;
-        shasum) h=$(shasum -a 256 "$1") || return 1; printf '%s\n' "${h%% *}" ;;
-        openssl) h=$(openssl dgst -sha256 "$1") || return 1; printf '%s\n' "${h##* }" ;;
+    case "$answer" in
+        y|Y|yes|YES) INSECURE_CONFIRMED=1; echo "zsetup: user accepted insecure HTTP bootstrap" >&2 ;;
+        *) echo "zsetup: insecure HTTP bootstrap declined" >&2; return 1 ;;
     esac
 }
-# No persistent recommendation cache. Old cache overrides are deliberately
-# ignored: every invocation fetches a fresh recommendation into a private dir.
-# /tmp is a platform trust anchor, not an arbitrary caller-selected directory.
-if [ "$asus_entry" = 0 ]; then
-    temp_parent=$(CDPATH= cd -P /tmp && pwd -P) || fail '无法访问临时目录' '检查系统 /tmp' 12
-    case "$temp_parent" in /tmp|/private/tmp) ;; *) fail '临时目录位置不受支持' '检查系统 /tmp，不要放宽目录权限' 12 ;; esac
-    for parent in / ${temp_parent%/tmp} "$temp_parent"; do
-        [ -n "$parent" ] || continue
-        [ -d "$parent" ] && [ ! -L "$parent" ] || fail '临时目录不安全' '检查系统目录类型' 12
-        fields=$(ddnsto_file_fields "$parent") || fail '无法检查临时目录权限' '检查系统 ls/stat 功能；不会跳过权限检查' 12
-        field_owner=${fields%% *}; field_rest=${fields#* }; field_mode=${field_rest%% *}
-        [ "$field_owner" = 0 ] || fail '临时目录所有者不安全' '检查系统目录所有者' 12
-        permissions=$((0$field_mode))
-        if [ "$((permissions & 0022))" != 0 ]; then
-            [ "$parent" = "$temp_parent" ] && [ "$((permissions & 01000))" != 0 ] ||
-                fail '临时目录可被其他用户改写' '检查系统目录权限；不要关闭权限检查' 12
-        fi
-    done
-fi
-work=
-entry_child=
-cleanup() {
-    cleanup_rc=$?
-    trap - EXIT
-    trap '' HUP INT TERM
-    # Retain the verified source until the installer has joined
-    # its worker/recovery. Only signal our own child, never a global process set.
-    if [ -n "$entry_child" ]; then
-        kill -TERM "$entry_child" 2>/dev/null || :
-        wait "$entry_child" 2>/dev/null || :
-        entry_child=
+
+read_stable_version() {
+    file=$1
+    IFS= read -r RESCUE_VERSION < "$file" || return 1
+    case "$RESCUE_VERSION" in
+        ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) return 1 ;;
+    esac
+    [ -n "$RESCUE_VERSION" ] && [ "${#RESCUE_VERSION}" -le 64 ] || return 1
+    compatibility_version=${RESCUE_VERSION%%[-+]*}
+    compatibility_major=${compatibility_version%%.*}
+    compatibility_rest=${compatibility_version#*.}
+    compatibility_minor=${compatibility_rest%%.*}
+    compatibility_patch=${compatibility_rest#*.}
+    case "$compatibility_major:$compatibility_minor:$compatibility_patch" in *[!0123456789:]*|::*|*::*) return 1 ;; esac
+    if [ "$compatibility_major" -eq 0 ]; then
+        [ "$compatibility_minor" -ge 5 ] || return 1
     fi
-    [ -z "$work" ] || rm -rf -- "$work"
-    exit "$cleanup_rc"
 }
-trap cleanup EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-if [ "$asus_entry" = 1 ]; then
-    work=$(ddnsto_asus_mktemp "$ASUS_STATE") || fail '无法创建工作目录' '检查缓存空间' 12
-else
-    work=$(mktemp -d "$temp_parent/ddnsto-entry.XXXXXXXX") || fail '无法创建工作目录' '检查缓存空间' 12
-fi
-if [ -n "$busybox_tools" ]; then
-    # POSIX functions are not inherited by the installer child. Provide only
-    # missing commands in this checked 0700 workspace, retained until child exit.
-    mkdir -m 700 "$work/tools" || fail '无法准备兼容命令' '检查私有缓存空间' 12
-    for tool in $busybox_tools; do
-        printf '#!/bin/sh\nexec busybox %s "$@"\n' "$tool" > "$work/tools/$tool" || fail '无法准备兼容命令' '检查私有缓存空间' 12
-        chmod 700 "$work/tools/$tool" || fail '无法保护兼容命令' '检查私有缓存权限' 12
-    done
-    PATH="$work/tools:$PATH"
-    export PATH
-fi
-# A narrow bootstrap transport, not a zsetup replacement. Do not execute a
-# caller-supplied/downloading zsetup just to ask its version. Curl follows at
-# most five HTTPS-only redirects; wget safely refuses redirects (see below).
-# ulimit bounds even chunked bodies on older curl; max-filesize adds exact limits.
-# Recommendation transport policy is independent of executor bootstrap policy.
-# Only installer/native bootstrap uses this transport. Products use zsetup.
-ddnsto_https_fetch() (
-    case "$1" in https://*) ;; *) return 42 ;; esac
-    url=$1 destination=$2 limit=$3
-    ulimit -c 0 || return 42
-    # POSIX shells use 512-byte blocks (some shells use 1024). Bound body AND
-    # response diagnostics; final byte count is exact even for chunked bodies.
-    ulimit -f "$(((limit + 511) / 512 + 128))" || return 42
-    code=0 status=
-    if command -v curl >/dev/null 2>&1; then
-        status=$(curl -q --silent --proto '=https' --proto-redir '=https' \
-            --location --max-redirs 5 \
-            --connect-timeout 5 --max-time 20 --max-filesize "$limit" \
-            --output "$destination" --write-out '%{http_code}' "$url" 2>/dev/null) || code=$?
-        case "$code" in 0) ;; 6|7|28) return 41 ;; *) return 42 ;; esac
-        case "$status" in 404|500|502|503|504) return 41 ;; esac
+
+read_expected_sha256() {
+    file=$1
+    EXPECTED_SHA256=
+    while IFS=' ' read -r digest name remainder; do
+        name=${name#\*}
+        if [ "$name" = "$ZSETUP_ARTIFACT" ] && [ -z "${remainder:-}" ]; then
+            EXPECTED_SHA256=$digest
+            break
+        fi
+    done < "$file"
+    [ "${#EXPECTED_SHA256}" -eq 64 ] || return 1
+    case "$EXPECTED_SHA256" in *[!0123456789abcdefABCDEF]*) return 1 ;; esac
+}
+
+have_hash_tool() {
+    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
+        command -v shasum >/dev/null 2>&1
+}
+
+hash_matches() {
+    [ -f "$1" ] || return 1
+    if [ -z "${EXPECTED_SHA256:-}" ]; then
+        echo "zsetup: bootstrap SHA-256 verification skipped; HTTPS transport remains required" >&2
+        return 0
+    fi
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$1")
+        actual=${actual%% *}
+    elif command -v openssl >/dev/null 2>&1; then
+        actual=$(openssl dgst -sha256 "$1")
+        actual=${actual##*= }
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$1")
+        actual=${actual%% *}
     else
-        # --no-config must cover system wgetrc, ~/.wgetrc AND WGETRC. A plain
-        # -e check_certificate=on cannot neutralize input/output/redirect config.
-        version=$(LC_ALL=C wget --no-config --version 2>/dev/null) || version=
-        case "$version" in
-            'GNU Wget '*)
-                case "$version" in *+https*) ;; *) version= ;; esac ;;
-            *) version= ;;
-        esac
-        if [ -z "$version" ]; then
-            printf '%s\n' 'DDNSTO: TLS certificate validation requires curl or GNU Wget with HTTPS and --no-config; BusyBox/uclient wget is unsupported' >&2
-            return 42
-        fi
-        log="$destination.wget-response"
-        pid= timer=
-        finish_fetch() {
-            [ -z "$pid" ] || { kill "$pid" 2>/dev/null || :; wait "$pid" 2>/dev/null || :; }
-            [ -z "$timer" ] || { kill "$timer" 2>/dev/null || :; wait "$timer" 2>/dev/null || :; }
-            rm -f "$log"
-        }
-        trap finish_fetch EXIT
-        trap 'exit 42' HUP INT TERM
-        LC_ALL=C wget --no-config --execute=check_certificate=on \
-            --https-only --max-redirect=0 --tries=1 --timeout=5 \
-            --no-netrc --no-hsts --no-verbose --server-response \
-            -O "$destination" "$url" 2>"$log" &
-        pid=$!
-        # Wget's timeout is an idle timeout, not a total deadline. Reap both
-        # watchdog and sleeper on success, failure, and signal.
-        (
-            sleeper=
-            trap '[ -z "$sleeper" ] || { kill "$sleeper" 2>/dev/null; wait "$sleeper" 2>/dev/null; }; exit 0' HUP INT TERM
-            sleep 20 & sleeper=$!
-            wait "$sleeper" || exit 0
-            kill "$pid" 2>/dev/null || :
-        ) </dev/null >/dev/null 2>&1 &
-        timer=$!
-        wait "$pid" || code=$?
-        pid=
-        kill "$timer" 2>/dev/null || :
-        wait "$timer" 2>/dev/null || :
-        timer=
-        # C-locale TLS diagnostics only veto fallback; HTTP status is parsed
-        # structurally. Never expose response headers/URLs. GNU
-        # --server-response emits indented HTTP status lines; headers cannot
-        # masquerade as status lines without an HTTP/ prefix.
-        set -f
-        tls_error=0
-        while IFS= read -r line; do
-            # Exit 5 already rejects certificate errors below. Exit 4 also
-            # covers handshake failures: recognize only GNU's nonindented
-            # diagnostics, never TLS words in response headers or URLs.
-            if [ "$code" = 4 ]; then
-                case "$line" in
-                    'Unable to establish SSL connection.'*|'GnuTLS: '*|'OpenSSL: '*) tls_error=1 ;;
-                esac
-            fi
-            set -- $line
-            case "${1:-}" in HTTP/*) status=${2:-} ;; esac
-        done < "$log"
-        [ "$tls_error" = 0 ] || return 42
-        # GNU wget --https-only governs recursive link selection, not redirect
-        # schemes. Keep max-redirect=0: never contact an HTTP Location, and do
-        # not turn a refused redirect into an availability/cache fallback.
-        case "$status" in 301|302|303|307|308)
-            printf '%s\n' 'DDNSTO：下载地址需要重定向，wget 已安全拒绝；请安装 curl 后重试（最多五次 HTTPS 跳转，不允许降级 HTTP）' >&2
-            return 42 ;;
-        esac
-        case "$code" in 0|8)
-            case "$status" in 404|500|502|503|504) return 41 ;; esac ;;
-        esac
-        case "$status" in ''|200) ;; *) return 42 ;; esac
-        case "$code" in 0) ;; 4|143) return 41 ;; *) return 42 ;; esac
+        echo "zsetup: bootstrap SHA-256 tool disappeared before verification" >&2
+        return 1
     fi
-    [ "$status" = 200 ] || return 42
-    [ -f "$destination" ] && [ "$(wc -c < "$destination")" -le "$limit" ] || return 42
+    [ "$actual" = "$EXPECTED_SHA256" ]
+}
+
+is_expected_zsetup() {
+    [ -x "$1" ] && [ "$("$1" --version 2>/dev/null || true)" = "zsetup $RESCUE_VERSION" ]
+}
+
+find_existing_zsetup() {
+    if [ -n "${ZSETUP_BIN:-}" ] && is_expected_zsetup "$ZSETUP_BIN"; then
+        ACTIVE_ZSETUP=$ZSETUP_BIN
+        return 0
+    fi
+    if is_expected_zsetup "$WORK_ROOT/rescue/$RESCUE_VERSION/zsetup"; then
+        ACTIVE_ZSETUP="$WORK_ROOT/rescue/$RESCUE_VERSION/zsetup"
+        return 0
+    fi
+    if command -v zsetup >/dev/null 2>&1; then
+        system_zsetup=$(command -v zsetup)
+        if is_expected_zsetup "$system_zsetup"; then
+            ACTIVE_ZSETUP=$system_zsetup
+            return 0
+        fi
+    fi
+    return 1
+}
+
+fetch_bootstrap_metadata() {
+    scheme=$1
+    stable_file=$2
+    sums_file=$3
+    for base in $BOOTSTRAP_BASES; do
+        bootstrap_fetch_from_base "$scheme" "$base" "$ZSETUP_STABLE_PATH" "$stable_file" || continue
+        read_stable_version "$stable_file" || continue
+        EXPECTED_SHA256=
+        if have_hash_tool && bootstrap_fetch_from_base "$scheme" "$base" "zsetup/$RESCUE_VERSION/SHA256SUMS" "$sums_file"; then
+            read_expected_sha256 "$sums_file" || EXPECTED_SHA256=
+        fi
+        return 0
+    done
+    echo "zsetup: no source returned valid stable metadata over $scheme" >&2
+    return 1
+}
+
+bootstrap_zsetup() {
+    bootstrap_arch
+    state_dir="$WORK_ROOT/bootstrap"
+    mkdir -p "$state_dir"
+    stable_file="$state_dir/.stable.$$"
+    sums_file="$state_dir/.SHA256SUMS.$$"
+    trap 'rm -f "$stable_file" "$sums_file" "${candidate:-}" 2>/dev/null || true' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    metadata_scheme=https
+    if ! fetch_bootstrap_metadata https "$stable_file" "$sums_file"; then
+        confirm_insecure_http
+        metadata_scheme=http
+        fetch_bootstrap_metadata http "$stable_file" "$sums_file"
+    fi
+
+    if find_existing_zsetup; then
+        trap - EXIT HUP INT TERM
+        rm -f "$stable_file" "$sums_file" 2>/dev/null || true
+        return 0
+    fi
+
+    rescue_dir="$WORK_ROOT/rescue/$RESCUE_VERSION"
+    rescue_bin="$rescue_dir/zsetup"
+    candidate="$rescue_dir/.zsetup-download.$$"
+    mkdir -p "$rescue_dir"
+    if ! bootstrap_fetch https "zsetup/$RESCUE_VERSION/$ZSETUP_ARTIFACT" "$candidate"; then
+        confirm_insecure_http
+        bootstrap_fetch http "zsetup/$RESCUE_VERSION/$ZSETUP_ARTIFACT" "$candidate"
+    fi
+    hash_matches "$candidate" || {
+        echo "zsetup: bootstrap checksum mismatch" >&2
+        return 1
+    }
+    chmod 0755 "$candidate"
+    is_expected_zsetup "$candidate" || {
+        echo "zsetup: downloaded bootstrap has the wrong product or version" >&2
+        return 1
+    }
+    mv -f "$candidate" "$rescue_bin"
+    ACTIVE_ZSETUP=$rescue_bin
+    trap - EXIT HUP INT TERM
+    rm -f "$stable_file" "$sums_file" 2>/dev/null || true
+    [ "$metadata_scheme" = https ] || echo "zsetup: insecure HTTP bootstrap completed with user consent" >&2
+}
+
+# Return the verified native path while confining bootstrap's temporary signal
+# traps to a subprocess. Long-running installers can call this after installing
+# their own transaction cleanup traps without losing those handlers.
+bootstrap_zsetup_path() (
+    bootstrap_zsetup
+    printf '%s\n' "$ACTIVE_ZSETUP"
 )
 
-fetch() (
-    ddnsto_https_fetch "$@"
-)
-parse() {
-    [ -f "$1" ] && [ ! -L "$1" ] || return 1
-    manifest_bytes=$(wc -c < "$1") || return 1
-    [ "$manifest_bytes" -le 128 ] || return 1
-    {
-        IFS= read -r magic && IFS= read -r digest && IFS= read -r size
-    } < "$1" || return 1
-    [ "$magic" = ddnsto-recommendation-v1-shell ] || return 1
-    case "$digest" in ''|*[!0-9a-f]*) return 1 ;; esac
-    [ "${#digest}" = 64 ] || return 1
-    case "$size" in ''|0*|*[!0-9]*) return 1 ;; esac
-    [ "${#size}" -le 7 ] && [ "$size" -le 8388608 ] || return 1
-    # Fields are ASCII-only; exact byte length rejects NULs discarded by some
-    # shells, extra lines, CRLF and missing final newline without requiring cmp.
-    [ "$manifest_bytes" -eq "$((${#magic} + ${#digest} + ${#size} + 3))" ]
-}
-verify() {
-    [ -f "$1" ] && [ ! -L "$1" ] &&
-        [ "$(wc -c < "$1")" -eq "$size" ] && [ "$(hash_file "$1")" = "$digest" ]
-}
-recommend_native=
 
-rc=0
-fetch "$base/recommended-shell.txt" "$work/recommended.txt" 128 || rc=$?
-case "$rc" in
-    0) parse "$work/recommended.txt" || fail '推荐清单非法' '联系发布者核对清单' 11 ;;
-    41) fail '推荐源暂不可用，本入口需要联网' '检查网络后重新运行；也可使用官方手动安装指引' 11 ;;
-    *) fail '推荐源响应或 TLS 校验异常' '检查 HTTPS 证书、系统时间和下载工具' 11 ;;
-esac
-download_rc=0
-if [ -n "${recommend_native:-}" ]; then
-    ddnsto_recommend_native_download
-else
-    fetch "$base/immutable/$digest/install.sh" "$work/install.sh" "$size" || download_rc=$?
-fi
-case "$download_rc" in
-    0) verify "$work/install.sh" || fail '安装脚本校验失败' '联系发布者核对摘要和大小' 11 ;;
-    41) fail '安装脚本暂不可用' '检查网络后重试；不会执行旧缓存' 11 ;;
-    *) fail '安装脚本响应异常' '检查 HTTPS 证书和不可变路径' 11 ;;
-esac
-verify "$work/install.sh" || fail '执行前校验失败' '重新下载或联系发布者' 11
-# Preserve exact argv and executor status. No token, manifest or exception dump.
-# Lifecycle success (including stable local service checks) belongs to executor.
-result=0
-# Async POSIX shells replace fd 0 before applying redirections. Preserve the
-# original via a separate descriptor, then close it in both parent and child.
-exec 3<&0
-sh "$work/install.sh" "$@" <&3 3<&- &
-entry_child=$!
-exec 3<&-
-wait "$entry_child" || result=$?
-entry_child=
-exit "$result"
+bootstrap_zsetup
+
+config_dir=$WORK_ROOT/zsetup-scripts
+config_file=$config_dir/config.json
+config_candidate=$config_dir/.config.json.$$
+mkdir -p "$config_dir"
+trap 'rm -f "$config_candidate" 2>/dev/null || true' EXIT HUP INT TERM
+download_business_config() {
+    set -- download --quiet -o "$config_candidate" --max-bytes 131072
+    for config_url in $CONFIG_PRIMARY_URLS; do set -- "$@" "$config_url"; done
+    set -- "$@" --fallback-url "$CONFIG_FALLBACK_URL"
+    "$ACTIVE_ZSETUP" "$@"
+}
+download_business_config
+chmod 0600 "$config_candidate"
+mv -f "$config_candidate" "$config_file"
+trap - EXIT HUP INT TERM
+ZSETUP_CONFIG=$config_file
+export ZSETUP_CONFIG
+exec "$ACTIVE_ZSETUP" install "$APP_ID" --foreground -- "$@"
+

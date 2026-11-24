@@ -1,6 +1,7 @@
 # `apps/` publication layout v1
 
-Status: accepted implementation contract.  The repository `apps/` directory is
+Status: superseded by [apps layout v2](apps-layout-v2.md). This document records
+the historical schema-v1 contract. The repository `apps/` directory is
 the public release tree: every byte below it may be copied to the download
 server.  Tests, fixtures, build tools, credentials and production connection
 data live outside `apps/`.

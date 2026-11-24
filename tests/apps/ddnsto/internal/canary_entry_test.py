@@ -23,7 +23,7 @@ class CanaryEntry(unittest.TestCase):
 
     def test_keeps_fixed_github_commit_support(self):
         result = self.check_entry('https://raw.githubusercontent.com/linkease/zsetup-scripts/' +
-                                  'a' * 40 + '/apps/ddnsto/0.2.5/installer.sh')
+                                  'a' * 40 + '/apps/ddnsto/versions/0.3.0/install.sh')
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_rejects_mutable_insecure_or_external_url_and_bad_hash(self):
@@ -33,7 +33,7 @@ class CanaryEntry(unittest.TestCase):
             'https://web.toany.net/install/',
             'https://web.toany.net/ddnsto-install/0.1.9/../install.sh',
             'https://web.toany.net/ddnsto-install/0.1.9/latest/install.sh',
-            'https://raw.githubusercontent.com/linkease/zsetup-scripts/main/apps/ddnsto/0.2.5/installer.sh',
+            'https://raw.githubusercontent.com/linkease/zsetup-scripts/main/apps/ddnsto/versions/0.3.0/install.sh',
         ):
             with self.subTest(url=url):
                 self.assertNotEqual(self.check_entry(url).returncode, 0)

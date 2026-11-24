@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class SynologyAuto(unittest.TestCase):
     def test_help_describes_synology_automatic_support(self):
-        result = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/0.2.5/installer.sh'), '--help'], capture_output=True, text=True)
+        result = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/versions/0.3.0/install.sh'), '--help'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0)
         self.assertIn('DS220j', result.stdout)
         self.assertNotIn('暂不支持 NAS/Docker', result.stdout)

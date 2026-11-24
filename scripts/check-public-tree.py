@@ -10,7 +10,7 @@ import sys
 
 
 SAFE_APP = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
-RESERVED_DIRECTORIES = {"zsetup", "_shared"}
+RESERVED_DIRECTORIES = {"zsetup", "_shared", "_sites"}
 ROOT_FILES = {"README.md", "SHA256SUMS"}
 FORBIDDEN_DIRECTORIES = {"test", "tests", "fixture", "fixtures", "__pycache__", ".git"}
 FORBIDDEN_NAMES = {
@@ -35,7 +35,7 @@ def validate(root: Path):
     if ddnsto.is_dir():
         for path in ddnsto.rglob('*'):
             relative = path.relative_to(ddnsto)
-            if (relative.parts[0] in {'source', 'sources', 'templates', 'tests', 'app.json', 'README.md'}
+            if (relative.parts[0] in {'source', 'sources', 'templates', 'tests', 'README.md'}
                     or path.suffix in {'.py', '.in'} or path.name == 'review.json'):
                 fail(f'non-runtime DDNSTO material is forbidden in public tree: {path}')
     for child in root.iterdir():

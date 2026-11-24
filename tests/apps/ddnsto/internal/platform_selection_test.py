@@ -100,7 +100,7 @@ printf 'SELECTED %s\n' "$detected_platform"
             env = os.environ | dict(ZSETUP_INSTALLER_MODE='1', ZSETUP_BIN='/bin/false',
                 ZSETUP_SOURCE_BASES='https://example.invalid', ZSETUP_OS='linux',
                 ZSETUP_PACKAGE_MANAGER='unknown', ZSETUP_ARCH='x86_64', ZSETUP_WORK_DIR=tmp + '/work')
-            r = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/0.2.5/installer.sh'), '--platform', 'openwrt'],
+            r = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/versions/0.3.0/install.sh'), '--platform', 'openwrt'],
                                env=env, capture_output=True, text=True, timeout=5)
             self.assertEqual(r.returncode, 2, r.stderr)
             self.assertIn('platform mismatch', r.stderr)

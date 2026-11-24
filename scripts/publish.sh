@@ -50,6 +50,21 @@ safe_destination() {
     done
 }
 
+safe_relative() {
+    case "$1" in
+        ''|/*|../*|*/../*|*/..|./*|*/./*|*/.|*\\*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+source_contains() {
+    wanted=$1
+    while IFS=' ' read -r ignored candidate; do
+        [ "$candidate" = "$wanted" ] && return 0
+    done < "$src/SHA256SUMS"
+    return 1
+}
+
 atomic_copy() {
     from=$1
     to=$2
@@ -68,11 +83,14 @@ atomic_copy() {
 
 is_immutable() {
     old_ifs=$IFS; IFS=/; set -- $1; IFS=$old_ifs
-    if [ "$#" = 6 ] && [ "$1/$2" = ddnsto/ddnsto-install ]; then
+    if [ "$#" = 6 ] && [ "$1/$2" = _sites/run.ddnsto.com ]; then
         case "$3/$4" in current/immutable|agent/versions)
             case "$5" in ''|*[!0-9a-f]*) return 1 ;; esac
             [ "${#5}" = 64 ]; return $? ;;
         esac
+    fi
+    if [ "$#" -ge 4 ] && [ "$2" = versions ]; then
+        case "$3" in [0-9]*.[0-9]*.[0-9]*) return 0 ;; *) return 1 ;; esac
     fi
     [ "$#" -ge 3 ] || return 1
     case "$2" in [0-9]*.[0-9]*.[0-9]*) return 0 ;; *) return 1 ;; esac
@@ -116,6 +134,12 @@ if [ "$mode" = verify ]; then
         [ -f "$dst/$relative" ] && [ ! -L "$dst/$relative" ] || die "published file missing: $relative"
         cmp "$src/$relative" "$dst/$relative" >/dev/null || die "published file differs: $relative"
     done < "$src/SHA256SUMS"
+    if [ -f "$snapshot/retired-list" ]; then
+        while IFS= read -r relative; do
+            [ -n "$relative" ] || continue
+            [ ! -e "$dst/$relative" ] || die "retired published file remains: $relative"
+        done < "$snapshot/retired-list"
+    fi
     printf 'Verified apps release %s\n' "$release_id"
     exit 0
 fi
@@ -133,6 +157,7 @@ if [ "$mode" = stage ]; then
     mkdir "$snapshot"
     chmod 0700 "$snapshot"
     : > "$snapshot/mutable-list"
+    : > "$snapshot/retired-list"
     relative=SHA256SUMS
     safe_destination "$relative" || die 'mutable target has a symlink ancestor: SHA256SUMS'
     printf '%s\n' "$relative" >> "$snapshot/mutable-list"
@@ -161,6 +186,23 @@ if [ "$mode" = stage ]; then
             fi
         fi
     done < "$src/SHA256SUMS"
+    if [ -f "$dst/SHA256SUMS" ]; then
+        while IFS=' ' read -r digest relative; do
+            [ -n "$relative" ] || continue
+            safe_relative "$relative" || die "unsafe retired path in current SHA256SUMS: $relative"
+            source_contains "$relative" && continue
+            target=$dst/$relative
+            [ -e "$target" ] || continue
+            safe_destination "$relative" || die "retired target has a symlink ancestor: $relative"
+            [ -f "$target" ] && [ ! -L "$target" ] || die "retired target is not a regular file: $relative"
+            actual=$(sha256sum "$target"); actual=${actual%% *}
+            [ "$actual" = "$digest" ] || die "retired target differs from current manifest: $relative"
+            printf '%s\n' "$relative" >> "$snapshot/mutable-list"
+            printf '%s\n' "$relative" >> "$snapshot/retired-list"
+            mkdir -p "$snapshot/previous/$(dirname -- "$relative")"
+            cp -p "$target" "$snapshot/previous/$relative"
+        done < "$dst/SHA256SUMS"
+    fi
     printf '%s\n' staged > "$snapshot/phase"
     printf 'Staged apps release %s; mutable tree unchanged\n' "$release_id"
     exit 0
@@ -173,7 +215,11 @@ if [ "$mode" = rollback ]; then
     [ "$phase" = activated ] || die 'release is not active'
     while IFS= read -r relative; do
         [ -n "$relative" ] || continue
-        [ -f "$dst/$relative" ] && cmp "$src/$relative" "$dst/$relative" >/dev/null || die "later publication changed $relative"
+        if [ -f "$src/$relative" ]; then
+            [ -f "$dst/$relative" ] && cmp "$src/$relative" "$dst/$relative" >/dev/null || die "later publication changed $relative"
+        else
+            [ ! -e "$dst/$relative" ] || die "later publication restored retired file $relative"
+        fi
     done < "$snapshot/mutable-list"
     restore || die 'rollback failed'
     printf '%s\n' rolled-back > "$snapshot/phase"
@@ -196,6 +242,7 @@ switching=1
 for activation_class in ordinary config entry; do
     while IFS= read -r relative; do
         [ -n "$relative" ] || continue
+        [ -f "$src/$relative" ] || continue
         case "$relative" in
             zsetup/config.json) class=config ;;
             */*.sh|*/*.ps1) class=entry ;;
@@ -210,6 +257,15 @@ for activation_class in ordinary config entry; do
         fi
     done < "$snapshot/mutable-list"
 done
+while IFS= read -r relative; do
+    [ -n "$relative" ] || continue
+    rm -f "$dst/$relative" || exit 1
+    parent=$(dirname -- "$dst/$relative")
+    while [ "$parent" != "$dst" ]; do
+        rmdir "$parent" 2>/dev/null || break
+        parent=$(dirname -- "$parent")
+    done
+done < "$snapshot/retired-list"
 printf '%s\n' activated > "$snapshot/phase"
 switching=0
 printf 'Activated apps release %s; rollback snapshot %s\n' "$release_id" "$snapshot"

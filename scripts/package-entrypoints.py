@@ -39,7 +39,7 @@ def main():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 source = (ROOT / 'sources/ddnsto/install.ps1'
                           if name == 'install.ps1'
-                          else ROOT / 'apps/ddnsto/0.2.4/installer.sh')
+                          else ROOT / 'apps/ddnsto/versions/0.3.0/install.sh')
                 shutil.copy2(source, target)
         # Audit metadata travels with the candidate, never fetched as executable
         # policy at runtime. Each public entry remains standalone.

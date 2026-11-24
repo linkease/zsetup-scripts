@@ -2612,7 +2612,7 @@ installer_privilege_install() {
 }
 
 
-# Business logic: maintained in apps/ddnsto/source/business.sh
+# Business logic: maintained in sources/ddnsto/business.sh
 # Metadata for DDNSTO only. Prefer native stat, but minimal OpenWrt firmware
 # may omit both stat and its BusyBox applet. Never replace checks with success.
 ddnsto_file_fields() (
@@ -2871,6 +2871,7 @@ ddnsto_business_asus_service_file() (
         service_link=$(readlink "$service_file") || exit 2
         case "$service_file:$service_link" in
             /koolshare/init.d/S70ddnsto.sh:/koolshare/scripts/ddnsto_config.sh)
+                [ -f /koolshare/scripts/ddnsto_config.sh ] || { ddnsto_business_match unknown; exit 2; }
                 ddnsto_business_asus_service_file /koolshare/scripts/ddnsto_config.sh
                 exit $? ;;
             /koolshare/scripts/ddnsto_config.sh:/jffs/.ddnsto-installer/current/ddnsto_config.sh|/koolshare/init.d/S70ddnsto.sh:/jffs/.ddnsto-installer/current/S70ddnsto.sh)
@@ -4340,7 +4341,27 @@ ddnsto_ow_owned() (
         ow_owner=$(opkg search "$1" 2>/dev/null) || return 1
         case "$ow_owner" in *'
 '*) return 1 ;; esac
-        case "$ow_owner" in 'ddnsto - '?*) return 0 ;; *) return 1 ;; esac
+        case "$ow_owner" in
+            'ddnsto - '?*) return 0 ;;
+            '') ;; # Retained conffiles may be absent from opkg's file list.
+            *) return 1 ;;
+        esac
+        [ "$1" = "${config:-/etc/config/ddnsto}" ] || return 1
+        ow_status=$(opkg status ddnsto 2>/dev/null) || return 1
+        printf '%s\n' "$ow_status" | LC_ALL=C awk -v target="$1" '
+            /^Package:/ { packages++; if ($0 != "Package: ddnsto") bad=1 }
+            /^Status:/ {
+                statuses++
+                if (NF!=4 || $4!="installed") bad=1
+            }
+            /^Conffiles:$/ { sections++; in_config=1; next }
+            /^[^ \t]/ { in_config=0 }
+            in_config && $1==target {
+                matches++
+                if (NF!=2 || $2 ~ /[^0-9a-f]/ || (length($2)!=32 && length($2)!=64)) bad=1
+            }
+            END { exit !(packages==1 && statuses==1 && sections==1 && matches==1 && !bad) }
+        '
     else
         ow_owner=$(apk -q info --who-owns "$1" 2>/dev/null) || return 1
         [ "$ow_owner" = ddnsto ]
@@ -6559,6 +6580,11 @@ ddnsto_asus_transport() (
 
 ddnsto_asus_native() {
     umask 077
+    # Legacy ASUS ash lacks command. Shared metadata/hash discovery uses only
+    # command -v; keep this bounded compatibility helper in the ASUS worker.
+    if ! type command >/dev/null 2>&1; then
+        command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
+    fi
     case "$ASUS_ARCH" in aarch64) ZSETUP_ARCH=aarch64 ;; armv7l) ZSETUP_ARCH=armv7 ;; *) return 2 ;; esac
     bootstrap_arch || return $?
     native_metadata=$(ddnsto_asus_mktemp "$ASUS_STATE") || return 12
@@ -7522,6 +7548,7 @@ ddnsto_business_asus_service_file() (
         service_link=$(readlink "$service_file") || exit 2
         case "$service_file:$service_link" in
             /koolshare/init.d/S70ddnsto.sh:/koolshare/scripts/ddnsto_config.sh)
+                [ -f /koolshare/scripts/ddnsto_config.sh ] || { ddnsto_business_match unknown; exit 2; }
                 ddnsto_business_asus_service_file /koolshare/scripts/ddnsto_config.sh
                 exit $? ;;
             /koolshare/scripts/ddnsto_config.sh:/jffs/.ddnsto-installer/current/ddnsto_config.sh|/koolshare/init.d/S70ddnsto.sh:/jffs/.ddnsto-installer/current/S70ddnsto.sh)
@@ -8797,7 +8824,27 @@ ddnsto_ow_owned() (
         ow_owner=$(opkg search "$1" 2>/dev/null) || return 1
         case "$ow_owner" in *'
 '*) return 1 ;; esac
-        case "$ow_owner" in 'ddnsto - '?*) return 0 ;; *) return 1 ;; esac
+        case "$ow_owner" in
+            'ddnsto - '?*) return 0 ;;
+            '') ;; # Retained conffiles may be absent from opkg's file list.
+            *) return 1 ;;
+        esac
+        [ "$1" = "${config:-/etc/config/ddnsto}" ] || return 1
+        ow_status=$(opkg status ddnsto 2>/dev/null) || return 1
+        printf '%s\n' "$ow_status" | LC_ALL=C awk -v target="$1" '
+            /^Package:/ { packages++; if ($0 != "Package: ddnsto") bad=1 }
+            /^Status:/ {
+                statuses++
+                if (NF!=4 || $4!="installed") bad=1
+            }
+            /^Conffiles:$/ { sections++; in_config=1; next }
+            /^[^ \t]/ { in_config=0 }
+            in_config && $1==target {
+                matches++
+                if (NF!=2 || $2 ~ /[^0-9a-f]/ || (length($2)!=32 && length($2)!=64)) bad=1
+            }
+            END { exit !(packages==1 && statuses==1 && sections==1 && matches==1 && !bad) }
+        '
     else
         ow_owner=$(apk -q info --who-owns "$1" 2>/dev/null) || return 1
         [ "$ow_owner" = ddnsto ]
@@ -10696,6 +10743,9 @@ ddnsto_asus_transport() (
 )
 ddnsto_asus_native() {
     umask 077
+    if ! type command >/dev/null 2>&1; then
+        command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
+    fi
     case "$ASUS_ARCH" in aarch64) ZSETUP_ARCH=aarch64 ;; armv7l) ZSETUP_ARCH=armv7 ;; *) return 2 ;; esac
     bootstrap_arch || return $?
     native_metadata=$(ddnsto_asus_mktemp "$ASUS_STATE") || return 12

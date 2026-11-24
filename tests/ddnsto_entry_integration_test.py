@@ -20,7 +20,7 @@ class EntryIntegration(unittest.TestCase):
             before = {p: (repo / p).read_bytes() for p in paths}
             result = subprocess.run([sys.executable, '-B', str(repo / 'scripts/build-entrypoints.py')], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            entry = (repo / 'apps/ddnsto/0.2.5/installer.sh').read_text()
+            entry = (repo / 'apps/ddnsto/versions/0.3.0/install.sh').read_text()
             self.assertIn('Darwin', entry)
             self.assertIn('bootstrap_zsetup_path', entry)
             self.assertNotIn('ddnsto_bootstrap_zsetup', entry)

@@ -16,7 +16,7 @@ class SharedBootstrapEmbedding(unittest.TestCase):
             self.assertIn(token, bootstrap)
 
     def test_generated_ddnsto_installer_is_valid_posix_shell(self):
-        installer = ROOT / "apps/ddnsto/0.2.5/installer.sh"
+        installer = ROOT / "apps/ddnsto/versions/0.3.0/install.sh"
         result = subprocess.run(["sh", "-n", str(installer)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         text = installer.read_text()

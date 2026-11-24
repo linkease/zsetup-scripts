@@ -46,8 +46,8 @@ with tempfile.TemporaryDirectory(prefix="apps-full-preflight-") as folder:
     assert staged.returncode == 0, staged.stderr
     assert (live / "zsetup/config.json").read_bytes() == old_config
     assert (live / "ddnsto/install.sh").read_bytes() == old_entry
-    assert (live / "ddnsto/0.2.4/installer.sh").read_bytes() == (
-        APPS / "ddnsto/0.2.4/installer.sh").read_bytes()
+    assert (live / "ddnsto/versions/0.3.0/install.sh").read_bytes() == (
+        APPS / "ddnsto/versions/0.3.0/install.sh").read_bytes()
 
     activated = publish("activate", live)
     assert activated.returncode == 0, activated.stderr
@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix="apps-full-preflight-") as folder:
     assert (live / "zsetup/config.json").read_bytes() == old_config
     assert (live / "ddnsto/install.sh").read_bytes() == old_entry
     assert not (live / "SHA256SUMS").exists()
-    assert (live / "ddnsto/0.2.4/installer.sh").is_file()
+    assert (live / "ddnsto/versions/0.3.0/install.sh").is_file()
     assert (binary / "server-owned/product.bin").read_bytes() == unrelated
     assert (binary / "zsetup/config.json").read_bytes() == root_config
     assert (binary / "ddnsto/install.sh").read_bytes() == root_entry

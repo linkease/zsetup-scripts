@@ -28,8 +28,8 @@ class EntrypointPackage(unittest.TestCase):
                 alias = 'binary/ddnsto/' + name
                 immutable = 'binary/ddnsto/0.2.4/' + name
                 self.assertTrue((output / immutable).is_file(), immutable)
-                source = (ROOT / 'apps/ddnsto/0.2.5/installer.sh' if name != 'install.ps1'
-                          else ROOT / 'sources/ddnsto/install.ps1')
+                source = (ROOT / 'apps/ddnsto/versions/0.3.0/install.sh' if name != 'install.ps1'
+                          else ROOT / 'apps/ddnsto/versions/0.3.0/install.ps1')
                 self.assertEqual((output / alias).read_bytes(), source.read_bytes())
                 self.assertEqual((output / immutable).read_bytes(), (output / alias).read_bytes())
                 self.assertEqual(files[alias]['sha256'], hashlib.sha256((output / alias).read_bytes()).hexdigest())

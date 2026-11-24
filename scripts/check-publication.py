@@ -64,7 +64,7 @@ def audit(base, fetch=None, mode='indexed', verify_products=False, fetch_product
             checks.append({'path': path, 'ok': False, 'error': str(exc)})
             return None
 
-    installer = (ROOT / 'apps/ddnsto/0.2.4/installer.sh').read_bytes()
+    installer = (ROOT / 'apps/ddnsto/versions/0.3.0/install.sh').read_bytes()
     digest = hashlib.sha256(installer).hexdigest()
 
     def verify_entry(data):

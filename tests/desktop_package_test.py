@@ -22,8 +22,8 @@ class DesktopPackage(unittest.TestCase):
             copy(binary, True)
             for name in ('install.ps1', 'install-macos.sh'):
                 path = binary / 'ddnsto/desktop-candidate-0.2.4' / name
-                source = (ROOT / 'sources/ddnsto/install.ps1' if name == 'install.ps1'
-                          else ROOT / 'apps/ddnsto/0.2.5/installer.sh')
+                source = (ROOT / 'apps/ddnsto/versions/0.3.0/install.ps1' if name == 'install.ps1'
+                          else ROOT / 'apps/ddnsto/versions/0.3.0/install.sh')
                 self.assertEqual(path.read_bytes(), source.read_bytes())
                 self.assertFalse((binary / 'ddnsto' / name).exists())
             copy(binary, True)

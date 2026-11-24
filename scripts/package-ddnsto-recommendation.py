@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a LOCAL recommendation candidate; never upload, fetch or regenerate.
 
-Review canonical ddnsto/ddnsto-install.sh and ddnsto/install.ps1, including their
+Review canonical versioned DDNSTO POSIX and Windows installers, including their
 embedded product pins, then supply both reviewed SHA256 values. The two hashes
 are review acknowledgements, not a signing system or proof of device acceptance.
 
@@ -67,7 +67,7 @@ def source_url(value):
 def package(args):
     base = source_url(args.source_url)
     repository_source = args.source_root.resolve() == ROOT
-    version = (json.loads((ROOT / 'sources/ddnsto/app.json').read_text())['version']
+    version = (json.loads((ROOT / 'apps/ddnsto/app.json').read_text())['version']
                if repository_source else args.candidate_version)
     source_directory = (args.source_root / 'sources/ddnsto'
                         if repository_source else args.source_root / 'ddnsto')
@@ -78,7 +78,7 @@ def package(args):
         products = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(products)
         products.generate(args.source_root, check=True)
-        combined = ((args.source_root / 'apps/ddnsto' / version / 'installer.sh')
+        combined = ((args.source_root / 'apps/ddnsto/versions' / version / 'install.sh')
                     if repository_source else source_directory / 'ddnsto-install.sh').read_text()
         for name in products.OUTPUTS:
             if name.endswith('.sh') and (source_directory / name).read_text().rstrip() not in combined:
@@ -92,7 +92,7 @@ def package(args):
         ('shell', 'ddnsto-install.sh', args.reviewed_shell_sha256, 'sh'),
         ('powershell', 'install.ps1', args.reviewed_powershell_sha256, 'ps1'),
     ]:
-        path = ((args.source_root / 'apps/ddnsto' / version / 'installer.sh')
+        path = ((args.source_root / 'apps/ddnsto/versions' / version / 'install.sh')
                 if repository_source and extension == 'sh'
                 else source_directory / name)
         if path.is_symlink() or not path.is_file() or not 0 < path.stat().st_size <= MAX_SCRIPT:
@@ -160,7 +160,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--reviewed-shell-sha256', required=True)
     parser.add_argument('--reviewed-powershell-sha256', required=True)
-    parser.add_argument('--candidate-version', default='0.2.5', choices=['0.2.4', '0.2.5'])
+    parser.add_argument('--candidate-version', default='0.3.0')
     parser.add_argument('--native-first', action='store_true',
                         help='build isolated Linux x86_64/aarch64 native-first candidate; not release approval')
     args = parser.parse_args()

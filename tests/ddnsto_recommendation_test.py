@@ -277,7 +277,7 @@ class Recommendation(unittest.TestCase):
         self.assertEqual(self.manifest.read_text(), 'ddnsto-recommendation-v1-shell\n%s\n%s\n' % (sha(self.shell), len(self.shell)))
         review = json.loads((self.release / 'review.json').read_text())
         self.assertFalse(review['published'])
-        self.assertEqual(review.get('candidate_version'), '0.2.5')
+        self.assertEqual(review.get('candidate_version'), '0.3.0')
         self.assertIn(PIN, review['installers']['shell']['embedded_sha256'])
         first = (self.release / 'recommended-entry.sh').read_bytes()
         self.shell += b'# newer approved installer\n'
@@ -605,8 +605,8 @@ mktemp() { return 99; }
 
     def test_canonical_sources_package_without_regeneration(self):
         canonical = {
-            'ddnsto-install.sh': ROOT / 'apps/ddnsto/0.2.5/installer.sh',
-            'install.ps1': ROOT / 'sources/ddnsto/install.ps1',
+            'ddnsto-install.sh': ROOT / 'apps/ddnsto/versions/0.3.0/install.sh',
+            'install.ps1': ROOT / 'apps/ddnsto/versions/0.3.0/install.ps1',
         }
         before = {name: path.read_bytes() for name, path in canonical.items()}
         self.source = ROOT

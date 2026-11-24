@@ -24,6 +24,9 @@ BASE = {
                       "artifacts": [{"arch": "x86_64", "path": "zsetup/0.6.4/zsetup-linux-x86_64",
                                      "sha256": "3" * 64, "size": 123}]},
 }
+OLD_RETIRED = b"retired entry\n"
+OLD_MANIFEST = (hashlib.sha256(OLD_RETIRED).hexdigest()
+                + "  demo/legacy-install.sh\n").encode()
 
 
 def make_apps(root: Path):
@@ -49,9 +52,10 @@ def make_live(root: Path):
     (root / "zsetup/config.json").write_bytes(b"old config\n")
     (root / "demo").mkdir()
     (root / "demo/install.sh").write_bytes(b"old entry\n")
+    (root / "demo/legacy-install.sh").write_bytes(OLD_RETIRED)
     (root / "products").mkdir()
     (root / "products/product.bin").write_bytes(b"server-owned")
-    (root / "SHA256SUMS").write_bytes(b"old manifest\n")
+    (root / "SHA256SUMS").write_bytes(OLD_MANIFEST)
 
 
 def run(mode, apps, live, extra=None):
@@ -85,7 +89,8 @@ with tempfile.TemporaryDirectory(prefix="apps-publish-") as name:
     assert (live / "demo/1.0.0/installer.sh").read_bytes() == (apps / "demo/1.0.0/installer.sh").read_bytes()
     assert not ((live / "demo/1.0.0/installer.sh").stat().st_mode & (stat.S_IWGRP | stat.S_IWOTH))
     assert (live / "demo/install.sh").read_bytes() == b"old entry\n"
-    assert (live / "SHA256SUMS").read_bytes() == b"old manifest\n"
+    assert (live / "SHA256SUMS").read_bytes() == OLD_MANIFEST
+    assert (live / "demo/legacy-install.sh").read_bytes() == OLD_RETIRED
     snapshot = live / f"zsetup/.apps-rollback-{release_id}"
     assert (snapshot / "phase").read_text().strip() == "staged"
     assert run("stage", apps, live).returncode != 0
@@ -98,13 +103,15 @@ with tempfile.TemporaryDirectory(prefix="apps-publish-") as name:
     assert not ((live / "demo/install.sh").stat().st_mode & (stat.S_IWGRP | stat.S_IWOTH))
     assert (live / "zsetup/config.json").read_bytes() == (apps / "zsetup/config.json").read_bytes()
     assert (live / "products/product.bin").read_bytes() == b"server-owned"
+    assert not (live / "demo/legacy-install.sh").exists()
     verified = run("verify", apps, live)
     assert verified.returncode == 0, verified.stderr
 
     rolled = run("rollback", apps, live)
     assert rolled.returncode == 0, rolled.stderr
     assert (live / "demo/install.sh").read_bytes() == b"old entry\n"
-    assert (live / "SHA256SUMS").read_bytes() == b"old manifest\n"
+    assert (live / "SHA256SUMS").read_bytes() == OLD_MANIFEST
+    assert (live / "demo/legacy-install.sh").read_bytes() == OLD_RETIRED
     assert (live / "zsetup/config.json").read_bytes() == b"old config\n"
     assert (live / "demo/1.0.0/installer.sh").is_file(), "immutable version must remain"
     assert (live / "products/product.bin").read_bytes() == b"server-owned"

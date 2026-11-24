@@ -9,7 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
-    "ddnsto": {"version": "0.2.5", "entrypoints": ["sh"], "linux": 22, "windows": 0},
+    "ddnsto": {"version": "0.3.0", "entrypoints": ["sh", "ps1"], "linux": 24, "windows": 1},
     "linkease": {"version": "0.1.9", "entrypoints": ["sh"], "linux": 24, "windows": 0},
     "jq": {"version": "0.1.0", "entrypoints": ["sh", "ps1"], "linux": 22, "windows": 3},
     "kai-skills": {"version": "1.2.6", "entrypoints": ["sh", "ps1"], "linux": 2, "windows": 1},
@@ -21,30 +21,33 @@ linux = json.loads((ROOT / "apps/zsetup/config.json").read_text())
 windows = json.loads((ROOT / "apps/zsetup/config-windows.json").read_text())
 for app_id, expected in EXPECTED.items():
     app = ROOT / "apps" / app_id
-    manifest_path = ROOT / 'sources/ddnsto/app.json' if app_id == 'ddnsto' else app / 'app.json'
-    manifest = json.loads(manifest_path.read_text())
+    manifest = json.loads((app / 'app.json').read_text())
     assert manifest["version"] == expected["version"]
     for extension in ("sh", "ps1"):
         if extension not in expected["entrypoints"]:
             continue
-        payload = app / expected["version"] / f"installer.{extension}"
+        payload = (app / "versions" / expected["version"] / f"install.{extension}"
+                   if manifest["schema_version"] == 2
+                   else app / expected["version"] / f"installer.{extension}")
         assert payload.is_file() and not payload.is_symlink()
         assert (app / f"install.{extension}").is_file()
-        assert (app / f"{app_id}-install.{extension}").read_bytes() == (app / f"install.{extension}").read_bytes()
+        if manifest["schema_version"] == 1:
+            assert (app / f"{app_id}-install.{extension}").read_bytes() == (app / f"install.{extension}").read_bytes()
     assert not (app / "tests").exists()
     linux_records = [record for record in linux["installers"] if record["application"] == app_id]
     windows_records = [record for record in windows["installers"] if record["application"] == app_id]
     assert len(linux_records) == expected["linux"]
     assert len(windows_records) == expected["windows"]
-    assert all(record["path"].startswith(
-        f"zsetup-scripts/apps/{app_id}/{expected['version']}/installer.")
-        for record in linux_records + windows_records)
+    prefix = (f"zsetup-scripts/apps/{app_id}/versions/{expected['version']}/install."
+              if manifest["schema_version"] == 2
+              else f"zsetup-scripts/apps/{app_id}/{expected['version']}/installer.")
+    assert all(record["path"].startswith(prefix) for record in linux_records + windows_records)
 
-assert len(linux["installers"]) == 129
-assert len(windows["installers"]) == 9
-assert {path.parent.name for path in (ROOT / "apps").glob("*/app.json")} | {'ddnsto'} == {
+assert len(linux["installers"]) == 131
+assert len(windows["installers"]) == 10
+assert {path.parent.name for path in (ROOT / "apps").glob("*/app.json")} == {
     "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli", "kspeeder",
     "linkease", "linkspace", "scoop",
 }
 
-print("Complex apps migration: all ten applications and 138 platform records passed")
+print("Complex apps migration: all ten applications and 141 platform records passed")

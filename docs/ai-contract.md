@@ -13,8 +13,8 @@ Linux已发布入口`zsetup install ks-cli --foreground`与`zsetup install kspee
 |---|---|---|
 | fastnet | `zsetup install fastnet --foreground -- ARGS...` | 原样传 ARGS，安装器最终 exec FastNet，退出码继承业务程序；它可能打开菜单，自动化须使用业务已支持的非交互参数，本文不虚构 FastNet 参数 |
 | ddnsto | `zsetup install ddnsto --foreground -- --token TOKEN [--force-version lite\|standard] [--verify-status]` | OpenWrt token 可选；Linux 无终端 token 必需。Linux 不支持 lite/verify-status。前台退出码为业务结果 |
-| ddnsto/macOS | `sh apps/ddnsto/ddnsto-install.sh --token TOKEN` | 仅支持 x86_64/arm64；使用用户级 launchd；入口校验归档 SHA256 |
-| ddnsto/Windows | `powershell -ExecutionPolicy Bypass -File apps/ddnsto/ddnsto-install.ps1 -Token TOKEN` | Windows 10 x64 WOW64 / PowerShell 5.1 验证范围；使用 x86_64 CLI 和 SYSTEM 计划任务；入口校验归档及二进制 SHA256 |
+| ddnsto/macOS | `sh apps/ddnsto/install.sh --token TOKEN` | 仅支持 x86_64/arm64；使用用户级 launchd；入口校验归档 SHA256 |
+| ddnsto/Windows | `powershell -ExecutionPolicy Bypass -File apps/ddnsto/install.ps1 -Token TOKEN` | Windows 10 x64 WOW64 / PowerShell 5.1 验证范围；使用 x86_64 CLI 和 SYSTEM 计划任务；入口校验归档及二进制 SHA256 |
 | linkease | `zsetup install linkease --foreground -- [--version VERSION]` | 无 token/菜单交互；Linux 默认 1.7.5、OpenWrt 默认服务器 VERSION；默认前台，可后台读取最终 result；root/已配置 sudo 与 tar/unzip 或 opkg 要求见模块 README |
 | fastpve | `zsetup install fastpve --foreground -- ARGS...` | Debian/apt/x86_64 PVE、root/pveversion 必需；exec FastPVE，默认交互菜单；参数/退出码原样继承，不虚构非交互参数 |
 

@@ -38,7 +38,7 @@ zsetup-scripts 整体业务发布完成后，统一入口会自行取得 zsetup 
 
 ```sh
 sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastnet/fastnet-install.sh)"
-sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/ddnsto-install.sh)" -- --token 'YOUR_TOKEN'
+sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.sh)" -- --token 'YOUR_TOKEN'
 sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/linkease/linkease-install.sh)"
 sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/fastpve/fastpve-install.sh)"
 ```
@@ -61,8 +61,8 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 | `fastnet` | Linux/OpenWrt；启动后由 FastNet 管理菜单 | x86_64、aarch64、armv7 | 参数逐项原样传给 FastNet；菜单交互由业务程序决定 |
 | `ddnsto` | OpenWrt opkg/apk | x86_64、aarch64、armv7、mipsel | `--token TOKEN` 可选；`--force-version lite\|standard` 可选；低于 900 MB 自动选 Lite；`--verify-status` 检查服务 |
 | `ddnsto` | Ubuntu/Debian apt、CentOS/RHEL yum/dnf、其他已识别 Linux | x86_64、aarch64 | 默认 Standard 4.2.3；`DDNSTO_VERSION` 可覆盖已发布版本；无终端必须传 `--token` |
-| `ddnsto` | Windows 10 x64 WOW64 / PowerShell 5.1 | x86_64 CLI | 标准入口 `apps/ddnsto/ddnsto-install.ps1`；使用计划任务随系统启动；必须提供 `-Token` |
-| `ddnsto` | macOS | x86_64、arm64 | 标准入口 `apps/ddnsto/ddnsto-install.sh`；使用用户级 launchd；必须提供 `--token` |
+| `ddnsto` | Windows 10 x64 WOW64 / PowerShell 5.1 | x86_64 CLI | 标准入口 `apps/ddnsto/install.ps1`；使用计划任务随系统启动；必须提供 `-Token` |
+| `ddnsto` | macOS | x86_64、arm64 | 标准入口 `apps/ddnsto/install.sh`；使用用户级 launchd；必须提供 `--token` |
 | `linkease` | OpenWrt opkg、Ubuntu/Debian、CentOS/RHEL、通用 Linux | x86_64、aarch64、armv7 | `--version VERSION` 可选；Linux 默认 1.7.5；无菜单/token 交互 |
 | `fastpve` | PVE 宿主机（Debian / apt），root、pveversion 必需 | x86_64 | 默认前台菜单；参数原样传给 FastPVE；PVE 大版本兼容性待设备验证 |
 | `ks-cli` | Linux、macOS、Windows | Linux x86_64/aarch64/armv7；macOS/Windows x86_64/arm64 | 只安装用户级 CLI，不执行业务命令或安装服务 |

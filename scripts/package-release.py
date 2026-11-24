@@ -24,7 +24,7 @@ def copy_desktop_candidates(binary, include=False):
     directory = binary / 'ddnsto' / ('desktop-candidate-' + versions.pop())
     sources = {
         'install.ps1': ROOT / 'sources/ddnsto/install.ps1',
-        'install-macos.sh': ROOT / 'apps/ddnsto/0.2.4/installer.sh',
+        'install-macos.sh': ROOT / 'apps/ddnsto/versions/0.3.0/install.sh',
     }
     for name, source in sources.items():
         copy_immutable(source, directory / name)
@@ -131,7 +131,7 @@ def main():
         # Candidate inclusion never activates desktop aliases or catalog rows.
         copy_desktop_candidates(binary, args.include_desktop_candidates)
         copy_ddnsto_compat_installers(
-            ROOT / "apps/ddnsto/0.2.4/installer.sh", binary / "ddnsto"
+            ROOT / "apps/ddnsto/versions/0.3.0/install.sh", binary / "ddnsto"
         )
         subprocess.run(["python3", "-B", str(zroot / "scripts/generate-product-config.py"), "--release-directory", str(package), "--installer-catalog", str(ROOT / "catalog.json"), "--output", str(binary / "zsetup/config.json")], check=True)
         if is_rust:

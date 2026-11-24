@@ -20,8 +20,14 @@ for app in IDS:
     directory = ROOT / "apps" / app
     manifest = json.loads((directory / "app.json").read_text(encoding="utf-8"))
     version = manifest["version"]
-    for extension in manifest["entrypoints"]:
-        assert (directory / version / f"installer.{extension}").is_file()
+    extensions = (["sh" if family == "posix" else "ps1"
+                   for family in manifest["entrypoints"]]
+                  if manifest["schema_version"] == 2 else manifest["entrypoints"])
+    for extension in extensions:
+        payload = (directory / "versions" / version / f"install.{extension}"
+                   if manifest["schema_version"] == 2
+                   else directory / version / f"installer.{extension}")
+        assert payload.is_file()
         assert (directory / f"install.{extension}").is_file()
     assert not (directory / "tests").exists()
     assert ((ROOT / "tests/apps" / app).is_dir()

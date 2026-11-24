@@ -47,8 +47,7 @@ def compose(root: Path, app: Path) -> str:
             "asus-package.sh", "asus-service.sh", "asus-transaction.sh", "auto-asus.sh",
         )
     )
-    # Preserve the historical header bytes of the published 0.2.4 payload.
-    content = common + "\n# Business logic: maintained in apps/ddnsto/source/business.sh\n" + business
+    content = common + "\n# Business logic: maintained in sources/ddnsto/business.sh\n" + business
 
     program = "set -eu\nstatus() { printf '%s\\n' \"$*\" >&2; }\n"
     program += foundation + dispatch + shared(root, "install-service.sh") + business
@@ -86,31 +85,37 @@ bootstrap_and_run() {
     return content
 
 
+def install_output(path: Path, content: bytes, *, mode: int, check: bool, label: str) -> None:
+    if check:
+        if (not path.is_file() or path.is_symlink() or path.read_bytes() != content
+                or path.stat().st_mode & 0o777 != mode):
+            raise ValueError(f"stale DDNSTO {label}: {path}")
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", delete=False) as stream:
+        stream.write(content)
+        temporary = Path(stream.name)
+    try:
+        temporary.chmod(mode)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def generate(root: Path = ROOT, apps: Path | None = None, check: bool = False) -> None:
     apps = apps or root / "apps"
     app = apps / "ddnsto"
     if not app.is_dir() or not (apps.parent / 'sources/ddnsto').is_dir():
         return
-    manifest = json.loads((apps.parent / 'sources/ddnsto/app.json').read_text())
-    output = app / manifest["version"] / "installer.sh"
-    content = compose(root, app)
-    if check:
-        if not output.is_file() or output.read_text() != content:
-            raise ValueError(f"stale DDNSTO installer: {output}")
-    else:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=output.parent,
-            prefix=".installer-", delete=False,
-        ) as stream:
-            stream.write(content)
-            temporary = Path(stream.name)
-        try:
-            temporary.chmod(0o755)
-            temporary.replace(output)
-        finally:
-            temporary.unlink(missing_ok=True)
-    subprocess.run(["sh", "-n", str(output)], check=True)
+    manifest = json.loads((app / 'app.json').read_text())
+    version_root = app / "versions" / manifest["version"]
+    shell_output = version_root / "install.sh"
+    install_output(shell_output, compose(root, app).encode(), mode=0o755,
+                   check=check, label="POSIX version installer")
+    windows_output = version_root / "install.ps1"
+    install_output(windows_output, (root / "sources/ddnsto/install.ps1").read_bytes(),
+                   mode=0o644, check=check, label="Windows version installer")
+    subprocess.run(["sh", "-n", str(shell_output)], check=True)
 
 
 if __name__ == "__main__":

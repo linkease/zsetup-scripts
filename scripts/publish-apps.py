@@ -292,9 +292,11 @@ def public_bases(apps: Path) -> list[str]:
 
 def is_immutable(relative: str) -> bool:
     parts = PurePosixPath(relative).parts
-    if len(parts) == 6 and parts[0] == 'ddnsto' and parts[1] == 'ddnsto-install':
+    if len(parts) == 6 and parts[:2] == ('_sites', 'run.ddnsto.com'):
         if parts[2:4] in [('current', 'immutable'), ('agent', 'versions')]:
             return re.fullmatch(r'[0-9a-f]{64}', parts[4]) is not None
+    if len(parts) >= 4 and parts[1] == 'versions':
+        return VERSION.fullmatch(parts[2]) is not None
     return len(parts) >= 3 and VERSION.fullmatch(parts[1]) is not None
 
 

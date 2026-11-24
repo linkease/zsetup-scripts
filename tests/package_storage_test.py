@@ -92,8 +92,8 @@ exit 0
                             Handler.bodies[f'/binary/{remote}/{relative}']=data
                             if app == 'ddnsto': fixture_pins[relative]=hashlib.sha256(data).hexdigest()
                         Handler.bodies[f'/binary/{remote}/{folder}/SHA256SUMS']=''.join(f'{hashlib.sha256(data).hexdigest()}  {filename}\n' for filename,data in files.items()).encode()
-                    version={'ddnsto':'0.2.4','linkease':'0.1.9'}[app]
-                    script=ROOT/'apps'/app/version/'installer.sh'
+                    script=(ROOT/'apps/ddnsto/versions/0.3.0/install.sh'
+                            if app=='ddnsto' else ROOT/'apps/linkease/0.1.9/installer.sh')
                     if app == 'ddnsto':
                         source=script.read_text()
                         pins=(ROOT/'sources/ddnsto/product-pins.sh').read_text()

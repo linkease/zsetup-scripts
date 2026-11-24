@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix="apps-manifest-") as name:
     assert result.returncode == 0, result.stderr
 
     invalid = []
-    changed = manifest(); changed["schema_version"] = 2
+    changed = manifest(); changed["schema_version"] = 3
     invalid.append(("schema", changed, "demo", "schema_version"))
     changed = manifest("other")
     invalid.append(("identity", changed, "demo", "must equal directory"))

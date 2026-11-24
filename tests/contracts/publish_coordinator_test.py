@@ -27,8 +27,8 @@ with tempfile.TemporaryDirectory(prefix="apps-coordinator-") as folder:
         "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli",
         "kspeeder", "linkease", "linkspace", "scoop",
     ]
-    assert metadata["linux_installer_records"] == 129
-    assert metadata["windows_installer_records"] == 9
+    assert metadata["linux_installer_records"] == 131
+    assert metadata["windows_installer_records"] == 10
     assert metadata["published"] is False
     assert (release / "apps/SHA256SUMS").read_bytes() == (ROOT / "apps/SHA256SUMS").read_bytes()
     assert not list((release / "apps").rglob("tests"))
@@ -66,6 +66,9 @@ with tempfile.TemporaryDirectory(prefix="apps-coordinator-") as folder:
     immutable = [relative for _, relative in manifest if publish_apps.is_immutable(relative)]
     assert immutable and all("/" in relative for relative in immutable)
     assert not publish_apps.is_immutable("ddnsto/install.sh")
+    assert publish_apps.is_immutable("ddnsto/versions/0.3.0/install.sh")
+    assert publish_apps.is_immutable(
+        "_sites/run.ddnsto.com/current/immutable/" + "a" * 64 + "/install.sh")
 
     # Public verification covers every configured mirror and checks exact bytes.
     fetched = []

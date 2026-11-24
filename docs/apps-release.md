@@ -58,8 +58,10 @@ The coordinator uses strict, noninteractive SSH host-key checking and performs:
 4. snapshot and activate mutable entries, configs and `SHA256SUMS`;
 5. verify every server byte and every file through every HTTPS source.
 
-No delete synchronization is used. Published version directories are
-immutable. Mutable rollback state is kept by the bundled low-level transaction.
+Activation retires files recorded by the previous managed `SHA256SUMS` when they
+are absent from the new candidate. Each retired byte is digest-checked and
+snapshotted before deletion, and rollback restores it. Candidate version files
+remain immutable. Mutable rollback state is kept by the bundled transaction.
 If final CDN verification fails, the script reports failure and retains the
 state for inspection; it does not hide a possibly active release by silently
 claiming success.
@@ -80,8 +82,8 @@ release is activated.
 
 ## DDNSTO console resources
 
-The complete tree also contains generated `ddnsto/install.sh`, `ddnsto/install.ps1`, and
-`ddnsto/ddnsto-install/` (recommendations, digest-addressed bodies and AI guide).
+The complete tree also contains generated `_sites/run.ddnsto.com/` runtime
+content (recommendations, digest-addressed bodies and AI guide).
 Run `scripts/build.py` before reviewing and committing; `--check` rejects drift.
 These files are not a separate deployment or an upload from an old `dist/`.
 Both the coordinator and server transaction stage digest-addressed bodies and

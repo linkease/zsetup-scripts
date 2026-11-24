@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "apps-624b00f659c9",
+  "config_version": "apps-206b49f43114",
   "source_groups": [
     {
       "id": "release",
@@ -25,6 +25,18 @@
     ]
   },
   "installers": [
+    {
+      "application": "ddnsto",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.0/install.ps1",
+      "background": false,
+      "source_group": "release",
+      "sha256": "04d98cf8f84bf54bc5d2b07c9b4d212ead933bba479f828eb8013999e00b19f7",
+      "size": 67276,
+      "min_version": "0.5.0"
+    },
     {
       "application": "jq",
       "os": "windows",

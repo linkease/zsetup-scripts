@@ -52,7 +52,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -61,7 +61,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -70,7 +70,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "armv7",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -79,7 +79,7 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "mipsel",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -88,7 +88,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -97,7 +97,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -106,7 +106,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "armv7",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -115,7 +115,7 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "mipsel",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -124,7 +124,7 @@
       "os": "ubuntu",
       "package_manager": "apt",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -133,7 +133,7 @@
       "os": "ubuntu",
       "package_manager": "apt",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -142,7 +142,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -151,7 +151,7 @@
       "os": "debian",
       "package_manager": "apt",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -160,7 +160,7 @@
       "os": "centos",
       "package_manager": "yum",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -169,7 +169,7 @@
       "os": "centos",
       "package_manager": "yum",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -178,7 +178,7 @@
       "os": "centos",
       "package_manager": "dnf",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -187,7 +187,7 @@
       "os": "centos",
       "package_manager": "dnf",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -196,7 +196,7 @@
       "os": "rhel",
       "package_manager": "yum",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -205,7 +205,7 @@
       "os": "rhel",
       "package_manager": "yum",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -214,7 +214,7 @@
       "os": "rhel",
       "package_manager": "dnf",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -223,7 +223,7 @@
       "os": "rhel",
       "package_manager": "dnf",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -232,7 +232,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
@@ -241,7 +241,7 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "script": "apps/ddnsto/0.2.4/installer.sh",
+      "script": "apps/ddnsto/versions/0.3.0/install.sh",
       "path": "ddnsto/0.2.4/ddnsto-install.sh",
       "background": false
     },
