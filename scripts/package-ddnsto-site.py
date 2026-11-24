@@ -31,7 +31,7 @@ def package_site(args):
             output=current, reviewed_shell_sha256=args.reviewed_shell_sha256,
             reviewed_powershell_sha256=args.reviewed_powershell_sha256,
             candidate_version='0.2.4', native_first=args.native_first))
-        for alias, entry in [('i', 'recommended-entry.sh'), ('i.ps1', 'recommended-entry.ps1')]:
+        for alias, entry in [('install.sh', 'recommended-entry.sh'), ('install.ps1', 'recommended-entry.ps1')]:
             shutil.copyfile(current / entry, stage / alias)
         guide = (ROOT / 'sources/ddnsto/agent/install.md').read_bytes()
         if b'installer.invalid' in guide or ORIGIN.encode() not in guide:

@@ -5,7 +5,7 @@ DDNSTO 推荐版本更新、验收、发布和回滚统一遵循 [发布 SOP](do
 
 2026-11-24 本地候选：[安装域名与 apps 发布](docs/ddnsto-install-deployment.md)。
 DDNSTO 完整安装资源由统一构建生成到 `apps/ddnsto/`，随完整 `apps/` 发布；
-控制台固定引用 `run.ddnsto.com/i` 和 `/i.ps1`。测试参数只切换客户端业务环境，
+控制台固定引用 `run.ddnsto.com/install.sh` 和 `/install.ps1`。测试参数只切换客户端业务环境，
 不切换脚本推荐渠道。本次候选尚未发布，域名映射需运维切换并验证。
 
 DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在

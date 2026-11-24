@@ -21,12 +21,12 @@ OpenWrt 配置归属兼容修复、独立工作目录重装及普通入口重复
 `ddns-server` 与 `ddnsto-static` 不发布或渲染安装资源。
 原有客户端包及 zsetup 核心下载来源保持不变。
 
-部署使用运维现有上传/托管流程，不新增部署系统。运维可对安装域名设置 HTTP 301/302；每个目标必须为 HTTPS，最多五次跳转，保留有效证书验证。路由需覆盖下列全部路径，不能只跳转 `/i`。脚本正文按摘要校验，不对正文做 URL 替换。
+部署使用运维现有上传/托管流程，不新增部署系统。运维可对安装域名设置 HTTP 301/302；每个目标必须为 HTTPS，最多五次跳转，保留有效证书验证。路由需覆盖下列全部路径，不能只跳转 `/install.sh`。脚本正文按摘要校验，不对正文做 URL 替换。
 
 ```text
 apps/ddnsto/                  # run.ddnsto.com 的路径映射根
-├── i                         # recommended-entry.sh 的同字节副本
-├── i.ps1                     # recommended-entry.ps1 的同字节副本（UTF-8 BOM）
+├── install.sh                         # recommended-entry.sh 的同字节副本
+├── install.ps1                     # recommended-entry.ps1 的同字节副本（UTF-8 BOM）
 └── ddnsto-install
     ├── current
     │   ├── recommended-entry.sh / recommended-entry.ps1
@@ -39,14 +39,17 @@ apps/ddnsto/                  # run.ddnsto.com 的路径映射根
 
 | 用户地址 | 下载站地址 |
 |---|---|
-| `https://run.ddnsto.com/i` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/i` |
-| `https://run.ddnsto.com/i.ps1` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/i.ps1` |
+| `https://run.ddnsto.com/install.sh` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.sh` |
+| `https://run.ddnsto.com/install.ps1` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.ps1` |
 | `https://run.ddnsto.com/ddnsto-install/<路径>` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/ddnsto-install/<路径>` |
 
-后缀路径逐项保留；未知路径返回 404。根 `/` 可选映射到 `i`，控制台不依赖根路径。
-不能将所有请求重定向到旧 `install_ddnsto_linux.sh`。现有 `install.sh`、
-`ddnsto-install.sh` 是 apps 标准原生入口，继续保持原索引范围；控制台使用 `i`、
-`i.ps1` 的跨平台推荐协议。本次不新增 DDNSTO 的原生 Windows 索引记录。
+后缀路径逐项保留；未知路径返回 404。根 `/` 可选映射到 `install.sh`，控制台不依赖根路径。
+不能将所有请求重定向到旧 `install_ddnsto_linux.sh`。
+`ddnsto-install.sh` 保留为历史兼容的原生索引入口；控制台使用 `install.sh`、
+`install.ps1` 的跨平台推荐协议。本次不新增 DDNSTO 的原生 Windows 索引记录。
+先发布标准入口及其完整依赖、配置并回读上述映射，再发布引用新地址的控制台和官网。
+发布树不再生成 `i` / `i.ps1`；若要兼容已复制的命令，由运维将旧路径重定向至标准路径。
+这些路由需要单独上线；本地生成、测试通过不代表线上已经切换。
 维护源码、模板、推荐配置和 app.json 均在发布树外的 `sources/ddnsto/`。
 `apps/ddnsto/` 仅保留运行产物；说明和审核记录在 `docs/`，不部署。
 

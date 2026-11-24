@@ -80,7 +80,7 @@ release is activated.
 
 ## DDNSTO console resources
 
-The complete tree also contains generated `ddnsto/i`, `ddnsto/i.ps1`, and
+The complete tree also contains generated `ddnsto/install.sh`, `ddnsto/install.ps1`, and
 `ddnsto/ddnsto-install/` (recommendations, digest-addressed bodies and AI guide).
 Run `scripts/build.py` before reviewing and committing; `--check` rejects drift.
 These files are not a separate deployment or an upload from an old `dist/`.
@@ -88,4 +88,5 @@ Both the coordinator and server transaction stage digest-addressed bodies and
 guide versions before activating mutable entries, and retain them on rollback.
 Ops maps `run.ddnsto.com` paths to this DDNSTO subtree, preserving the suffix;
 see [the complete mapping](ddnsto-install-deployment.md).
-Standard DDNSTO `install.sh` and native index selectors remain unchanged.
+DDNSTO standard entries use recommendation wrappers. The historical native
+bootstrap remains at `ddnsto-install.sh`; native index selectors remain unchanged.

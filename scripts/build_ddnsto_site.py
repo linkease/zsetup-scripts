@@ -31,6 +31,6 @@ def generate(root: Path, apps: Path, *, check: bool, install_file):
             immutable = 'immutable' in relative.parts or 'versions' in relative.parts
             if immutable and target.exists() and target.read_bytes() != source.read_bytes():
                 raise ValueError(f'conflicting DDNSTO immutable resource: {target}')
-            install_file(target, source.read_bytes(), executable=False, check=check,
+            install_file(target, source.read_bytes(), executable=relative == Path('install.sh'), check=check,
                          label='DDNSTO console resource')
     # Never prune old digest paths: copied commands and rollback need them.

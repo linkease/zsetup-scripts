@@ -16,11 +16,12 @@
 - Preserve version-specific compatibility gates; a new recommended version is not proof of a new health protocol.
   See `docs/ddnsto-platform-releases.md` for publication and GUI/Docker boundaries.
 - When changing console installation distribution, read `docs/ddnsto-install-deployment.md`.
-  `scripts/build.py` generates `apps/ddnsto/i`, `i.ps1` and `ddnsto-install/` using
+  `scripts/build.py` generates `apps/ddnsto/install.sh`, `install.ps1` and `ddnsto-install/` using
   the existing recommendation packager; commit these outputs with `apps/SHA256SUMS`.
   They map to `run.ddnsto.com` and use the existing complete apps publisher.
   Keep digest-addressed installer/guide history. Build hashes are consistency
-  checks, not release approval. Standard `install.sh` and native indices remain separate.
+  checks, not release approval. DDNSTO standard entries use recommendation wrappers;
+  `ddnsto-install.sh` retains the native bootstrap. Native indices remain versioned.
 
 - DDNSTO sources, templates, release configuration and app.json belong only to `sources/ddnsto/`.
   Generate runtime-only `apps/ddnsto/` with build.py; never put source, README or review.json there.
