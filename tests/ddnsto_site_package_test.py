@@ -28,7 +28,7 @@ class SitePackageTest(unittest.TestCase):
             # even when the HTTP service has a different uid than the builder.
             for directory in [output, current, current / 'immutable']:
                 self.assertEqual(directory.stat().st_mode & 0o777, 0o755)
-            for alias, entry in [('i', 'recommended-entry.sh'), ('i.ps1', 'recommended-entry.ps1')]:
+            for alias, entry in [('install.sh', 'recommended-entry.sh'), ('install.ps1', 'recommended-entry.ps1')]:
                 self.assertEqual((output / alias).read_bytes(), (current / entry).read_bytes())
                 self.assertIn('https://run.ddnsto.com/ddnsto-install/current',
                               (output / alias).read_text(encoding='utf-8-sig'))

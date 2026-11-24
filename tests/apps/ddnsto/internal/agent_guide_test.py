@@ -13,7 +13,7 @@ class AgentGuideTest(unittest.TestCase):
     def test_required_boundaries_and_complete_document(self):
         text = GUIDE.read_text(encoding='utf-8')
         self.assertNotIn('web.toany.net', text)
-        self.assertIn('https://run.ddnsto.com/i', text)
+        self.assertIn('https://run.ddnsto.com/install.sh', text)
         self.assertNotIn('installer.invalid', text)
         for required in ['--env test', '-Environment test', '用户一次明确确认', 'Agent 沙箱', 'Windows',
                          '不检查云端在线', '最多重试一次', '不得自动换绑',

@@ -14,6 +14,12 @@ APP = ROOT / 'apps/ddnsto'
 
 
 class AppsSiteTest(unittest.TestCase):
+    def test_only_standard_public_entries(self):
+        for name in ['i', 'i.ps1']:
+            self.assertFalse((APP / name).exists(), name)
+        self.assertNotEqual((APP / 'install.sh').read_bytes(),
+                            (APP / 'ddnsto-install.sh').read_bytes())
+
     def test_public_ddnsto_contains_only_runtime_artifacts(self):
         for relative in ['source', 'app.json', 'README.md', 'ddnsto-install/current/review.json']:
             self.assertFalse((APP / relative).exists(), f'non-runtime material: {relative}')
@@ -39,7 +45,7 @@ class AppsSiteTest(unittest.TestCase):
             def run(*flags):
                 return subprocess.run(command + list(flags), capture_output=True, text=True)
             self.assertEqual(run('--check').returncode, 0)
-            alias = root / 'apps/ddnsto/i.ps1'
+            alias = root / 'apps/ddnsto/install.ps1'
             alias.unlink()
             self.assertNotEqual(run('--check').returncode, 0)
             self.assertEqual(run().returncode, 0)
@@ -91,17 +97,17 @@ class AppsSiteTest(unittest.TestCase):
             body = next((apps / 'ddnsto/ddnsto-install/current/immutable').glob('*/install.ps1'))
             target = live / body.relative_to(apps)
             self.assertEqual(target.read_bytes(), body.read_bytes())
-            self.assertFalse((live / 'ddnsto/i.ps1').exists())
+            self.assertFalse((live / 'ddnsto/install.ps1').exists())
             run('activate')
-            self.assertEqual((live / 'ddnsto/i.ps1').read_bytes(), (APP / 'i.ps1').read_bytes())
+            self.assertEqual((live / 'ddnsto/install.ps1').read_bytes(), (APP / 'install.ps1').read_bytes())
             run('verify')
             run('rollback')
             self.assertTrue(target.is_file())
-            self.assertFalse((live / 'ddnsto/i.ps1').exists())
+            self.assertFalse((live / 'ddnsto/install.ps1').exists())
 
     def test_complete_console_site_is_committed_build_output(self):
         for extension, platform in [('sh', 'shell'), ('ps1', 'powershell')]:
-            alias = APP / ('i' if extension == 'sh' else 'i.ps1')
+            alias = APP / ('install.sh' if extension == 'sh' else 'install.ps1')
             self.assertTrue(alias.is_file(), f'missing deployable entry: {alias}')
             current = APP / 'ddnsto-install/current'
             self.assertEqual(alias.read_bytes(), (current / f'recommended-entry.{extension}').read_bytes())
@@ -115,7 +121,7 @@ class AppsSiteTest(unittest.TestCase):
             self.assertEqual(hashlib.sha256(payload).hexdigest(), digest)
             self.assertEqual(len(payload), int(size))
         guide = APP / 'ddnsto-install/agent/install.md'
-        self.assertIn('https://run.ddnsto.com/i', guide.read_text())
+        self.assertIn('https://run.ddnsto.com/install.sh', guide.read_text())
         self.assertNotIn('install.ddnsto.com', guide.read_text())
 
     def test_deployment_stages_digest_bodies_before_entries(self):
@@ -126,7 +132,7 @@ class AppsSiteTest(unittest.TestCase):
         for path in [f'ddnsto/ddnsto-install/current/immutable/{digest}/install.ps1',
                      f'ddnsto/ddnsto-install/agent/versions/{digest}/install.md']:
             self.assertTrue(module.is_immutable(path), path)
-        self.assertFalse(module.is_immutable('ddnsto/i.ps1'))
+        self.assertFalse(module.is_immutable('ddnsto/install.ps1'))
         self.assertFalse(module.is_immutable('ddnsto/ddnsto-install/current/recommended-shell.txt'))
 
 
