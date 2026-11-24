@@ -24,7 +24,7 @@ status() {
 }
 
 bootstrap_mips_byte_order() {
-    command -v od >/dev/null 2>&1 || return 1
+    type od >/dev/null 2>&1 || return 1
     set -- $(od -An -tu1 -N6 /bin/sh 2>/dev/null)
     [ "$#" -eq 6 ] && [ "$1" = 127 ] && [ "$2" = 69 ] && [ "$3" = 76 ] && [ "$4" = 70 ] && [ "$6" = 1 ]
 }
@@ -67,14 +67,14 @@ bootstrap_fetch_from_base() {
     destination=$4
     found=0
     url=$(bootstrap_url "$scheme" "$base" "$remote_path")
-    if command -v curl >/dev/null 2>&1; then
+    if type curl >/dev/null 2>&1; then
         found=1
         rm -f "$destination" 2>/dev/null || true
         if curl -fsSL --connect-timeout 10 --max-time 30 -o "$destination" "$url"; then
             return 0
         fi
     fi
-    if command -v wget >/dev/null 2>&1; then
+    if type wget >/dev/null 2>&1; then
         found=1
         rm -f "$destination" 2>/dev/null || true
         if wget -q -T 10 -O "$destination" "$url"; then
@@ -148,8 +148,8 @@ read_expected_sha256() {
 }
 
 have_hash_tool() {
-    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
-        command -v shasum >/dev/null 2>&1
+    type sha256sum >/dev/null 2>&1 || type openssl >/dev/null 2>&1 ||
+        type shasum >/dev/null 2>&1
 }
 
 hash_matches() {
@@ -158,13 +158,13 @@ hash_matches() {
         echo "zsetup: bootstrap SHA-256 verification skipped; HTTPS transport remains required" >&2
         return 0
     fi
-    if command -v sha256sum >/dev/null 2>&1; then
+    if type sha256sum >/dev/null 2>&1; then
         actual=$(sha256sum "$1")
         actual=${actual%% *}
-    elif command -v openssl >/dev/null 2>&1; then
+    elif type openssl >/dev/null 2>&1; then
         actual=$(openssl dgst -sha256 "$1")
         actual=${actual##*= }
-    elif command -v shasum >/dev/null 2>&1; then
+    elif type shasum >/dev/null 2>&1; then
         actual=$(shasum -a 256 "$1")
         actual=${actual%% *}
     else
@@ -201,15 +201,23 @@ fetch_bootstrap_metadata() {
     scheme=$1
     stable_file=$2
     sums_file=$3
+    metadata_incomplete=0
     for base in $BOOTSTRAP_BASES; do
         bootstrap_fetch_from_base "$scheme" "$base" "$ZSETUP_STABLE_PATH" "$stable_file" || continue
         read_stable_version "$stable_file" || continue
         EXPECTED_SHA256=
         if have_hash_tool && bootstrap_fetch_from_base "$scheme" "$base" "zsetup/$RESCUE_VERSION/SHA256SUMS" "$sums_file"; then
-            read_expected_sha256 "$sums_file" || EXPECTED_SHA256=
+            # A fetched manifest which omits this platform is a broken release,
+            # not permission to execute an unverified artifact from it.
+            read_expected_sha256 "$sums_file" || {
+                echo "zsetup: stable $RESCUE_VERSION does not publish $ZSETUP_ARTIFACT; release metadata must be repaired" >&2
+                metadata_incomplete=1
+                continue
+            }
         fi
         return 0
     done
+    [ "$metadata_incomplete" = 0 ] || return 11
     echo "zsetup: no source returned valid stable metadata over $scheme" >&2
     return 1
 }
@@ -226,7 +234,13 @@ bootstrap_zsetup() {
     trap 'exit 143' TERM
 
     metadata_scheme=https
-    if ! fetch_bootstrap_metadata https "$stable_file" "$sums_file"; then
+    if fetch_bootstrap_metadata https "$stable_file" "$sums_file"; then
+        :
+    else
+        metadata_rc=$?
+        # An authenticated release missing this platform cannot be repaired by
+        # HTTP, a different architecture, or silently downgrading the runtime.
+        [ "$metadata_rc" != 11 ] || return 11
         confirm_insecure_http
         metadata_scheme=http
         fetch_bootstrap_metadata http "$stable_file" "$sums_file"
@@ -271,6 +285,8 @@ bootstrap_zsetup_path() (
 )
 
 
+
+
 bootstrap_zsetup
 
 config_dir=$WORK_ROOT/zsetup-scripts
@@ -290,5 +306,23 @@ mv -f "$config_candidate" "$config_file"
 trap - EXIT HUP INT TERM
 ZSETUP_CONFIG=$config_file
 export ZSETUP_CONFIG
+if [ "$APP_ID" = ddnsto ]; then
+    index_file=$config_dir/ddnsto-index.json
+    config_candidate=$config_dir/.ddnsto-index.json.$$
+    trap 'rm -f "$config_candidate" 2>/dev/null || true' EXIT HUP INT TERM
+    index_urls=
+    for config_url in $CONFIG_PRIMARY_URLS; do
+        index_urls="$index_urls ${config_url%/config.json}/ddnsto-index.json"
+    done
+    CONFIG_PRIMARY_URLS=$index_urls
+    CONFIG_FALLBACK_URL=${CONFIG_FALLBACK_URL%/config.json}/ddnsto-index.json
+    download_business_config
+    chmod 0600 "$config_candidate"
+    mv -f "$config_candidate" "$index_file"
+    trap - EXIT HUP INT TERM
+    ZSETUP_SOURCE_BASES=$DIRECT_PRIMARY_BASES
+    ZSETUP_SOURCE_FALLBACK=$DIRECT_FALLBACK_BASE
+    export ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK
+    exec "$ACTIVE_ZSETUP" install --index "$index_file" "$APP_ID" --foreground -- "$@"
+fi
 exec "$ACTIVE_ZSETUP" install "$APP_ID" --foreground -- "$@"
-

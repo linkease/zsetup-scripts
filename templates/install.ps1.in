@@ -6,6 +6,11 @@ $ErrorActionPreference = 'Stop'
 $AppId = '@APP_ID@'
 $ConfigPrimaryUrls = @(@CONFIG_PRIMARY_URLS@)
 $ConfigFallbackUrl = '@CONFIG_FALLBACK_URL@'
+if ($AppId -eq 'ddnsto') {
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+    $OutputEncoding = [Console]::OutputEncoding
+    $ProgressPreference = 'SilentlyContinue'
+}
 
 @BOOTSTRAP@
 
@@ -26,6 +31,23 @@ try {
     Remove-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
 }
 $env:ZSETUP_CONFIG = $config
+if ($AppId -eq 'ddnsto') {
+    $index = Join-Path $configDirectory 'ddnsto-index-windows.json'
+    $candidate = $index + '.candidate-' + [Guid]::NewGuid().ToString('N')
+    try {
+        $arguments = @('download', '--quiet', '-o', $candidate, '--max-bytes', '131072')
+        $arguments += @($ConfigPrimaryUrls | ForEach-Object { $_ -replace '/config-windows.json$', '/ddnsto-index-windows.json' })
+        $arguments += @('--fallback-url', ($ConfigFallbackUrl -replace '/config-windows.json$', '/ddnsto-index-windows.json'))
+        & $active @arguments
+        if ($LASTEXITCODE -ne 0) { throw "DDNSTO native index download failed: $LASTEXITCODE" }
+        Move-Item -LiteralPath $candidate -Destination $index -Force -ErrorAction Stop
+    } finally {
+        Remove-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
+    }
+    $env:ZSETUP_SOURCE_BASES = $script:BootstrapPrimaryBases -join ' '
+    $env:ZSETUP_SOURCE_FALLBACK = $script:BootstrapFallbackBase
+    & $active install --index $index $AppId --foreground -- @InstallerArguments
+    exit $LASTEXITCODE
+}
 & $active install $AppId --foreground -- @InstallerArguments
 exit $LASTEXITCODE
-

@@ -16,6 +16,11 @@ def shared(root: Path, name: str) -> str:
 
 def compose(root: Path, app: Path) -> str:
     source = root / 'sources/ddnsto'
+    minimum = json.loads((app / 'app.json').read_text())['min_zsetup']
+    floor = (source / 'native-floor.sh.in').read_text()
+    for marker, value in zip(('MAJOR', 'MINOR', 'PATCH'), minimum.split('.')):
+        floor = floor.replace(f'@@{marker}@@', value)
+    floor = floor.replace('@@MINIMUM@@', minimum)
     foundation = "".join(
         shared(root, name)
         for name in ("install-storage.sh", "install-bounds.sh", "install-transaction.sh")
@@ -82,7 +87,7 @@ bootstrap_and_run() {
     content += (source / "main.sh").read_text()
     if len(content.encode()) > 1048576:
         raise ValueError("DDNSTO standalone installer exceeds file budget")
-    return content
+    return floor + '\n' + content
 
 
 def install_output(path: Path, content: bytes, *, mode: int, check: bool, label: str) -> None:
@@ -113,7 +118,10 @@ def generate(root: Path = ROOT, apps: Path | None = None, check: bool = False) -
     install_output(shell_output, compose(root, app).encode(), mode=0o755,
                    check=check, label="POSIX version installer")
     windows_output = version_root / "install.ps1"
-    install_output(windows_output, (root / "sources/ddnsto/install.ps1").read_bytes(),
+    bridge = (root / 'sources/ddnsto/native-bridge.ps1.in').read_text()
+    bridge = bridge.replace('@@MINIMUM@@', manifest['min_zsetup']).replace(
+        '@@PAYLOAD@@', (root / 'sources/ddnsto/install.ps1').read_text(encoding='utf-8-sig'))
+    install_output(windows_output, bridge.encode('utf-8-sig'),
                    mode=0o644, check=check, label="Windows version installer")
     subprocess.run(["sh", "-n", str(shell_output)], check=True)
 

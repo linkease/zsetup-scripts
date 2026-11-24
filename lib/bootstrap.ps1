@@ -48,6 +48,7 @@ public static class LinkeaseBootstrapTrust {
     }
     private static bool Validate(object sender, X509Certificate certificate, X509Chain supplied, SslPolicyErrors errors) {
         if (certificate == null || (errors & (SslPolicyErrors.RemoteCertificateNameMismatch | SslPolicyErrors.RemoteCertificateNotAvailable)) != 0) return false;
+        if (errors == SslPolicyErrors.None) return true;
         using (X509Certificate2 leaf = new X509Certificate2(certificate))
         using (X509Chain chain = new X509Chain()) {
             chain.ChainPolicy.ExtraStore.AddRange(roots);

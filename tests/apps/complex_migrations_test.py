@@ -9,7 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
-    "ddnsto": {"version": "0.3.0", "entrypoints": ["sh", "ps1"], "linux": 24, "windows": 1},
+    "ddnsto": {"version": "0.3.1", "entrypoints": ["sh", "ps1"], "linux": 20, "windows": 1},
     "linkease": {"version": "0.1.9", "entrypoints": ["sh"], "linux": 24, "windows": 0},
     "jq": {"version": "0.1.0", "entrypoints": ["sh", "ps1"], "linux": 22, "windows": 3},
     "kai-skills": {"version": "1.2.6", "entrypoints": ["sh", "ps1"], "linux": 2, "windows": 1},
@@ -43,11 +43,11 @@ for app_id, expected in EXPECTED.items():
               else f"zsetup-scripts/apps/{app_id}/{expected['version']}/installer.")
     assert all(record["path"].startswith(prefix) for record in linux_records + windows_records)
 
-assert len(linux["installers"]) == 131
+assert len(linux["installers"]) == 127
 assert len(windows["installers"]) == 10
 assert {path.parent.name for path in (ROOT / "apps").glob("*/app.json")} == {
     "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli", "kspeeder",
     "linkease", "linkspace", "scoop",
 }
 
-print("Complex apps migration: all ten applications and 141 platform records passed")
+print("Complex apps migration: all ten applications and 137 platform records passed")

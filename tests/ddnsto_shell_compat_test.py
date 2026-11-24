@@ -4,17 +4,21 @@ DDNSTO_TEST_LEGACY_SHELL is a maintainer-only interpreter command, e.g. a
 network-disabled Bash 4.2 container. It is never read by the installer.
 """
 import os
+import json
 from pathlib import Path
 import shlex
 import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = json.loads((ROOT / 'apps/ddnsto/app.json').read_text())['version']
+CURRENT = f'apps/ddnsto/versions/{VERSION}/install.sh'
 
 
 class ShellCompatibility(unittest.TestCase):
     def check_parser(self, command):
-        for relative in ('lib/bootstrap.sh', 'apps/ddnsto/versions/0.3.0/install.sh'):
+        for relative in ('lib/bootstrap.sh', 'apps/ddnsto/install.sh', CURRENT,
+                         'apps/ddnsto/versions/0.3.0/install.sh'):
             with self.subTest(source=relative):
                 result = subprocess.run(command + ['-n'], input=(ROOT / relative).read_text(),
                                         text=True, capture_output=True, timeout=30)
@@ -37,7 +41,7 @@ class ShellCompatibility(unittest.TestCase):
 
     def test_legacy_entry_help(self):
         result = subprocess.run(self.legacy_shell() + ['-s', '--', '--help'],
-                                input=(ROOT / 'apps/ddnsto/versions/0.3.0/install.sh').read_text(),
+                                input=(ROOT / CURRENT).read_text(),
                                 text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('Usage: ddnsto-install.sh', result.stdout)

@@ -27,7 +27,8 @@ with tempfile.TemporaryDirectory(prefix="apps-coordinator-") as folder:
         "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli",
         "kspeeder", "linkease", "linkspace", "scoop",
     ]
-    assert metadata["linux_installer_records"] == 131
+    # Consolidated yum/dnf selectors stay below the published native 128 cap.
+    assert metadata["linux_installer_records"] == 127
     assert metadata["windows_installer_records"] == 10
     assert metadata["published"] is False
     assert (release / "apps/SHA256SUMS").read_bytes() == (ROOT / "apps/SHA256SUMS").read_bytes()

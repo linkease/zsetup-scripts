@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "application": "ddnsto",
+      "os": "centos",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "centos",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "debian",
+      "package_manager": "apt",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "debian",
+      "package_manager": "apt",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "linux",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "macos",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "apk",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "apk",
+      "arch": "armv7",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "apk",
+      "arch": "mipsel",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "apk",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "opkg",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "opkg",
+      "arch": "armv7",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "opkg",
+      "arch": "mipsel",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "openwrt",
+      "package_manager": "opkg",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "rhel",
+      "package_manager": "*",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "rhel",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "ubuntu",
+      "package_manager": "apt",
+      "arch": "aarch64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    },
+    {
+      "application": "ddnsto",
+      "os": "ubuntu",
+      "package_manager": "apt",
+      "arch": "x86_64",
+      "sha256": "afd3be1f8cc6859493c90d30054e5aeec4709180ac797cd4c5d50f99b19ca2a5",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.sh"
+    }
+  ]
+}

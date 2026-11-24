@@ -6,6 +6,11 @@ $ErrorActionPreference = 'Stop'
 $AppId = 'scoop'
 $ConfigPrimaryUrls = @('https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/config-windows.json', 'https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/config-windows.json', 'https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config-windows.json')
 $ConfigFallbackUrl = 'https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config-windows.json'
+if ($AppId -eq 'ddnsto') {
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+    $OutputEncoding = [Console]::OutputEncoding
+    $ProgressPreference = 'SilentlyContinue'
+}
 
 # Shared first-dependency bootstrap. Business packages use canonical zsetup.
 # Kept separate from business functions and embedded by the entry generator.
@@ -57,6 +62,7 @@ public static class LinkeaseBootstrapTrust {
     }
     private static bool Validate(object sender, X509Certificate certificate, X509Chain supplied, SslPolicyErrors errors) {
         if (certificate == null || (errors & (SslPolicyErrors.RemoteCertificateNameMismatch | SslPolicyErrors.RemoteCertificateNotAvailable)) != 0) return false;
+        if (errors == SslPolicyErrors.None) return true;
         using (X509Certificate2 leaf = new X509Certificate2(certificate))
         using (X509Chain chain = new X509Chain()) {
             chain.ChainPolicy.ExtraStore.AddRange(roots);
@@ -235,6 +241,23 @@ try {
     Remove-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
 }
 $env:ZSETUP_CONFIG = $config
+if ($AppId -eq 'ddnsto') {
+    $index = Join-Path $configDirectory 'ddnsto-index-windows.json'
+    $candidate = $index + '.candidate-' + [Guid]::NewGuid().ToString('N')
+    try {
+        $arguments = @('download', '--quiet', '-o', $candidate, '--max-bytes', '131072')
+        $arguments += @($ConfigPrimaryUrls | ForEach-Object { $_ -replace '/config-windows.json$', '/ddnsto-index-windows.json' })
+        $arguments += @('--fallback-url', ($ConfigFallbackUrl -replace '/config-windows.json$', '/ddnsto-index-windows.json'))
+        & $active @arguments
+        if ($LASTEXITCODE -ne 0) { throw "DDNSTO native index download failed: $LASTEXITCODE" }
+        Move-Item -LiteralPath $candidate -Destination $index -Force -ErrorAction Stop
+    } finally {
+        Remove-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
+    }
+    $env:ZSETUP_SOURCE_BASES = $script:BootstrapPrimaryBases -join ' '
+    $env:ZSETUP_SOURCE_FALLBACK = $script:BootstrapFallbackBase
+    & $active install --index $index $AppId --foreground -- @InstallerArguments
+    exit $LASTEXITCODE
+}
 & $active install $AppId --foreground -- @InstallerArguments
 exit $LASTEXITCODE
-

@@ -1,0 +1,40 @@
+# Native 0.6.4 reports these supported appliances as unknown. Keep their
+# fingerprint/transaction adapter, without falsifying native context or falling
+# back from a failed generic install. The generated identity is immutable.
+ddnsto_entry_appliance() (
+    [ -n "$DDNSTO_ENTRY_APPLIANCE" ] || return 0
+    umask 077
+    if [ "$DDNSTO_ENTRY_APPLIANCE" = asus ]; then
+        entry_dir=$(ddnsto_asus_mktemp "$WORK_ROOT") || exit 12
+    else entry_dir=$(mktemp -d "$WORK_ROOT/entry.XXXXXX") || exit 12; fi
+    entry_file=$entry_dir/install.sh
+    trap 'rm -f "$entry_file"; rmdir "$entry_dir"' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    entry_digest='@@SHA256@@'
+    entry_size='@@SIZE@@'
+    entry_relative='ddnsto/versions/@@VERSION@@/install.sh'
+    if [ "$DDNSTO_ENTRY_LEGACY" = 1 ]; then
+        entry_ok=0
+        for entry_base in $CONFIG_PRIMARY_URLS "$CONFIG_FALLBACK_URL"; do
+            entry_base=${entry_base%/zsetup/config.json}
+            if bootstrap_fetch_from_base https "$entry_base" "$entry_relative" "$entry_file"; then
+                entry_ok=1; break
+            fi
+        done
+        [ "$entry_ok" = 1 ] && [ "$(wc -c < "$entry_file")" -eq "$entry_size" ] &&
+            [ "$(ddnsto_asus_hash "$entry_file")" = "$entry_digest" ] || exit 11
+    else
+        # Keep caller arguments untouched in the parent function/subshell.
+        ddnsto_entry_fetch_payload() {
+            set -- download --quiet -o "$entry_file" --sha256 "$entry_digest" --size "$entry_size" --max-bytes "$entry_size"
+            for entry_base in $CONFIG_PRIMARY_URLS; do
+                set -- "$@" "${entry_base%/zsetup/config.json}/$entry_relative"
+            done
+            "$ACTIVE_ZSETUP" "$@" --fallback-url "${CONFIG_FALLBACK_URL%/zsetup/config.json}/$entry_relative"
+        }
+        ddnsto_entry_fetch_payload || exit $?
+    fi
+    sh "$entry_file" "$@"
+)

@@ -86,7 +86,10 @@ def audit(base, fetch=None, mode='indexed', verify_products=False, fetch_product
 
     if mode == 'indexed':
         check('zsetup/config.json', verify_config)
-    windows_path = ROOT / 'sources/ddnsto/install.ps1'
+    # This legacy audit explicitly selects the frozen 0.3.0 shell above. Its
+    # Windows peer must come from that same immutable release, not live source.
+    # Current apps-layout-v2 publication is checked by publish-apps.py.
+    windows_path = ROOT / 'apps/ddnsto/versions/0.3.0/install.ps1'
     windows = windows_path.read_bytes() if windows_path.is_file() else b''
     def verify_windows(data):
         if data != windows:

@@ -24,6 +24,15 @@ POSIX runtime family. Windows uses PowerShell. Standard entries bootstrap the
 latest compatible stable zsetup and call `zsetup install APP`; generated zsetup
 configuration references only immutable version installers.
 
+DDNSTO 0.3.1 compatibility exception (local candidate): published native
+0.6.4/0.6.5 require a derived `install --index` adapter, with the actual runtime
+floor checked inside the immutable payload. The two generated indexes belong
+under `apps/zsetup/`, not the application root. Recognized DSM/ASUS appliances
+whose native context is `unknown` use verified payload dispatch before business
+platform validation. See [device evidence and release blockers](verification/2026-11-24-ddnsto-release-entry-repair.md).
+This does not reintroduce aliases, recommendation manifests, or a second product
+version table, and does not establish macOS release readiness.
+
 Schema v2 fixes entry names, requires `install.md`, and forbids compatibility aliases. Every application
 manifest lives in its public application directory and is its only registration
 source. Maintained implementation lives in `sources/APP/`; tests and fixtures

@@ -75,6 +75,8 @@ if [ "$native_only" = 0 ] && [ -f "$zroot/Cargo.toml" ]; then
     python3 -B "$root/tests/windows_app_release_test.py" "$zroot" "$native_bin"
 fi
 python3 -B "$root/tests/bootstrap_platform_test.py"
+DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/tests/bootstrap_regression_test.py"
+DDNSTO_TEST_NATIVE="$native_bin" python3 -B "$root/tests/ddnsto_native_entry_test.py"
 python3 -B "$root/tests/minimum_native_test.py"
 python3 -B "$root/tests/windows_scoop_contract_test.py"
 python3 -B "$root/tests/install_storage_test.py"

@@ -1,6 +1,6 @@
 """The promoted Scoop installer keeps the locked M4/M3 trust chain explicit."""
 import json
-import importlib.util
+import hashlib
 from pathlib import Path
 import unittest
 
@@ -42,15 +42,19 @@ class WindowsScoopContract(unittest.TestCase):
         self.assertNotIn("Invoke-WebRequest", source)
         self.assertNotIn("Start-BitsTransfer", source)
 
-    def test_generated_entry_is_current_and_bounded(self):
+    def test_published_entry_is_immutable_and_bounded(self):
         entry = ROOT / "apps/scoop/0.1.2/installer.ps1"
         self.assertLess(entry.stat().st_size, 131072)
-        spec = importlib.util.spec_from_file_location(
-            "scoop_build", ROOT / "apps/scoop/source/build.py"
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        self.assertEqual(entry.read_text(encoding="utf-8"), module.render())
+        # Shared bootstrap fixes must not rewrite an already published Scoop
+        # version. Its next regeneration requires a new Scoop release, not a
+        # DDNSTO repair overwriting 0.1.2 with today's library bytes.
+        self.assertEqual(hashlib.sha256(entry.read_bytes()).hexdigest(),
+            '324ba6bd60bffba4af20eb136df839016a8d32c82f0f207684e3cda2eb27fc9c')
+        config = json.loads((ROOT / 'apps/zsetup/config-windows.json').read_text())
+        for record in config['installers']:
+            if record['application'] == 'scoop':
+                self.assertEqual(record['sha256'], hashlib.sha256(entry.read_bytes()).hexdigest())
+                self.assertEqual(record['size'], entry.stat().st_size)
 
     def test_sealed_builder_is_present_and_has_no_network_fallback(self):
         builder = (ROOT / "scripts/package-scoop-sealed.py").read_text(encoding="utf-8")

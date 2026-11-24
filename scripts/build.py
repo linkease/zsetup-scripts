@@ -188,9 +188,27 @@ def posix_entry(root: Path, application: Application):
         bootstrap_lines.pop(0)
     bootstrap = "\n".join(bootstrap_lines).strip() + "\n"
     primary_urls, fallback_url = config_urls(application.directory.parent, windows=False)
+    appliance = ''
+    if application.id == 'ddnsto':
+        payload = application.payload_path('sh').read_bytes()
+        appliance = (root / 'sources/ddnsto/entry-appliance.sh.in').read_text()
+        for marker, value in {'SHA256': hashlib.sha256(payload).hexdigest(),
+                              'SIZE': str(len(payload)), 'VERSION': application.manifest['version']}.items():
+            appliance = appliance.replace(f'@@{marker}@@', value)
     replacements = {
         "@APP_ID@": application.id,
         "@BOOTSTRAP@": bootstrap,
+        "@APP_PREFLIGHT@": (
+            (root / "sources/ddnsto/portable-files.sh").read_text() + "\n" +
+            (root / "sources/ddnsto/asus-storage.sh").read_text() + "\n" +
+            (root / "sources/ddnsto/entry-preflight.sh").read_text() + "\n" + appliance
+            if application.id == "ddnsto" else ""
+        ),
+        "@BOOTSTRAP_CALL@": (
+            'if [ "$DDNSTO_ENTRY_LEGACY" = 0 ]; then\nbootstrap_zsetup\nfi\n'
+            'if [ -n "$DDNSTO_ENTRY_APPLIANCE" ]; then\n    ddnsto_entry_appliance "$@"\n    exit "$?"\nfi'
+            if application.id == 'ddnsto' else 'bootstrap_zsetup'
+        ),
         "@CONFIG_PRIMARY_URLS@": " ".join(primary_urls),
         "@CONFIG_FALLBACK_URL@": fallback_url,
     }
@@ -351,6 +369,8 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
                 "min_version": minimum,
             })
     records.sort(key=lambda item: (item["application"], item["os"], item["package_manager"], item["arch"], item["path"]))
+    require(len(records) <= 128,
+            f"zsetup {output} exceeds the published native limit of 128 installer records ({len(records)})")
     identity = hashlib.sha256(json.dumps({
         "stable": stable_version, "installers": records,
     }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:12]
@@ -366,6 +386,25 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
             f"zsetup {output} exceeds the standard entry download bound")
     install_file(apps / "zsetup" / output, content, executable=False,
                  check=check, label=f"zsetup {output}")
+    # Compatibility transport for published native 0.6.4/0.6.5: its install
+    # coordinator uses legacy ABI 0.1.0. No independent product/version table:
+    # derive selectors, URLs and digests from the same canonical records.
+    ddnsto_records = [record for record in records if record['application'] == 'ddnsto']
+    if ddnsto_records:
+        entries = []
+        for record in ddnsto_records:
+            group = next(g for g in base['source_groups'] if g['id'] == record['source_group'])
+            entries.append({
+                **{key: record[key] for key in ('application', 'os', 'package_manager', 'arch', 'sha256', 'background')},
+                'min_version': '0.1.0',
+                'urls': [url.rstrip('/') + '/' + record['path'] for url in group['primary_bases']],
+                'fallback_url': group['fallback_base'].rstrip('/') + '/' + record['path'],
+            })
+        index_name = 'ddnsto-index-windows.json' if windows else 'ddnsto-index.json'
+        index_bytes = (json.dumps({'schema_version': 1, 'entries': entries}, indent=2) + '\n').encode()
+        require(len(index_bytes) <= 131072, 'DDNSTO native index exceeds download bound')
+        install_file(apps / 'zsetup' / index_name, index_bytes, executable=False,
+                     check=check, label='DDNSTO native compatibility index')
 
 
 def generate_checksums(apps: Path, *, check: bool):

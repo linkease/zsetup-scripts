@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "application": "ddnsto",
+      "os": "windows",
+      "package_manager": "*",
+      "arch": "x86_64",
+      "sha256": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+      "background": false,
+      "min_version": "0.1.0",
+      "urls": [
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.ps1",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.ps1",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.ps1"
+      ],
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.1/install.ps1"
+    }
+  ]
+}
