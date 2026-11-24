@@ -7,273 +7,6 @@ if [ "$(uname -s)" = Darwin ]; then
 set -eu
 set +x
 umask 077
-#!/bin/sh
-set -eu
-
-WORK_ROOT=${ZSETUP_ROOT:-/tmp/zsetup}
-DEFAULT_PRIMARY_BASES="https://dl.istoreos.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary"
-DEFAULT_FALLBACK_BASE="https://fw.koolcenter.com/binary"
-if [ -n "${ZSETUP_BOOTSTRAP_BASES:-}" ]; then
-    BOOTSTRAP_BASES=$ZSETUP_BOOTSTRAP_BASES
-    DIRECT_PRIMARY_BASES=$ZSETUP_BOOTSTRAP_BASES
-    DIRECT_FALLBACK_BASE=
-else
-    BOOTSTRAP_BASES="$DEFAULT_PRIMARY_BASES $DEFAULT_FALLBACK_BASE"
-    DIRECT_PRIMARY_BASES=$DEFAULT_PRIMARY_BASES
-    DIRECT_FALLBACK_BASE=$DEFAULT_FALLBACK_BASE
-fi
-INSECURE_CONFIRMED=0
-
-status() {
-    printf '%s\n' "$*" >&2
-}
-
-bootstrap_mips_byte_order() {
-    command -v od >/dev/null 2>&1 || return 1
-    set -- $(od -An -tu1 -N6 /bin/sh 2>/dev/null)
-    [ "$#" -eq 6 ] && [ "$1" = 127 ] && [ "$2" = 69 ] && [ "$3" = 76 ] && [ "$4" = 70 ] && [ "$6" = 1 ]
-}
-
-bootstrap_arch() {
-    case "$(uname -m 2>/dev/null || true)" in
-        x86_64|amd64) ZSETUP_ARCH=x86_64 ;;
-        aarch64|arm64) ZSETUP_ARCH=aarch64 ;;
-        armv7l|armv7) ZSETUP_ARCH=armv7 ;;
-        mipsel|mipsle) ZSETUP_ARCH=mipsel ;;
-        mips)
-            # uname alone does not identify byte order. ELF EI_DATA=1 is little endian.
-            bootstrap_mips_byte_order || { echo "zsetup: MIPS byte order is unsupported or unknown" >&2; return 2; }
-            ZSETUP_ARCH=mipsel ;;
-        *) echo "zsetup: unsupported architecture" >&2; return 2 ;;
-    esac
-    case "$(uname -s 2>/dev/null || true)" in
-        Darwin)
-            ZSETUP_ARTIFACT="zsetup-macos-$ZSETUP_ARCH"
-            ZSETUP_STABLE_PATH=zsetup/stable-macos ;;
-        Linux)
-            ZSETUP_ARTIFACT="zsetup-linux-$ZSETUP_ARCH"
-            ZSETUP_STABLE_PATH=zsetup/stable ;;
-        *) echo "zsetup: unsupported operating system" >&2; return 2 ;;
-    esac
-}
-
-bootstrap_url() {
-    scheme=$1
-    base=$2
-    path=$3
-    authority_path=${base#*://}
-    printf '%s://%s/%s\n' "$scheme" "${authority_path%/}" "$path"
-}
-
-bootstrap_fetch_from_base() {
-    scheme=$1
-    base=$2
-    remote_path=$3
-    destination=$4
-    found=0
-    url=$(bootstrap_url "$scheme" "$base" "$remote_path")
-    if command -v curl >/dev/null 2>&1; then
-        found=1
-        rm -f "$destination" 2>/dev/null || true
-        if curl -fsSL --connect-timeout 10 --max-time 30 -o "$destination" "$url"; then
-            return 0
-        fi
-    fi
-    if command -v wget >/dev/null 2>&1; then
-        found=1
-        rm -f "$destination" 2>/dev/null || true
-        if wget -q -T 10 -O "$destination" "$url"; then
-            return 0
-        fi
-    fi
-    [ "$found" -eq 1 ] || echo "zsetup: curl or wget is required for first bootstrap" >&2
-    return 1
-}
-
-bootstrap_fetch() {
-    scheme=$1
-    remote_path=$2
-    destination=$3
-    for base in $BOOTSTRAP_BASES; do
-        if bootstrap_fetch_from_base "$scheme" "$base" "$remote_path" "$destination"; then
-            return 0
-        fi
-    done
-    return 1
-}
-
-confirm_insecure_http() {
-    [ "$INSECURE_CONFIRMED" -eq 0 ] || return 0
-    echo "zsetup: all HTTPS bootstrap sources failed." >&2
-    echo "WARNING: HTTP can be intercepted; both zsetup and checksum metadata may be replaced." >&2
-    printf 'Continue with insecure HTTP bootstrap? [y/N] ' >&2
-    confirm_file=${ZSETUP_CONFIRM_FILE:-/dev/tty}
-    answer=
-    if ! IFS= read -r answer < "$confirm_file"; then
-        echo >&2
-        echo "zsetup: HTTP bootstrap refused because no interactive confirmation is available" >&2
-        return 1
-    fi
-    case "$answer" in
-        y|Y|yes|YES) INSECURE_CONFIRMED=1; echo "zsetup: user accepted insecure HTTP bootstrap" >&2 ;;
-        *) echo "zsetup: insecure HTTP bootstrap declined" >&2; return 1 ;;
-    esac
-}
-
-read_stable_version() {
-    file=$1
-    IFS= read -r RESCUE_VERSION < "$file" || return 1
-    case "$RESCUE_VERSION" in
-        ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) return 1 ;;
-    esac
-    [ -n "$RESCUE_VERSION" ] && [ "${#RESCUE_VERSION}" -le 64 ] || return 1
-    compatibility_version=${RESCUE_VERSION%%[-+]*}
-    compatibility_major=${compatibility_version%%.*}
-    compatibility_rest=${compatibility_version#*.}
-    compatibility_minor=${compatibility_rest%%.*}
-    compatibility_patch=${compatibility_rest#*.}
-    case "$compatibility_major:$compatibility_minor:$compatibility_patch" in *[!0123456789:]*|::*|*::*) return 1 ;; esac
-    if [ "$compatibility_major" -eq 0 ]; then
-        [ "$compatibility_minor" -ge 5 ] || return 1
-    fi
-}
-
-read_expected_sha256() {
-    file=$1
-    EXPECTED_SHA256=
-    while IFS=' ' read -r digest name remainder; do
-        name=${name#\*}
-        if [ "$name" = "$ZSETUP_ARTIFACT" ] && [ -z "${remainder:-}" ]; then
-            EXPECTED_SHA256=$digest
-            break
-        fi
-    done < "$file"
-    [ "${#EXPECTED_SHA256}" -eq 64 ] || return 1
-    case "$EXPECTED_SHA256" in *[!0123456789abcdefABCDEF]*) return 1 ;; esac
-}
-
-have_hash_tool() {
-    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
-        command -v shasum >/dev/null 2>&1
-}
-
-hash_matches() {
-    [ -f "$1" ] || return 1
-    if [ -z "${EXPECTED_SHA256:-}" ]; then
-        echo "zsetup: bootstrap SHA-256 verification skipped; HTTPS transport remains required" >&2
-        return 0
-    fi
-    if command -v sha256sum >/dev/null 2>&1; then
-        actual=$(sha256sum "$1")
-        actual=${actual%% *}
-    elif command -v openssl >/dev/null 2>&1; then
-        actual=$(openssl dgst -sha256 "$1")
-        actual=${actual##*= }
-    elif command -v shasum >/dev/null 2>&1; then
-        actual=$(shasum -a 256 "$1")
-        actual=${actual%% *}
-    else
-        echo "zsetup: bootstrap SHA-256 tool disappeared before verification" >&2
-        return 1
-    fi
-    [ "$actual" = "$EXPECTED_SHA256" ]
-}
-
-is_expected_zsetup() {
-    [ -x "$1" ] && [ "$("$1" --version 2>/dev/null || true)" = "zsetup $RESCUE_VERSION" ]
-}
-
-find_existing_zsetup() {
-    if [ -n "${ZSETUP_BIN:-}" ] && is_expected_zsetup "$ZSETUP_BIN"; then
-        ACTIVE_ZSETUP=$ZSETUP_BIN
-        return 0
-    fi
-    if is_expected_zsetup "$WORK_ROOT/rescue/$RESCUE_VERSION/zsetup"; then
-        ACTIVE_ZSETUP="$WORK_ROOT/rescue/$RESCUE_VERSION/zsetup"
-        return 0
-    fi
-    if command -v zsetup >/dev/null 2>&1; then
-        system_zsetup=$(command -v zsetup)
-        if is_expected_zsetup "$system_zsetup"; then
-            ACTIVE_ZSETUP=$system_zsetup
-            return 0
-        fi
-    fi
-    return 1
-}
-
-fetch_bootstrap_metadata() {
-    scheme=$1
-    stable_file=$2
-    sums_file=$3
-    for base in $BOOTSTRAP_BASES; do
-        bootstrap_fetch_from_base "$scheme" "$base" "$ZSETUP_STABLE_PATH" "$stable_file" || continue
-        read_stable_version "$stable_file" || continue
-        EXPECTED_SHA256=
-        if have_hash_tool && bootstrap_fetch_from_base "$scheme" "$base" "zsetup/$RESCUE_VERSION/SHA256SUMS" "$sums_file"; then
-            read_expected_sha256 "$sums_file" || EXPECTED_SHA256=
-        fi
-        return 0
-    done
-    echo "zsetup: no source returned valid stable metadata over $scheme" >&2
-    return 1
-}
-
-bootstrap_zsetup() {
-    bootstrap_arch
-    state_dir="$WORK_ROOT/bootstrap"
-    mkdir -p "$state_dir"
-    stable_file="$state_dir/.stable.$$"
-    sums_file="$state_dir/.SHA256SUMS.$$"
-    trap 'rm -f "$stable_file" "$sums_file" "${candidate:-}" 2>/dev/null || true' EXIT
-    trap 'exit 129' HUP
-    trap 'exit 130' INT
-    trap 'exit 143' TERM
-
-    metadata_scheme=https
-    if ! fetch_bootstrap_metadata https "$stable_file" "$sums_file"; then
-        confirm_insecure_http
-        metadata_scheme=http
-        fetch_bootstrap_metadata http "$stable_file" "$sums_file"
-    fi
-
-    if find_existing_zsetup; then
-        trap - EXIT HUP INT TERM
-        rm -f "$stable_file" "$sums_file" 2>/dev/null || true
-        return 0
-    fi
-
-    rescue_dir="$WORK_ROOT/rescue/$RESCUE_VERSION"
-    rescue_bin="$rescue_dir/zsetup"
-    candidate="$rescue_dir/.zsetup-download.$$"
-    mkdir -p "$rescue_dir"
-    if ! bootstrap_fetch https "zsetup/$RESCUE_VERSION/$ZSETUP_ARTIFACT" "$candidate"; then
-        confirm_insecure_http
-        bootstrap_fetch http "zsetup/$RESCUE_VERSION/$ZSETUP_ARTIFACT" "$candidate"
-    fi
-    hash_matches "$candidate" || {
-        echo "zsetup: bootstrap checksum mismatch" >&2
-        return 1
-    }
-    chmod 0755 "$candidate"
-    is_expected_zsetup "$candidate" || {
-        echo "zsetup: downloaded bootstrap has the wrong product or version" >&2
-        return 1
-    }
-    mv -f "$candidate" "$rescue_bin"
-    ACTIVE_ZSETUP=$rescue_bin
-    trap - EXIT HUP INT TERM
-    rm -f "$stable_file" "$sums_file" 2>/dev/null || true
-    [ "$metadata_scheme" = https ] || echo "zsetup: insecure HTTP bootstrap completed with user consent" >&2
-}
-
-# Return the verified native path while confining bootstrap's temporary signal
-# traps to a subprocess. Long-running installers can call this after installing
-# their own transaction cleanup traps without losing those handlers.
-bootstrap_zsetup_path() (
-    bootstrap_zsetup
-    printf '%s\n' "$ACTIVE_ZSETUP"
-)
 VERSION=${DDNSTO_VERSION:-4.2.8}
 INSTALL_DIR=${DDNSTO_INSTALL_DIR:-$HOME/.local/bin}
 CONFIG_DIR=${DDNSTO_CONFIG_DIR:-$HOME/Library/Application Support/DDNSTO}
@@ -364,8 +97,7 @@ case "$(uname -m)" in x86_64|amd64) member=ddnsto_cli.amd64 ;; arm64|aarch64) me
 if [ "$PLAN_ONLY" = 1 ]; then
     [ -z "$TOKEN$TOKEN_FILE" ] || fail '--plan does not accept credentials'
     printf '%s\n' 'facts_source=local-preflight' 'platform=macos' "arch=${member#ddnsto_cli.}" \
-        "client_version=$VERSION" 'zsetup_channel=zsetup/stable-macos' 'zsetup_min_version=0.5.0' \
-        'native_status=requires-launchd-preflight' \
+        "client_version=$VERSION" 'zsetup_version=0.3.0' 'native_status=requires-launchd-preflight' \
         'docker_installable=false' 'installation_performed=false'
     exit 0
 fi
@@ -1041,19 +773,43 @@ ddnsto_https_fetch() (
 )
 
 ensure_zsetup() {
-    ZSETUP_BIN=$(installer_output bootstrap_zsetup_path) || fail 'zsetup stable bootstrap download/checksum failed; no client changes made' 11
+    if [ -n "$ZSETUP_BIN" ]; then
+        [ -x "$ZSETUP_BIN" ] && [ "$(installer_output "$ZSETUP_BIN" --version)" = 'zsetup 0.3.0' ] || fail 'explicit zsetup must be executable version 0.3.0'
+        return
+    fi
+    command -v shasum >/dev/null || fail 'shasum is required for initial bootstrap verification'
+    case "$member" in
+        ddnsto_cli.amd64) native=zsetup-macos-x86_64; native_sha=608323145bcd8f083c0845b4bd0481eabccf0d74b99aa2aa6a88e59b34ce5b31 ;;
+        *) native=zsetup-macos-aarch64; native_sha=06ec453f851bd0395cf9ea8539de168f80a9628d1a25597dd598c85f9dc633b0 ;;
+    esac
+    printf '%s\n' 'DDNSTO：正在下载并校验 zsetup 0.3.0。' >&2
+    # The fixed macOS 0.3.0 artifact redirects on dl.istoreos.com. Prefer its
+    # direct HTTPS origin without relaxing the no-redirect transport policy.
+    for base in https://fw.koolcenter.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary https://dl.istoreos.com/binary; do
+        fetch_code=0
+        ddnsto_https_fetch "$base/zsetup/0.3.0/$native" "$work/zsetup.part" 16777216 || fetch_code=$?
+        if [ "$fetch_code" = 0 ]; then
+            actual=$(shasum -a 256 "$work/zsetup.part")
+            if [ "${actual%% *}" = "$native_sha" ]; then
+                mv "$work/zsetup.part" "$work/zsetup"
+                chmod 700 "$work/zsetup"
+                ZSETUP_BIN="$work/zsetup"
+                [ "$(installer_output "$ZSETUP_BIN" --version)" = 'zsetup 0.3.0' ] || fail 'unexpected zsetup version'
+                return
+            fi
+            fail 'zsetup bootstrap checksum failed' 11
+        fi
+        [ "$fetch_code" = 41 ] || fail 'HTTPS 证书、响应或下载边界检查失败；需要支持 TLS 校验的 curl 或 GNU Wget' 11
+    done
+    fail 'zsetup bootstrap download/checksum failed; no client changes made' 11
 }
 printf 'DDNSTO：安装器固定版本 %s，未查询推荐版本。\n' "$VERSION" >&2
-if [ "$ACTION" != repair ] && [ "$ACTION" != configure ]; then
-    diagnostic_event installing
-    # Bootstrap before taking the DDNSTO transaction lock. The shared
-    # bootstrap owns temporary signal traps while it verifies the core.
-    ensure_zsetup
-fi
 mkdir -p "$CONFIG_DIR"
 mkdir "$CONFIG_DIR/.install-lock" 2>/dev/null || fail 'another installation is active'
 locked=1
 if [ "$ACTION" != repair ] && [ "$ACTION" != configure ]; then
+    diagnostic_event installing
+    ensure_zsetup
     installer_command "$ZSETUP_BIN" download -o "$work/client.tar.gz" --sha256 "$archive_sha" \
         "https://fw.koolcenter.com/binary/ddnsto/macOS/ddnsto_darwin_cli_${VERSION}.tar.gz"
     installer_command tar -xzf "$work/client.tar.gz" -C "$work" "$member"
@@ -1298,8 +1054,7 @@ read_expected_sha256() {
 }
 
 have_hash_tool() {
-    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
-        command -v shasum >/dev/null 2>&1
+    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1
 }
 
 hash_matches() {
@@ -1314,9 +1069,6 @@ hash_matches() {
     elif command -v openssl >/dev/null 2>&1; then
         actual=$(openssl dgst -sha256 "$1")
         actual=${actual##*= }
-    elif command -v shasum >/dev/null 2>&1; then
-        actual=$(shasum -a 256 "$1")
-        actual=${actual%% *}
     else
         echo "zsetup: bootstrap SHA-256 tool disappeared before verification" >&2
         return 1
@@ -1411,14 +1163,6 @@ bootstrap_zsetup() {
     rm -f "$stable_file" "$sums_file" 2>/dev/null || true
     [ "$metadata_scheme" = https ] || echo "zsetup: insecure HTTP bootstrap completed with user consent" >&2
 }
-
-# Return the verified native path while confining bootstrap's temporary signal
-# traps to a subprocess. Long-running installers can call this after installing
-# their own transaction cleanup traps without losing those handlers.
-bootstrap_zsetup_path() (
-    bootstrap_zsetup
-    printf '%s\n' "$ACTIVE_ZSETUP"
-)
 
 # Shared Linux installer policy. Native facts come only from canonical Rust
 # zsetup; this file does not download, execute metadata or install packages.
@@ -2611,8 +2355,285 @@ installer_privilege_install() {
     return "$ip_return"
 }
 
+#!/bin/sh
+# DDNSTO Linux/OpenWrt only. Embed AFTER lib/bootstrap.sh, only in DDNSTO.
+# Call ddnsto_bootstrap_zsetup instead of bootstrap_zsetup at the business
+# bootstrap call site. The shared function remains intact; no alias is needed.
+# Desktop entrypoints retain their separate 0.3.0 / 0.4.0 policies.
 
-# Business logic: maintained in apps/ddnsto/source/business.sh
+# The native bootstrap must understand the same hash backends as the entry,
+# including a BusyBox applet without a standalone command link.
+have_hash_tool() {
+    command -v sha256sum >/dev/null 2>&1 || command -v openssl >/dev/null 2>&1 ||
+        command -v shasum >/dev/null 2>&1 ||
+        { command -v busybox >/dev/null 2>&1 && busybox sha256sum </dev/null >/dev/null 2>&1; }
+}
+
+hash_matches() (
+    [ -f "$1" ] && [ -n "${EXPECTED_SHA256:-}" ] || return 1
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum < "$1") || return 1
+        actual=${actual%% *}
+    elif command -v openssl >/dev/null 2>&1; then
+        actual=$(openssl dgst -sha256 < "$1") || return 1
+        actual=${actual##* }
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 < "$1") || return 1
+        actual=${actual%% *}
+    else
+        actual=$(busybox sha256sum < "$1") || return 1
+        actual=${actual%% *}
+    fi
+    [ "$actual" = "$EXPECTED_SHA256" ]
+)
+
+# dl.istoreos.com redirects native downloads (verified 2026-11-09). The
+# bootstrap deliberately never follows redirects. Use direct HTTPS mirrors
+# only here; preserve shared bootstrap and native product source selection.
+if [ -z "${ZSETUP_BOOTSTRAP_BASES:-}" ]; then
+    BOOTSTRAP_BASES='https://fw.koolcenter.com/binary https://fw.d4ctech.com/binary https://fw20.koolcenter.com/binary'
+fi
+
+fetch_bootstrap_metadata() {
+    # Deliberately ignore remote stable and SHA256SUMS, including fixture files.
+    # Pins verified against HTTPS fw.koolcenter.com/binary/zsetup/0.5.0/SHA256SUMS.
+    RESCUE_VERSION=0.5.0
+    EXPECTED_SHA256=
+    case "${ZSETUP_ARCH:-}" in
+        x86_64) EXPECTED_SHA256=9563b8442a75957792bb82a2d98a736142fc52be57dd2dc42005490096897617 ;;
+        aarch64) EXPECTED_SHA256=70cc54fcfdc6c6516965485879f0929e7dc9aabc1bd0fe09cbab099dd4619020 ;;
+        armv7) EXPECTED_SHA256=16eca14c00167ef45dac13e536c5ef2880f682ec48c70661044ee453724a66aa ;;
+        mipsel) EXPECTED_SHA256=4821bbeae11fdcdfa9eb5e0b46b63e9751e069c21b1e0e598c5658eb73383a7b ;;
+        *) printf '%s\n' 'DDNSTO: no fixed zsetup release for this architecture' >&2; return 2 ;;
+    esac
+}
+
+confirm_insecure_http() {
+    # Always called inside the wrapper's subprocess. Exit also fails closed
+    # when a caller uses the wrapper in an if/|| context (POSIX disables -e).
+    printf '%s\n' 'DDNSTO: HTTPS bootstrap failed; HTTP bootstrap is disabled' >&2
+    exit 1
+}
+
+# Kept identical in the three standalone DDNSTO bootstrap sources; tested together.
+# Only installer/native bootstrap uses this transport. Products use zsetup.
+ddnsto_https_fetch() (
+    case "$1" in https://*) ;; *) return 42 ;; esac
+    url=$1 destination=$2 limit=$3
+    ulimit -c 0 || return 42
+    # POSIX shells use 512-byte blocks (some shells use 1024). Bound body AND
+    # response diagnostics; final byte count is exact even for chunked bodies.
+    ulimit -f "$(((limit + 511) / 512 + 128))" || return 42
+    code=0 status=
+    if command -v curl >/dev/null 2>&1; then
+        status=$(curl -q --silent --proto '=https' --proto-redir '=https' \
+            --connect-timeout 5 --max-time 20 --max-filesize "$limit" \
+            --output "$destination" --write-out '%{http_code}' "$url" 2>/dev/null) || code=$?
+        case "$code" in 0) ;; 6|7|28) return 41 ;; *) return 42 ;; esac
+        case "$status" in 404|500|502|503|504) return 41 ;; esac
+    else
+        # --no-config must cover system wgetrc, ~/.wgetrc AND WGETRC. A plain
+        # -e check_certificate=on cannot neutralize input/output/redirect config.
+        version=$(LC_ALL=C wget --no-config --version 2>/dev/null) || version=
+        case "$version" in
+            'GNU Wget '*)
+                case "$version" in *+https*) ;; *) version= ;; esac ;;
+            *) version= ;;
+        esac
+        if [ -z "$version" ]; then
+            printf '%s\n' 'DDNSTO: TLS certificate validation requires curl or GNU Wget with HTTPS and --no-config; BusyBox/uclient wget is unsupported' >&2
+            return 42
+        fi
+        log="$destination.wget-response"
+        pid= timer=
+        finish_fetch() {
+            [ -z "$pid" ] || { kill "$pid" 2>/dev/null || :; wait "$pid" 2>/dev/null || :; }
+            [ -z "$timer" ] || { kill "$timer" 2>/dev/null || :; wait "$timer" 2>/dev/null || :; }
+            rm -f "$log"
+        }
+        trap finish_fetch EXIT
+        trap 'exit 42' HUP INT TERM
+        LC_ALL=C wget --no-config --execute=check_certificate=on \
+            --https-only --max-redirect=0 --tries=1 --timeout=5 \
+            --no-netrc --no-hsts --no-verbose --server-response \
+            -O "$destination" "$url" 2>"$log" &
+        pid=$!
+        # Wget's timeout is an idle timeout, not a total deadline. Reap both
+        # watchdog and sleeper on success, failure, and signal.
+        (
+            sleeper=
+            trap '[ -z "$sleeper" ] || { kill "$sleeper" 2>/dev/null; wait "$sleeper" 2>/dev/null; }; exit 0' HUP INT TERM
+            sleep 20 & sleeper=$!
+            wait "$sleeper" || exit 0
+            kill "$pid" 2>/dev/null || :
+        ) </dev/null >/dev/null 2>&1 &
+        timer=$!
+        wait "$pid" || code=$?
+        pid=
+        kill "$timer" 2>/dev/null || :
+        wait "$timer" 2>/dev/null || :
+        timer=
+        # C-locale TLS diagnostics only veto fallback; HTTP status is parsed
+        # structurally. Never expose response headers/URLs. GNU
+        # --server-response emits indented HTTP status lines; headers cannot
+        # masquerade as status lines without an HTTP/ prefix.
+        set -f
+        tls_error=0
+        while IFS= read -r line; do
+            # Exit 5 already rejects certificate errors below. Exit 4 also
+            # covers handshake failures: recognize only GNU's nonindented
+            # diagnostics, never TLS words in response headers or URLs.
+            if [ "$code" = 4 ]; then
+                case "$line" in
+                    'Unable to establish SSL connection.'*|'GnuTLS: '*|'OpenSSL: '*) tls_error=1 ;;
+                esac
+            fi
+            set -- $line
+            case "${1:-}" in HTTP/*) status=${2:-} ;; esac
+        done < "$log"
+        [ "$tls_error" = 0 ] || return 42
+        case "$code" in 0|8)
+            case "$status" in 404|500|502|503|504) return 41 ;; esac ;;
+        esac
+        case "$status" in ''|200) ;; *) return 42 ;; esac
+        case "$code" in 0) ;; 4|143) return 41 ;; *) return 42 ;; esac
+    fi
+    [ "$status" = 200 ] || return 42
+    [ -f "$destination" ] && [ "$(wc -c < "$destination")" -le "$limit" ] || return 42
+)
+
+bootstrap_fetch_from_base() (
+    # DDNSTO-only transport policy; retain the shared mirror/download lifecycle
+    # and URL construction. A valid pin does not authorize HTTP transport.
+    [ "$1" = https ] || return 42
+    case "$2" in https://*) ;; *) return 42 ;; esac
+    url=$(bootstrap_url "$1" "$2" "$3") || return 42
+    rm -f "$4" || return 42
+    ddnsto_https_fetch "$url" "$4" 16777216
+)
+
+# Override only DDNSTO's mirror loop: security failures never try another source.
+bootstrap_fetch() {
+    for fetch_base in $BOOTSTRAP_BASES; do
+        fetch_code=0
+        bootstrap_fetch_from_base "$1" "$fetch_base" "$2" "$3" || fetch_code=$?
+        case "$fetch_code" in 0) return 0 ;; 41) ;; *) return "$fetch_code" ;; esac
+    done
+    return 41
+}
+
+ddnsto_bootstrap_safe_ancestors() (
+    # Validate before creating anything. Symlink components, dot components,
+    # untrusted owners and writable ancestors can redirect a privileged cache.
+    case "$1" in /*) ;; *) return 1 ;; esac
+    case "$1/" in *//*|*/./*|*/../*) [ "$1" = / ] || return 1 ;; esac
+    directory=$1
+    while :; do
+        [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
+        owner=$(ddnsto_stat -c %u "$directory") || return 1
+        mode=$(ddnsto_stat -c %a "$directory") || return 1
+        [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
+        # A root-owned sticky /tmp is safe for an owned, private child.
+        if [ "$((0$mode & 0022))" -ne 0 ]; then
+            [ "$owner" = 0 ] && [ "$((0$mode & 01000))" -ne 0 ] || return 1
+        fi
+        [ "$directory" != / ] || break
+        directory=${directory%/*}
+        [ -n "$directory" ] || directory=/
+    done
+)
+
+ddnsto_bootstrap_private_dir() (
+    [ ! -L "$1" ] || return 1
+    if [ ! -e "$1" ]; then
+        (umask 077; mkdir "$1") || return 1
+    fi
+    [ -d "$1" ] && [ "$(ddnsto_stat -c %u "$1")" = "$(id -u)" ] &&
+        [ "$(ddnsto_stat -c %a "$1")" = 700 ]
+)
+
+is_expected_zsetup() (
+    # Never use --version to establish trust. Even a cached or explicit native
+    # must have reviewed bytes before its first instruction executes.
+    [ -f "$1" ] && [ ! -L "$1" ] && [ -x "$1" ] || return 1
+    [ -n "${EXPECTED_SHA256:-}" ] && have_hash_tool || return 1
+    case "$1" in /*) ;; *) return 1 ;; esac
+    ddnsto_bootstrap_safe_ancestors "${1%/*}" || return 1
+    owner=$(ddnsto_stat -c %u "$1") || return 1
+    mode=$(ddnsto_stat -c %a "$1") || return 1
+    [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
+    [ "$((0$mode & 0022))" -eq 0 ] || return 1
+    [ "$(ddnsto_stat -c %h "$1")" = 1 ] || return 1
+    hash_matches "$1" || return 1
+    [ "$("$1" --version 2>/dev/null)" = "zsetup $RESCUE_VERSION" ]
+)
+
+ddnsto_bootstrap_zsetup() {
+    ACTIVE_ZSETUP=
+    bootstrap_arch || return $?
+    fetch_bootstrap_metadata https '' '' || return $?
+    have_hash_tool || {
+        printf '%s\n' 'DDNSTO: SHA-256 verification requires sha256sum, openssl, shasum or BusyBox sha256sum' >&2
+        return 1
+    }
+    # Use the existing override; no host services or global installation paths.
+    # Do not chmod/chown an existing cache to "repair" someone else's directory.
+    ACTIVE_ZSETUP=$(
+        umask 077
+        # Balance case-pattern parentheses inside $(...) for Bash 4.2's
+        # POSIX parser; unpaired patterns can close the substitution early.
+        case "$WORK_ROOT" in (/*) ;; (*) exit 1 ;; esac
+        case "$WORK_ROOT/" in (*//*|*/./*|*/../*) exit 1 ;; esac
+        ddnsto_bootstrap_safe_ancestors "${WORK_ROOT%/*}" &&
+            ddnsto_bootstrap_private_dir "$WORK_ROOT" || {
+            printf '%s\n' 'DDNSTO: bootstrap cache must be owned, private and free of symlinks' >&2
+            exit 1
+        }
+        # Serialize cache publication; never remove or steal an existing lock.
+        lock="$WORK_ROOT/.ddnsto-bootstrap-lock"
+        mkdir "$lock" 2>/dev/null || {
+            printf '%s\n' 'DDNSTO: bootstrap cache is locked' >&2
+            exit 16
+        }
+        trap 'rmdir "$lock" 2>/dev/null || true' EXIT
+        trap 'exit 129' HUP
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        for directory in "$WORK_ROOT/bootstrap" "$WORK_ROOT/rescue" "$WORK_ROOT/rescue/$RESCUE_VERSION"; do
+            ddnsto_bootstrap_private_dir "$directory" || {
+                printf '%s\n' 'DDNSTO: unsafe bootstrap cache directory' >&2
+                exit 1
+            }
+        done
+        # Shared helper uses PID-specific temporary names. Refuse stale or
+        # redirected entries before its cleanup traps can touch those paths.
+        for temporary in "$WORK_ROOT/bootstrap/.stable.$$" "$WORK_ROOT/bootstrap/.SHA256SUMS.$$" \
+            "$WORK_ROOT/rescue/$RESCUE_VERSION/.zsetup-download.$$"; do
+            [ ! -e "$temporary" ] && [ ! -L "$temporary" ] || exit 1
+        done
+        [ ! -L "$WORK_ROOT/rescue/$RESCUE_VERSION/zsetup" ] || exit 1
+        if [ -e "$WORK_ROOT/rescue/$RESCUE_VERSION/zsetup" ]; then
+            [ -f "$WORK_ROOT/rescue/$RESCUE_VERSION/zsetup" ] || exit 1
+        fi
+        # Inner scope preserves the lock cleanup when shared bootstrap installs
+        # and removes its own traps. Only the verified path crosses back out.
+        (
+            candidate=
+            bootstrap_zsetup || exit $?
+            # Shared code assumes errexit for mv/chmod. Revalidate publication
+            # explicitly because conditional callers disable that assumption.
+            is_expected_zsetup "$ACTIVE_ZSETUP" || {
+                [ -z "$candidate" ] || rm -f "$candidate"
+                exit 1
+            }
+            printf '%s\n' "$ACTIVE_ZSETUP"
+        )
+    ) || return $?
+    [ -n "$ACTIVE_ZSETUP" ]
+}
+
+
+# Business logic: maintained in ddnsto/business.sh
 # Metadata for DDNSTO only. Prefer native stat, but minimal OpenWrt firmware
 # may omit both stat and its BusyBox applet. Never replace checks with success.
 ddnsto_file_fields() (
@@ -2670,36 +2691,6 @@ ddnsto_stat() (
         %h) printf '%s\n' "$3" ;;
         *) return 1 ;;
     esac
-)
-
-# Validate storage ancestors before privileged DDNSTO adapters create or
-# replace files.  These are filesystem-safety primitives, not zsetup version
-# policy, so they live with the portable metadata implementation.
-ddnsto_bootstrap_safe_ancestors() (
-    case "$1" in /*) ;; *) return 1 ;; esac
-    case "$1/" in *//*|*/./*|*/../*) [ "$1" = / ] || return 1 ;; esac
-    directory=$1
-    while :; do
-        [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
-        owner=$(ddnsto_stat -c %u "$directory") || return 1
-        mode=$(ddnsto_stat -c %a "$directory") || return 1
-        [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
-        if [ "$((0$mode & 0022))" -ne 0 ]; then
-            [ "$owner" = 0 ] && [ "$((0$mode & 01000))" -ne 0 ] || return 1
-        fi
-        [ "$directory" != / ] || break
-        directory=${directory%/*}
-        [ -n "$directory" ] || directory=/
-    done
-)
-
-ddnsto_bootstrap_private_dir() (
-    [ ! -L "$1" ] || return 1
-    if [ ! -e "$1" ]; then
-        (umask 077; mkdir "$1") || return 1
-    fi
-    [ -d "$1" ] && [ "$(ddnsto_stat -c %u "$1")" = "$(id -u)" ] &&
-        [ "$(ddnsto_stat -c %a "$1")" = 700 ]
 )
 
 # Generated from templates/managed-cli.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
@@ -2993,30 +2984,18 @@ ddnsto_prompt_token() (
 )
 
 # DDNSTO actions use the shared protected service coordinator, never flat paths.
-ddnsto_zsetup_version_compatible() (
-    managed_version=${1#zsetup }
-    old_ifs=$IFS
-    IFS=.
-    set -- $managed_version
-    IFS=$old_ifs
-    [ "$#" = 3 ] || return 1
-    for managed_part in "$@"; do
-        [ -n "$managed_part" ] || return 1
-        case "$managed_part" in *[!0-9]*) return 1 ;; esac
-    done
-    [ "$1" -gt 0 ] || { [ "$1" = 0 ] && [ "$2" -ge 5 ]; }
-)
-
 ddnsto_managed_native() {
-    # Standalone actions bootstrap the platform stable before entering this
-    # function. Installer mode receives the already verified current zsetup.
-    [ -n "${ZSETUP_BIN:-}" ] && [ -x "$ZSETUP_BIN" ] || {
-        ddnsto_error 'managed action requires the verified zsetup selected by the shared bootstrap'
-        return 2
-    }
-    managed_version=$("$ZSETUP_BIN" --version 2>/dev/null) || managed_version=
-    ddnsto_zsetup_version_compatible "$managed_version" && return 0
-    ddnsto_error 'managed action requires zsetup >= 0.5.0'
+    # Offline operations must use the same reviewed bytes as installation.
+    # This reads compiled-in pins only: no bootstrap, download or cache writes.
+    bootstrap_arch || return 2
+    fetch_bootstrap_metadata https '' '' || return 2
+    if [ -n "${ZSETUP_BIN:-}" ]; then
+        if is_expected_zsetup "$ZSETUP_BIN"; then return 0; fi
+    elif find_existing_zsetup; then
+        ZSETUP_BIN=$ACTIVE_ZSETUP
+        return 0
+    fi
+    ddnsto_error 'offline management requires the verified pinned zsetup in the installer cache, PATH or ZSETUP_BIN; restore it using the installer before retrying'
     return 2
 }
 
@@ -4216,7 +4195,8 @@ ddnsto_synology_download() (
 ddnsto_synology_entry() (
     if [ "${PLAN_ONLY:-0}" = 1 ]; then ddnsto_synology_download "$@"; exit $?; fi
     if [ "${ZSETUP_INSTALLER_MODE:-0}" != 1 ]; then
-        ZSETUP_BIN=$(bootstrap_zsetup_path) || exit $?
+        ddnsto_bootstrap_zsetup || exit $?
+        ZSETUP_BIN=$ACTIVE_ZSETUP
     fi
     ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}
     ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}
@@ -5208,7 +5188,7 @@ ddnsto_synology_version() {
 ddnsto_synology_fetch() (
     ddnsto_synology_storage || exit $?
     WORK_ROOT="$syno_storage/native"
-    ACTIVE_ZSETUP=$(bootstrap_zsetup_path) || { ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载或校验失败' '请检查 HTTPS 下载和缓存权限'; exit 2; }
+    ddnsto_bootstrap_zsetup || { ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载或校验失败' '请检查 HTTPS 下载和缓存权限'; exit 2; }
     ddnsto_synology_select || exit 2
     "$ACTIVE_ZSETUP" download -o "$1" --sha256 "$digest" --max-bytes 33554432 --min-free-bytes 8388608 \
         "https://fw.koolcenter.com/binary/ddnsto/$relative" \
@@ -7274,31 +7254,6 @@ ddnsto_stat() (
         *) return 1 ;;
     esac
 )
-ddnsto_bootstrap_safe_ancestors() (
-    case "$1" in /*) ;; *) return 1 ;; esac
-    case "$1/" in *//*|*/./*|*/../*) [ "$1" = / ] || return 1 ;; esac
-    directory=$1
-    while :; do
-        [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
-        owner=$(ddnsto_stat -c %u "$directory") || return 1
-        mode=$(ddnsto_stat -c %a "$directory") || return 1
-        [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || return 1
-        if [ "$((0$mode & 0022))" -ne 0 ]; then
-            [ "$owner" = 0 ] && [ "$((0$mode & 01000))" -ne 0 ] || return 1
-        fi
-        [ "$directory" != / ] || break
-        directory=${directory%/*}
-        [ -n "$directory" ] || directory=/
-    done
-)
-ddnsto_bootstrap_private_dir() (
-    [ ! -L "$1" ] || return 1
-    if [ ! -e "$1" ]; then
-        (umask 077; mkdir "$1") || return 1
-    fi
-    [ -d "$1" ] && [ "$(ddnsto_stat -c %u "$1")" = "$(id -u)" ] &&
-        [ "$(ddnsto_stat -c %a "$1")" = 700 ]
-)
 ddnsto_usage() {
     printf '%s\n' 'Usage: ddnsto-install.sh [--plan] [--action ensure|install|update|status|start|stop|restart|repair|configure|uninstall|download] [--platform auto|linux|openwrt|macos|windows|synology|asus|qnap|unraid] [--method auto|native|docker] [--token TOKEN | --token-file FILE] [--force-version lite|standard] [--verify-status]' \
         '默认 ensure：必须提供 Token，自动安装/升级/启用启动，不降级，不切换账号；仅验证本地稳定运行，不判断设备在线。' \
@@ -7565,27 +7520,16 @@ ddnsto_prompt_token() (
     IFS= read -r entered_token <&3
     printf '%s' "$entered_token"
 )
-ddnsto_zsetup_version_compatible() (
-    managed_version=${1#zsetup }
-    old_ifs=$IFS
-    IFS=.
-    set -- $managed_version
-    IFS=$old_ifs
-    [ "$#" = 3 ] || return 1
-    for managed_part in "$@"; do
-        [ -n "$managed_part" ] || return 1
-        case "$managed_part" in *[!0-9]*) return 1 ;; esac
-    done
-    [ "$1" -gt 0 ] || { [ "$1" = 0 ] && [ "$2" -ge 5 ]; }
-)
 ddnsto_managed_native() {
-    [ -n "${ZSETUP_BIN:-}" ] && [ -x "$ZSETUP_BIN" ] || {
-        ddnsto_error 'managed action requires the verified zsetup selected by the shared bootstrap'
-        return 2
-    }
-    managed_version=$("$ZSETUP_BIN" --version 2>/dev/null) || managed_version=
-    ddnsto_zsetup_version_compatible "$managed_version" && return 0
-    ddnsto_error 'managed action requires zsetup >= 0.5.0'
+    bootstrap_arch || return 2
+    fetch_bootstrap_metadata https '' '' || return 2
+    if [ -n "${ZSETUP_BIN:-}" ]; then
+        if is_expected_zsetup "$ZSETUP_BIN"; then return 0; fi
+    elif find_existing_zsetup; then
+        ZSETUP_BIN=$ACTIVE_ZSETUP
+        return 0
+    fi
+    ddnsto_error 'offline management requires the verified pinned zsetup in the installer cache, PATH or ZSETUP_BIN; restore it using the installer before retrying'
     return 2
 }
 ddnsto_linux_environment() {
@@ -8642,7 +8586,8 @@ ddnsto_synology_download() (
 ddnsto_synology_entry() (
     if [ "${PLAN_ONLY:-0}" = 1 ]; then ddnsto_synology_download "$@"; exit $?; fi
     if [ "${ZSETUP_INSTALLER_MODE:-0}" != 1 ]; then
-        ZSETUP_BIN=$(bootstrap_zsetup_path) || exit $?
+        ddnsto_bootstrap_zsetup || exit $?
+        ZSETUP_BIN=$ACTIVE_ZSETUP
     fi
     ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}
     ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}
@@ -9496,7 +9441,7 @@ ddnsto_synology_version() {
 ddnsto_synology_fetch() (
     ddnsto_synology_storage || exit $?
     WORK_ROOT="$syno_storage/native"
-    ACTIVE_ZSETUP=$(bootstrap_zsetup_path) || { ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载或校验失败' '请检查 HTTPS 下载和缓存权限'; exit 2; }
+    ddnsto_bootstrap_zsetup || { ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载或校验失败' '请检查 HTTPS 下载和缓存权限'; exit 2; }
     ddnsto_synology_select || exit 2
     "$ACTIVE_ZSETUP" download -o "$1" --sha256 "$digest" --max-bytes 33554432 --min-free-bytes 8388608 \
         "https://fw.koolcenter.com/binary/ddnsto/$relative" \
@@ -10643,20 +10588,18 @@ ddnsto_asus_ensure() {
     [ "$asus_cancel_rc" = 0 ] || return "$asus_cancel_rc"
     return "$asus_worker_rc"
 }
+installer_dispatch ddnsto "$@"
 ZSETUP_PRIVATE_ROOT_PROGRAM
 }
 
 bootstrap_and_run() {
     status "[1/4] Checking zsetup..."
-    # bootstrap_zsetup_path isolates cleanup traps in a subprocess; retain the
-    # selected architecture in this shell for installer-mode context.
-    bootstrap_arch || return $?
-    ACTIVE_ZSETUP=$(bootstrap_zsetup_path) || {
+    ddnsto_bootstrap_zsetup || {
         bootstrap_rc=$?
-        ddnsto_flow_error E_BOOTSTRAP 'zsetup 最新稳定版下载、校验或缓存检查失败，尚未安装客户端' '请检查下载连通性、系统时间及缓存权限；不要删除客户端配置' || :
+        ddnsto_flow_error E_BOOTSTRAP 'zsetup 下载、校验或缓存检查失败，尚未安装客户端' '请检查 HTTPS 下载连通性、系统时间、SHA-256 工具及私有缓存权限；不要删除客户端配置' || :
         return "$bootstrap_rc"
     }
-    status "      $("$ACTIVE_ZSETUP" --version) is ready"
+    status "      zsetup $RESCUE_VERSION is ready"
     ZSETUP_BIN=$ACTIVE_ZSETUP
     ZSETUP_SOURCE_BASES=${ZSETUP_SOURCE_BASES:-$DIRECT_PRIMARY_BASES}
     ZSETUP_SOURCE_FALLBACK=${ZSETUP_SOURCE_FALLBACK-$DIRECT_FALLBACK_BASE}
@@ -10711,10 +10654,6 @@ ddnsto_entry_install() {
             if [ "$detected_platform" = openwrt ]; then
                 if [ "$ACTION" = status ]; then ddnsto_openwrt_local
                 else ddnsto_machine_locked ddnsto_openwrt_local; fi
-                return $?
-            fi
-            if [ "${ZSETUP_INSTALLER_MODE:-0}" != 1 ]; then
-                bootstrap_and_run "$@"
                 return $?
             fi
             ddnsto_managed_native || return $?
