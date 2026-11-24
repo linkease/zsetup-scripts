@@ -68,36 +68,24 @@ Shell 入口/生成器变更还必须通过 Bash 4.2 POSIX 模式验证，不能
 完成条件：记录命令、通过/失败/跳过数及原因。新失败必须修复；疑似历史失败需与修改前提交对照。
 跳过、环境受限或历史失败都不能写为“全量通过”；影响目标平台的验证缺口需在继续发布前明确确认。
 
-## 5. 审核字节、生成本地候选
+## 5. 审核标准应用接口
 
-控制台完整安装站点的正式交付路径是 `apps/_sites/run.ddnsto.com/`。
-步骤 3 的 `scripts/build.py` 同时生成 `install.sh`、`install.ps1`、推荐清单、摘要执行器和 AI 指南，
-随 `apps/SHA256SUMS` 一起审核、提交。运行 `tests/ddnsto_apps_site_test.py` 验证完整性及
-发布事务。完整 apps 交付使用 [现有发布协调器](apps-release.md)，不能只上传旧 dist。
-下述推荐打包命令仅用于隔离候选检查，不再是正式目录的另一份维护源。
+控制台完整安装资源的唯一交付路径是 `apps/ddnsto/`。步骤 3 的
+`scripts/build.py` 生成 `install.sh`、`install.ps1` 和配置；`install.md` 直接维护，
+三者随不可变 `versions/` 和 `apps/SHA256SUMS` 一起审核、提交。运行
+`tests/ddnsto_apps_standard_test.py` 和
+`tests/apps/ddnsto/internal/agent_guide_test.py` 验证完整性及发布事务。
+完整 apps 交付使用 [现有发布协调器](apps-release.md)，不存在推荐打包器或独立站点候选。
 
-先审查差异，再取得两个实际安装器的 SHA-256：
+先审查差异，再核对两个实际安装器和指南：
 
 ```sh
 sha256sum apps/ddnsto/versions/0.3.0/install.sh apps/ddnsto/versions/0.3.0/install.ps1
-python3 -B scripts/package-ddnsto-recommendation.py --help
+python3 -B scripts/build.py --check
+python3 -B tests/apps/ddnsto/internal/agent_guide_test.py
 ```
 
-将审核后的摘要代入现有打包命令（尖括号为待填写值，不能原样执行）：
-
-```sh
-python3 -B scripts/package-ddnsto-recommendation.py \
-  --source-url '<本次确认的HTTPS推荐目录>' \
-  --reviewed-shell-sha256 '<审核后的shell摘要>' \
-  --reviewed-powershell-sha256 '<审核后的PowerShell摘要>' \
-  --output '<不存在的本地候选目录绝对路径>'
-```
-
-`--native-first` 必须根据目标环境当前策略和本次确认决定；包生成器默认未启用，不能因省略参数
-而悄悄改变现有入口策略。脚本候选版本参数以当前 `--help` 为准，不能用客户端版本号代替。
-打包后再修改任何安装器内容，都必须重新生成、验证、审核和打包。
-
-完成条件：候选 `review.json`、推荐清单、不可变脚本摘要一致，记录源提交及未提交差异；
+完成条件：三个标准入口、不可变脚本、配置和全局摘要一致，记录源提交及未提交差异；
 本阶段状态只能写“本地候选”，不能写“已发布”。正式发布前源代码须提交并记录最终提交号；提交另需授权。
 
 ## 6. 测试环境发布和真机验收
@@ -126,9 +114,8 @@ python3 -B scripts/package-ddnsto-recommendation.py \
 ## 7. 正式发布与归档
 
 正式发布需要单独明确授权。核对最终提交、审核摘要、验收记录、正式目标和回滚备份；
-重复步骤 6 的不可变文件先行、读回、可变清单最后切换流程。
-若正式环境来源 URL 与测试环境不同，重新审核对应入口和包装差异，不假设候选字节完全相同。
-核对短地址仍指向预期推荐入口，清单引用的安装器真实存在且摘要/大小一致。
+不可变版本文件先行并读回，最后切换三个标准入口和配置。
+核对 `run.ddnsto.com` 三个地址仍映射到 apps 中的同名文件，配置引用的安装器真实存在且摘要/大小一致。
 
 完成条件：记录发布前后摘要、实际环境、验证时间、结果和限制；用户交付包含最终命令及更新说明。
 只有公网发布与验收均完成才能写“已上线”；测试发布不能改标为正式发布。
@@ -136,17 +123,18 @@ python3 -B scripts/package-ddnsto-recommendation.py \
 ## 回滚分支
 
 1. 对比线上当前摘要与本次刚发布的摘要；不同则停止，避免覆盖后续发布。
-2. 只恢复本次改动的入口/推荐清单备份；保留不可变脚本和用户配置。
-3. 经 HTTPS 读回，确认短地址、清单和安装器恢复到预期组合，记录回滚结果。
+2. 只恢复本次改动的标准入口和配置备份；保留不可变脚本和用户配置。
+3. 经 HTTPS 读回，确认三个友好地址、配置和安装器恢复到预期组合，记录回滚结果。
 
-推荐清单回滚只影响后续执行安装命令的推荐结果，**不会自动把已升级设备降级**。
+入口和配置回滚只影响后续执行安装命令的选择结果，**不会自动把已升级设备降级**。
 设备恢复必须依据该平台实际事务状态另行处理，不能承诺所有平台都能完整回退安装包。
 
 ## 安装域名与完整 apps 发布（2026-11-24）
 
-控制台固定访问 `https://run.ddnsto.com`。统一构建复用推荐/站点打包器生成到
-`apps/ddnsto/`，不进入 `ddns-server` 或 `ddnsto-static`，不使用 Host 渲染。
+控制台固定访问 `https://run.ddnsto.com`。运维将 `install.sh`、`install.ps1` 和
+`install.md` 直接映射到 `apps/ddnsto/` 的同名文件，不进入 `ddns-server` 或
+`ddnsto-static`，不使用 Host 渲染，也不建立域名专属目录。
 构建检查摘要一致性，人工审核与上线授权仍独立进行。Windows 用户入口为 `install.ps1`，
 不是 `source/` 中的模板；原生 apps 索引范围保持不变。
 
-先安装正文、再清单/入口、最后控制台；保留历史摘要。现有线上文件本轮不清理。业务环境参数不改变脚本下载源；候选脚本测试分发暂未实施。完整边界和发布命令见 [部署模型](ddnsto-install-deployment.md)，本次证据见 [发布记录](verification/2026-11-20-ddnsto-release-install-domain.md)。运维交接在工作区 `ddnsto-meta/09-playbooks-SOP/DDNSTO一键安装-正式部署说明.md`。本轮仅本地修改，不代表上线。
+先暂存不可变版本实现，再激活标准入口及配置，最后更新控制台。业务环境参数不改变脚本下载源；候选脚本测试分发暂未实施。完整边界和发布命令见 [部署模型](ddnsto-install-deployment.md)，本次证据见 [发布记录](verification/2026-11-20-ddnsto-release-install-domain.md)。运维交接在工作区 `ddnsto-meta/09-playbooks-SOP/DDNSTO一键安装-正式部署说明.md`。本轮仅本地修改，不代表上线。

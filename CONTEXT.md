@@ -9,7 +9,8 @@ A named installable product registered once in the applications tree.
 _Avoid_: Script, package
 
 **Standard Entry**:
-The stable user-facing launcher for one runtime family; POSIX uses `install.sh` and Windows uses `install.ps1`.
+The stable user-facing file for one application interface; POSIX uses `install.sh`, Windows uses
+`install.ps1`, and installation guidance uses `install.md`.
 _Avoid_: Alias, installer payload, short link
 
 **Version Installer**:
@@ -25,8 +26,8 @@ A second published name for a standard entry. Layout v2 forbids compatibility al
 _Avoid_: Standard entry
 
 **Website Route**:
-A domain-specific public URL such as `run.ddnsto.com/i` that resolves to website runtime content without becoming an application entry name.
-_Avoid_: Application entry, compatibility alias
+A friendly domain URL such as `run.ddnsto.com/install.md` that maps directly to an application's standard entry without creating another publication tree.
+_Avoid_: Application entry copy, compatibility alias, site directory
 
 **Product Artifact**:
 A business-owned binary or archive consumed by a version installer and released outside the applications tree.

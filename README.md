@@ -4,8 +4,8 @@ DDNSTO 推荐版本更新、验收、发布和回滚统一遵循 [发布 SOP](do
 每次使用其链接的发布记录模板留存证据。
 
 2026-11-24 本地候选：[安装域名与 apps 发布](docs/ddnsto-install-deployment.md)。
-DDNSTO 完整安装资源由统一构建生成到 `apps/ddnsto/`，随完整 `apps/` 发布；
-控制台固定引用 `run.ddnsto.com/install.sh` 和 `/install.ps1`。测试参数只切换客户端业务环境，
+DDNSTO 完整安装资源位于 `apps/ddnsto/`，随完整 `apps/` 发布；控制台固定引用
+`run.ddnsto.com/install.sh`、`/install.ps1` 和 `/install.md`，分别直接映射 apps 中的同名文件。测试参数只切换客户端业务环境，
 不切换脚本推荐渠道。本次候选尚未发布，域名映射需运维切换并验证。
 
 DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
@@ -71,7 +71,8 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
 
 `apps/` 是整体发布时原样复制到服务器的目录。DDNSTO 仅在其中保留部署产物，
-维护源码、模板、推荐配置和应用清单位于 `sources/ddnsto/`；其他应用仍由
+维护源码、模板和推荐配置位于 `sources/ddnsto/`，应用清单和 `install.md` 位于
+`apps/ddnsto/`；其他应用仍由
 `apps/<id>/app.json` 声明身份和当前版本，`apps/<id>/<version>/installer.*` 是配置索引引用的
 版本化安装器；复杂应用的可维护源码放在 `apps/<id>/source/`。所有测试和测试夹具位于
 `tests/`，不会随 `apps/` 发布。公共 `lib/`、`scripts/`、`tests/`、`docs/` 只保留共享能力、
@@ -79,9 +80,10 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 
 ```text
 zsetup-scripts/
-  sources/ddnsto/   # DDNSTO 维护源码、模板、推荐配置及 app.json，不部署
-  apps/             # 完整发布树；ddnsto 子目录仅含运行产物
+  sources/ddnsto/   # DDNSTO 维护源码、模板和推荐配置，不部署
+  apps/             # 完整发布树；ddnsto 子目录含标准入口、指南和版本实现
     APP/app.json    # 应用身份、当前版本、平台和兼容别名
+    APP/install.md  # layout v2 的标准 AI/人工安装指南
     APP/VERSION/    # 配置索引引用的不可变 installer.sh / installer.ps1
     APP/source/     # 可选的复杂应用维护源码；不含测试
   legacy/           # 原仓库旧脚本快照与来源说明，仅供历史参考

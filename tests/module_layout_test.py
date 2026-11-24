@@ -29,6 +29,8 @@ for app in IDS:
                    else directory / version / f"installer.{extension}")
         assert payload.is_file()
         assert (directory / f"install.{extension}").is_file()
+    if manifest["schema_version"] == 2:
+        assert (directory / "install.md").is_file()
     assert not (directory / "tests").exists()
     assert ((ROOT / "tests/apps" / app).is_dir()
             or app == "ks-cli" and (ROOT / "tests/apps/kspeeder").is_dir())

@@ -83,12 +83,6 @@ atomic_copy() {
 
 is_immutable() {
     old_ifs=$IFS; IFS=/; set -- $1; IFS=$old_ifs
-    if [ "$#" = 6 ] && [ "$1/$2" = _sites/run.ddnsto.com ]; then
-        case "$3/$4" in current/immutable|agent/versions)
-            case "$5" in ''|*[!0-9a-f]*) return 1 ;; esac
-            [ "${#5}" = 64 ]; return $? ;;
-        esac
-    fi
     if [ "$#" -ge 4 ] && [ "$2" = versions ]; then
         case "$3" in [0-9]*.[0-9]*.[0-9]*) return 0 ;; *) return 1 ;; esac
     fi

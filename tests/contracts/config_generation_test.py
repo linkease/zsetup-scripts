@@ -36,6 +36,7 @@ def create(apps: Path):
     (app / "versions/1.2.3").mkdir(parents=True)
     payload = b"#!/bin/sh\nexit 0\n"
     (app / "versions/1.2.3/install.sh").write_bytes(payload)
+    (app / "install.md").write_text("# Demo installation\n")
     (app / "app.json").write_text(json.dumps({
         "schema_version": 2, "id": "demo", "name": "Demo",
         "version": "1.2.3", "min_zsetup": "0.5.0",

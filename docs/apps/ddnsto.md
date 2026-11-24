@@ -39,9 +39,9 @@ sh -c "$(curl -fsSL https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/
 
 OpenWrt 支持 opkg/apk × x86_64/aarch64/armv7/mipsel；总内存低于 900 MiB 自动选 Lite，可传 `--force-version lite|standard`。token 可选；`--verify-status` 请求服务检查。Linux 支持 x86_64/aarch64，默认 Standard 4.2.3，无终端时必须提供 token。Windows 入口支持 x86_64 CLI 4.2.1，在 Windows 10 x64 WOW64 / PowerShell 5.1 验证范围内使用计划任务启动；macOS 入口支持 Intel/Apple Silicon CLI 4.2.1，使用用户级 launchd。Windows/macOS 的 4.2.1 归档 SHA256 固定在入口脚本中，升级新版本前必须更新脚本、测试和发布配置。参数、退出码及交互详情见 [统一协议](../docs/ai-contract.md)。
 
-应用接口只包含 `app.json`、两个标准入口和 `versions/`。产品文件由 DDNSTO 业务发布流程提前部署到独立 `/binary/ddnsto/`；测试位于 `tests/apps/ddnsto/`，不会复制到服务器。
+应用接口只包含 `app.json`、三个标准入口 `install.sh`、`install.ps1`、`install.md` 和 `versions/`。产品文件由 DDNSTO 业务发布流程提前部署到独立 `/binary/ddnsto/`；测试位于 `tests/apps/ddnsto/`，不会复制到服务器。
 
-DDNSTO 是 [apps layout v2](../apps-layout-v2.md) 标杆，不提供兼容别名。标准入口只有 `install.sh` 和 `install.ps1`，不可变实现位于 `versions/0.3.0/`。网站短入口属于 `_sites/run.ddnsto.com/`；business、Python 工具、测试和 README 不进入应用发布目录。
+DDNSTO 是 [apps layout v2](../apps-layout-v2.md) 标杆，不提供兼容别名。`run.ddnsto.com` 直接映射三个标准入口，不建立 `_sites`；不可变实现位于 `versions/0.3.0/`。business、Python 工具、测试和 README 不进入应用发布目录。
 
 模块命令（从仓库根目录执行）：
 
@@ -64,12 +64,3 @@ installations are migration conflicts. OpenWrt keeps only its proven native
 package mappings and explicit root invocation. See ../docs/linux-install-storage.md
 for disk bounds, two-version cache, metadata/network behavior and recovery.
 This is an unpublished candidate, not a new production pointer.
-# 推荐入口依赖优化（2026-11-16，测试站）
-
-Shell 推荐入口默认联网获取推荐清单和不可变安装器，只使用本次运行的私有临时目录；不再读取或写入长期推荐缓存，旧 `DDNSTO_RECOMMEND_CACHE` 参数不再生效，旧缓存不会自动删除。zsetup 自身的受保护二进制缓存、客户端配置与诊断日志不受此项调整影响。
-
-入口不再要求独立 `stat` 或 `cmp`。Linux/OpenWrt 后续引导和配置保护使用同一元数据辅助函数：优先 stat，缺失时严格解析 `LC_ALL=C ls -dn` 的数字所有者、权限与链接数，仅接受无歧义路径和格式；符号链接、ACL 标记或无法确认的权限仍会拒绝。macOS、DSM 原有业务依赖不因此被取消。
-
-保留 SHA-256、字节数、清单严格解析、TLS 证书和下载边界检查；支持 BusyBox 的 wc、mktemp、sha256sum 功能，不创建系统命令链接、不自动安装依赖。缺少 mktemp 且 BusyBox 不提供时仍明确拒绝；未经验证的 BusyBox/uclient wget 仍不开放，使用 curl 或符合要求的 GNU Wget。不修改 zsetup 核心。
-
-本轮只发布测试站；本地隔离测试不代表真机安装验收，设备测试由用户完成。发布记录见 [无 stat 入口验证](../docs/verification/2026-11-16-ddnsto-statless-entry.md)。

@@ -8,11 +8,10 @@ data live outside `apps/`.
 
 ## Per-application contract
 
-DDNSTO exception (2026-11-24): its registration file and maintained sources live
-in `sources/ddnsto/`, outside the public tree. `apps/ddnsto/` contains only
-generated runtime entries, manifests, immutable executors and agent guides.
-Other applications retain the layout below. Detached release validation and
-deployment require only `apps/`, not the external source directory.
+DDNSTO has migrated to layout v2 and is not an exception to this historical
+contract. Remaining schema-v1 applications retain the layout below. Detached
+release validation and deployment require only `apps/`, not external source
+directories.
 
 Each application owns one directory:
 

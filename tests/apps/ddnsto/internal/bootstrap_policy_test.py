@@ -18,7 +18,6 @@ class SharedBootstrapContract(unittest.TestCase):
         paths = [
             SOURCE / "templates/install-macos.sh.in",
             SOURCE / "templates/install.ps1.in",
-            SOURCE / "recommendation-native.sh",
             APP / "versions/0.3.0/install.sh",
         ]
         pattern = re.compile(r"zsetup(?:/|\s+)(?:0\.3\.0|0\.4\.0|0\.5\.0)")

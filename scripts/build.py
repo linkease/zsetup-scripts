@@ -12,7 +12,6 @@ import sys
 import tempfile
 
 import build_ddnsto_installer
-import build_ddnsto_site
 
 
 APP_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
@@ -28,7 +27,7 @@ MANIFEST_KEYS_V2 = {
 }
 V2_ENTRYPOINTS = {"posix": "install.sh", "windows": "install.ps1"}
 TARGET_KEYS = {"os", "package_manager", "arch"}
-RESERVED_DIRECTORIES = {"zsetup", "_shared", "_sites"}
+RESERVED_DIRECTORIES = {"zsetup", "_shared"}
 LEGACY_V1_APPLICATIONS = {
     "fastnet", "fastpve", "jq", "kai-skills", "ks-cli",
     "kspeeder", "linkease", "linkspace", "scoop",
@@ -85,7 +84,7 @@ class Application:
 
 
 def validate_v2_layout(application: Application):
-    expected_root = {"app.json", "versions"}
+    expected_root = {"app.json", "install.md", "versions"}
     expected_root.update(f"install.{extension}" for extension in application.extensions)
     actual_root = {path.name for path in application.directory.iterdir()}
     require(actual_root == expected_root,
@@ -403,7 +402,6 @@ def main():
             has_windows = any(os_name == "windows" for app in applications for os_name, _, _ in app.expanded_targets)
             if has_windows or (args.apps / "zsetup/base-windows.json").exists():
                 generate_config(args.apps, applications, check=args.check, windows=True)
-            build_ddnsto_site.generate(root, args.apps, check=args.check, install_file=install_file)
             generate_checksums(args.apps, check=args.check)
         else:
             for application in applications:

@@ -32,6 +32,7 @@ def write_tree(root: Path, data):
     version = app / "versions/1.2.3"
     version.mkdir(parents=True)
     (app / "app.json").write_text(json.dumps(data) + "\n")
+    (app / "install.md").write_text("# Demo installation\n")
     for name in ("install.sh", "install.ps1"):
         (app / name).write_text("entry\n")
         (version / name).write_text("payload\n")
@@ -69,6 +70,12 @@ with tempfile.TemporaryDirectory(prefix="apps-v2-") as name:
     write_tree(cluttered, manifest())
     (cluttered / "demo/i").write_text("short name\n")
     result = run(cluttered)
+    assert result.returncode != 0 and "root must contain only" in result.stderr
+
+    undocumented = base / "undocumented"
+    write_tree(undocumented, manifest())
+    (undocumented / "demo/install.md").unlink()
+    result = run(undocumented)
     assert result.returncode != 0 and "root must contain only" in result.stderr
 
     missing = base / "missing"

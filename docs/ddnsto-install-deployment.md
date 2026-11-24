@@ -15,44 +15,44 @@ OpenWrt 配置归属兼容修复、独立工作目录重装及普通入口重复
 
 ## 唯一职责
 
-`zsetup-scripts` 维护、测试并生成入口、推荐清单、不可变执行器和 AI 指南到
+`zsetup-scripts` 维护、测试标准入口、不可变版本安装器和安装指南到
 `apps/ddnsto/`，作为 Git 跟踪的最终产物，随现有完整 `apps/` 发布。
 控制台固定引用 `https://run.ddnsto.com`，不随网页 Host 变化。
 `ddns-server` 与 `ddnsto-static` 不发布或渲染安装资源。
 原有客户端包及 zsetup 核心下载来源保持不变。
 
-部署使用运维现有上传/托管流程，不新增部署系统。运维可对安装域名设置 HTTP 301/302；每个目标必须为 HTTPS，最多五次跳转，保留有效证书验证。路由需覆盖下列全部路径，不能只跳转 `/install.sh`。脚本正文按摘要校验，不对正文做 URL 替换。
+部署使用运维现有上传/托管流程，不新增部署系统。优先使用服务器内部映射，让三个
+`run.ddnsto.com` 地址直接读取 apps 中的同名文件；若使用 HTTP 跳转，目标必须为 HTTPS，
+最多五次跳转并保留有效证书验证。不能对脚本或指南正文做 URL 替换。
 
 ```text
 apps/ddnsto/                  # run.ddnsto.com 的路径映射根
-├── install.sh                         # recommended-entry.sh 的同字节副本
-├── install.ps1                     # recommended-entry.ps1 的同字节副本（UTF-8 BOM）
-└── ddnsto-install
-    ├── current
-    │   ├── recommended-entry.sh / recommended-entry.ps1
-    │   ├── recommended-shell.txt / recommended-powershell.txt
-    │   └── immutable/<SHA256>/install.sh 或 install.ps1
-    └── agent/install.md       # 同时保留 versions/<SHA256>/install.md
+├── app.json
+├── install.sh                # POSIX 标准入口
+├── install.ps1               # Windows 标准入口（UTF-8 BOM）
+├── install.md                # AI Agent/人工安装指南
+└── versions/0.3.0/
+    ├── install.sh            # 不可变 POSIX 实现
+    └── install.ps1           # 不可变 Windows 实现
 ```
 
 ## 运维映射（必须整体配置）
 
 | 用户地址 | 下载站地址 |
 |---|---|
-| `https://run.ddnsto.com/install.sh` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/_sites/run.ddnsto.com/install.sh` |
-| `https://run.ddnsto.com/install.ps1` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/_sites/run.ddnsto.com/install.ps1` |
-| `https://run.ddnsto.com/ddnsto-install/<路径>` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/_sites/run.ddnsto.com/<路径>` |
+| `https://run.ddnsto.com/install.sh` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.sh` |
+| `https://run.ddnsto.com/install.ps1` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.ps1` |
+| `https://run.ddnsto.com/install.md` | `https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/install.md` |
 
-后缀路径逐项保留；未知路径返回 404。根 `/` 可选映射到 `install.sh`，控制台不依赖根路径。
-不能将所有请求重定向到旧 `install_ddnsto_linux.sh`。应用标准入口位于
-`apps/ddnsto/install.sh` 和 `install.ps1`；网站推荐协议位于
-`apps/_sites/run.ddnsto.com/`。Windows 已作为 DDNSTO v0.3.0 的标准索引目标。
+三个路径逐项映射；未知路径返回 404。根 `/` 可选映射到 `install.md`，控制台不依赖根路径。
+不能将所有请求重定向到旧 `install_ddnsto_linux.sh`。Windows 已作为 DDNSTO v0.3.0 的标准索引目标。
 维护源码、模板和推荐配置位于 `sources/ddnsto/`，唯一注册清单位于
 `apps/ddnsto/app.json`；说明和审核记录在 `docs/`，不部署。
-发布树不生成 `i`、`i.ps1` 或 `ddnsto-install.sh` 兼容入口。这些路由需要单独上线；
+发布树不生成 `_sites`、`current`、`agent/versions`、`i`、`i.ps1` 或
+`ddnsto-install.sh` 兼容入口。这三个路由需要单独上线；
 本地生成、测试通过不代表线上已经切换。
 
-短入口、推荐清单和指南应 `Cache-Control: no-store`，执行器的摘要路径可 immutable。资源缺失应返回真实 404，不回退 HTML。仅文本内容，不需要网关动态渲染。脚本代码更新不要求重新构建控制台；修改客户端推荐仍遵守 `platform-releases.json` 的唯一维护源约束。
+三个标准入口应 `Cache-Control: no-store`，`versions/` 路径可 immutable。资源缺失应返回真实 404，不回退 HTML。仅文本内容，不需要网关动态渲染。脚本代码更新不要求重新构建控制台；修改客户端推荐仍遵守 `platform-releases.json` 的唯一维护源约束。
 
 重定向支持使用 curl 或 Windows PowerShell 的逐跳验证。GNU Wget 的 `--https-only` 不保证重定向禁止降级，所以 wget 备用入口仍拒绝跳转；遇到 301/302 会要求安装 curl 后重试。这是明确的兼容限制，不关闭 TLS 校验来绕过。
 
@@ -60,8 +60,8 @@ apps/ddnsto/                  # run.ddnsto.com 的路径映射根
 
 | 场景 | 脚本来源 | 客户端业务环境 |
 | --- | --- | --- |
-| production 控制台 | 固定安装域名的已发布推荐 | 正式（省略环境参数） |
-| development / staging 控制台 | 同一个已发布推荐，不等于本地候选 | `--env test` / `-Environment test` |
+| production 控制台 | 固定安装域名的标准入口 | 正式（省略环境参数） |
+| development / staging 控制台 | 同一个已发布标准入口，不等于本地候选 | `--env test` / `-Environment test` |
 | 本地脚本开发 | 工作区候选及隔离 fixture | 测试参数只决定业务连接；不更换脚本 |
 | 后续候选脚本测试发布 | 开发者可更新的测试服务器（待实现） | 独立指定测试业务环境 |
 
@@ -94,33 +94,28 @@ python3 -B scripts/build-ddnsto-products.py
 python3 -B scripts/build-ddnsto-products.py --check
 python3 -B scripts/build.py
 python3 -B scripts/build.py --check
-python3 -B tests/ddnsto_apps_site_test.py
-python3 -B tests/ddnsto_site_package_test.py
+python3 -B tests/ddnsto_apps_standard_test.py
+python3 -B tests/apps/ddnsto/internal/agent_guide_test.py
 python3 -B scripts/check-public-tree.py apps
 (cd apps && sha256sum -c SHA256SUMS)
 ```
 
-构建复用站点/推荐打包器，将完整结果写入 `apps/ddnsto/`，并更新全局
-`apps/SHA256SUMS`；`--check` 检查入口、清单、正文、指南及摘要是否漂移。
-历史摘要文件保留，不用旧 dist 覆盖新源码，不手工编辑生成文件。
-隔离打包器生成的 review.json 只记录一致性，`published=false`，不代替人工审核和真机验收；
-审核记录归档到 `docs/verification/`，完整 apps 构建不复制它。
-本次 apps 推荐入口采用原打包器默认 shell-first；native-first 仍是独立审核选项，
-不在本次更改中激活。标准 apps install.sh 自举行为不变。
-旧 `package-ddnsto-site.py` 仍可生成隔离候选用于测试，但其 dist 不再单独部署。
+构建生成标准脚本和配置并更新全局 `apps/SHA256SUMS`；`--check` 检查入口、
+版本实现、指南和摘要是否一致。`install.md` 直接维护，不由构建脚本合成；缺失时构建失败。
+审核记录归档到 `docs/verification/`，不会进入 apps 发布目录。
 
 ## 正式发布与迁移
 
-发布器不删除远端文件。如果下载站已有旧 `source/`、app.json、README.md 或 review.json，
-本次目录调整不会自动移除它们；需另行确认精确路径、备份并授权运维清理。不要使用广泛的 `--delete`。
+发布事务会按上一版 `SHA256SUMS` 精确识别、校验、快照并退休候选中已经不存在的受管文件；
+不会使用广泛的 `--delete`。不在旧清单中的非受管服务器文件仍需另行核对和清理授权。
 
 1. 审核源码及生成结果，获得授权后提交并推送 main，记录最终提交及回滚点；本轮不自动提交。
 2. 按 [现有 apps 发布流程](apps-release.md) 执行 `scripts/publish-apps.py prepare` 和 `plan`。
    prepare 要求 apps 已提交且干净；不要为本地未提交候选绕过门禁。发布物仍为完整 apps，
    固定同步到 `/binary/zsetup-scripts/apps/`，不把 apps/ddnsto 直接覆盖 `/binary/ddnsto/`。
-3. 获得精确 release ID 的上线授权后，使用现有协调器发布。版本文件、摘要执行器和历史指南
-   先暂存并经 HTTPS 回读，再激活可变清单及入口；不另建独立站点上传流程。
-4. 运维修正上表域名映射，逐项核对短/长入口字节、清单引用、Windows BOM、AI 文档和
+3. 获得精确 release ID 的上线授权后，使用现有协调器发布。版本文件先暂存并经 HTTPS
+   回读，再激活三个标准入口及配置；不另建独立站点上传流程。
+4. 运维修正上表域名映射，逐项核对三个入口字节、配置引用、Windows BOM、AI 文档和
    HTTPS 跳转；不能只检查 HTTP 200。链路通过后，按既有流程发布测试控制台，验收后发布正式控制台。
 5. 现有服务器旧文件的清理是单独运维动作；本地删除旧副本不授权远端删除。保留全量同步的 legacy 排除保护，避免 `--delete` 清除历史资源。
 6. 复制实际控制台命令完成获授权的目标设备验收；测试环境必须确认重启后业务环境仍正确。尚未做真实验收不得宣称上线就绪。

@@ -7,7 +7,8 @@
   the SOP does not authorize commits, device mutations or deployments.
 
 - DDNSTO is the apps-layout-v2 reference implementation. Read `docs/apps-layout-v2.md` and
-  preserve its minimal `app.json`, `install.sh`, `install.ps1`, `versions/VERSION/install.*`
+  preserve its minimal `app.json`, `install.sh`, `install.ps1`, `install.md`,
+  `versions/VERSION/install.*`
   interface. Do not restore compatibility aliases or root-level version directories.
 - Native DDNSTO product versions/digests are maintained only in `sources/ddnsto/platform-releases.json`.
 - If `sources/ddnsto/templates/NAME.in` exists, edit that template for behavior, not the generated
@@ -19,16 +20,14 @@
 - Preserve version-specific compatibility gates; a new recommended version is not proof of a new health protocol.
   See `docs/ddnsto-platform-releases.md` for publication and GUI/Docker boundaries.
 - When changing console installation distribution, read `docs/ddnsto-install-deployment.md`.
-  `scripts/build.py` generates the standard application entries under `apps/ddnsto/` and the
-  recommendation site under `apps/_sites/run.ddnsto.com/`; commit these outputs with
-  `apps/SHA256SUMS`. The site tree maps to `run.ddnsto.com` and uses the existing complete apps publisher.
-  Keep digest-addressed installer/guide history. Build hashes are consistency
-  checks, not release approval. DDNSTO standard entries use recommendation wrappers;
-  `ddnsto-install.sh` retains the native bootstrap. Native indices remain versioned.
+  `scripts/build.py` generates the standard application entries under `apps/ddnsto/`; maintain
+  `apps/ddnsto/install.md` beside them and commit the complete interface with `apps/SHA256SUMS`.
+  Operations maps `run.ddnsto.com/install.sh`, `/install.ps1` and `/install.md` directly to
+  these three files. Build hashes are consistency checks, not release approval.
 
 - DDNSTO sources, templates and release configuration belong only to `sources/ddnsto/`;
   its sole registration manifest is `apps/ddnsto/app.json`. Generate runtime-only application
-  and website trees with build.py; never put source, README or review.json in `apps/ddnsto/`.
+  entries with build.py; never put source, README or review.json in `apps/ddnsto/`.
   Review evidence belongs in docs/verification/. Other business installation belongs to its owning `apps/APP/` tree (normally `business.sh`, or `source/`
   for complex apps); zsetup owns download/context/run/install and its existing configuration schema.
   Do not copy runtime-zig or invent a second downloader.
@@ -43,7 +42,8 @@
 - Do not rewrite a running shell script in place. Generated entries and package pointers must be installed atomically.
 - Product binaries/packages and their version/SHA256 metadata are published ahead of installation by the business server release process. Do not collect, cache or bundle them in this repository's release. Package only installer scripts, canonical zsetup release and the unified configuration. Preserve immutable paths and matching config/size/SHA256; server metadata and device canary remain deployment checks. Local package success is not server availability or publication evidence.
 
-- `apps/APP/` is the aggregate publication owner; DDNSTO maintenance sources live outside it as above. Tests and fixtures live under
+- `apps/APP/` is the aggregate publication owner; its standard `install.md` is public application
+  guidance, not a test or maintenance source. DDNSTO implementation sources live outside it as above. Tests and fixtures live under
   `tests/apps/` and must never be copied into `apps/`. The complete apps release publishes the full
   `apps/` tree under `/binary/zsetup-scripts/apps/`; independent product namespaces remain separate.
 

@@ -10,7 +10,7 @@ import sys
 
 
 SAFE_APP = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
-RESERVED_DIRECTORIES = {"zsetup", "_shared", "_sites"}
+RESERVED_DIRECTORIES = {"zsetup", "_shared"}
 ROOT_FILES = {"README.md", "SHA256SUMS"}
 FORBIDDEN_DIRECTORIES = {"test", "tests", "fixture", "fixtures", "__pycache__", ".git"}
 FORBIDDEN_NAMES = {

@@ -66,9 +66,8 @@ with tempfile.TemporaryDirectory(prefix="apps-coordinator-") as folder:
     immutable = [relative for _, relative in manifest if publish_apps.is_immutable(relative)]
     assert immutable and all("/" in relative for relative in immutable)
     assert not publish_apps.is_immutable("ddnsto/install.sh")
+    assert not publish_apps.is_immutable("ddnsto/install.md")
     assert publish_apps.is_immutable("ddnsto/versions/0.3.0/install.sh")
-    assert publish_apps.is_immutable(
-        "_sites/run.ddnsto.com/current/immutable/" + "a" * 64 + "/install.sh")
 
     # Public verification covers every configured mirror and checks exact bytes.
     fetched = []
