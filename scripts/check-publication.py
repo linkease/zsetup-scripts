@@ -86,7 +86,7 @@ def audit(base, fetch=None, mode='indexed', verify_products=False, fetch_product
 
     if mode == 'indexed':
         check('zsetup/config.json', verify_config)
-    windows_path = ROOT / 'apps/ddnsto/source/install.ps1'
+    windows_path = ROOT / 'sources/ddnsto/install.ps1'
     windows = windows_path.read_bytes() if windows_path.is_file() else b''
     def verify_windows(data):
         if data != windows:

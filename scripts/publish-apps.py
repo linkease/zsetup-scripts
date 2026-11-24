@@ -108,7 +108,9 @@ def validate_candidate(root: Path, *, require_clean: bool = True) -> tuple[str, 
 def release_metadata(root: Path, identity: str, records: list[tuple[str, str]]) -> dict:
     linux = json.loads((root / "apps/zsetup/config.json").read_text(encoding="utf-8"))
     windows = json.loads((root / "apps/zsetup/config-windows.json").read_text(encoding="utf-8"))
-    applications = sorted(path.parent.name for path in (root / "apps").glob("*/app.json"))
+    applications = sorted(path.name for path in (root / 'apps').iterdir()
+                          if path.is_dir() and ((path / 'app.json').is_file()
+                          or (root / 'sources' / path.name / 'app.json').is_file()))
     return {
         "schema_version": 1,
         "release_id": identity,
@@ -290,6 +292,9 @@ def public_bases(apps: Path) -> list[str]:
 
 def is_immutable(relative: str) -> bool:
     parts = PurePosixPath(relative).parts
+    if len(parts) == 6 and parts[0] == 'ddnsto' and parts[1] == 'ddnsto-install':
+        if parts[2:4] in [('current', 'immutable'), ('agent', 'versions')]:
+            return re.fullmatch(r'[0-9a-f]{64}', parts[4]) is not None
     return len(parts) >= 3 and VERSION.fullmatch(parts[1]) is not None
 
 

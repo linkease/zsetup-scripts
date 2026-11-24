@@ -36,6 +36,7 @@ ddnsto_entry_install() {
     fi
     if [ "$PLAN_ONLY" = 1 ]; then ddnsto_plan; return $?; fi
     if [ "$detected_platform" = synology ]; then
+        if [ "$ACTION" = status ]; then ddnsto_synology_status; return $?; fi
         ddnsto_synology_entry
         return $?
     fi

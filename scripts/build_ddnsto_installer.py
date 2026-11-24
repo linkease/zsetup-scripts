@@ -15,7 +15,7 @@ def shared(root: Path, name: str) -> str:
 
 
 def compose(root: Path, app: Path) -> str:
-    source = app / "source"
+    source = root / 'sources/ddnsto'
     foundation = "".join(
         shared(root, name)
         for name in ("install-storage.sh", "install-bounds.sh", "install-transaction.sh")
@@ -47,6 +47,7 @@ def compose(root: Path, app: Path) -> str:
             "asus-package.sh", "asus-service.sh", "asus-transaction.sh", "auto-asus.sh",
         )
     )
+    # Preserve the historical header bytes of the published 0.2.4 payload.
     content = common + "\n# Business logic: maintained in apps/ddnsto/source/business.sh\n" + business
 
     program = "set -eu\nstatus() { printf '%s\\n' \"$*\" >&2; }\n"
@@ -88,9 +89,9 @@ bootstrap_and_run() {
 def generate(root: Path = ROOT, apps: Path | None = None, check: bool = False) -> None:
     apps = apps or root / "apps"
     app = apps / "ddnsto"
-    if not (app / "source").is_dir():
+    if not app.is_dir() or not (apps.parent / 'sources/ddnsto').is_dir():
         return
-    manifest = json.loads((app / "app.json").read_text())
+    manifest = json.loads((apps.parent / 'sources/ddnsto/app.json').read_text())
     output = app / manifest["version"] / "installer.sh"
     content = compose(root, app)
     if check:

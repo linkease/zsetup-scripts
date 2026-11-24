@@ -68,6 +68,12 @@ atomic_copy() {
 
 is_immutable() {
     old_ifs=$IFS; IFS=/; set -- $1; IFS=$old_ifs
+    if [ "$#" = 6 ] && [ "$1/$2" = ddnsto/ddnsto-install ]; then
+        case "$3/$4" in current/immutable|agent/versions)
+            case "$5" in ''|*[!0-9a-f]*) return 1 ;; esac
+            [ "${#5}" = 64 ]; return $? ;;
+        esac
+    fi
     [ "$#" -ge 3 ] || return 1
     case "$2" in [0-9]*.[0-9]*.[0-9]*) return 0 ;; *) return 1 ;; esac
 }
@@ -207,4 +213,3 @@ done
 printf '%s\n' activated > "$snapshot/phase"
 switching=0
 printf 'Activated apps release %s; rollback snapshot %s\n' "$release_id" "$snapshot"
-

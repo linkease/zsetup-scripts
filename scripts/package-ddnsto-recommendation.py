@@ -67,7 +67,9 @@ def source_url(value):
 def package(args):
     base = source_url(args.source_url)
     repository_source = args.source_root.resolve() == ROOT
-    source_directory = (args.source_root / 'apps/ddnsto/source'
+    version = (json.loads((ROOT / 'sources/ddnsto/app.json').read_text())['version']
+               if repository_source else args.candidate_version)
+    source_directory = (args.source_root / 'sources/ddnsto'
                         if repository_source else args.source_root / 'ddnsto')
     # Full product trees must be compiled before review/packaging. Minimal
     # inert installer fixtures remain useful for testing the transport wrapper.
@@ -76,7 +78,7 @@ def package(args):
         products = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(products)
         products.generate(args.source_root, check=True)
-        combined = ((args.source_root / 'apps/ddnsto/0.2.4/installer.sh')
+        combined = ((args.source_root / 'apps/ddnsto' / version / 'installer.sh')
                     if repository_source else source_directory / 'ddnsto-install.sh').read_text()
         for name in products.OUTPUTS:
             if name.endswith('.sh') and (source_directory / name).read_text().rstrip() not in combined:
@@ -90,7 +92,7 @@ def package(args):
         ('shell', 'ddnsto-install.sh', args.reviewed_shell_sha256, 'sh'),
         ('powershell', 'install.ps1', args.reviewed_powershell_sha256, 'ps1'),
     ]:
-        path = ((args.source_root / 'apps/ddnsto/0.2.4/installer.sh')
+        path = ((args.source_root / 'apps/ddnsto' / version / 'installer.sh')
                 if repository_source and extension == 'sh'
                 else source_directory / name)
         if path.is_symlink() or not path.is_file() or not 0 < path.stat().st_size <= MAX_SCRIPT:
@@ -110,20 +112,22 @@ def package(args):
         payloads[relative] = data
         payloads[f'recommended-{platform}.txt'] = (
             f'ddnsto-recommendation-v1-{platform}\n{actual}\n{len(data)}\n').encode('ascii')
-        template = (ROOT / 'apps/ddnsto/source' / f'recommended-entry.{extension}').read_text()
+        template = (ROOT / 'sources/ddnsto' / f'recommended-entry.{extension}').read_text()
         if extension == 'sh':
-            template = template.replace('@@ASUS_STORAGE@@', (ROOT / 'apps/ddnsto/source/asus-storage.sh').read_text())
-            template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'apps/ddnsto/source/portable-files.sh').read_text())
+            template = template.replace('@@ASUS_STORAGE@@', (ROOT / 'sources/ddnsto/asus-storage.sh').read_text())
+            template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'sources/ddnsto/portable-files.sh').read_text())
             native = ''
             if args.native_first:
                 native += (ROOT / 'lib/bootstrap.sh').read_text().rstrip() + '\n'
-                native += (ROOT / 'apps/ddnsto/source/recommendation-native.sh').read_text()
+                native += (ROOT / 'sources/ddnsto/recommendation-native.sh').read_text()
                 native += '\nddnsto_recommend_native_prepare\n'
             template = template.replace('# @@NATIVE_FIRST@@', native)
         payloads[f'recommended-entry.{extension}'] = template.replace(
             '@@SOURCE_URL@@', base).replace('@@CACHE_KEY@@', digest(base.encode())).encode(
                 'utf-8-sig' if extension == 'ps1' else 'utf-8')
-    review = dict(schema=1, candidate_version=args.candidate_version,
+        if b'@@' in payloads[f'recommended-entry.{extension}']:
+            raise ValueError('unresolved recommendation template marker: ' + extension)
+    review = dict(schema=1, candidate_version=version,
                   shell_bootstrap='native-first-candidate' if args.native_first else 'shell-first',
                   native_first_activation=('blocked: device-chain and HTTPS-redirect-policy review required'
                                            if args.native_first else 'not-selected'),
@@ -156,7 +160,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--reviewed-shell-sha256', required=True)
     parser.add_argument('--reviewed-powershell-sha256', required=True)
-    parser.add_argument('--candidate-version', default='0.2.4', choices=['0.2.4'])
+    parser.add_argument('--candidate-version', default='0.2.5', choices=['0.2.4', '0.2.5'])
     parser.add_argument('--native-first', action='store_true',
                         help='build isolated Linux x86_64/aarch64 native-first candidate; not release approval')
     args = parser.parse_args()

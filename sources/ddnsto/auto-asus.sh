@@ -44,8 +44,21 @@ ddnsto_asus_transport() (
 
 ddnsto_asus_native() {
     umask 077
+    # Legacy ASUS ash lacks command. Shared metadata/hash discovery uses only
+    # command -v; keep this bounded compatibility helper in the ASUS worker.
+    if ! type command >/dev/null 2>&1; then
+        command() { [ "$1" = -v ] && [ "$#" = 2 ] && type "$2"; }
+    fi
     case "$ASUS_ARCH" in aarch64) ZSETUP_ARCH=aarch64 ;; armv7l) ZSETUP_ARCH=armv7 ;; *) return 2 ;; esac
-    fetch_bootstrap_metadata || return $?
+    bootstrap_arch || return $?
+    native_metadata=$(ddnsto_asus_mktemp "$ASUS_STATE") || return 12
+    native_metadata_rc=0
+    fetch_bootstrap_metadata https "$native_metadata/stable" "$native_metadata/SHA256SUMS" || native_metadata_rc=$?
+    rm -f "$native_metadata/stable" "$native_metadata/SHA256SUMS"
+    rmdir "$native_metadata" || return 12
+    [ "$native_metadata_rc" = 0 ] || return "$native_metadata_rc"
+    case "$EXPECTED_SHA256" in ''|*[!0-9a-f]*) return 11 ;; esac
+    [ "${#EXPECTED_SHA256}" = 64 ] || return 11
     native_cache=$ASUS_STATE/native-$RESCUE_VERSION-$ZSETUP_ARCH
     ddnsto_asus_private_dir "$native_cache" || return 12
     ASUS_ZSETUP=$native_cache/zsetup

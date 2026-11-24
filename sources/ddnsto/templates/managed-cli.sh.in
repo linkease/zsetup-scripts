@@ -137,8 +137,8 @@ ddnsto_business_environment_preflight() {
         openwrt) ddnsto_business_service_file "${DDNSTO_SERVICE_PATH:-/etc/init.d/ddnsto}" || return $? ;;
         synology) ddnsto_business_service_file /var/packages/ddnsto/scripts/start-stop-status || return $? ;;
         asus)
-            ddnsto_business_service_file /koolshare/scripts/ddnsto_config.sh || return $?
-            ddnsto_business_service_file /koolshare/init.d/S70ddnsto.sh || return $? ;;
+            ddnsto_business_asus_service_file /koolshare/scripts/ddnsto_config.sh || return $?
+            ddnsto_business_asus_service_file /koolshare/init.d/S70ddnsto.sh || return $? ;;
     esac
     [ "${BUSINESS_ENV:-production}" = test ] || return 0
     if [ "${REQUESTED_METHOD:-native}" = docker ]; then
@@ -159,6 +159,31 @@ ddnsto_business_environment_preflight() {
     ddnsto_error "E_ENV_UNSUPPORTED：$env_reason；未修改设备，不会回退到正式环境"
     return 2
 }
+
+ddnsto_business_asus_service_file() (
+    [ -e "$1" ] || [ -L "$1" ] || exit 0
+    service_file=$1
+    if [ -L "$service_file" ]; then
+        service_link=$(readlink "$service_file") || exit 2
+        case "$service_file:$service_link" in
+            /koolshare/init.d/S70ddnsto.sh:/koolshare/scripts/ddnsto_config.sh)
+                [ -f /koolshare/scripts/ddnsto_config.sh ] || { ddnsto_business_match unknown; exit 2; }
+                ddnsto_business_asus_service_file /koolshare/scripts/ddnsto_config.sh
+                exit $? ;;
+            /koolshare/scripts/ddnsto_config.sh:/jffs/.ddnsto-installer/current/ddnsto_config.sh|/koolshare/init.d/S70ddnsto.sh:/jffs/.ddnsto-installer/current/S70ddnsto.sh)
+                service_file=$(readlink -f "$service_file") || exit 2
+                ddnsto_asus_safe_file "$service_file" || { ddnsto_business_match unknown; exit 2; } ;;
+            *) ddnsto_business_match unknown; exit 2 ;;
+        esac
+    fi
+    # Only read vendor scripts; never source or execute them. Firmware's
+    # writable software-center directories remain an inherited trust boundary.
+    service_fields=$(_ddnsto_asus_metadata "$service_file") || { ddnsto_business_match unknown; exit 2; }
+    set -- $service_fields
+    [ "$1" = 0 ] && [ "$4" = - ] || { ddnsto_business_match unknown; exit 2; }
+    case "$2" in [4567][0145][0145]) ;; *) ddnsto_business_match unknown; exit 2 ;; esac
+    ddnsto_business_service_file "$service_file"
+)
 
 ddnsto_business_service_file() {
     [ -e "$1" ] || return 0

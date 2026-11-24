@@ -3,15 +3,16 @@
 DDNSTO 推荐版本更新、验收、发布和回滚统一遵循 [发布 SOP](docs/ddnsto-release-sop.md)，
 每次使用其链接的发布记录模板留存证据。
 
-2026-11-20 本地迁移方案：[独立安装域名与业务环境](docs/ddnsto-install-deployment.md)。
-DDNSTO 安装站点由本仓库单独打包；控制台固定引用 install.ddnsto.com，
-测试参数只切换客户端业务环境，不切换脚本推荐渠道。域名尚未部署。
+2026-11-24 本地候选：[安装域名与 apps 发布](docs/ddnsto-install-deployment.md)。
+DDNSTO 完整安装资源由统一构建生成到 `apps/ddnsto/`，随完整 `apps/` 发布；
+控制台固定引用 `run.ddnsto.com/i` 和 `/i.ps1`。测试参数只切换客户端业务环境，
+不切换脚本推荐渠道。本次候选尚未发布，域名映射需运维切换并验证。
 
 DDNSTO 原生一键安装的推荐版本和产品摘要现统一维护在
-[`apps/ddnsto/source/platform-releases.json`](apps/ddnsto/source/platform-releases.json)，支持各平台独立版本。
+[`sources/ddnsto/platform-releases.json`](sources/ddnsto/platform-releases.json)，支持各平台独立版本。
 修改后执行 `python3 -B scripts/build-ddnsto-products.py` 和 `python3 -B scripts/build.py`，
 再审核发布；设备端不增加配置解析依赖。带有对应
-`apps/ddnsto/source/templates/*.in` 的文件为生成副本，维护规则见
+`sources/ddnsto/templates/*.in` 的文件为生成副本，维护规则见
 [分平台推荐配置](docs/ddnsto-platform-releases.md)。以下旧版平台表中的固定版本不是当前推荐配置。
 
 FastNet、DDNSTO、LinkEase、FastPVE、Linkspace 及 KSpeeder 项目的统一业务安装仓库。业务脚本负责包管理、服务和业务参数；可靠下载、系统探测、后台执行与安装选择复用 [zsetup](../../linkease-vpn/linkease-tunnel/zsetup-rust/README.md)。应用分别声明 zsetup 能力最低版本；安装入口读取平台最新 stable，较新的兼容核心不会被旧配置降级。规则和提升门禁见 [zsetup 兼容策略](docs/zsetup-compatibility.md)。
@@ -69,7 +70,8 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 
 默认前台执行，并传播业务退出码。自动化不要把“后台启动成功”当成“安装完成”；后台用 `zsetup install ddnsto --background -- --token TOKEN`，读取命令输出中的日志/result 路径。后台 stdin 已关闭，必须提供 token。细节见 [AI 调用约定](docs/ai-contract.md)。
 
-`apps/` 是唯一业务源码树，也是整体发布时原样复制到服务器的目录。每个应用由
+`apps/` 是整体发布时原样复制到服务器的目录。DDNSTO 仅在其中保留部署产物，
+维护源码、模板、推荐配置和应用清单位于 `sources/ddnsto/`；其他应用仍由
 `apps/<id>/app.json` 声明身份和当前版本，`apps/<id>/<version>/installer.*` 是配置索引引用的
 版本化安装器；复杂应用的可维护源码放在 `apps/<id>/source/`。所有测试和测试夹具位于
 `tests/`，不会随 `apps/` 发布。公共 `lib/`、`scripts/`、`tests/`、`docs/` 只保留共享能力、
@@ -77,7 +79,8 @@ FastNet、Linkspace、ks-cli、KSpeeder 等既有独立入口属于兼容/冗余
 
 ```text
 zsetup-scripts/
-  apps/             # 唯一业务源码和完整发布树
+  sources/ddnsto/   # DDNSTO 维护源码、模板、推荐配置及 app.json，不部署
+  apps/             # 完整发布树；ddnsto 子目录仅含运行产物
     APP/app.json    # 应用身份、当前版本、平台和兼容别名
     APP/VERSION/    # 配置索引引用的不可变 installer.sh / installer.ps1
     APP/source/     # 可选的复杂应用维护源码；不含测试
@@ -91,7 +94,7 @@ zsetup-scripts/
 ```
 
 共享 bootstrap 只用于生成 `apps/APP/install.*` 及兼容别名；真正被索引和校验的是版本化
-`apps/APP/VERSION/installer.*`。业务逻辑只在所属 `apps/APP/` 内维护，运行中的入口不会下载自身。
+`apps/APP/VERSION/installer.*`。DDNSTO 业务逻辑在 `sources/ddnsto/` 维护，其他应用仍在所属 `apps/APP/` 内维护，运行中的入口不会下载自身。
 旧脚本集中归档到 [legacy/](legacy/README.md)，根目录不再保留业务目录或旧别名。日常调用使用
 `apps/APP/APP-install.*` 或 `zsetup install APP`。
 

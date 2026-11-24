@@ -1,0 +1,64 @@
+{
+  "candidate_version": "0.2.4",
+  "installers": {
+    "powershell": {
+      "embedded_sha256": [
+        "5b09cf2be048e1592668b8b5fed922206849b35f9fe6469122b0460aeee64688",
+        "5ef383feb22857dd3cbfe8b60f49018218855c1b67e778d27e34ba702f64aa8d"
+      ],
+      "path": "immutable/04d98cf8f84bf54bc5d2b07c9b4d212ead933bba479f828eb8013999e00b19f7/install.ps1",
+      "sha256": "04d98cf8f84bf54bc5d2b07c9b4d212ead933bba479f828eb8013999e00b19f7",
+      "size": 67276,
+      "source": "ddnsto/install.ps1"
+    },
+    "shell": {
+      "embedded_sha256": [
+        "0afd87b8a17db1616b73e64625badd7eae714cf1bcdb963cc46038b8288a0553",
+        "2834dfe9fe683d6dfffed8b73a71a7d84867789fbd8537fe3e21f8ea7e4e8c6b",
+        "2842ea8b3b191528ccd8bf0f0600c99de540a56812531fe8b3fa4aacdde3fb87",
+        "3bf7ada14448b5aa04afa171e497f85d0b8bb4adcf2209991e52ef5826d4e975",
+        "3e331d2f59f891f33b2f3c00a8cecd429a266c5a52810966f78051aef267c1fb",
+        "4cb863a85d5c5dcd00ff8a3f5a09fa90465b59b48e48cdce12163be62b1f10ce",
+        "4d5c656af9560ba2a039f7305968ad086788204dcc678e8bc6bbbe345a481bf9",
+        "56c0298ec811e51cf93390bbfa2f9489752188320aaf96c43d2b19289ba7580d",
+        "5f291b4c28daefe4298f33d8dae9860945091bdb4af357d58b1c4553e41828cf",
+        "671c1c77d7b867f5019af35e8702be665695e30c107138ae150d045e11df1960",
+        "6740fea1fbc6f58de41d5024af0d4c6d523599947c50b70889c15646f0a482c0",
+        "67e3e784a38a05aa8d3c8693caa8fd20d8316ca950268b956f688df6a1f11d8f",
+        "702828cdfc1cf2e33dc1b2894ec69a49f1739dfd3ece8948da0d093c6348d123",
+        "7286134081b518e5e339b60be7f51bc270979cbd4708998121f61e1d08470ad9",
+        "8bb1e102160c8e52f670839051ca341f0a083720634da79c2142a1de6d13f446",
+        "8d08921e49bed7bcafed48dc6c6b6795467f77767a97cc8af23f0b463285248a",
+        "8e0ff71269b8ba8674427896310d99309d97eae92b007d97cb968eb1d880664d",
+        "8ef767b45b7546e2b4e979ac0fc426d663e34988c816e465a6c0b8b54a62d9b8",
+        "91cfe44983494d3efea407fe5bd4ee5c76e227e821cd5729684ef92f46d3043e",
+        "9f3409198a7794212931e044c095a3133489c1241320f2fb45acea0c08011f03",
+        "aaf16937cad6373849ad1d1f15d64b9a085a55d4f44778c2458997fb2af0b65d",
+        "acc8df1f81049cde0695357347aeeeecec1f99046e5e91fed1cfdde5cbedc3c6",
+        "b725dab7fd7387527c03015f37cfa1e5424e13d550cc0d2fba3a7067627cef96",
+        "b83750595c95db591be99eb06749a7a657597426d13e4b699bce4c0ad16c3e60",
+        "c9ab02d44f753eb1129570687ec1fd31246f654444fc77dc219a7dd91fb7417e",
+        "d2965019064df274cea7a04433aabeb767a4b49502f724d61aa26adf641eda63",
+        "dbb3b6d2176f1c223e82ca46e6be4fda50ff30f449c9302be3382eb6162d8e2d",
+        "ed4bd946f54840a61312e4121cc6887e874baea00506711c2ce3e69f4f8411ac",
+        "edd733e46d476b688da2dc046f6d87eee5365c72b1be34c82c6b9f5ef4b87a18",
+        "f400d53e82b4ad83da42e05b8561e3a92afbaca21f228fb994d2a5ed659474a7",
+        "f70d2afbb0da6b21ff8865a4f3d9869775360bfbec1fff03474e5478a702ad30",
+        "fa021afaf9424f032ff9e084e76c80fadd7fe74e844060e0d84ac6053db19216",
+        "fff0850c893a75eb597d9e60cada9350caf5bc22219628a8c212f79f82e90679"
+      ],
+      "path": "immutable/50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f/install.sh",
+      "sha256": "50d04954ccb5a5dd7d035730ff09ee6716ae1df31288e1487ea07aa66259e42f",
+      "size": 536653,
+      "source": "ddnsto/ddnsto-install.sh"
+    }
+  },
+  "lifecycle_acceptance": "not-verified; canonical-executor-owned",
+  "native_and_product_payloads_included": false,
+  "native_first_activation": "not-selected",
+  "product_pins": "embedded in the approved immutable installer bytes",
+  "published": false,
+  "schema": 1,
+  "shell_bootstrap": "shell-first",
+  "source_url": "https://run.ddnsto.com/ddnsto-install/current"
+}

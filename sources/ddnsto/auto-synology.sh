@@ -2,6 +2,37 @@
 # DSM package-managed default workflow. Never install a generic Linux service.
 ddnsto_synopkg() { /usr/syno/bin/synopkg "$@"; }
 
+# Local read-only status must not bootstrap a binary in DSM's noexec /tmp.
+ddnsto_synology_status() (
+    [ "$(id -u)" = 0 ] || {
+        ddnsto_flow_error E_PRIVILEGE '群晖状态检查需要管理员权限' '请 sudo -i 后执行 --action status'; exit 2;
+    }
+    syno_pkg=/var/packages/ddnsto
+    syno_config=$syno_pkg/var/ddnsto-config.json
+    if [ ! -e "$syno_pkg/INFO" ]; then
+        printf '%s\n' 'local_service=not_installed cloud_status=unverified'
+        exit 0
+    fi
+    command -v jq >/dev/null 2>&1 && ddnsto_synology_check_paths || {
+        ddnsto_flow_error E_OWNERSHIP '无法安全检查群晖套件文件' '请检查 jq、套件来源和文件权限'; exit 2;
+    }
+    syno_status=$(ddnsto_synopkg status ddnsto) || {
+        ddnsto_flow_error E_STATUS 'DSM 套件状态查询失败' '请检查套件中心和运行日志' || :; exit 13;
+    }
+    syno_state=$(printf '%s' "$syno_status" | jq -er '.status') || exit 13
+    case "$syno_state" in
+        running)
+            if ddnsto_synology_running; then
+                printf '%s\n' 'local_service=running cloud_status=unverified'
+            else
+                printf '%s\n' 'local_service=unverified cloud_status=unverified'
+                ddnsto_flow_error E_STATUS '套件报告运行但未确认本地进程稳定' '请检查套件日志和 PID 文件' || :; exit 13
+            fi ;;
+        stopped|stop) printf '%s\n' 'local_service=stopped cloud_status=unverified' ;;
+        *) ddnsto_flow_error E_STATUS 'DSM 返回未知套件状态' '请检查套件中心' || :; exit 13 ;;
+    esac
+)
+
 ddnsto_synology_storage() {
     # DSM /tmp is noexec; /var/tmp can be world-writable without sticky bit.
     # Do not change mounts or weaken the shared cache ownership rules.

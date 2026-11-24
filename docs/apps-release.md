@@ -15,6 +15,12 @@ existing `/binary/zsetup`, `/binary/ddnsto` or other product namespaces.
 
 ## Prepare and review
 
+DDNSTO is maintained in `sources/ddnsto/` (including app.json). Build it with
+`scripts/build.py` before preparation. Only its runtime outputs enter
+`apps/ddnsto/`; templates, README and review.json must stay outside the public
+tree. The coordinator still packages literal apps and discovers DDNSTO identity
+from its external manifest. Servers do not need sources or build tools.
+
 Preparation is local and read-only with respect to servers:
 
 ```sh
@@ -71,3 +77,15 @@ Connection aliases, credentials, physical server inventory and rollout
 authorization remain outside `apps/`. Product packages remain owned by their
 existing `/binary/APP/` release processes and must be present before the apps
 release is activated.
+
+## DDNSTO console resources
+
+The complete tree also contains generated `ddnsto/i`, `ddnsto/i.ps1`, and
+`ddnsto/ddnsto-install/` (recommendations, digest-addressed bodies and AI guide).
+Run `scripts/build.py` before reviewing and committing; `--check` rejects drift.
+These files are not a separate deployment or an upload from an old `dist/`.
+Both the coordinator and server transaction stage digest-addressed bodies and
+guide versions before activating mutable entries, and retain them on rollback.
+Ops maps `run.ddnsto.com` paths to this DDNSTO subtree, preserving the suffix;
+see [the complete mapping](ddnsto-install-deployment.md).
+Standard DDNSTO `install.sh` and native index selectors remain unchanged.

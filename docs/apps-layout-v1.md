@@ -7,6 +7,12 @@ data live outside `apps/`.
 
 ## Per-application contract
 
+DDNSTO exception (2026-11-24): its registration file and maintained sources live
+in `sources/ddnsto/`, outside the public tree. `apps/ddnsto/` contains only
+generated runtime entries, manifests, immutable executors and agent guides.
+Other applications retain the layout below. Detached release validation and
+deployment require only `apps/`, not the external source directory.
+
 Each application owns one directory:
 
 ```text
@@ -80,4 +86,3 @@ products, native zsetup releases or historical installers.
 Server resources and production rollout metadata do not belong in `apps/`.
 They are supplied to the publication command or owned by the production
 orchestration repository.
-

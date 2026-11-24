@@ -51,7 +51,27 @@ ddnsto_ow_owned() (
         ow_owner=$(opkg search "$1" 2>/dev/null) || return 1
         case "$ow_owner" in *'
 '*) return 1 ;; esac
-        case "$ow_owner" in 'ddnsto - '?*) return 0 ;; *) return 1 ;; esac
+        case "$ow_owner" in
+            'ddnsto - '?*) return 0 ;;
+            '') ;; # Retained conffiles may be absent from opkg's file list.
+            *) return 1 ;;
+        esac
+        [ "$1" = "${config:-/etc/config/ddnsto}" ] || return 1
+        ow_status=$(opkg status ddnsto 2>/dev/null) || return 1
+        printf '%s\n' "$ow_status" | LC_ALL=C awk -v target="$1" '
+            /^Package:/ { packages++; if ($0 != "Package: ddnsto") bad=1 }
+            /^Status:/ {
+                statuses++
+                if (NF!=4 || $4!="installed") bad=1
+            }
+            /^Conffiles:$/ { sections++; in_config=1; next }
+            /^[^ \t]/ { in_config=0 }
+            in_config && $1==target {
+                matches++
+                if (NF!=2 || $2 ~ /[^0-9a-f]/ || (length($2)!=32 && length($2)!=64)) bad=1
+            }
+            END { exit !(packages==1 && statuses==1 && sections==1 && matches==1 && !bad) }
+        '
     else
         ow_owner=$(apk -q info --who-owns "$1" 2>/dev/null) || return 1
         [ "$ow_owner" = ddnsto ]

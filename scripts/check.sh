@@ -55,6 +55,8 @@ python3 -B "$root/tests/apps/ordinary_migrations_test.py"
 python3 -B "$root/tests/apps/complex_migrations_test.py"
 python3 -B "$root/scripts/build-ddnsto-products.py" --check
 python3 -B "$root/tests/ddnsto_release_config_test.py"
+python3 -B "$root/tests/ddnsto_apps_site_test.py"
+python3 -B "$root/tests/ddnsto_site_package_test.py"
 python3 -B "$root/tests/ddnsto_shell_compat_test.py"
 python3 -B "$root/tests/publication_test.py"
 python3 -B "$root/tests/ddnsto_offline_native_test.py"
@@ -81,7 +83,7 @@ python3 -B "$root/tests/apps/jq/jq_install_test.py" "$native_bin"
 sh -n "$root/apps/jq/source/business.sh"
 sh -n "$root/apps/jq/0.1.0/installer.sh"
 for script in "$root"/lib/*.sh "$root"/scripts/*.sh "$root"/tests/*.sh \
-    "$root"/apps/*/*.sh "$root"/apps/*/*/*.sh "$root"/apps/*/source/*.sh; do
+    "$root"/apps/*/*.sh "$root"/apps/*/*/*.sh "$root"/apps/*/source/*.sh "$root"/sources/ddnsto/*.sh; do
     sh -n "$script"
 done
 for script in "$root"/legacy/*.sh; do

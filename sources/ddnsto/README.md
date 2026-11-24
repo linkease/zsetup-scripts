@@ -1,8 +1,9 @@
 # DDNSTO
 
-当前部署模型见 [独立安装域名与业务环境](../docs/ddnsto-install-deployment.md)，
-本轮状态见 [2026-11-20 本地变更记录](../docs/verification/2026-11-20-ddnsto-release-install-domain.md)。
-控制台将固定使用 install.ddnsto.com；安装资源不再由业务服务器/静态仓库发布。
+当前部署模型见仓库 `docs/ddnsto-install-deployment.md`，
+本轮状态见 `docs/verification/2026-11-24-ddnsto-release-apps-site.md`。
+控制台固定使用 run.ddnsto.com；安装资源生成到 apps/ddnsto 随完整 apps 发布，
+不再由业务服务器/静态仓库发布。
 以下日期条目是历史证据，不代表新域名或业务环境参数已经完成真机验收。
 
 ## 分平台产品版本维护

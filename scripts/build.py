@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 import build_ddnsto_installer
+import build_ddnsto_site
 
 
 APP_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
@@ -51,6 +52,9 @@ class Application:
 
 def read_application(directory: Path):
     path = directory / "app.json"
+    external = directory.parent.parent / 'sources' / directory.name / 'app.json'
+    if directory.name == 'ddnsto' and external.is_file():
+        path = external
     require(path.is_file() and not path.is_symlink(), f"missing {directory.name}/app.json")
     raw = path.read_bytes()
     require(len(raw) <= 65536, f"{directory.name}/app.json is too large")
@@ -330,6 +334,7 @@ def main():
             has_windows = any(os_name == "windows" for app in applications for os_name, _, _ in app.expanded_targets)
             if has_windows or (args.apps / "zsetup/base-windows.json").exists():
                 generate_config(args.apps, applications, check=args.check, windows=True)
+            build_ddnsto_site.generate(root, args.apps, check=args.check, install_file=install_file)
             generate_checksums(args.apps, check=args.check)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"apps build: {error}", file=sys.stderr)
@@ -340,4 +345,3 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

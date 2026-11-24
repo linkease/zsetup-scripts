@@ -37,13 +37,13 @@ def main():
             for directory in (Path('ddnsto'), version_dir):
                 target = staging / 'binary' / directory / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                source = (ROOT / 'apps/ddnsto/source/install.ps1'
+                source = (ROOT / 'sources/ddnsto/install.ps1'
                           if name == 'install.ps1'
                           else ROOT / 'apps/ddnsto/0.2.4/installer.sh')
                 shutil.copy2(source, target)
         # Audit metadata travels with the candidate, never fetched as executable
         # policy at runtime. Each public entry remains standalone.
-        shutil.copy2(ROOT / 'apps/ddnsto/source/install-rules.json',
+        shutil.copy2(ROOT / 'sources/ddnsto/install-rules.json',
                      staging / 'binary' / version_dir / 'install-rules.json')
         files = [{'path': str(p.relative_to(staging)), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'size': p.stat().st_size}
                  for p in sorted(staging.rglob('*')) if p.is_file()]

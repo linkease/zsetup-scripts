@@ -30,8 +30,8 @@
 
 ## 3. 修改唯一维护源并生成
 
-版本/摘要改 `apps/ddnsto/source/platform-releases.json`；安装行为改对应
-`apps/ddnsto/source/templates/*.in`。
+版本/摘要改 `sources/ddnsto/platform-releases.json`；安装行为改对应
+`sources/ddnsto/templates/*.in`。
 没有模板的模块直接修改源文件。生成副本不作为人工修改入口。
 
 ```sh
@@ -41,7 +41,7 @@ python3 -B scripts/build.py
 python3 -B scripts/build.py --check
 git diff --check
 git diff --stat
-git diff -- apps/ddnsto/source/platform-releases.json apps/ddnsto/source/templates
+git diff -- sources/ddnsto/platform-releases.json sources/ddnsto/templates
 ```
 
 同时审查未跟踪文件，`git diff` 不会显示它们。检查生成结果中各平台版本、包路径、摘要、
@@ -70,10 +70,16 @@ Shell 入口/生成器变更还必须通过 Bash 4.2 POSIX 模式验证，不能
 
 ## 5. 审核字节、生成本地候选
 
+控制台完整安装站点的正式交付路径已于 2026-11-24 切换为 `apps/ddnsto/`。
+步骤 3 的 `scripts/build.py` 同时生成 `i`、`i.ps1`、推荐清单、摘要执行器和 AI 指南，
+随 `apps/SHA256SUMS` 一起审核、提交。运行 `tests/ddnsto_apps_site_test.py` 验证完整性及
+发布事务。完整 apps 交付使用 [现有发布协调器](apps-release.md)，不能只上传旧 dist。
+下述推荐打包命令仅用于隔离候选检查，不再是正式目录的另一份维护源。
+
 先审查差异，再取得两个实际安装器的 SHA-256：
 
 ```sh
-sha256sum apps/ddnsto/0.2.4/installer.sh apps/ddnsto/source/install.ps1
+sha256sum apps/ddnsto/0.2.5/installer.sh sources/ddnsto/install.ps1
 python3 -B scripts/package-ddnsto-recommendation.py --help
 ```
 
@@ -136,8 +142,11 @@ python3 -B scripts/package-ddnsto-recommendation.py \
 推荐清单回滚只影响后续执行安装命令的推荐结果，**不会自动把已升级设备降级**。
 设备恢复必须依据该平台实际事务状态另行处理，不能承诺所有平台都能完整回退安装包。
 
-## 独立安装域名（2026-11-20，替代同域部署方案）
+## 安装域名与完整 apps 发布（2026-11-24）
 
-控制台固定访问 `https://install.ddnsto.com`。本站点内容仅由 `zsetup-scripts` 的 `scripts/package-ddnsto-site.py` 打包，不进入 `ddns-server` 或 `ddnsto-static`，不使用 Host 渲染或 `.invalid` 占位域名。推荐清单打包器继续负责实际执行器审核与摘要，站点打包器只组织完整路径。
+控制台固定访问 `https://run.ddnsto.com`。统一构建复用推荐/站点打包器生成到
+`apps/ddnsto/`，不进入 `ddns-server` 或 `ddnsto-static`，不使用 Host 渲染。
+构建检查摘要一致性，人工审核与上线授权仍独立进行。Windows 用户入口为 `i.ps1`，
+不是 `source/` 中的模板；原生 apps 索引范围保持不变。
 
 先安装正文、再清单/入口、最后控制台；保留历史摘要。现有线上文件本轮不清理。业务环境参数不改变脚本下载源；候选脚本测试分发暂未实施。完整边界和发布命令见 [部署模型](ddnsto-install-deployment.md)，本次证据见 [发布记录](verification/2026-11-20-ddnsto-release-install-domain.md)。运维交接在工作区 `ddnsto-meta/09-playbooks-SOP/DDNSTO一键安装-正式部署说明.md`。本轮仅本地修改，不代表上线。

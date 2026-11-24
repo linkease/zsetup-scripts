@@ -31,6 +31,13 @@ def fail(message: str):
 def validate(root: Path):
     if not root.is_dir() or root.is_symlink():
         fail("public apps root must be a real directory")
+    ddnsto = root / 'ddnsto'
+    if ddnsto.is_dir():
+        for path in ddnsto.rglob('*'):
+            relative = path.relative_to(ddnsto)
+            if (relative.parts[0] in {'source', 'sources', 'templates', 'tests', 'app.json', 'README.md'}
+                    or path.suffix in {'.py', '.in'} or path.name == 'review.json'):
+                fail(f'non-runtime DDNSTO material is forbidden in public tree: {path}')
     for child in root.iterdir():
         if child.name in ROOT_FILES:
             if not child.is_file() or child.is_symlink():
@@ -84,4 +91,3 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

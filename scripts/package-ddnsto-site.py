@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare an offline install.ddnsto.com document root; never deploy or fetch.
+"""Prepare an offline run.ddnsto.com document root; never deploy or fetch.
 
 Reuses the reviewed recommendation packager. Upload immutable bodies before
 activating manifests/aliases. Preserve existing immutable files on the host.
@@ -12,7 +12,7 @@ import shutil
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-ORIGIN = 'https://install.ddnsto.com'
+ORIGIN = 'https://run.ddnsto.com'
 
 
 def package_site(args):
@@ -33,7 +33,7 @@ def package_site(args):
             candidate_version='0.2.4', native_first=args.native_first))
         for alias, entry in [('i', 'recommended-entry.sh'), ('i.ps1', 'recommended-entry.ps1')]:
             shutil.copyfile(current / entry, stage / alias)
-        guide = (ROOT / 'apps/ddnsto/source/agent/install.md').read_bytes()
+        guide = (ROOT / 'sources/ddnsto/agent/install.md').read_bytes()
         if b'installer.invalid' in guide or ORIGIN.encode() not in guide:
             raise ValueError('agent guide must use the published installation origin')
         guide_root = stage / 'ddnsto-install/agent'

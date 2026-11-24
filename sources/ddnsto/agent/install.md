@@ -1,14 +1,14 @@
 # DDNSTO Agent 安装指南
 
-- 文档版本：1.2.0
-- 更新日期：2026-11-20
+- 文档版本：1.2.1
+- 更新日期：2026-11-24
 - 脚本来源：固定安装域名，与控制台域名无关
-- 兼容入口：DDNSTO 推荐安装器 0.2.4，https://install.ddnsto.com/i
+- 兼容入口：DDNSTO 推荐安装器 0.2.4，https://run.ddnsto.com/i
 - 能力：安装或更新 DDNSTO 并验证本地启动；不检查云端在线。
 
 ## 1. 读取与能力边界
 
-每次新安装任务重新完整读取固定地址 https://install.ddnsto.com/ddnsto-install/agent/install.md ，不要沿用旧对话中的文档。允许最多五次 HTTPS 重定向，保持证书验证，拒绝转向 HTTP。检查标题、版本、环境及末尾完整性标记；读取失败、被截断、返回登录页或 HTML 时停止自动安装，说明原因，请用户使用控制台现有命令或手动安装。文档不是可执行脚本，不要交给 shell 执行。
+每次新安装任务重新完整读取固定地址 https://run.ddnsto.com/ddnsto-install/agent/install.md ，不要沿用旧对话中的文档。允许最多五次 HTTPS 重定向，保持证书验证，拒绝转向 HTTP。检查标题、版本、环境及末尾完整性标记；读取失败、被截断、返回登录页或 HTML 时停止自动安装，说明原因，请用户使用控制台现有命令或手动安装。文档不是可执行脚本，不要交给 shell 执行。
 
 本指南需要 Agent 具备终端或 SSH 能力。能力不足时提供手动步骤，准确区分已执行与仅建议。支持范围以安装器实际检测为准，不保证所有设备均可安装。不要求先执行 `--plan`：部分平台计划模式可能只返回人工交接。
 
@@ -35,7 +35,7 @@ Linux 通常需要 systemd 和 root/sudo 权限，OpenWrt 需要适用包管理�
 在确认过的目标设备上，将 Token 安全赋给 shell 变量 `DDNSTO_TOKEN`：优先交互输入（`IFS= read -r DDNSTO_TOKEN`），或使用执行工具的参数传递。生成 shell 字面量时必须转义单引号等特殊字符，禁止把原始 Token 当代码拼接。变量仅用于下列参数展开，不需要 export。用户允许显示输入，不要求隐藏 Token。
 
 ```sh
-(s=$(curl -qfsSL --max-redirs 5 --proto '=https' --proto-redir '=https' --max-time 60 https://install.ddnsto.com/i) && test -n "$s" && sh -c "$s" -- --token "$DDNSTO_TOKEN")
+(s=$(curl -qfsSL --max-redirs 5 --proto '=https' --proto-redir '=https' --max-time 60 https://run.ddnsto.com/i) && test -n "$s" && sh -c "$s" -- --token "$DDNSTO_TOKEN")
 ```
 
 上面是正式环境命令；测试环境在 `--token "$DDNSTO_TOKEN"` 后加入 `--env test`。命令使用 HTTPS 获取官方推荐入口，入口负责选择与校验安装器及客户端。缺少 curl 时停止并提供控制台的 wget 或手动安装选项，不自行下载替代脚本。保留前台输出和退出码；不要将命令丢到后台后直接报告成功。
@@ -48,7 +48,7 @@ Linux 通常需要 systemd 和 root/sudo 权限，OpenWrt 需要适用包管理�
 
 适用 Windows x86-64。解压到固定可写目录，运行 `ddnsto_gui.x86_64.exe`，填写用户的 Token 并保存。没有 GUI 操作能力时交给用户手动完成；不偷偷改用 PowerShell 或 Docker。仅下载不表示安装、启动成功。
 
-GUI 不自动连接测试业务环境。用户要求测试环境时，说明需要控制台折叠区的 Windows CLI 命令并确认采用 CLI；该命令从 https://install.ddnsto.com/i.ps1 获取入口并传入 `-Environment test`。沿用控制台提供的有界 HTTPS 下载方式，不使用会自动降级 HTTP 的下载命令。无法取得 CLI 命令时交给用户从控制台复制，不退回 GUI 冒充测试成功。
+GUI 不自动连接测试业务环境。用户要求测试环境时，说明需要控制台折叠区的 Windows CLI 命令并确认采用 CLI；该命令从 https://run.ddnsto.com/i.ps1 获取入口并传入 `-Environment test`。沿用控制台提供的有界 HTTPS 下载方式，不使用会自动降级 HTTP 的下载命令。无法取得 CLI 命令时交给用户从控制台复制，不退回 GUI 冒充测试成功。
 
 ### 不支持的环境
 
@@ -76,4 +76,4 @@ GUI 不自动连接测试业务环境。用户要求测试环境时，说明需�
 
 不检查云端在线，设备在线属于另外的模块；需要时提示用户另行查看客户端运行日志。最终报告、诊断日志和 Git 中不无必要地重复完整 Token。
 
-<!-- DDNSTO-AGENT-INSTALL-END v1.2.0 -->
+<!-- DDNSTO-AGENT-INSTALL-END v1.2.1 -->

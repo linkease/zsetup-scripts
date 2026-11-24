@@ -23,7 +23,7 @@ def copy_desktop_candidates(binary, include=False):
         raise ValueError('DDNSTO needs one candidate version')
     directory = binary / 'ddnsto' / ('desktop-candidate-' + versions.pop())
     sources = {
-        'install.ps1': ROOT / 'apps/ddnsto/source/install.ps1',
+        'install.ps1': ROOT / 'sources/ddnsto/install.ps1',
         'install-macos.sh': ROOT / 'apps/ddnsto/0.2.4/installer.sh',
     }
     for name, source in sources.items():

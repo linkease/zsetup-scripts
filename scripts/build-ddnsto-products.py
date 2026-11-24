@@ -17,7 +17,7 @@ VERSION = r'(?:0|[1-9][0-9]{0,5})\.(?:0|[1-9][0-9]{0,5})\.(?:0|[1-9][0-9]{0,5})'
 
 
 def render(root, config):
-    source = root / 'apps/ddnsto/source'
+    source = root / 'sources/ddnsto'
     if not source.is_dir():
         source = root / 'ddnsto'
     if set(config) != {'schema_version', 'platforms'} or config['schema_version'] != 1:
@@ -70,7 +70,7 @@ def render(root, config):
 
 
 def generate(root=ROOT, check=False):
-    source = root / 'apps/ddnsto/source'
+    source = root / 'sources/ddnsto'
     if not source.is_dir():
         source = root / 'ddnsto'
     config = json.loads((source / 'platform-releases.json').read_text())
