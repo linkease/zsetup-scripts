@@ -16,11 +16,11 @@ class AutoOpenWrt(unittest.TestCase):
 
     def invoke(self, token='old-secret', pending='', body='ddnsto_ensure_ow_account'):
         script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in (
-            'apps/ddnsto/source/business.sh', 'apps/ddnsto/source/auto-install.sh',
-            'apps/ddnsto/source/openwrt-lifecycle.sh',
-            'apps/ddnsto/source/portable-files.sh',
-            'apps/ddnsto/source/openwrt-adapter.sh'))
-        path = ROOT / 'apps/ddnsto/source/auto-openwrt.sh'
+            'sources/ddnsto/business.sh', 'sources/ddnsto/auto-install.sh',
+            'sources/ddnsto/openwrt-lifecycle.sh',
+            'sources/ddnsto/portable-files.sh',
+            'sources/ddnsto/openwrt-adapter.sh'))
+        path = ROOT / 'sources/ddnsto/auto-openwrt.sh'
         if path.exists(): script += f'. "{path}"\n'
         script += '''
 ddnsto_openwrt_paths

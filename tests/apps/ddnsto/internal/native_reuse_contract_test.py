@@ -131,7 +131,7 @@ class NativeReuseContract(unittest.TestCase):
         self.assertTrue(json.loads(result.stdout)['private_directory'])
         self.assertEqual(original.stat().st_nlink, 2)
         # A true private_directory result cannot replace the file's link check.
-        source = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'portable-files.sh'
+        source = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'portable-files.sh'
         fields = subprocess.run(['sh', '-c', '. "$1"; ddnsto_file_fields "$2"',
             'test', str(source), str(original)], text=True, capture_output=True)
         self.assertEqual(fields.returncode, 0, fields.stderr)
@@ -152,7 +152,7 @@ class NativeReuseContract(unittest.TestCase):
         self.assertFalse((self.work / 'captured').exists())
 
     def test_asus_fetch_uses_real_native_without_shell_rehash(self):
-        source = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'auto-asus.sh'
+        source = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'auto-asus.sh'
         script = f'''
 set -eu
 . {shlex.quote(str(source))}
@@ -187,7 +187,7 @@ ddnsto_asus_fetch "$OUTPUT"
             self.skipTest('archive/checksum not required of pinned 0.5.0')
 
     def test_asus_capture_delegates_bounds_to_trusted_native(self):
-        source = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'asus-package.sh'
+        source = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'asus-package.sh'
         archive = self.work / 'fixture.tar.gz'
         with tarfile.open(archive, 'w:gz') as output:
             member = tarfile.TarInfo('payload')
@@ -220,7 +220,7 @@ _ddnsto_asus_package_capture "$LIMIT" "$OUTPUT" -xOzf "$ARCHIVE" "$MEMBER"
                     self.assertFalse(output.exists())
 
     def test_asus_armsoft_capture_does_not_invoke_native(self):
-        source = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'asus-package.sh'
+        source = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'asus-package.sh'
         result = subprocess.run(['sh', '-eu', '-c', f'''
 . {shlex.quote(str(source))}
 channel=armsoft
@@ -234,7 +234,7 @@ _ddnsto_asus_package_capture 7 "$1"
         self.assertEqual((self.work / 'legacy').read_bytes(), b'payload')
 
     def test_asus_extractor_keeps_business_checks_with_native_capture(self):
-        app = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source'
+        app = Path(__file__).resolve().parents[4] / 'sources/ddnsto'
         for variant in ('valid', 'duplicate', 'wrong-channel', 'wrong-version'):
             with self.subTest(variant=variant):
                 entries = members()

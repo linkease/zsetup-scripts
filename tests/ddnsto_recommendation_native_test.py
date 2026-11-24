@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE = ROOT / 'apps/ddnsto/source/recommendation-native.sh'
+MODULE = ROOT / 'sources/ddnsto/recommendation-native.sh'
 
 
 class NativeEntry(unittest.TestCase):

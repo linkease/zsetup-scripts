@@ -6,7 +6,7 @@ import tempfile
 import time
 import unittest
 
-ROOT = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source'
+ROOT = Path(__file__).resolve().parents[4] / 'sources/ddnsto'
 
 
 class AsusCancellation(unittest.TestCase):

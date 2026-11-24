@@ -17,7 +17,7 @@ class ManagedNativeFloor(unittest.TestCase):
             binary.write_text(f"#!/bin/sh\nprintf 'zsetup {version}\\n'\n")
             binary.chmod(0o700)
             script = f'''
-. "{ROOT / "apps/ddnsto/source/managed-service.sh"}"
+. "{ROOT / "sources/ddnsto/managed-service.sh"}"
 ddnsto_error() {{ printf '%s\\n' "$*" >&2; }}
 ZSETUP_BIN="$1"
 ddnsto_managed_native

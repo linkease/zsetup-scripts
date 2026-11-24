@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def shell(body, *args):
-    source = ROOT / 'apps/ddnsto/source'
+    source = ROOT / 'sources/ddnsto'
     sources = [ROOT / 'lib/bootstrap.sh', source / 'portable-files.sh',
                ROOT / 'lib/install-storage.sh',
                ROOT / 'lib/install-bounds.sh', ROOT / 'lib/install-transaction.sh',
@@ -98,13 +98,13 @@ ddnsto_register
         self.assertEqual(result.stdout, 'rewrite')
 
     def test_help_precedes_native_bootstrap(self):
-        result = shell('bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"', '--help')
+        result = shell('bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'sources/ddnsto/main.sh') + '"', '--help')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--action', result.stdout)
 
     def test_shared_options_reach_readonly_plan(self):
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
-                       'bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"',
+                       'bootstrap_and_run() { return 99; }; . "' + str(ROOT / 'sources/ddnsto/main.sh') + '"',
                        '--installer-prefix', '/opt/example-ddnsto', '--plan')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('installation_performed=false', result.stdout)
@@ -210,7 +210,7 @@ ddnsto_managed_health_probe
     def test_installer_mode_uses_native_platform_facts(self):
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                        'ZSETUP_INSTALLER_MODE=1; ZSETUP_OS=openwrt; ZSETUP_PACKAGE_MANAGER=opkg; ZSETUP_ARCH=mipsel\n'
-                       'ddnsto_install() { printf "platform=%s" "$detected_platform"; }; . "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"',
+                       'ddnsto_install() { printf "platform=%s" "$detected_platform"; }; . "' + str(ROOT / 'sources/ddnsto/main.sh') + '"',
                        '--action', 'install', '--platform', 'openwrt', '--force-version', 'lite')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'platform=openwrt')
@@ -218,7 +218,7 @@ ddnsto_managed_health_probe
     def test_docker_write_uses_separate_locked_adapter(self):
         result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                        'ddnsto_docker_locked() { printf DOCKER; };\n'
-                       '. "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"', '--action', 'install', '--method', 'docker')
+                       '. "' + str(ROOT / 'sources/ddnsto/main.sh') + '"', '--action', 'install', '--method', 'docker')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'DOCKER')
 
@@ -228,7 +228,7 @@ ddnsto_managed_health_probe
             result = shell('. "' + str(ROOT / 'lib/install-launcher.sh') + '"\n'
                            'ddnsto_local_platform() { detected_platform=synology; };\n'
                            'ddnsto_synology_entry() { printf SYNOLOGY; };\n'
-                           '. "' + str(ROOT / 'apps/ddnsto/source/main.sh') + '"', '--action', 'download', '--output-dir', str(output))
+                           '. "' + str(ROOT / 'sources/ddnsto/main.sh') + '"', '--action', 'download', '--output-dir', str(output))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, 'SYNOLOGY')
             self.assertFalse(output.exists())

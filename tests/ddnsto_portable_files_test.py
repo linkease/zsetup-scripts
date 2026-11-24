@@ -24,7 +24,7 @@ class PortableFiles(unittest.TestCase):
         self.file.write_text('fixture')
 
     def run_probe(self, body, path=None):
-        script = f'. "{ROOT / "apps/ddnsto/source/portable-files.sh"}"\n' + body
+        script = f'. "{ROOT / "sources/ddnsto/portable-files.sh"}"\n' + body
         return subprocess.run(['/bin/sh', '-eu', '-c', script, 'probe', str(path or self.file)],
                               env=os.environ | {'PATH': str(self.tools)},
                               text=True, capture_output=True)

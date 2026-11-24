@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[4]
 
 class DockerProbe(unittest.TestCase):
     def probe(self, endpoint=None, info='linux|x86_64|Ubuntu', context='', host='', fail=False):
-        source = ROOT / 'apps/ddnsto/source/docker-probe.sh'
+        source = ROOT / 'sources/ddnsto/docker-probe.sh'
         self.assertTrue(source.exists(), 'missing read-only Docker probe')
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

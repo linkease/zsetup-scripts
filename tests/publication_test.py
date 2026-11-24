@@ -16,7 +16,7 @@ spec.loader.exec_module(publication)
 class Publication(unittest.TestCase):
     def setUp(self):
         self.requested = []
-        self.shell = (ROOT / 'apps/ddnsto/0.2.4/installer.sh').read_bytes()
+        self.shell = (ROOT / 'apps/ddnsto/0.2.5/installer.sh').read_bytes()
         catalog = json.loads((ROOT / 'catalog.json').read_text())
         self.records = [dict(r, sha256=hashlib.sha256(self.shell).hexdigest(), size=len(self.shell))
                         for r in catalog['installers'] if r['application'] == 'ddnsto']
@@ -29,7 +29,7 @@ class Publication(unittest.TestCase):
         if path == 'zsetup/config.json':
             return json.dumps({'installers': self.records}).encode()
         if path.endswith('install.ps1'):
-            return (ROOT / 'apps/ddnsto/source/install.ps1').read_bytes()
+            return (ROOT / 'sources/ddnsto/install.ps1').read_bytes()
         if path.endswith('install.sh'):
             return self.shell
         raise AssertionError('unexpected metadata request: ' + path)

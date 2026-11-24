@@ -52,10 +52,10 @@ class LinuxRunningUpgrade(unittest.TestCase):
 
     def invoke(self, download_fail=False):
         sources = ['lib/install-storage.sh', 'lib/install-bounds.sh', 'lib/install-transaction.sh',
-                   'lib/install-service.sh', 'apps/ddnsto/source/product-pins.sh',
-                   'apps/ddnsto/source/managed-cli.sh', 'apps/ddnsto/source/business.sh',
-                   'apps/ddnsto/source/managed-service.sh', 'apps/ddnsto/source/auto-install.sh',
-                   'apps/ddnsto/source/auto-linux.sh']
+                   'lib/install-service.sh', 'sources/ddnsto/product-pins.sh',
+                   'sources/ddnsto/managed-cli.sh', 'sources/ddnsto/business.sh',
+                   'sources/ddnsto/managed-service.sh', 'sources/ddnsto/auto-install.sh',
+                   'sources/ddnsto/auto-linux.sh']
         script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in sources) + r'''
 ZSETUP_BIN=$ZSETUP_TEST_NATIVE
 arch=x86_64; detected_platform=linux; ACTION=ensure

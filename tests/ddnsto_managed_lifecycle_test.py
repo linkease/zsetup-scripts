@@ -93,8 +93,8 @@ class ManagedLifecycle(unittest.TestCase):
     def run_action(self, action, setup='', health=0):
         sources = ['lib/install-storage.sh', 'lib/install-bounds.sh',
                    'lib/install-transaction.sh', 'lib/install-service.sh',
-                   'apps/ddnsto/source/product-pins.sh',
-                   'apps/ddnsto/source/managed-service.sh']
+                   'sources/ddnsto/product-pins.sh',
+                   'sources/ddnsto/managed-service.sh']
         script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in sources)
         script += f'''
 ZSETUP_BIN='{NATIVE}'; detected_platform=linux; ACTION=$1; TOKEN='new-token'

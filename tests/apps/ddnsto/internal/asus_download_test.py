@@ -4,10 +4,74 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source'
+ROOT = Path(__file__).resolve().parents[4] / 'sources/ddnsto'
 
 
 class AsusDownload(unittest.TestCase):
+    def test_metadata_transport_without_command_builtin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            native = Path(directory) / 'native-0.6.4-aarch64/zsetup'
+            native.parent.mkdir()
+            native.write_text('verified')
+            native.chmod(0o700)
+            script = f'''
+set -eu
+. "{ROOT.parents[1]}/lib/bootstrap.sh"
+. "{ROOT}/auto-asus.sh"
+ASUS_STATE=$FIXTURE ASUS_ARCH=aarch64
+type() {{ if [ "$1" = command ]; then return 1; else builtin type "$@"; fi; }}
+command() {{ return 127; }}
+bootstrap_arch() {{ ZSETUP_ARCH=aarch64; ZSETUP_ARTIFACT=zsetup-linux-aarch64; ZSETUP_STABLE_PATH=zsetup/stable; }}
+ddnsto_asus_mktemp() {{ mktemp -d "$1/metadata.XXXXXX"; }}
+curl() {{
+    while [ "$1" != -o ]; do shift; done
+    case "$3" in
+      */zsetup/stable) printf '0.6.4\\n' > "$2" ;;
+      */zsetup/0.6.4/SHA256SUMS) printf '%064d  zsetup-linux-aarch64\\n' 0 > "$2" ;;
+      *) return 99 ;;
+    esac
+}}
+ddnsto_asus_private_dir() {{ test -d "$1"; }}
+ddnsto_asus_safe_file() {{ test -f "$1"; }}
+ddnsto_asus_hash() {{ printf '%064d\\n' 0; }}
+ddnsto_asus_native
+test "$ASUS_ZSETUP" = "$FIXTURE/native-0.6.4-aarch64/zsetup"
+'''
+            result = subprocess.run(['bash', '-c', script], text=True, capture_output=True,
+                                    env=os.environ | {'FIXTURE': directory})
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_shared_bootstrap_metadata_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            native = fixture / 'native-0.6.4-aarch64/zsetup'
+            native.parent.mkdir()
+            native.write_text('verified')
+            native.chmod(0o700)
+            script = f'''
+set -eu
+. "{ROOT.parents[1]}/lib/bootstrap.sh"
+. "{ROOT}/auto-asus.sh"
+ASUS_STATE=$FIXTURE ASUS_ARCH=aarch64
+bootstrap_arch() {{ ZSETUP_ARCH=aarch64; ZSETUP_ARTIFACT=zsetup-linux-aarch64; ZSETUP_STABLE_PATH=zsetup/stable; }}
+ddnsto_asus_mktemp() {{ mktemp -d "$1/metadata.XXXXXX"; }}
+bootstrap_fetch_from_base() {{
+    case "$3" in
+      zsetup/stable) printf '0.6.4\\n' > "$4" ;;
+      zsetup/0.6.4/SHA256SUMS) printf '%064d  zsetup-linux-aarch64\\n' 0 > "$4" ;;
+      *) return 99 ;;
+    esac
+}}
+ddnsto_asus_private_dir() {{ test -d "$1"; }}
+ddnsto_asus_safe_file() {{ test -f "$1"; }}
+ddnsto_asus_hash() {{ printf '%064d\\n' 0; }}
+ddnsto_asus_native
+test "$ASUS_ZSETUP" = "$FIXTURE/native-0.6.4-aarch64/zsetup"
+'''
+            result = subprocess.run(['sh', '-c', script], text=True, capture_output=True,
+                                    env=os.environ | {'FIXTURE': directory})
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_native_cache_is_rehashed_and_reused(self):
         with tempfile.TemporaryDirectory() as directory:
             script = f'''
@@ -15,11 +79,12 @@ set -eu
 umask 077
 . "{ROOT}/auto-asus.sh"
 ASUS_STATE=$FIXTURE ASUS_ARCH=aarch64
-fetch_bootstrap_metadata() {{ RESCUE_VERSION=$FIXTURE_VERSION; EXPECTED_SHA256=fixture; }}
+bootstrap_arch() {{ :; }}
+fetch_bootstrap_metadata() {{ RESCUE_VERSION=$FIXTURE_VERSION; EXPECTED_SHA256=$(printf '%064d' 0); }}
 ddnsto_asus_private_dir() {{ mkdir -p "$1"; }}
 ddnsto_asus_safe_file() {{ [ -f "$1" ] && [ ! -L "$1" ]; }}
 ddnsto_asus_mktemp() {{ mktemp -d "$1/attempt.XXXXXX"; }}
-ddnsto_asus_hash() {{ [ "$(cat "$1")" = native ] && echo fixture || echo bad; }}
+ddnsto_asus_hash() {{ [ "$(cat "$1")" = native ] && printf '%064d\\n' 0 || echo bad; }}
 ddnsto_asus_transport() {{ echo fetch >> "$FIXTURE/events"; printf native > "$2"; }}
 ddnsto_asus_native
 first=$ASUS_ZSETUP

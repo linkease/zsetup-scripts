@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 import unittest
 
-MODULE = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / "asus-platform.sh"
+MODULE = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / "asus-platform.sh"
 
 
 class AsusPlatformTest(unittest.TestCase):

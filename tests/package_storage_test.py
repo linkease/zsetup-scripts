@@ -96,7 +96,7 @@ exit 0
                     script=ROOT/'apps'/app/version/'installer.sh'
                     if app == 'ddnsto':
                         source=script.read_text()
-                        pins=(ROOT/'apps/ddnsto/source/product-pins.sh').read_text()
+                        pins=(ROOT/'sources/ddnsto/product-pins.sh').read_text()
                         for relative,digest in fixture_pins.items():
                             match=re.search(re.escape(relative)+r"\) printf '%s\\n' ([0-9a-f]{64})",pins)
                             assert match,relative

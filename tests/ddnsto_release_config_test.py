@@ -21,12 +21,12 @@ class ReleaseConfigurationTests(unittest.TestCase):
         return module
 
     def config(self):
-        return json.loads((ROOT / 'apps/ddnsto/source/platform-releases.json').read_text())
+        return json.loads((ROOT / 'sources/ddnsto/platform-releases.json').read_text())
 
     def test_checked_in_outputs_match_configuration(self):
         builder = self.builder()
         for name, content in builder.render(ROOT, self.config()).items():
-            self.assertEqual((ROOT / 'apps/ddnsto/source' / name).read_text(), content, name)
+            self.assertEqual((ROOT / 'sources/ddnsto' / name).read_text(), content, name)
 
     def test_powershell_bom_is_only_at_start(self):
         content = self.builder().render(ROOT, self.config())['install.ps1']
@@ -107,8 +107,8 @@ class ReleaseConfigurationTests(unittest.TestCase):
         import shutil
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            shutil.copytree(ROOT / 'apps/ddnsto/source/templates', root / 'ddnsto/templates')
-            shutil.copyfile(ROOT / 'apps/ddnsto/source/platform-releases.json', root / 'ddnsto/platform-releases.json')
+            shutil.copytree(ROOT / 'sources/ddnsto/templates', root / 'ddnsto/templates')
+            shutil.copyfile(ROOT / 'sources/ddnsto/platform-releases.json', root / 'ddnsto/platform-releases.json')
             builder.generate(root)
             output = root / 'ddnsto/install.ps1'
             output.write_text('stale')
@@ -121,7 +121,7 @@ class ReleaseConfigurationTests(unittest.TestCase):
         import shutil
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            shutil.copytree(ROOT / 'apps/ddnsto/source/templates', root / 'ddnsto/templates')
+            shutil.copytree(ROOT / 'sources/ddnsto/templates', root / 'ddnsto/templates')
             (root / 'ddnsto/templates/asus-service.sh.in').unlink()
             with self.assertRaises(ValueError):
                 builder.render(root, self.config())
@@ -130,7 +130,7 @@ class ReleaseConfigurationTests(unittest.TestCase):
         config = self.config()
         config['platforms']['linux']['client_version'] = '9.8.7'
         builder.render(ROOT, config)
-        source = (ROOT / 'apps/ddnsto/source/managed-service.sh').read_text()
+        source = (ROOT / 'sources/ddnsto/managed-service.sh').read_text()
         self.assertIn('[ "${version_num:-}" = 4.2.8 ]', source)
 
 

@@ -9,7 +9,7 @@ import tarfile
 import tempfile
 import unittest
 
-MODULE = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / "asus-package.sh"
+MODULE = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / "asus-package.sh"
 PLATFORM = MODULE.with_name("asus-platform.sh")
 MARKERS = dict(rogsoft="hnd", armsoft="arm384", mtksoft="mtk",
                ipq32soft="ipq32", ipq64soft="ipq64", qcasoft="qca")

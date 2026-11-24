@@ -9,7 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
-    "ddnsto": {"version": "0.2.4", "entrypoints": ["sh"], "linux": 22, "windows": 0},
+    "ddnsto": {"version": "0.2.5", "entrypoints": ["sh"], "linux": 22, "windows": 0},
     "linkease": {"version": "0.1.9", "entrypoints": ["sh"], "linux": 24, "windows": 0},
     "jq": {"version": "0.1.0", "entrypoints": ["sh", "ps1"], "linux": 22, "windows": 3},
     "kai-skills": {"version": "1.2.6", "entrypoints": ["sh", "ps1"], "linux": 2, "windows": 1},
@@ -21,7 +21,8 @@ linux = json.loads((ROOT / "apps/zsetup/config.json").read_text())
 windows = json.loads((ROOT / "apps/zsetup/config-windows.json").read_text())
 for app_id, expected in EXPECTED.items():
     app = ROOT / "apps" / app_id
-    manifest = json.loads((app / "app.json").read_text())
+    manifest_path = ROOT / 'sources/ddnsto/app.json' if app_id == 'ddnsto' else app / 'app.json'
+    manifest = json.loads(manifest_path.read_text())
     assert manifest["version"] == expected["version"]
     for extension in ("sh", "ps1"):
         if extension not in expected["entrypoints"]:
@@ -41,10 +42,9 @@ for app_id, expected in EXPECTED.items():
 
 assert len(linux["installers"]) == 129
 assert len(windows["installers"]) == 9
-assert {path.parent.name for path in (ROOT / "apps").glob("*/app.json")} == {
+assert {path.parent.name for path in (ROOT / "apps").glob("*/app.json")} | {'ddnsto'} == {
     "ddnsto", "fastnet", "fastpve", "jq", "kai-skills", "ks-cli", "kspeeder",
     "linkease", "linkspace", "scoop",
 }
 
 print("Complex apps migration: all ten applications and 138 platform records passed")
-

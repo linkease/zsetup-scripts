@@ -144,8 +144,8 @@ class Recommendation(unittest.TestCase):
         self.assertFalse(review['published'])
 
     def test_stale_product_configuration_cannot_be_packaged(self):
-        shutil.copytree(ROOT / 'apps/ddnsto/source/templates', self.source / 'ddnsto/templates')
-        shutil.copyfile(ROOT / 'apps/ddnsto/source/platform-releases.json',
+        shutil.copytree(ROOT / 'sources/ddnsto/templates', self.source / 'ddnsto/templates')
+        shutil.copyfile(ROOT / 'sources/ddnsto/platform-releases.json',
                         self.source / 'ddnsto/platform-releases.json')
         result = self.package()
         self.assertNotEqual(result.returncode, 0)
@@ -159,11 +159,11 @@ class Recommendation(unittest.TestCase):
         self.assertNotIn('ddnsto_recommend_native_prepare\n', entry)
 
     def test_stale_combined_entry_cannot_be_packaged(self):
-        shutil.copytree(ROOT / 'apps/ddnsto/source/templates', self.source / 'ddnsto/templates')
-        shutil.copyfile(ROOT / 'apps/ddnsto/source/platform-releases.json', self.source / 'ddnsto/platform-releases.json')
-        for template in (ROOT / 'apps/ddnsto/source/templates').glob('*.in'):
+        shutil.copytree(ROOT / 'sources/ddnsto/templates', self.source / 'ddnsto/templates')
+        shutil.copyfile(ROOT / 'sources/ddnsto/platform-releases.json', self.source / 'ddnsto/platform-releases.json')
+        for template in (ROOT / 'sources/ddnsto/templates').glob('*.in'):
             name = template.name[:-3]
-            shutil.copyfile(ROOT / 'apps/ddnsto/source' / name,
+            shutil.copyfile(ROOT / 'sources/ddnsto' / name,
                             self.source / 'ddnsto' / name)
         result = self.package()
         self.assertNotEqual(result.returncode, 0)
@@ -277,7 +277,7 @@ class Recommendation(unittest.TestCase):
         self.assertEqual(self.manifest.read_text(), 'ddnsto-recommendation-v1-shell\n%s\n%s\n' % (sha(self.shell), len(self.shell)))
         review = json.loads((self.release / 'review.json').read_text())
         self.assertFalse(review['published'])
-        self.assertEqual(review.get('candidate_version'), '0.2.4')
+        self.assertEqual(review.get('candidate_version'), '0.2.5')
         self.assertIn(PIN, review['installers']['shell']['embedded_sha256'])
         first = (self.release / 'recommended-entry.sh').read_bytes()
         self.shell += b'# newer approved installer\n'
@@ -423,7 +423,7 @@ class Recommendation(unittest.TestCase):
 
     def test_asus_recommendation_does_not_require_id_stat_mktemp(self):
         self.prepare()
-        template = (ROOT / 'apps/ddnsto/source/recommended-entry.sh').read_text()
+        template = (ROOT / 'sources/ddnsto/recommended-entry.sh').read_text()
         self.assertIn('@@ASUS_STORAGE@@', template)
         fixtures = '''
 ddnsto_asus_storage() { ASUS_STATE="$ASUS_FIXTURE"; mkdir -m 700 "$ASUS_STATE"; }
@@ -435,7 +435,7 @@ stat() { return 99; }
 mktemp() { return 99; }
 '''
         template = template.replace('@@ASUS_STORAGE@@', fixtures)
-        template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'apps/ddnsto/source/portable-files.sh').read_text())
+        template = template.replace('@@PORTABLE_FILES@@', (ROOT / 'sources/ddnsto/portable-files.sh').read_text())
         template = template.replace('[ -d /koolshare ] && [ -x /usr/bin/dbus ] && [ -x /bin/nvram ]', 'true')
         template = template.replace('@@SOURCE_URL@@', self.base + '/release').replace('@@CACHE_KEY@@', 'fixture')
         path = self.work / 'asus-entry.sh'
@@ -605,8 +605,8 @@ mktemp() { return 99; }
 
     def test_canonical_sources_package_without_regeneration(self):
         canonical = {
-            'ddnsto-install.sh': ROOT / 'apps/ddnsto/0.2.4/installer.sh',
-            'install.ps1': ROOT / 'apps/ddnsto/source/install.ps1',
+            'ddnsto-install.sh': ROOT / 'apps/ddnsto/0.2.5/installer.sh',
+            'install.ps1': ROOT / 'sources/ddnsto/install.ps1',
         }
         before = {name: path.read_bytes() for name, path in canonical.items()}
         self.source = ROOT
@@ -626,7 +626,7 @@ class PowerShellReview(Recommendation):
     These tests do not claim Windows filesystem ACL enforcement coverage.
     """
     def ps_run(self, body, *, acl=False, args=()):
-        source = (ROOT / 'apps/ddnsto/source/recommended-entry.ps1').read_text()
+        source = (ROOT / 'sources/ddnsto/recommended-entry.ps1').read_text()
         # Definitions only: never enter the Windows installer main function.
         definitions = source.split('\ntry {\n', 1)[0]
         if acl:
@@ -699,7 +699,7 @@ catch { 'rejected' }
         shutil.copyfile(self.release / 'recommended-powershell.txt', cache / 'recommended.txt')
         cached = cache / (sha(self.ps) + '.ps1')
         cached.write_bytes(self.ps)
-        source = (ROOT / 'apps/ddnsto/source/recommended-entry.ps1').read_text()
+        source = (ROOT / 'sources/ddnsto/recommended-entry.ps1').read_text()
         # Exercise the real fallback control flow, stopping before cache commit
         # and installer execution. Only ACL checks are unavailable on Linux.
         fallback = source[source.index('    $online = Receive-Bounded'):source.index('    # File.Replace')]

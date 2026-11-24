@@ -6,9 +6,9 @@ set -eu
 test "${#ENTRY_SHA}" = 64 || exit 2
 case "$ENTRY_SHA" in *[!0-9a-f]*) exit 2 ;; esac
 case "$ENTRY_URL" in
-    https://raw.githubusercontent.com/linkease/zsetup-scripts/*/apps/ddnsto/0.2.4/installer.sh)
+    https://raw.githubusercontent.com/linkease/zsetup-scripts/*/apps/ddnsto/0.2.5/installer.sh)
         revision=${ENTRY_URL#https://raw.githubusercontent.com/linkease/zsetup-scripts/}
-        revision=${revision%/apps/ddnsto/0.2.4/installer.sh}
+        revision=${revision%/apps/ddnsto/0.2.5/installer.sh}
         test "${#revision}" = 40 || exit 2
         case "$revision" in *[!0-9a-f]*) exit 2 ;; esac
         ;;

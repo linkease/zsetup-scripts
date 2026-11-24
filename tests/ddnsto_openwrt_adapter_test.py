@@ -27,10 +27,10 @@ class Adapter(unittest.TestCase):
                     target.symlink_to(shutil.which(tool))
             test_path = str(self.tools)
         script = '\n'.join('. "' + str(ROOT / p) + '"' for p in (
-            'apps/ddnsto/source/business.sh', 'apps/ddnsto/source/managed-cli.sh',
-            'apps/ddnsto/source/openwrt-lifecycle.sh',
-            'apps/ddnsto/source/portable-files.sh',
-            'apps/ddnsto/source/openwrt-adapter.sh'))
+            'sources/ddnsto/business.sh', 'sources/ddnsto/managed-cli.sh',
+            'sources/ddnsto/openwrt-lifecycle.sh',
+            'sources/ddnsto/portable-files.sh',
+            'sources/ddnsto/openwrt-adapter.sh'))
         script += '''
 binary=$DDNSTO_OPENWRT_BIN_PATH; config=$DDNSTO_CONFIG_PATH
 service_path=$DDNSTO_SERVICE_PATH; package_manager=opkg

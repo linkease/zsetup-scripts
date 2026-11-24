@@ -5,7 +5,7 @@ import re
 import subprocess
 import unittest
 
-APP = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source'
+APP = Path(__file__).resolve().parents[4] / 'sources/ddnsto'
 
 
 class InstallRulesTest(unittest.TestCase):

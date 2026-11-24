@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 import unittest
 
-ROOT = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source'
+ROOT = Path(__file__).resolve().parents[4] / 'sources/ddnsto'
 SCRIPT = '. "$BUSINESS"\n. "$CLI"\n. "$LAUNCHER"\n' + (ROOT / 'main.sh').read_text().removesuffix('main "$@"\n') + r'''
 ddnsto_local_platform() { detected_platform=$TEST_PLATFORM; }
 ddnsto_business_environment_preflight() { :; }

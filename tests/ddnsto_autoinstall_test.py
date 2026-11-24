@@ -9,9 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(body, *args, env=None):
-    sources = ['apps/ddnsto/source/business.sh', 'apps/ddnsto/source/managed-cli.sh',
-               'apps/ddnsto/source/product-pins.sh']
-    source = ROOT / 'apps/ddnsto/source/auto-install.sh'
+    sources = ['sources/ddnsto/business.sh', 'sources/ddnsto/managed-cli.sh',
+               'sources/ddnsto/product-pins.sh']
+    source = ROOT / 'sources/ddnsto/auto-install.sh'
     script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in sources)
     if source.exists():
         script += f'. "{source}"\n'
@@ -28,7 +28,7 @@ class AutoInstall(unittest.TestCase):
         self.assertEqual(result.stdout, 'install')
 
     def test_legacy_alias_does_not_request_cloud_checks(self):
-        source = (ROOT / 'apps/ddnsto/source/main.sh').read_text()
+        source = (ROOT / 'sources/ddnsto/main.sh').read_text()
         result = subprocess.run(['sh', '-c', source.replace('main "$@"', '') +
             '\ninstaller_dispatch() { printf "%s\\n" "$@"; }; main account',
             'setup_ddnsto.sh'], capture_output=True, text=True)
@@ -37,7 +37,7 @@ class AutoInstall(unittest.TestCase):
         self.assertNotIn('--verify-status', result.stdout)
 
     def test_authorization_checks_controlling_terminal_not_background_stdin(self):
-        source = (ROOT / 'apps/ddnsto/source/auto-linux.sh').read_text()
+        source = (ROOT / 'sources/ddnsto/auto-linux.sh').read_text()
         self.assertNotIn('[ -t 0 ]', source)
         result = subprocess.run(['sh', '-c', source + '\nddnsto_ensure_tty_available'],
             capture_output=True, text=True, start_new_session=True)
@@ -119,7 +119,7 @@ ddnsto_ensure_linux_account
                                     ('{"token":"other"}', 2), ('{}', 2),
                                     ('{"token":"account-secret"}\n{}', 2), ('not json', 2)]:
                 config.write_text(data)
-                result = run(script, str(ROOT / 'apps/ddnsto/source/auto-linux.sh'), str(config), secret)
+                result = run(script, str(ROOT / 'sources/ddnsto/auto-linux.sh'), str(config), secret)
                 self.assertEqual(result.returncode, expected, result.stderr)
                 self.assertEqual(config.read_text(), data)
                 self.assertNotIn(secret, result.stdout + result.stderr)
@@ -136,7 +136,7 @@ ddnsto_ensure_linux_running
 '''
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / 'pid').write_text('10')
-            result = run(body, str(ROOT / 'apps/ddnsto/source/auto-linux.sh'), tmp)
+            result = run(body, str(ROOT / 'sources/ddnsto/auto-linux.sh'), tmp)
             self.assertEqual(result.returncode, 13, result.stderr)
 
 

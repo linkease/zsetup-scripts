@@ -45,7 +45,7 @@ ddnsto_openwrt
 class PinnedProducts(unittest.TestCase):
     def test_windows_archive_and_executable_match_published_428(self):
         artifact = next(x for x in HISTORY['files'] if x['source_path'].startswith('windows/'))
-        source = (ROOT / 'apps/ddnsto/source/install.ps1').read_text()
+        source = (ROOT / 'sources/ddnsto/install.ps1').read_text()
         self.assertIn("$Version = '4.2.8'", source)
         self.assertIn('--sha256 ' + artifact['sha256'], source)
         self.assertIn(artifact['members']['ddnsto_cli.x86_64.exe'], source)
@@ -60,7 +60,7 @@ ddnsto_download() { return 11; }
 transaction_dir=$2
 if ddnsto_verified_download product "$2/package" "$3"; then exit 0; else exit "$?"; fi
 '''
-            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'apps/ddnsto/source/business.sh'), tmp, 'a' * 64, str(ROOT / 'lib')], text=True, capture_output=True)
+            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'sources/ddnsto/business.sh'), tmp, 'a' * 64, str(ROOT / 'lib')], text=True, capture_output=True)
             self.assertEqual(r.returncode, 11, r.stderr)
             self.assertFalse((Path(tmp) / 'package.verified').exists())
 
@@ -78,7 +78,7 @@ ddnsto_download() { printf 'verified-download\n'; printf good > "$2"; }
 transaction_dir=$2
 ddnsto_verified_download product "$2/package" "$3"
 '''
-            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'apps/ddnsto/source/business.sh'), tmp, 'a' * 64, str(ROOT / 'lib')], text=True, capture_output=True)
+            r = subprocess.run(['sh', '-eu', '-c', script, 'test', str(ROOT / 'sources/ddnsto/business.sh'), tmp, 'a' * 64, str(ROOT / 'lib')], text=True, capture_output=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(artifact.read_bytes(), b'good')
 
@@ -97,10 +97,10 @@ ddnsto_verified_download product "$2/package" "$3"
                             executable = fixture / 'tools' / tool
                             executable.write_text(FAKE)
                             executable.chmod(0o755)
-                        env = os.environ | {'BUSINESS': str(ROOT / 'apps/ddnsto/source/business.sh'),
-                            'LIFECYCLE': str(ROOT / 'apps/ddnsto/source/openwrt-lifecycle.sh'),
+                        env = os.environ | {'BUSINESS': str(ROOT / 'sources/ddnsto/business.sh'),
+                            'LIFECYCLE': str(ROOT / 'sources/ddnsto/openwrt-lifecycle.sh'),
                             'LIBRARY': str(ROOT / 'lib'),
-                            'PINS': str(ROOT / 'apps/ddnsto/source/product-pins.sh'), 'TEST_ROOT': tmp,
+                            'PINS': str(ROOT / 'sources/ddnsto/product-pins.sh'), 'TEST_ROOT': tmp,
                             'FIXTURE': tmp, 'PATH': str(fixture / 'tools') + ':' + os.environ['PATH'],
                             'DDNSTO_CONFIG_PATH': tmp + '/etc/config/ddnsto',
                             'DDNSTO_OPENWRT_BIN_PATH': tmp + '/usr/sbin/ddnstod',
@@ -116,14 +116,14 @@ ddnsto_verified_download product "$2/package" "$3"
                         self.assertNotIn('UNEXPECTED_METADATA', result.stdout)
 
     def test_unknown_product_is_rejected_without_digest(self):
-        source = ROOT / 'apps/ddnsto/source/product-pins.sh'
+        source = ROOT / 'sources/ddnsto/product-pins.sh'
         self.assertTrue(source.is_file(), 'missing embedded product pins')
         result = subprocess.run(['sh', '-c', '. "$1"; ddnsto_pinned_sha "linux-binary/unknown.tar.gz"', 'sh', str(source)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 11, result.stderr)
         self.assertEqual(result.stdout, '')
 
     def test_linux_archive_digest_is_pinned(self):
-        source = ROOT / 'apps/ddnsto/source/product-pins.sh'
+        source = ROOT / 'sources/ddnsto/product-pins.sh'
         self.assertTrue(source.is_file(), 'missing embedded product pins')
         path = 'linux-binary/ddnsto-standard-4.2.8.tar.gz'
         result = subprocess.run(['sh', '-c', '. "$1"; ddnsto_pinned_sha "$2"', 'sh', str(source), path], capture_output=True, text=True)

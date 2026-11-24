@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ExtraPlatforms(unittest.TestCase):
     def run_adapter(self, body, *args):
-        source = ROOT / 'apps/ddnsto/source/extra-platforms.sh'
+        source = ROOT / 'sources/ddnsto/extra-platforms.sh'
         self.assertTrue(source.is_file(), 'missing safe platform adapter')
         return subprocess.run(['sh', '-eu', '-c', '. "$1"; shift; ' + body, 'adapter', str(source), *args], capture_output=True, text=True)
 

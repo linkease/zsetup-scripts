@@ -5,7 +5,7 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[4]
-SOURCE = ROOT / 'apps/ddnsto/source/templates/install.ps1.in'
+SOURCE = ROOT / 'sources/ddnsto/templates/install.ps1.in'
 
 
 class WindowsEnvironmentContract(unittest.TestCase):

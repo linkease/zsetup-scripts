@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 import unittest
 
-SOURCE = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'openwrt-lifecycle.sh'
+SOURCE = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'openwrt-lifecycle.sh'
 MAIN_HARNESS = r'''
 . "$APP/portable-files.sh"
 . "$APP/business.sh"

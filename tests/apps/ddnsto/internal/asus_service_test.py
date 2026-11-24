@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-SOURCE = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'asus-service.sh'
+SOURCE = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'asus-service.sh'
 
 
 class AsusServiceTest(unittest.TestCase):

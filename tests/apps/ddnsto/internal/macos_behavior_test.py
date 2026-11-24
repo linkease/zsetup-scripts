@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SCRIPT = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'install-macos.sh'
+SCRIPT = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'install-macos.sh'
 
 
 class MacInstaller(unittest.TestCase):
@@ -26,7 +26,7 @@ class MacInstaller(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('products', repository / 'scripts/build-ddnsto-products.py')
         builder = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(builder)
-        config = repository / 'apps/ddnsto/source/platform-releases.json'
+        config = repository / 'sources/ddnsto/platform-releases.json'
         rendered = builder.render(repository, json.loads(config.read_text()))
         script = self.root / 'install-macos.sh'
         script.write_text(rendered['install-macos.sh'])

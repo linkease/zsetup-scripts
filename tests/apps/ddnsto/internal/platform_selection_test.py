@@ -22,7 +22,7 @@ ddnsto_detect_platform
 ddnsto_validate_platform_options
 printf 'SELECTED %s\n' "$detected_platform"
 '''
-        env = os.environ | dict(BUSINESS=str(ROOT / 'apps/ddnsto/source/business.sh'), CLI=str(ROOT / 'apps/ddnsto/source/managed-cli.sh'), SYSTEM=system,
+        env = os.environ | dict(BUSINESS=str(ROOT / 'sources/ddnsto/business.sh'), CLI=str(ROOT / 'sources/ddnsto/managed-cli.sh'), SYSTEM=system,
                                 MANAGER=manager, DEVICE=device, APPLIANCE=appliance)
         return subprocess.run(['sh', '-c', script, 'test', *args], env=env,
                               text=True, capture_output=True)
@@ -91,7 +91,7 @@ printf 'SELECTED %s\n' "$detected_platform"
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('exit 99\n')
                 r = subprocess.run(['sh', '-eu', '-c', '. "$1"; ddnsto_appliance_platform "$2"',
-                                    'test', str(ROOT / 'apps/ddnsto/source/managed-cli.sh'), tmp], capture_output=True, text=True)
+                                    'test', str(ROOT / 'sources/ddnsto/managed-cli.sh'), tmp], capture_output=True, text=True)
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertEqual(r.stdout.strip(), expected)
 
@@ -100,7 +100,7 @@ printf 'SELECTED %s\n' "$detected_platform"
             env = os.environ | dict(ZSETUP_INSTALLER_MODE='1', ZSETUP_BIN='/bin/false',
                 ZSETUP_SOURCE_BASES='https://example.invalid', ZSETUP_OS='linux',
                 ZSETUP_PACKAGE_MANAGER='unknown', ZSETUP_ARCH='x86_64', ZSETUP_WORK_DIR=tmp + '/work')
-            r = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/0.2.4/installer.sh'), '--platform', 'openwrt'],
+            r = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/0.2.5/installer.sh'), '--platform', 'openwrt'],
                                env=env, capture_output=True, text=True, timeout=5)
             self.assertEqual(r.returncode, 2, r.stderr)
             self.assertIn('platform mismatch', r.stderr)

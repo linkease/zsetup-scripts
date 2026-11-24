@@ -25,7 +25,7 @@ class PlanTest(unittest.TestCase):
                 DDNSTO_INSTALL_DIR=str(root / 'install'), DDNSTO_CONFIG_DIR=str(root / 'config'),
                 DDNSTO_LAUNCH_AGENTS_DIR=str(root / 'agents'))
             env.update(extra_env or {})
-            r = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/0.2.4/installer.sh'), '--plan', *args], env=env,
+            r = subprocess.run(['sh', str(ROOT / 'apps/ddnsto/0.2.5/installer.sh'), '--plan', *args], env=env,
                                capture_output=True, text=True, timeout=10)
             for name in ('cache', 'install', 'config', 'agents'):
                 self.assertFalse((root / name).exists(), name)

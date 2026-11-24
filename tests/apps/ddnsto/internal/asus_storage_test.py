@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 
-MODULE = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / "asus-storage.sh"
+MODULE = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / "asus-storage.sh"
 
 
 class AsusStorageTest(unittest.TestCase):

@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source'
+ROOT = Path(__file__).resolve().parents[4] / 'sources/ddnsto'
 
 HARNESS = r'''
 set -u

@@ -11,7 +11,7 @@ import tempfile
 import time
 import unittest
 
-SOURCE = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'docker-lifecycle.sh'
+SOURCE = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'docker-lifecycle.sh'
 IMAGE = 'linkease/ddnsto@sha256:f70d2afbb0da6b21ff8865a4f3d9869775360bfbec1fff03474e5478a702ad30'
 CID = 'a' * 64
 IID = 'sha256:' + 'b' * 64

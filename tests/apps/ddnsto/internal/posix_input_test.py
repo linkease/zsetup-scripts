@@ -9,8 +9,8 @@ import subprocess
 import tempfile
 import unittest
 
-BUSINESS = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'business.sh'
-CLI = Path(__file__).resolve().parents[4] / 'apps/ddnsto/source' / 'managed-cli.sh'
+BUSINESS = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'business.sh'
+CLI = Path(__file__).resolve().parents[4] / 'sources/ddnsto' / 'managed-cli.sh'
 
 
 class InputContract(unittest.TestCase):

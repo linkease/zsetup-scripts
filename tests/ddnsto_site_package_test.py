@@ -16,8 +16,8 @@ class SitePackageTest(unittest.TestCase):
             output = Path(directory) / 'site'
             args = [sys.executable, '-B', str(ROOT / 'scripts/package-ddnsto-site.py'),
                     '--output', str(output)]
-            reviewed = [('shell', ROOT / 'apps/ddnsto/0.2.4/installer.sh'),
-                        ('powershell', ROOT / 'apps/ddnsto/source/install.ps1')]
+            reviewed = [('shell', ROOT / 'apps/ddnsto/0.2.5/installer.sh'),
+                        ('powershell', ROOT / 'sources/ddnsto/install.ps1')]
             for label, path in reviewed:
                 args += ['--reviewed-' + label + '-sha256',
                          hashlib.sha256(path.read_bytes()).hexdigest()]
@@ -30,11 +30,11 @@ class SitePackageTest(unittest.TestCase):
                 self.assertEqual(directory.stat().st_mode & 0o777, 0o755)
             for alias, entry in [('i', 'recommended-entry.sh'), ('i.ps1', 'recommended-entry.ps1')]:
                 self.assertEqual((output / alias).read_bytes(), (current / entry).read_bytes())
-                self.assertIn('https://install.ddnsto.com/ddnsto-install/current',
+                self.assertIn('https://run.ddnsto.com/ddnsto-install/current',
                               (output / alias).read_text(encoding='utf-8-sig'))
             guide = output / 'ddnsto-install/agent/install.md'
             self.assertEqual(guide.stat().st_mode & 0o777, 0o644)
-            self.assertEqual(guide.read_bytes(), (ROOT / 'apps/ddnsto/source/agent/install.md').read_bytes())
+            self.assertEqual(guide.read_bytes(), (ROOT / 'sources/ddnsto/agent/install.md').read_bytes())
             self.assertNotIn('installer.invalid', guide.read_text())
             review = json.loads((current / 'review.json').read_text())
             self.assertFalse(review['published'])
@@ -43,7 +43,7 @@ class SitePackageTest(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(body).hexdigest(), record['sha256'])
             repeat = subprocess.run(args, capture_output=True, text=True)
             self.assertNotEqual(repeat.returncode, 0)
-            self.assertEqual(guide.read_bytes(), (ROOT / 'apps/ddnsto/source/agent/install.md').read_bytes())
+            self.assertEqual(guide.read_bytes(), (ROOT / 'sources/ddnsto/agent/install.md').read_bytes())
 
 
 if __name__ == '__main__':
