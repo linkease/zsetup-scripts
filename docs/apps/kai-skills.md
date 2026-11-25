@@ -1,5 +1,28 @@
 # kai-skills Business Installer
 
+KaiPlus has a separate complete-snapshot mode on the same fixed standard entry,
+`/binary/zsetup-scripts/apps/kai-skills/install.sh --source kaiplus --system istoreos --context CONTEXT`.
+KaiPlus downloads the entry and checks its SHA256 against the aggregate apps
+checksum list before running it. `source/kaiplus-entry.sh` is embedded by
+`scripts/build.py`; regenerate the standard entry, compatibility alias and
+`apps/SHA256SUMS` together. This is a local candidate until the complete apps
+release is published through the existing coordinator.
+
+The mode requires `KAI_PLUS_BIN` from the calling KaiPlus server and an absolute
+private context path. It runs that binary's `_skills_prepare` command without
+zsetup bootstrap, ordinary consumer installation or an HTTP fallback. It only
+prepares a verified immutable KaiPlus snapshot; the parent validates the plan
+and activates it. Existing Codex/Claude/OpenCode arguments remain unchanged.
+Do not use `--target-skills` to overwrite KaiPlus snapshot/state directories.
+
+In this branch `--system` identifies the KaiPlus host (using its resolved system
+role, not a hardcoded iStoreOS value); it does not filter the full multi-system
+snapshot. The worker compares both source and host identity to the private
+context before downloading. KaiPlus updates all shared and system-specific
+content together while retaining existing enabled selections. Normal callers
+omit `--source kaiplus` and continue using `--system SYSTEM` or `--skill ID` to
+install just the corresponding collection, including its shared dependencies.
+
 This module binds one immutable schema-3 `kai-skills` release to a verified
 Business Installer. Linux targets need zsetup 0.6.0, POSIX shell, jq (the
 OpenWrt build without Oniguruma is supported) and the base file operations

@@ -208,7 +208,9 @@ def posix_entry(root: Path, application: Application, *, distribution_url=None):
             (root / "sources/ddnsto/portable-files.sh").read_text() + "\n" +
             (root / "sources/ddnsto/asus-storage.sh").read_text() + "\n" +
             (root / "sources/ddnsto/entry-preflight.sh").read_text() + "\n" + appliance
-            if application.id == "ddnsto" else ""
+            if application.id == "ddnsto" else
+            (application.directory / "source/kaiplus-entry.sh").read_text()
+            if application.id == "kai-skills" else ""
         ),
         "@BOOTSTRAP_CALL@": (
             'if [ "$DDNSTO_ENTRY_LEGACY" = 0 ]; then\n'
