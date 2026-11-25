@@ -55,8 +55,9 @@ existing product resources such as `/binary/fastnet/` and `/binary/ddnsto/`.
 Standard entries explicitly download the business configuration from the
 nested namespace; bootstrap zsetup binaries still come from `/binary/zsetup/`.
 
-`apps/zsetup/config.json`, generated standard entries, compatibility aliases
-and `apps/SHA256SUMS` are committed.  `scripts/build.py --check` detects drift.
+`apps/zsetup/config.json`, generated standard entries and compatibility aliases
+are committed. `apps/SHA256SUMS` is generated locally, ignored by Git and
+bundled by the release coordinator. `scripts/build.py --check` detects drift.
 No second release tree is generated.
 
 ## Public-tree policy

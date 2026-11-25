@@ -21,7 +21,8 @@
   See `docs/ddnsto-platform-releases.md` for publication and GUI/Docker boundaries.
 - When changing console installation distribution, read `docs/ddnsto-install-deployment.md`.
   `scripts/build.py` generates the standard application entries under `apps/ddnsto/`; maintain
-  `apps/ddnsto/install.md` beside them and commit the complete interface with `apps/SHA256SUMS`.
+  `apps/ddnsto/install.md` beside them and commit the complete interface. `apps/SHA256SUMS` is
+  generated locally, ignored by Git and packaged by the release coordinator; never commit it.
   Operations maps `run.ddnsto.com/install.sh`, `/install.ps1` and `/install.md` directly to
   these three files. Build hashes are consistency checks, not release approval.
 

@@ -32,11 +32,14 @@ python3 -B scripts/publish-apps.py plan \
   --binary-root /ABSOLUTE/WEB/ROOT/binary
 ```
 
-It requires generated entries/configuration and every `apps/SHA256SUMS` byte to
-match a clean committed `apps/` tree. The immutable review bundle is written to
-`dist/apps-releases/RELEASE_ID/`; `release.json` records the source commit, ten
-applications, Linux/Windows record counts and the fixed public subpath. The
-release ID is the SHA256 of `apps/SHA256SUMS`.
+The coordinator first regenerates the Git-ignored `apps/SHA256SUMS` from the
+local `apps/` tree, then checks all generated entries/configuration and every
+manifest byte. All tracked `apps/` files must still be committed and clean; the
+local manifest is the only excluded generated file. The immutable review bundle
+is written to `dist/apps-releases/RELEASE_ID/`; `release.json` records the source
+commit, ten applications, Linux/Windows record counts and the fixed public
+subpath. The release ID is the SHA256 of the locally generated
+`apps/SHA256SUMS` that is bundled and uploaded.
 
 `plan` does not connect to the server. Review its `public_apps` value and exact
 release ID before authorizing a mutation.

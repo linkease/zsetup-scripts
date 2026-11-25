@@ -238,7 +238,7 @@ def relevant_status() -> str:
         "release/kspeeder-products.json", "scripts/install-kspeeder-product-release.sh",
         "scripts/publish-kspeeder-products.py", "scripts/release-kspeeder.py",
         "apps/kspeeder", "apps/ks-cli",
-        "apps/zsetup/config.json", "apps/zsetup/config-windows.json", "apps/SHA256SUMS",
+        "apps/zsetup/config.json", "apps/zsetup/config-windows.json",
     ], capture=True).stdout
 
 

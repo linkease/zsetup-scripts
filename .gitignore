@@ -1,3 +1,4 @@
 dist/
+apps/SHA256SUMS
 __pycache__/
 *.pyc

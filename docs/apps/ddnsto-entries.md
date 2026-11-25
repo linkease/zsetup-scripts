@@ -22,5 +22,6 @@ POSIX 标准入口覆盖 Linux、OpenWrt 和 macOS；PowerShell 标准入口覆�
 `current`、`agent/versions`、`i`、`i.ps1`、`ddnsto-install.sh` 或其他兼容结构。
 
 在仓库根目录运行 `python3 -B scripts/build-ddnsto-products.py` 和
-`python3 -B scripts/build.py`，提交生成文件及 `apps/SHA256SUMS`。整体发布使用
+`python3 -B scripts/build.py`，提交生成的入口和配置；`apps/SHA256SUMS` 仅在本地生成并
+由 Git 忽略，整体发布时由协调器重新生成并打包。整体发布使用
 `scripts/publish-apps.py`；仅生成文件不表示已经上线。

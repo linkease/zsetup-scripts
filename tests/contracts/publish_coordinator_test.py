@@ -18,7 +18,16 @@ SPEC.loader.exec_module(publish_apps)
 
 with tempfile.TemporaryDirectory(prefix="apps-coordinator-") as folder:
     output = Path(folder) / "releases"
-    release = publish_apps.prepare_release(ROOT, output, require_clean=False)
+    manifest = ROOT / "apps/SHA256SUMS"
+    expected_manifest = manifest.read_bytes()
+    manifest.unlink()
+    generated_manifest = None
+    try:
+        release = publish_apps.prepare_release(ROOT, output, require_clean=False)
+        generated_manifest = manifest.read_bytes()
+    finally:
+        manifest.write_bytes(expected_manifest)
+    assert generated_manifest == expected_manifest
     identity = hashlib.sha256((ROOT / "apps/SHA256SUMS").read_bytes()).hexdigest()
     assert release == output / identity
     metadata = publish_apps.validate_release(release, identity)

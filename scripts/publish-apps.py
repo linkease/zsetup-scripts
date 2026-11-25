@@ -91,6 +91,10 @@ def source_commit(root: Path) -> str:
 
 def validate_candidate(root: Path, *, require_clean: bool = True) -> tuple[str, list[tuple[str, str]]]:
     apps = root / "apps"
+    # SHA256SUMS is a derived deployment input, not a tracked source file.
+    # Always regenerate it from the local apps tree so rebases never have to
+    # merge stale checksums and publication always uses the reviewed local bytes.
+    run([sys.executable, "-B", root / "scripts/build.py"])
     run([sys.executable, "-B", root / "scripts/build.py", "--check"])
     run([sys.executable, "-B", root / "scripts/check-public-tree.py", apps])
     records = read_manifest(apps)
@@ -101,7 +105,10 @@ def validate_candidate(root: Path, *, require_clean: bool = True) -> tuple[str, 
             capture=True,
         ).stdout
         if status:
-            raise PublicationError("apps candidate must be committed and clean")
+            raise PublicationError(
+                "tracked apps candidate must be committed and clean; "
+                "apps/SHA256SUMS is generated locally"
+            )
     return identity, records
 
 

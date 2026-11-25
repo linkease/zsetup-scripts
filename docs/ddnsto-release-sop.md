@@ -72,7 +72,8 @@ Shell 入口/生成器变更还必须通过 Bash 4.2 POSIX 模式验证，不能
 
 控制台完整安装资源的唯一交付路径是 `apps/ddnsto/`。步骤 3 的
 `scripts/build.py` 生成 `install.sh`、`install.ps1` 和配置；`install.md` 直接维护，
-三者随不可变 `versions/` 和 `apps/SHA256SUMS` 一起审核、提交。运行
+三者随不可变 `versions/` 一起审核、提交。`apps/SHA256SUMS` 由构建器在本地生成、
+由 Git 忽略，发布协调器会重新生成并将其纳入发布包；不得提交该文件。运行
 `tests/ddnsto_apps_standard_test.py` 和
 `tests/apps/ddnsto/internal/agent_guide_test.py` 验证完整性及发布事务。
 完整 apps 交付使用 [现有发布协调器](apps-release.md)，不存在推荐打包器或独立站点候选。

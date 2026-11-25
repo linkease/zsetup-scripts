@@ -4,9 +4,9 @@ KaiPlus has a separate complete-snapshot mode on the same fixed standard entry,
 `/binary/zsetup-scripts/apps/kai-skills/install.sh --source kaiplus --system istoreos --context CONTEXT`.
 KaiPlus downloads the entry and checks its SHA256 against the aggregate apps
 checksum list before running it. `source/kaiplus-entry.sh` is embedded by
-`scripts/build.py`; regenerate the standard entry, compatibility alias and
-`apps/SHA256SUMS` together. This is a local candidate until the complete apps
-release is published through the existing coordinator.
+`scripts/build.py`; regenerate the standard entry, compatibility alias and the
+Git-ignored local `apps/SHA256SUMS` together. This is a local candidate until
+the complete apps release is published through the existing coordinator.
 
 The mode requires `KAI_PLUS_BIN` from the calling KaiPlus server and an absolute
 private context path. It runs that binary's `_skills_prepare` command without
