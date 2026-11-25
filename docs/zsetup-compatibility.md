@@ -7,6 +7,14 @@
 macOS 使用 `zsetup/stable-macos`，Windows 使用 `zsetup/stable-windows`。DDNSTO 与其他应用
 遵守同一规则，不维护私有 zsetup 版本或摘要表。
 
+macOS 自举按 `stable-macos` 的版本，优先读取 `zsetup/macos/<版本>/SHA256SUMS`，
+匹配当前架构的 `zsetup-macos-aarch64` 或 `zsetup-macos-x86_64`；未找到有效记录时再检查
+旧平铺目录 `zsetup/<版本>/SHA256SUMS`。二进制必须从选中清单的同一相对目录下载并通过
+摘要校验，不能把平台目录的摘要和旧目录二进制混用。macOS 缺少 SHA-256 工具或所有来源
+均缺少匹配摘要时停止，不执行未校验文件；Linux 的发布布局保持不变。
+2026-11-25 的目录适配与验证见
+[macOS 发布目录记录](verification/2026-11-25-ddnsto-release-macos-directory.md)。
+
 核心执行规则：
 
 1. 当前核心版本低于应用的 `min_version` 时拒绝执行应用。

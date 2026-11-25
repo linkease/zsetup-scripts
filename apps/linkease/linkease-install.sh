@@ -206,7 +206,26 @@ fetch_bootstrap_metadata() {
         bootstrap_fetch_from_base "$scheme" "$base" "$ZSETUP_STABLE_PATH" "$stable_file" || continue
         read_stable_version "$stable_file" || continue
         EXPECTED_SHA256=
-        if have_hash_tool && bootstrap_fetch_from_base "$scheme" "$base" "zsetup/$RESCUE_VERSION/SHA256SUMS" "$sums_file"; then
+        ZSETUP_RELEASE_PATH="zsetup/$RESCUE_VERSION"
+        if [ "$ZSETUP_STABLE_PATH" = zsetup/stable-macos ]; then
+            # macOS releases have their own namespace. Keep the historical
+            # flat layout usable, but select binary and checksum as one pair.
+            have_hash_tool || {
+                echo "zsetup: macOS bootstrap requires a SHA-256 verification tool" >&2
+                return 11
+            }
+            for release_path in "zsetup/macos/$RESCUE_VERSION" "zsetup/$RESCUE_VERSION"; do
+                if bootstrap_fetch_from_base "$scheme" "$base" "$release_path/SHA256SUMS" "$sums_file" &&
+                    read_expected_sha256 "$sums_file"; then
+                    ZSETUP_RELEASE_PATH=$release_path
+                    return 0
+                fi
+            done
+            echo "zsetup: stable $RESCUE_VERSION has no valid checksum for $ZSETUP_ARTIFACT in macOS or flat release directories" >&2
+            metadata_incomplete=1
+            continue
+        fi
+        if have_hash_tool && bootstrap_fetch_from_base "$scheme" "$base" "$ZSETUP_RELEASE_PATH/SHA256SUMS" "$sums_file"; then
             # A fetched manifest which omits this platform is a broken release,
             # not permission to execute an unverified artifact from it.
             read_expected_sha256 "$sums_file" || {
@@ -256,9 +275,9 @@ bootstrap_zsetup() {
     rescue_bin="$rescue_dir/zsetup"
     candidate="$rescue_dir/.zsetup-download.$$"
     mkdir -p "$rescue_dir"
-    if ! bootstrap_fetch https "zsetup/$RESCUE_VERSION/$ZSETUP_ARTIFACT" "$candidate"; then
+    if ! bootstrap_fetch https "$ZSETUP_RELEASE_PATH/$ZSETUP_ARTIFACT" "$candidate"; then
         confirm_insecure_http
-        bootstrap_fetch http "zsetup/$RESCUE_VERSION/$ZSETUP_ARTIFACT" "$candidate"
+        bootstrap_fetch http "$ZSETUP_RELEASE_PATH/$ZSETUP_ARTIFACT" "$candidate"
     fi
     hash_matches "$candidate" || {
         echo "zsetup: bootstrap checksum mismatch" >&2
