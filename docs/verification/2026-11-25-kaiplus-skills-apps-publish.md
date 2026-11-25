@@ -1,6 +1,7 @@
 # KaiPlus Skills 固定安装入口：完整 apps 发布记录
 
-状态：验收完成，准备发布。用户已于 2026-11-25 明确授权部署最新 zsetup-scripts。
+状态：正式脚本已发布并校验通过；未部署新版 KaiPlus 客户端，未发布新的 Skills 内容快照。
+用户已于 2026-11-25 明确授权部署最新 zsetup-scripts。
 
 目标和任务树：父工作区 `docs/plans/kaiplus-skills-script-update-2026-11-25.md`。
 
@@ -39,4 +40,26 @@ SSH：`root@192.168.3.1`。
 协调器：`scripts/publish-apps.py`，使用上述精确 ID，先暂存/校验不可变文件，再激活入口和配置。
 原始基线、差异及验收记录保存在父工作区 `build/verification/kaiplus-skills-update-20261125/`。
 
-发布结果、源提交和回退命令待实际激活后填写。
+发布时间/最终复核：`2026-11-25T05:20:28.426256+00:00`。
+
+- 冻结源提交：`e82975108f37582835b029ecfe8c6282e66d3808`；发布 ID 及入口摘要与候选一致。
+- 服务器事务 phase：`activated`，全部 106 个文件逐字节验证成功。
+- 暂存阶段：四站 92 次不可变文件 HTTPS 校验通过，之后才激活可变入口。
+- 激活阶段：四站 424 次最终 HTTPS 字节校验通过。
+- 另外不带查询参数回读四站固定入口和 SHA256SUMS，共 8 次校验均匹配候选；
+  与 KaiPlus 的实际请求方式一致，没有只依赖 cache-busting URL。
+- 从实际公网下载并验证的脚本，在隔离的假 native/worker 上完成 4 个分流用例：
+  KaiPlus 来源的 istoreos/ubuntu 传递给 `_skills_prepare`；普通来源的 istoreos/ubuntu
+  仍传递给对应单系统安装命令。夹具未安装任何真实软件或修改宿主服务。
+- 外部 `/binary/zsetup/config.json` 和 `/binary/kai/defaults/snapshot-v2/index.json`
+  发布前后摘要不变；本次只发布脚本，不等于更新 KaiPlus 客户端或 Skills 内容版本。
+- 快照：`/mnt/sata3-1/istore-data/public_html/binary/zsetup-scripts/apps/zsetup/.apps-rollback-885aa737c6e114cf4fe126c69c622d2213f7575fc06a709a0eead13c30b5fab5`，未实际回滚成功发布的版本。
+
+必要时使用已有协调器回退本次入口/配置：
+
+```sh
+python3 -B scripts/publish-apps.py rollback --server root@192.168.3.1 --binary-root /mnt/sata3-1/istore-data/public_html/binary --release-id 885aa737c6e114cf4fe126c69c622d2213f7575fc06a709a0eead13c30b5fab5 --approve 885aa737c6e114cf4fe126c69c622d2213f7575fc06a709a0eead13c30b5fab5
+```
+
+完整清单、生产差异、stage/activate/verify 日志、固定 URL 与分流测试记录保存于
+父工作区 `build/verification/kaiplus-skills-update-20261125/`。

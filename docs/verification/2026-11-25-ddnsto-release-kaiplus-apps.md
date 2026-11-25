@@ -1,6 +1,6 @@
 # 完整 apps 最新版发布中的 DDNSTO 范围记录
 
-状态：发布前审核；本记录随最新完整 zsetup-scripts/apps 候选归档。
+状态：随完整 zsetup-scripts/apps 正式发布并通过源站及四站字节核验。
 
 用户于 2026-11-25 明确要求在 KaiPlus Skills 更新功能完整验收后部署最新 zsetup-scripts。
 因此发布范围为完整已提交 apps 树，不单独拼接 kai-skills 子目录。本轮不操作任何
@@ -26,7 +26,7 @@ DDNSTO 客户端设备，不改变客户端推荐版本、产品 URL、摘要或
 ## 本轮检查与部署
 
 本机完整 `scripts/check.sh --native-bin`、旧 Shell 兼容补验、源站和四站 HTTPS
-校验的最终结果及精确发布 ID 将填写于
+校验的最终结果及精确发布 ID 已填写于
 `docs/verification/2026-11-25-kaiplus-skills-apps-publish.md`。
 所有新文件先暂存，公开不可变字节核验后才切换标准入口、配置与完整 SHA256SUMS。
 回退使用本次协调器快照，只回退安装入口和索引，不删除历史文件或自动降级任何设备。
