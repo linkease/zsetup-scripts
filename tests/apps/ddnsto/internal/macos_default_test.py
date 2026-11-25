@@ -1,14 +1,125 @@
 """Default macOS workflow, with no host services or network access."""
 import unittest
+import shutil
+import shlex
+import re
+from pathlib import Path
 import macos_behavior_test as macos
 
 
 class MacDefault(unittest.TestCase):
+    def test_human_install_progress_and_clean_result(self):
+        result = self.run_script(DDNSTO_HUMAN_OUTPUT='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('正在检查客户端版本', result.stderr)
+        self.assertIn('正在下载并校验客户端', result.stderr)
+        self.assertIn('正在启动并检查服务', result.stderr)
+        self.assertIn('安装成功', result.stdout)
+        self.assertNotIn('local_service=', result.stdout)
+        again = self.run_script(DDNSTO_HUMAN_OUTPUT='1')
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn('当前已是 4.2.8', again.stderr)
+        self.assertNotIn('local_service=', again.stdout)
+        status = self.run_script(('--action', 'status'), DDNSTO_HUMAN_OUTPUT='1')
+        self.assertIn('local_service=running', status.stdout)
+
+    def test_unicode_messages_delimit_shell_variable_names(self):
+        template = Path(__file__).resolve().parents[4] / 'sources/ddnsto/templates/install-macos.sh.in'
+        self.assertEqual(re.findall(r'\$[A-Za-z_][A-Za-z_0-9]*[^\x00-\x7f]', template.read_text()), [])
+
     setUp = macos.MacInstaller.setUp
     tool = macos.MacInstaller.tool
     run_script = macos.MacInstaller.run_script
     run_menu = macos.MacInstaller.run_menu
     receipt = macos.MacInstaller.receipt
+    def legacy_install(self):
+        self.assertEqual(self.run_script().returncode, 0)
+        (self.install / 'ddnsto').write_text('official legacy fixture')
+        (self.config / '.installer-macos-version').unlink()
+        identity = self.config / '.ddnsto_boot.cfg'
+        identity.write_text('existing-device-identity')
+        identity.chmod(0o600)
+        real_shasum = shlex.quote(shutil.which('shasum'))
+        self.tool('shasum', '''
+if [ "$3" = "$DDNSTO_INSTALL_DIR/ddnsto" ] &&
+   [ "$(cat "$3")" = 'official legacy fixture' ]; then
+ case "${TEST_ARCH:-arm64}" in
+  arm64) hash=42b1daf64fcbec4b99623d0585ed80b7184d9f7b25772b5929957ba9de37afa6 ;;
+  *) hash=6bc92030748aed5ec639eddf543c5b68c9a8efdca83147e10db4e30a9f4edb51 ;;
+ esac
+ printf '%s  %s\\n' "$hash" "$3"
+else
+ exec ''' + real_shasum + ''' "$@"
+fi
+''')
+
+    def test_known_legacy_missing_receipt_upgrades_automatically(self):
+        self.legacy_install()
+        before = (self.config / 'ddnsto.yaml').read_bytes()
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.install / 'ddnsto').read_text(), 'new binary')
+        self.assertTrue((self.config / '.installer-macos-version').read_text().startswith('4.2.8 '))
+        self.assertEqual((self.config / 'ddnsto.yaml').read_bytes(), before)
+        self.assertEqual((self.config / '.ddnsto_boot.cfg').read_text(), 'existing-device-identity')
+        self.assertTrue((self.root / 'running').exists())
+
+    def test_known_legacy_intel_missing_receipt_upgrades(self):
+        self.env['TEST_ARCH'] = 'x86_64'
+        self.test_known_legacy_missing_receipt_upgrades_automatically()
+
+    def test_known_legacy_failed_start_restores_missing_receipt(self):
+        self.legacy_install()
+        result = self.run_script(FAIL_START='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / 'failed-once').exists(), result.stderr)
+        self.assertEqual((self.install / 'ddnsto').read_text(), 'official legacy fixture')
+        self.assertFalse((self.config / '.installer-macos-version').exists())
+        self.assertTrue((self.root / 'running').exists())
+
+    def test_known_legacy_failed_download_does_not_write_receipt(self):
+        self.legacy_install()
+        result = self.run_script(FAIL_DOWNLOAD='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('缺少版本凭据', result.stderr)
+        self.assertEqual((self.install / 'ddnsto').read_text(), 'official legacy fixture')
+        self.assertFalse((self.config / '.installer-macos-version').exists())
+
+    def test_known_legacy_does_not_bypass_account_or_invalid_receipt(self):
+        self.legacy_install()
+        result = self.run_script(('--token', 'other-account'))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('账号不一致', result.stderr)
+        receipt = self.config / '.installer-macos-version'
+        receipt.write_text('invalid')
+        receipt.chmod(0o600)
+        result = self.run_script()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('版本凭据无效', result.stderr)
+
+    def test_known_legacy_rechecks_binary_after_download(self):
+        self.legacy_install()
+        native = (self.bin / 'zsetup').read_text()
+        self.tool('zsetup', '''
+if [ "$1" = download ]; then
+ printf '%s' 'changed by another installer' > "$DDNSTO_INSTALL_DIR/ddnsto"
+fi
+''' + native)
+        result = self.run_script()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('未匹配已知官方文件', result.stderr)
+        self.assertFalse((self.config / '.installer-macos-version').exists())
+        self.assertEqual((self.install / 'ddnsto').read_text(), 'changed by another installer')
+
+    def test_unknown_legacy_binary_is_not_executed(self):
+        self.legacy_install()
+        (self.install / 'ddnsto').write_text('#!/bin/sh\ntouch "' + str(self.root / 'executed') + '"\n')
+        result = self.run_script()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('未匹配已知官方文件', result.stderr)
+        self.assertFalse((self.root / 'executed').exists())
+        self.assertFalse((self.config / '.installer-macos-version').exists())
+
     # Inherit fixture helpers, not the historical menu contract.
     def test_default_same_account_starts_disabled_offline(self):
         self.assertEqual(self.run_script().returncode, 0)

@@ -93,7 +93,7 @@ class BootstrapRegression(unittest.TestCase):
     def test_synology_preflight_selects_private_executable_cache_before_bootstrap(self):
         entry = (ROOT / 'apps/ddnsto/install.sh').read_text()
         self.assertIn('ddnsto_entry_storage', entry)
-        self.assertLess(entry.index('ddnsto_entry_storage\n'), entry.index('\nbootstrap_zsetup\n'))
+        self.assertLess(entry.index('ddnsto_entry_storage\n'), entry.index('ACTIVE_ZSETUP=$(ddnsto_entry_wait'))
 
     def test_synology_storage_rejects_unsafe_parent(self):
         source = ROOT / 'sources/ddnsto/entry-preflight.sh'
