@@ -25,6 +25,13 @@ status() {
     printf '%s\n' "$*" >&2
 }
 
+bootstrap_notice() {
+    if command -v zsetup_bootstrap_progress >/dev/null 2>&1; then
+        zsetup_bootstrap_progress "$@"
+    fi
+    return 0
+}
+
 bootstrap_mips_byte_order() {
     type od >/dev/null 2>&1 || return 1
     set -- $(od -An -tu1 -N6 /bin/sh 2>/dev/null)
@@ -69,12 +76,14 @@ bootstrap_fetch_from_base() {
     destination=$4
     found=0
     url=$(bootstrap_url "$scheme" "$base" "$remote_path")
+    bootstrap_notice source "$base"
     if type curl >/dev/null 2>&1; then
         found=1
         rm -f "$destination" 2>/dev/null || true
         if curl -fsSL --connect-timeout 10 --max-time 30 -o "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     if type wget >/dev/null 2>&1; then
         found=1
@@ -82,6 +91,7 @@ bootstrap_fetch_from_base() {
         if wget -q -T 10 -O "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     [ "$found" -eq 1 ] || echo "zsetup: curl or wget is required for first bootstrap" >&2
     return 1
@@ -268,12 +278,14 @@ bootstrap_zsetup() {
     fi
 
     if find_existing_zsetup; then
+        bootstrap_notice cached
         trap - EXIT HUP INT TERM
         rm -f "$stable_file" "$sums_file" 2>/dev/null || true
         return 0
     fi
 
     rescue_dir="$WORK_ROOT/rescue/$RESCUE_VERSION"
+    bootstrap_notice download
     rescue_bin="$rescue_dir/zsetup"
     candidate="$rescue_dir/.zsetup-download.$$"
     mkdir -p "$rescue_dir"
@@ -467,12 +479,29 @@ check_config_shape() {
 }
 check_version() {
     diagnostic_event version
-    [ -f "$receipt" ] || fail '缺少版本凭据，无法确认旧安装版本，需人工迁移'
-    installed_version=$(sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\) [0-9a-f]*$/\1/p' "$receipt")
+    if [ ! -f "$receipt" ]; then
+        # Historical installers did not write a version receipt. Recognize
+        # reviewed official bytes without executing the old program or writing
+        # a receipt ahead of the transaction. Rechecked after the install lock;
+        # rollback must leave an originally absent receipt absent.
+        [ "$state" = installed ] || fail '仅有保留配置且缺少版本记录，无法确认原客户端版本'
+        digest=$(shasum -a 256 "$binary") || fail '无法校验已安装程序'
+        case "$member:${digest%% *}" in
+            ddnsto_cli.arm64:42b1daf64fcbec4b99623d0585ed80b7184d9f7b25772b5929957ba9de37afa6|ddnsto_cli.amd64:6bc92030748aed5ec639eddf543c5b68c9a8efdca83147e10db4e30a9f4edb51)
+                installed_version=4.2.1
+                diagnostic_event legacy-official-binary
+                ;;
+            *) fail '旧客户端缺少版本记录且未匹配已知官方文件，已保留原安装；请反馈诊断记录以补充自动迁移支持' ;;
+        esac
+    else
+        installed_version=$(sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\) [0-9a-f]*$/\1/p' "$receipt")
+    fi
     printf '%s\n' "$installed_version" | grep -E -q '^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$' || fail '版本凭据无效'
     if [ "$state" = installed ]; then
         digest=$(shasum -a 256 "$binary") || fail '无法校验已安装程序'
-        [ "$(cat "$receipt")" = "$installed_version ${digest%% *}" ] || fail '程序与版本凭据不一致，已停止'
+        if [ -f "$receipt" ]; then
+            [ "$(cat "$receipt")" = "$installed_version ${digest%% *}" ] || fail '程序与版本凭据不一致，已停止'
+        fi
     else
         [ "$(wc -l < "$receipt" | tr -d ' ')" = 1 ] &&
             grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+ [0-9a-f]{64}$' "$receipt" || fail '版本凭据无效'
@@ -730,7 +759,8 @@ launchctl() {
     fi
 }
 installer_command() {
-    if [ "$default_install" = 1 ]; then "$@" >/dev/null 2>&1
+    if [ "${DDNSTO_HUMAN_OUTPUT:-0}" = 1 ] && [ "${2:-}" = download ]; then "$@"
+    elif [ "$default_install" = 1 ]; then "$@" >/dev/null 2>&1
     else "$@"; fi
 }
 installer_output() {
@@ -846,6 +876,7 @@ manage_service() (
         exit 0
     fi
     diagnostic_event starting
+    [ "$default_install" != 1 ] || printf '%s\n' 'DDNSTO：正在启动并检查服务…' >&2
     launchctl enable "$domain/$LABEL" || fail 'could not enable service'
     if [ "$ACTION" = restart ] && launchctl print "$domain/$LABEL" >/dev/null 2>&1; then
         launchctl bootout "$domain/$LABEL" || fail 'could not stop service for restart'
@@ -856,7 +887,10 @@ manage_service() (
     fi
     launchctl kickstart "$domain/$LABEL" || fail 'could not start service'
     stable_running
-    printf '%s\n' '启动成功：本地服务稳定运行，已启用登录启动。' 'local_service=running cloud_status=unverified'
+    printf '%s\n' 'DDNSTO：启动成功，本地服务稳定运行，已启用登录启动。'
+    if [ "${DDNSTO_HUMAN_OUTPUT:-0}" != 1 ] || [ "$default_install" != 1 ]; then
+        printf '%s\n' 'local_service=running cloud_status=unverified'
+    fi
 )
 case "$ACTION" in install|update|repair|configure) ;; *) manage_service; exit "$?" ;; esac
 case "$ACTION" in repair|configure) [ "$state" = installed ] || fail 'no managed installation';; esac
@@ -883,9 +917,15 @@ elif [ -f "$config" ]; then
 else
     [ -n "$TOKEN" ] || fail 'token is required on first installation'
 fi
+[ "$default_install" != 1 ] || printf '%s\n' 'DDNSTO：正在检查客户端版本…' >&2
 if [ "$state" = installed ] && { [ "$ACTION" = install ] || [ "$ACTION" = update ]; }; then
     check_version
     if [ "$older" = 0 ] && { [ "$ACTION" = install ] || [ "$installed_version" != "$VERSION" ]; }; then
+        if [ "$installed_version" = "$VERSION" ]; then
+            printf 'DDNSTO：当前已是 %s，无需重新下载客户端。\n' "$installed_version" >&2
+        else
+            printf 'DDNSTO：保留已安装的较新版本 %s，不降级。\n' "$installed_version" >&2
+        fi
         # Repair the owned definition as needed, without replacing newer bytes.
         if [ "$environment_change" = 1 ] || [ ! -f "$plist" ] || [ "$(cat "$plist")" != "$(managed_plist)" ]; then
             ACTION=repair
@@ -1073,7 +1113,7 @@ ddnsto_https_fetch() (
 ensure_zsetup() {
     ZSETUP_BIN=$(installer_output bootstrap_zsetup_path) || fail 'zsetup stable bootstrap download/checksum failed; no client changes made' 11
 }
-printf 'DDNSTO：安装器固定版本 %s，未查询推荐版本。\n' "$VERSION" >&2
+printf 'DDNSTO：本次安装目标版本 %s。\n' "$VERSION" >&2
 if [ "$ACTION" != repair ] && [ "$ACTION" != configure ]; then
     diagnostic_event installing
     # Bootstrap before taking the DDNSTO transaction lock. The shared
@@ -1084,6 +1124,7 @@ mkdir -p "$CONFIG_DIR"
 mkdir "$CONFIG_DIR/.install-lock" 2>/dev/null || fail 'another installation is active'
 locked=1
 if [ "$ACTION" != repair ] && [ "$ACTION" != configure ]; then
+    printf '%s\n' 'DDNSTO：正在下载并校验客户端…' >&2
     installer_command "$ZSETUP_BIN" download -o "$work/client.tar.gz" --sha256 "$archive_sha" \
         "https://fw.koolcenter.com/binary/ddnsto/macOS/ddnsto_darwin_cli_${VERSION}.tar.gz"
     installer_command tar -xzf "$work/client.tar.gz" -C "$work" "$member"
@@ -1159,6 +1200,7 @@ if [ "$had_config" = 0 ] || [ "$ACTION" = configure ]; then cp "$work/config" "$
 chmod 600 "$config"
 cp "$work/plist" "$plist"
 diagnostic_event starting
+printf '%s\n' 'DDNSTO：正在启动并检查服务…' >&2
 launchctl bootstrap "$domain" "$plist"
 launchctl kickstart -k "$domain/$LABEL"
 stable_running
@@ -1176,5 +1218,7 @@ case "$ACTION" in
     repair|configure) result_label=启动成功; result_version=${installed_version:-unknown} ;;
     *) result_label=安装成功; result_version=$VERSION ;;
 esac
-printf '%s\n' "DDNSTO $result_version: operation=$ACTION local_service=running cloud_status=unverified" \
-    "$result_label：本地服务稳定运行，已启用登录启动；未检查云端状态。"
+if [ "${DDNSTO_HUMAN_OUTPUT:-0}" != 1 ] || [ "$default_install" != 1 ]; then
+    printf '%s\n' "DDNSTO $result_version: operation=$ACTION local_service=running cloud_status=unverified"
+fi
+printf 'DDNSTO：%s，本地服务稳定运行，已启用登录启动。\n' "$result_label"

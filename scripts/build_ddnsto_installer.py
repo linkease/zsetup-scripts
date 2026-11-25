@@ -47,19 +47,20 @@ def compose(root: Path, app: Path) -> str:
             "product-pins.sh", "docker-probe.sh", "docker-lifecycle.sh",
             "method-selection.sh", "synology-download.sh", "extra-platforms.sh",
             "openwrt-lifecycle.sh", "openwrt-adapter.sh", "auto-install.sh",
-            "auto-linux.sh", "auto-openwrt.sh", "auto-synology.sh",
+            "auto-linux.sh", "process-linux.sh", "process-install.sh", "auto-openwrt.sh", "auto-synology.sh",
             "auto-synology-fresh.sh", "asus-platform.sh", "asus-storage.sh",
             "asus-package.sh", "asus-service.sh", "asus-transaction.sh", "auto-asus.sh",
         )
     )
     content = common + "\n# Business logic: maintained in sources/ddnsto/business.sh\n" + business
 
-    program = "set -eu\nstatus() { printf '%s\\n' \"$*\" >&2; }\n"
+    program = ('set -eu\n'
+               'if [ -z "${ZSETUP_CA_FILE:-}" ]; then unset ZSETUP_CA_FILE; fi\n'
+               "status() { printf '%s\\n' \"$*\" >&2; }\n")
     program += foundation + dispatch + shared(root, "install-service.sh") + business
-    program = "\n".join(
-        line for line in program.splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ) + "\n"
+    program += '\ninstaller_dispatch ddnsto "$@"\n'
+    # Shell here-documents contain executable scripts and literal data. Stripping
+    # comment-looking lines changes that data (notably service shebangs).
     delimiter = "ZSETUP_PRIVATE_ROOT_PROGRAM"
     if delimiter in program or len(program.encode()) > 1048576:
         raise ValueError("DDNSTO privileged program is invalid or too large")

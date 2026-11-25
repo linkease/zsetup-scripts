@@ -1,4 +1,5 @@
 #!/bin/sh
+ddnsto_entry_main() {
 set -eu
 
 APP_ID='ddnsto'
@@ -21,6 +22,13 @@ INSECURE_CONFIRMED=0
 
 status() {
     printf '%s\n' "$*" >&2
+}
+
+bootstrap_notice() {
+    if command -v zsetup_bootstrap_progress >/dev/null 2>&1; then
+        zsetup_bootstrap_progress "$@"
+    fi
+    return 0
 }
 
 bootstrap_mips_byte_order() {
@@ -67,12 +75,14 @@ bootstrap_fetch_from_base() {
     destination=$4
     found=0
     url=$(bootstrap_url "$scheme" "$base" "$remote_path")
+    bootstrap_notice source "$base"
     if type curl >/dev/null 2>&1; then
         found=1
         rm -f "$destination" 2>/dev/null || true
         if curl -fsSL --connect-timeout 10 --max-time 30 -o "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     if type wget >/dev/null 2>&1; then
         found=1
@@ -80,6 +90,7 @@ bootstrap_fetch_from_base() {
         if wget -q -T 10 -O "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     [ "$found" -eq 1 ] || echo "zsetup: curl or wget is required for first bootstrap" >&2
     return 1
@@ -266,12 +277,14 @@ bootstrap_zsetup() {
     fi
 
     if find_existing_zsetup; then
+        bootstrap_notice cached
         trap - EXIT HUP INT TERM
         rm -f "$stable_file" "$sums_file" 2>/dev/null || true
         return 0
     fi
 
     rescue_dir="$WORK_ROOT/rescue/$RESCUE_VERSION"
+    bootstrap_notice download
     rescue_bin="$rescue_dir/zsetup"
     candidate="$rescue_dir/.zsetup-download.$$"
     mkdir -p "$rescue_dir"
@@ -304,6 +317,52 @@ bootstrap_zsetup_path() (
 )
 
 
+# Human-facing stages. Never print arguments (which may contain the Token).
+DDNSTO_HUMAN_OUTPUT=1
+export DDNSTO_HUMAN_OUTPUT
+
+zsetup_bootstrap_progress() {
+    case "$1" in
+        source) printf 'DDNSTO：正在连接下载源 %s…\n' "${2#*://}" >&2 ;;
+        retry) printf '%s\n' 'DDNSTO：此下载源未成功，正在尝试下一种下载方式或镜像…' >&2 ;;
+        cached) printf '%s\n' 'DDNSTO：使用已有安装工具，无需重复下载。' >&2 ;;
+        download) printf '%s\n' 'DDNSTO：正在下载并校验安装工具…' >&2 ;;
+    esac
+}
+
+ddnsto_entry_wait() (
+    ddnsto_stage=$1
+    shift
+    printf 'DDNSTO：%s…\n' "$ddnsto_stage" >&2
+    ddnsto_interval=${DDNSTO_PROGRESS_INTERVAL:-8}
+    case "$ddnsto_interval" in ''|*[!0-9]*|0) ddnsto_interval=8 ;; esac
+    (
+        ddnsto_sleep=
+        trap '[ -z "$ddnsto_sleep" ] || kill "$ddnsto_sleep" 2>/dev/null || :; exit 0' HUP INT TERM
+        while :; do
+            sleep "$ddnsto_interval" & ddnsto_sleep=$!
+            wait "$ddnsto_sleep" || exit 0
+            ddnsto_sleep=
+            printf 'DDNSTO：%s，仍在处理，请稍候…\n' "$ddnsto_stage" >&2
+        done
+    ) &
+    ddnsto_ticker=$!
+    trap 'kill "$ddnsto_ticker" 2>/dev/null || :; wait "$ddnsto_ticker" 2>/dev/null || :' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    # Execute in a separate subshell so bootstrap traps and exec cannot replace
+    # the ticker cleanup handler. Preserve the original command's exit code.
+    set +e
+    ( set -e; "$@" )
+    ddnsto_rc=$?
+    if [ "$ddnsto_rc" != 0 ]; then
+        printf 'DDNSTO：阶段“%s”失败（退出码 %s）；下一步：根据上方错误检查网络或诊断记录后重试。\n' "$ddnsto_stage" "$ddnsto_rc" >&2
+    fi
+    exit "$ddnsto_rc"
+)
+
+printf '%s\n' 'DDNSTO：正在检查系统和已有安装…' >&2
 # Metadata for DDNSTO only. Prefer native stat, but minimal OpenWrt firmware
 # may omit both stat and its BusyBox applet. Never replace checks with success.
 ddnsto_file_fields() (
@@ -674,9 +733,9 @@ ddnsto_entry_appliance() (
     trap 'exit 129' HUP
     trap 'exit 130' INT
     trap 'exit 143' TERM
-    entry_digest='a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd'
-    entry_size='549824'
-    entry_relative='ddnsto/versions/0.3.2/install.sh'
+    entry_digest='31642e21fc07f69d150b7a4a6e683e05d08a055b87ce67be5518fc55dbf2bd49'
+    entry_size='611916'
+    entry_relative='ddnsto/versions/0.3.3/install.sh'
     if [ "$DDNSTO_ENTRY_LEGACY" = 1 ]; then
         entry_ok=0
         for entry_base in $CONFIG_PRIMARY_URLS "$CONFIG_FALLBACK_URL"; do
@@ -694,7 +753,11 @@ ddnsto_entry_appliance() (
             for entry_base in $CONFIG_PRIMARY_URLS; do
                 set -- "$@" "${entry_base%/zsetup/config.json}/$entry_relative"
             done
-            "$ACTIVE_ZSETUP" "$@" --fallback-url "${CONFIG_FALLBACK_URL%/zsetup/config.json}/$entry_relative"
+            case " $CONFIG_PRIMARY_URLS " in
+                *" $CONFIG_FALLBACK_URL "*) ;;
+                *) set -- "$@" --fallback-url "${CONFIG_FALLBACK_URL%/zsetup/config.json}/$entry_relative" ;;
+            esac
+            "$ACTIVE_ZSETUP" "$@"
         }
         ddnsto_entry_fetch_payload || exit $?
     fi
@@ -703,10 +766,10 @@ ddnsto_entry_appliance() (
 
 
 if [ "$DDNSTO_ENTRY_LEGACY" = 0 ]; then
-bootstrap_zsetup
+ACTIVE_ZSETUP=$(ddnsto_entry_wait "正在准备安装工具，首次运行可能稍久" bootstrap_zsetup_path)
 fi
 if [ -n "$DDNSTO_ENTRY_APPLIANCE" ]; then
-    ddnsto_entry_appliance "$@"
+    ddnsto_entry_wait "正在下载、校验并运行安装器" ddnsto_entry_appliance "$@"
     exit "$?"
 fi
 
@@ -721,7 +784,11 @@ download_business_config() {
     set -- "$@" --fallback-url "$CONFIG_FALLBACK_URL"
     "$ACTIVE_ZSETUP" "$@"
 }
-download_business_config
+if [ "$APP_ID" = ddnsto ]; then
+    ddnsto_entry_wait '正在获取安装信息' download_business_config
+else
+    download_business_config
+fi
 chmod 0600 "$config_candidate"
 mv -f "$config_candidate" "$config_file"
 trap - EXIT HUP INT TERM
@@ -737,13 +804,17 @@ if [ "$APP_ID" = ddnsto ]; then
     done
     CONFIG_PRIMARY_URLS=$index_urls
     CONFIG_FALLBACK_URL=${CONFIG_FALLBACK_URL%/config.json}/ddnsto-index.json
-    download_business_config
+    ddnsto_entry_wait '正在获取安装索引' download_business_config
     chmod 0600 "$config_candidate"
     mv -f "$config_candidate" "$index_file"
     trap - EXIT HUP INT TERM
     ZSETUP_SOURCE_BASES=$DIRECT_PRIMARY_BASES
     ZSETUP_SOURCE_FALLBACK=$DIRECT_FALLBACK_BASE
     export ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK
-    exec "$ACTIVE_ZSETUP" install --index "$index_file" "$APP_ID" --foreground -- "$@"
+    ddnsto_entry_wait '正在下载、校验并运行安装器' "$ACTIVE_ZSETUP" install --index "$index_file" "$APP_ID" --foreground -- "$@"
+    exit "$?"
 fi
 exec "$ACTIVE_ZSETUP" install "$APP_ID" --foreground -- "$@"
+
+}
+ddnsto_entry_main "$@" </dev/null

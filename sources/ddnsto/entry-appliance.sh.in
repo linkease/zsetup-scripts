@@ -32,7 +32,11 @@ ddnsto_entry_appliance() (
             for entry_base in $CONFIG_PRIMARY_URLS; do
                 set -- "$@" "${entry_base%/zsetup/config.json}/$entry_relative"
             done
-            "$ACTIVE_ZSETUP" "$@" --fallback-url "${CONFIG_FALLBACK_URL%/zsetup/config.json}/$entry_relative"
+            case " $CONFIG_PRIMARY_URLS " in
+                *" $CONFIG_FALLBACK_URL "*) ;;
+                *) set -- "$@" --fallback-url "${CONFIG_FALLBACK_URL%/zsetup/config.json}/$entry_relative" ;;
+            esac
+            "$ACTIVE_ZSETUP" "$@"
         }
         ddnsto_entry_fetch_payload || exit $?
     fi

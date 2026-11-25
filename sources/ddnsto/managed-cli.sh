@@ -9,7 +9,8 @@ ddnsto_usage() {
         'Platform is a constraint, not an override. QNAP/Unraid are unavailable; Windows requires install.ps1.' \
         'Synology: DSM 7 default ensure installs/starts a verified SPK; DS220j / DSM 7.1 tested, ARM64 limited to DS220j. DSM 6 and explicit download/install use manual handoff.' \
         'Docker: explicit selection only; no automatic native/container migration.' \
-        'Linux: protected systemd install/update and owned-service lifecycle.' \
+        'Linux: systemd service when available; otherwise a background process as the current user (x86_64/aarch64).' \
+        'Process fallback: ~/.local/share/ddnsto; no autostart, supervision or persistence guarantee. Re-run after reboot/recreation. configure/uninstall are not supported.' \
         'OpenWrt: package install/update and offline procd lifecycle; update preserves UCI identity and enabled state.' \
         'Shared options precede business options: --installer-prefix PATH --installer-work-dir PATH --installer-scope system.' \
         'Explicit install on OpenWrt: token optional; automatic Lite selection below 900 MB.' \
@@ -225,7 +226,7 @@ ddnsto_detect_platform() {
     if [ -z "$detected_platform" ]; then
         case "$os:$package_manager" in
             openwrt:opkg|openwrt:apk) detected_platform=openwrt ;;
-            ubuntu:apt|debian:apt|centos:yum|centos:dnf|rhel:yum|rhel:dnf|linux:*) detected_platform=linux ;;
+            ubuntu:*|debian:*|centos:*|rhel:*|linux:*) detected_platform=linux ;;
             *) ddnsto_error "unsupported platform: $os/$package_manager"; return 2 ;;
         esac
     fi

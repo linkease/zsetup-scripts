@@ -19,10 +19,14 @@ trap 'rm -f "$config_candidate" 2>/dev/null || true' EXIT HUP INT TERM
 download_business_config() {
     set -- download --quiet -o "$config_candidate" --max-bytes 131072
     for config_url in $CONFIG_PRIMARY_URLS; do set -- "$@" "$config_url"; done
-    set -- "$@" --fallback-url "$CONFIG_FALLBACK_URL"
+@CONFIG_FALLBACK_ARGUMENT@
     "$ACTIVE_ZSETUP" "$@"
 }
-download_business_config
+if [ "$APP_ID" = ddnsto ]; then
+    ddnsto_entry_wait '正在获取安装信息' download_business_config
+else
+    download_business_config
+fi
 chmod 0600 "$config_candidate"
 mv -f "$config_candidate" "$config_file"
 trap - EXIT HUP INT TERM
@@ -38,13 +42,14 @@ if [ "$APP_ID" = ddnsto ]; then
     done
     CONFIG_PRIMARY_URLS=$index_urls
     CONFIG_FALLBACK_URL=${CONFIG_FALLBACK_URL%/config.json}/ddnsto-index.json
-    download_business_config
+    ddnsto_entry_wait '正在获取安装索引' download_business_config
     chmod 0600 "$config_candidate"
     mv -f "$config_candidate" "$index_file"
     trap - EXIT HUP INT TERM
     ZSETUP_SOURCE_BASES=$DIRECT_PRIMARY_BASES
     ZSETUP_SOURCE_FALLBACK=$DIRECT_FALLBACK_BASE
     export ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK
-    exec "$ACTIVE_ZSETUP" install --index "$index_file" "$APP_ID" --foreground -- "$@"
+    ddnsto_entry_wait '正在下载、校验并运行安装器' "$ACTIVE_ZSETUP" install --index "$index_file" "$APP_ID" --foreground -- "$@"
+    exit "$?"
 fi
 exec "$ACTIVE_ZSETUP" install "$APP_ID" --foreground -- "$@"

@@ -19,6 +19,13 @@ status() {
     printf '%s\n' "$*" >&2
 }
 
+bootstrap_notice() {
+    if command -v zsetup_bootstrap_progress >/dev/null 2>&1; then
+        zsetup_bootstrap_progress "$@"
+    fi
+    return 0
+}
+
 bootstrap_mips_byte_order() {
     type od >/dev/null 2>&1 || return 1
     set -- $(od -An -tu1 -N6 /bin/sh 2>/dev/null)
@@ -63,12 +70,14 @@ bootstrap_fetch_from_base() {
     destination=$4
     found=0
     url=$(bootstrap_url "$scheme" "$base" "$remote_path")
+    bootstrap_notice source "$base"
     if type curl >/dev/null 2>&1; then
         found=1
         rm -f "$destination" 2>/dev/null || true
         if curl -fsSL --connect-timeout 10 --max-time 30 -o "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     if type wget >/dev/null 2>&1; then
         found=1
@@ -76,6 +85,7 @@ bootstrap_fetch_from_base() {
         if wget -q -T 10 -O "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     [ "$found" -eq 1 ] || echo "zsetup: curl or wget is required for first bootstrap" >&2
     return 1
@@ -262,12 +272,14 @@ bootstrap_zsetup() {
     fi
 
     if find_existing_zsetup; then
+        bootstrap_notice cached
         trap - EXIT HUP INT TERM
         rm -f "$stable_file" "$sums_file" 2>/dev/null || true
         return 0
     fi
 
     rescue_dir="$WORK_ROOT/rescue/$RESCUE_VERSION"
+    bootstrap_notice download
     rescue_bin="$rescue_dir/zsetup"
     candidate="$rescue_dir/.zsetup-download.$$"
     mkdir -p "$rescue_dir"

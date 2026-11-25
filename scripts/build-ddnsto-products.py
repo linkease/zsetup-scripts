@@ -31,7 +31,7 @@ def render(root, config):
         for field, value in fields.items():
             if not isinstance(value, str):
                 raise ValueError('product values must be strings')
-            if field == 'client_version':
+            if field == 'client_version' or (platform == 'macos' and field == 'legacy_client_version'):
                 pattern = VERSION
             elif field == 'package_version':
                 pattern = re.escape(fields['client_version']) + r'-[1-9][0-9]{0,5}'

@@ -190,6 +190,10 @@ ddnsto_install() {
     ddnsto_business_environment_preflight || return $?
     [ "$REQUESTED_METHOD" != docker ] || { ddnsto_error 'Docker requires the public entry'; return 2; }
     case "$detected_platform" in linux|openwrt) business_platform=$detected_platform ;; *) ddnsto_error 'native installation unavailable for this device'; return 2 ;; esac
+    if [ "$business_platform" = linux ] && command -v ddnsto_process_needed >/dev/null 2>&1 && ddnsto_process_needed; then
+        ddnsto_process_entry "$@"
+        return $?
+    fi
     case "$ACTION" in
         status|start|stop|restart|repair|configure|uninstall) ddnsto_managed_action; return $? ;;
     esac

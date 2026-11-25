@@ -1,0 +1,218 @@
+[
+  {
+    "url": "https://run.ddnsto.com/install.sh",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "0a9b38486731416f13e761b751ba103f40ea3d1bc2fd5a156f421c37ed12d0ca",
+    "expected": "0a9b38486731416f13e761b751ba103f40ea3d1bc2fd5a156f421c37ed12d0ca",
+    "size": 28711
+  },
+  {
+    "url": "https://run.ddnsto.com/install.ps1",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "223b33132b8634f94aaea13c34f6ab280ac485bd3d7b40360559d2d4e7de6767",
+    "expected": "223b33132b8634f94aaea13c34f6ab280ac485bd3d7b40360559d2d4e7de6767",
+    "size": 14868
+  },
+  {
+    "url": "https://run.ddnsto.com/install.md",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "2994dd794381a23b0af613d79d648d924c6103be264bf40cb9d1231abc861ca4",
+    "expected": "2994dd794381a23b0af613d79d648d924c6103be264bf40cb9d1231abc861ca4",
+    "size": 7154
+  },
+  {
+    "url": "https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/config.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "expected": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "size": 49907
+  },
+  {
+    "url": "https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/config-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "expected": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "size": 4468
+  },
+  {
+    "url": "https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "expected": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "size": 13739
+  },
+  {
+    "url": "https://dl.istoreos.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "expected": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "size": 733
+  },
+  {
+    "url": "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.sh",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "expected": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "size": 549824
+  },
+  {
+    "url": "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.ps1",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "expected": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "size": 69121
+  },
+  {
+    "url": "https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/config.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "expected": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "size": 49907
+  },
+  {
+    "url": "https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/config-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "expected": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "size": 4468
+  },
+  {
+    "url": "https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "expected": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "size": 13739
+  },
+  {
+    "url": "https://fw.d4ctech.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "expected": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "size": 733
+  },
+  {
+    "url": "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.sh",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "expected": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "size": 549824
+  },
+  {
+    "url": "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.ps1",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "expected": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "size": 69121
+  },
+  {
+    "url": "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "expected": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "size": 49907
+  },
+  {
+    "url": "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "expected": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "size": 4468
+  },
+  {
+    "url": "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "expected": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "size": 13739
+  },
+  {
+    "url": "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "expected": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "size": 733
+  },
+  {
+    "url": "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.sh",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "expected": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "size": 549824
+  },
+  {
+    "url": "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.ps1",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "expected": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "size": 69121
+  },
+  {
+    "url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "expected": "4ce6050f7a4074ebafdc78169658e7ede38ea7b77689097c90408cbfacf1f9ec",
+    "size": 49907
+  },
+  {
+    "url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/config-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "expected": "70da44dbdb223464a46b4de2c825011075848013be7f83595fcee30a4ef93210",
+    "size": 4468
+  },
+  {
+    "url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "expected": "fa74105afa4cb4473be2229abcbff45f279423e343d9a0dd7c91b8a127422370",
+    "size": 13739
+  },
+  {
+    "url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/zsetup/ddnsto-index-windows.json",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "expected": "2dc590d72c9548b349a5b51ca579e25cb5302a2e545e895e321442b6fbbb340f",
+    "size": 733
+  },
+  {
+    "url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.sh",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "expected": "a1e9c1f31503997bcea86042186f027e07ff2b8263c0715be495eb784852dbcd",
+    "size": 549824
+  },
+  {
+    "url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.2/install.ps1",
+    "exit_code": 0,
+    "match": true,
+    "sha256": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "expected": "583feb5dbeb542b43b7e211ebac7fada8397308eb4e2865d3eace065da390d2a",
+    "size": 69121
+  }
+]

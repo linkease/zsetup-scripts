@@ -23,6 +23,13 @@ status() {
     printf '%s\n' "$*" >&2
 }
 
+bootstrap_notice() {
+    if command -v zsetup_bootstrap_progress >/dev/null 2>&1; then
+        zsetup_bootstrap_progress "$@"
+    fi
+    return 0
+}
+
 bootstrap_mips_byte_order() {
     type od >/dev/null 2>&1 || return 1
     set -- $(od -An -tu1 -N6 /bin/sh 2>/dev/null)
@@ -67,12 +74,14 @@ bootstrap_fetch_from_base() {
     destination=$4
     found=0
     url=$(bootstrap_url "$scheme" "$base" "$remote_path")
+    bootstrap_notice source "$base"
     if type curl >/dev/null 2>&1; then
         found=1
         rm -f "$destination" 2>/dev/null || true
         if curl -fsSL --connect-timeout 10 --max-time 30 -o "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     if type wget >/dev/null 2>&1; then
         found=1
@@ -80,6 +89,7 @@ bootstrap_fetch_from_base() {
         if wget -q -T 10 -O "$destination" "$url"; then
             return 0
         fi
+        bootstrap_notice retry
     fi
     [ "$found" -eq 1 ] || echo "zsetup: curl or wget is required for first bootstrap" >&2
     return 1
@@ -266,12 +276,14 @@ bootstrap_zsetup() {
     fi
 
     if find_existing_zsetup; then
+        bootstrap_notice cached
         trap - EXIT HUP INT TERM
         rm -f "$stable_file" "$sums_file" 2>/dev/null || true
         return 0
     fi
 
     rescue_dir="$WORK_ROOT/rescue/$RESCUE_VERSION"
+    bootstrap_notice download
     rescue_bin="$rescue_dir/zsetup"
     candidate="$rescue_dir/.zsetup-download.$$"
     mkdir -p "$rescue_dir"
@@ -319,7 +331,11 @@ download_business_config() {
     set -- "$@" --fallback-url "$CONFIG_FALLBACK_URL"
     "$ACTIVE_ZSETUP" "$@"
 }
-download_business_config
+if [ "$APP_ID" = ddnsto ]; then
+    ddnsto_entry_wait '正在获取安装信息' download_business_config
+else
+    download_business_config
+fi
 chmod 0600 "$config_candidate"
 mv -f "$config_candidate" "$config_file"
 trap - EXIT HUP INT TERM
@@ -335,13 +351,14 @@ if [ "$APP_ID" = ddnsto ]; then
     done
     CONFIG_PRIMARY_URLS=$index_urls
     CONFIG_FALLBACK_URL=${CONFIG_FALLBACK_URL%/config.json}/ddnsto-index.json
-    download_business_config
+    ddnsto_entry_wait '正在获取安装索引' download_business_config
     chmod 0600 "$config_candidate"
     mv -f "$config_candidate" "$index_file"
     trap - EXIT HUP INT TERM
     ZSETUP_SOURCE_BASES=$DIRECT_PRIMARY_BASES
     ZSETUP_SOURCE_FALLBACK=$DIRECT_FALLBACK_BASE
     export ZSETUP_SOURCE_BASES ZSETUP_SOURCE_FALLBACK
-    exec "$ACTIVE_ZSETUP" install --index "$index_file" "$APP_ID" --foreground -- "$@"
+    ddnsto_entry_wait '正在下载、校验并运行安装器' "$ACTIVE_ZSETUP" install --index "$index_file" "$APP_ID" --foreground -- "$@"
+    exit "$?"
 fi
 exec "$ACTIVE_ZSETUP" install "$APP_ID" --foreground -- "$@"

@@ -83,6 +83,7 @@ ddnsto_flow_finish() {
     if [ "$flow_rc" = 0 ] && [ "$flow_state" != started ]; then flow_rc=13; fi
     if [ "$flow_rc" = 0 ]; then
         printf '%s\n' 'DDNSTO：安装成功，启动成功。' '仅验证本地运行；设备在线状态请查看客户端运行日志。'
+        [ ! -f "$DDNSTO_FLOW_DIR/notice" ] || cat "$DDNSTO_FLOW_DIR/notice"
     else
         flow_code=E_EXECUTOR
         flow_reason="平台执行失败（退出码 $flow_rc），未能确认启动成功"

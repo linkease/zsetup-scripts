@@ -1,5 +1,45 @@
 # DDNSTO 安装域名、业务环境与发布边界
 
+## 2026-11-25：小入口测试分发已实现
+
+本节取代下文此前阶段“候选脚本测试发布待实现”的状态描述；正式发布流程不变。
+标准 Shell 入口先完整解析再执行，子进程 stdin 与脚本文本管道分离；
+复用 zsetup 下载索引、校验并执行不可变安装器，不内嵌各平台完整安装逻辑。
+
+维护者准备独立测试目录：
+
+```sh
+python3 -B scripts/build-ddnsto-products.py
+python3 -B scripts/build.py
+python3 -B scripts/package-ddnsto-test.py \
+  --output /tmp/ddnsto-test-UNIQUE_ID \
+  --base-url https://web.toany.net/ddnsto-candidates/UNIQUE_ID
+```
+
+工具检查生成一致性，拒绝覆盖输出；从相同模板生成小入口和索引，完整安装器正文不变。
+只将安装资源来源改到测试目录，zsetup 核心和客户端包保持官方来源；不写回 `apps/`，不上传。
+测试源只有一个，不能重复作为 native download 的主源和 fallback，也不能只传 fallback。
+
+取得测试部署授权后，复用 test-toany 已有 `/ddnsto-candidates/` 路由：上传到独立临时目录，
+执行 `sha256sum -c SHA256SUMS`，确认目的目录不存在，再重命名激活。使用 HTTPS
+逐项对照入口、索引、完整正文。不要覆盖历史候选或修改正式安装域名。
+此测试准备器不替代正式 `publish-apps.py` 门禁，不新增服务器连接配置。
+
+用户测试命令：
+
+```sh
+curl -fsSL https://web.toany.net/ddnsto-candidates/UNIQUE_ID/ddnsto/install.sh | sh -s -- --token 'YOUR_TOKEN'
+```
+
+应分享这里的小入口，不分享 `versions/` 中的完整正文作为管道入口。
+Shell 解析完整入口后才开始工作；在支持 pipefail 的 Shell 中可开启它，以同时检查 curl 的退出状态。
+本机制不是对入口自身的签名验证，入口和索引依赖 HTTPS 与发布权限；安装器正文通过索引中的 SHA-256 校验。
+默认不传 `--env test`，即测试脚本但仍连接正式业务环境。完整指南继续描述正式地址，不应把
+候选目录中的指南当作已发布的正式指引。
+
+本轮测试部署与 macOS 验收记录见
+[小入口测试记录](verification/2026-11-25-ddnsto-release-small-entry.md)。
+
 更新：2026-11-24。状态：本地候选；本轮不部署、不做公网/真机验收。
 
 后续测试进展：同日用户另行授权测试服务器与真机验证，已建立独立

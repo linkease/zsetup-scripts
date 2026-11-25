@@ -30,6 +30,9 @@
     },
     "macos": {
       "client_version": "4.2.8",
+      "legacy_client_version": "4.2.1",
+      "legacy_arm64_sha256": "42b1daf64fcbec4b99623d0585ed80b7184d9f7b25772b5929957ba9de37afa6",
+      "legacy_amd64_sha256": "6bc92030748aed5ec639eddf543c5b68c9a8efdca83147e10db4e30a9f4edb51",
       "archive_sha256": "8bb1e102160c8e52f670839051ca341f0a083720634da79c2142a1de6d13f446"
     },
     "windows": {

@@ -179,7 +179,7 @@ def discover(apps: Path):
     return applications
 
 
-def posix_entry(root: Path, application: Application):
+def posix_entry(root: Path, application: Application, *, distribution_url=None):
     template = (root / "templates/install.sh.in").read_text()
     bootstrap_lines = (root / "lib/bootstrap.sh").read_text().splitlines()
     if bootstrap_lines and bootstrap_lines[0] == "#!/bin/sh":
@@ -188,6 +188,10 @@ def posix_entry(root: Path, application: Application):
         bootstrap_lines.pop(0)
     bootstrap = "\n".join(bootstrap_lines).strip() + "\n"
     primary_urls, fallback_url = config_urls(application.directory.parent, windows=False)
+    if distribution_url:
+        # Native requires a primary and rejects duplicate primary/fallback URLs.
+        primary_urls = [distribution_url + '/zsetup/config.json']
+        fallback_url = distribution_url + '/zsetup/config.json'
     appliance = ''
     if application.id == 'ddnsto':
         payload = application.payload_path('sh').read_bytes()
@@ -199,18 +203,22 @@ def posix_entry(root: Path, application: Application):
         "@APP_ID@": application.id,
         "@BOOTSTRAP@": bootstrap,
         "@APP_PREFLIGHT@": (
+            (root / "sources/ddnsto/entry-progress.sh").read_text() + "\n" +
+            "printf '%s\\n' 'DDNSTO：正在检查系统和已有安装…' >&2\n" +
             (root / "sources/ddnsto/portable-files.sh").read_text() + "\n" +
             (root / "sources/ddnsto/asus-storage.sh").read_text() + "\n" +
             (root / "sources/ddnsto/entry-preflight.sh").read_text() + "\n" + appliance
             if application.id == "ddnsto" else ""
         ),
         "@BOOTSTRAP_CALL@": (
-            'if [ "$DDNSTO_ENTRY_LEGACY" = 0 ]; then\nbootstrap_zsetup\nfi\n'
-            'if [ -n "$DDNSTO_ENTRY_APPLIANCE" ]; then\n    ddnsto_entry_appliance "$@"\n    exit "$?"\nfi'
+            'if [ "$DDNSTO_ENTRY_LEGACY" = 0 ]; then\n'
+            'ACTIVE_ZSETUP=$(ddnsto_entry_wait "正在准备安装工具，首次运行可能稍久" bootstrap_zsetup_path)\nfi\n'
+            'if [ -n "$DDNSTO_ENTRY_APPLIANCE" ]; then\n    ddnsto_entry_wait "正在下载、校验并运行安装器" ddnsto_entry_appliance "$@"\n    exit "$?"\nfi'
             if application.id == 'ddnsto' else 'bootstrap_zsetup'
         ),
         "@CONFIG_PRIMARY_URLS@": " ".join(primary_urls),
         "@CONFIG_FALLBACK_URL@": fallback_url,
+        "@CONFIG_FALLBACK_ARGUMENT@": '' if distribution_url else '    set -- "$@" --fallback-url "$CONFIG_FALLBACK_URL"',
     }
     require(all(template.count(marker) == 1 for marker in replacements),
             "invalid standard POSIX entry template")
@@ -218,18 +226,27 @@ def posix_entry(root: Path, application: Application):
             "unsafe POSIX entry value")
     for marker, value in replacements.items():
         template = template.replace(marker, value)
+    if application.id == 'ddnsto':
+        # Parse the complete entry before executing anything when fed by curl.
+        # Child processes must never consume the shell's script stream.
+        return '#!/bin/sh\nddnsto_entry_main() {\n' + template.split('\n', 1)[1] + '\n}\nddnsto_entry_main "$@" </dev/null\n'
     return template
 
 
-def powershell_entry(root: Path, application: Application):
+def powershell_entry(root: Path, application: Application, *, distribution_url=None):
     template = (root / "templates/install.ps1.in").read_text()
     bootstrap = (root / "lib/bootstrap.ps1").read_text().strip() + "\n"
     primary_urls, fallback_url = config_urls(application.directory.parent, windows=True)
+    if distribution_url:
+        primary_urls = [distribution_url + '/zsetup/config-windows.json']
+        fallback_url = distribution_url + '/zsetup/config-windows.json'
     replacements = {
         "@APP_ID@": application.id,
         "@BOOTSTRAP@": bootstrap,
         "@CONFIG_PRIMARY_URLS@": ", ".join(f"'{url}'" for url in primary_urls),
         "@CONFIG_FALLBACK_URL@": fallback_url,
+        "@CONFIG_FALLBACK_ARGUMENT@": '' if distribution_url else "    $downloadArguments += @('--fallback-url', $ConfigFallbackUrl)",
+        "@INDEX_FALLBACK_ARGUMENT@": '' if distribution_url else "        $arguments += @('--fallback-url', ($ConfigFallbackUrl -replace '/config-windows.json$', '/ddnsto-index-windows.json'))",
     }
     require(all(template.count(marker) == 1 for marker in replacements),
             "invalid standard PowerShell entry template")
@@ -263,11 +280,11 @@ def stat_mode(path: Path):
     return path.stat().st_mode & 0o777
 
 
-def generate_entries(root: Path, applications, *, check: bool):
+def generate_entries(root: Path, applications, *, check: bool, distribution_url=None):
     for application in applications:
         entrypoints = application.extensions
         if "sh" in entrypoints:
-            content = posix_entry(root, application).encode()
+            content = posix_entry(root, application, distribution_url=distribution_url).encode()
             install_file(application.directory / "install.sh", content,
                          executable=True, check=check, label="standard entry")
             for alias in application.aliases:
@@ -275,7 +292,7 @@ def generate_entries(root: Path, applications, *, check: bool):
                     install_file(application.directory / alias, content,
                                  executable=True, check=check, label="compatibility alias")
         if "ps1" in entrypoints:
-            content = powershell_entry(root, application)
+            content = powershell_entry(root, application, distribution_url=distribution_url)
             install_file(application.directory / "install.ps1", content,
                          executable=False, check=check, label="standard PowerShell entry")
             for alias in application.aliases:
@@ -338,12 +355,17 @@ def config_urls(apps: Path, *, windows: bool):
             f"{fallback.rstrip('/')}/{relative}")
 
 
-def generate_config(apps: Path, applications, *, check: bool, windows=False):
+def generate_config(apps: Path, applications, *, check: bool, windows=False, distribution_url=None):
     filename = "base-windows.json" if windows else "base.json"
     output = "config-windows.json" if windows else "config.json"
     base = read_base(apps, filename)
     stable_version = base["stable_zsetup"]["version"]
     release_group = base["stable_zsetup"]["source_group"]
+    if distribution_url:
+        release_group = 'installer-candidate'
+        require(not any(g['id'] == release_group for g in base['source_groups']), 'reserved candidate group')
+        base['source_groups'].append({'id': release_group, 'primary_bases': [distribution_url],
+                                     'fallback_base': distribution_url})
     records = []
     for application in applications:
         minimum = application.manifest["min_zsetup"]
@@ -355,6 +377,8 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
             extension = "ps1" if os_name == "windows" else "sh"
             payload = application.payload_path(extension)
             relative = f"{base['public_path_prefix']}/{payload.relative_to(apps).as_posix()}"
+            if distribution_url:
+                relative = payload.relative_to(apps).as_posix()
             raw = payload.read_bytes()
             records.append({
                 "application": application.id,
@@ -400,6 +424,8 @@ def generate_config(apps: Path, applications, *, check: bool, windows=False):
                 'urls': [url.rstrip('/') + '/' + record['path'] for url in group['primary_bases']],
                 'fallback_url': group['fallback_base'].rstrip('/') + '/' + record['path'],
             })
+            if entries[-1]['fallback_url'] in entries[-1]['urls']:
+                del entries[-1]['fallback_url']
         index_name = 'ddnsto-index-windows.json' if windows else 'ddnsto-index.json'
         index_bytes = (json.dumps({'schema_version': 1, 'entries': entries}, indent=2) + '\n').encode()
         require(len(index_bytes) <= 131072, 'DDNSTO native index exceeds download bound')

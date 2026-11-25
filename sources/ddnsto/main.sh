@@ -41,6 +41,10 @@ ddnsto_entry_install() {
         return $?
     fi
     case "$detected_platform" in linux|openwrt) ;; *) ddnsto_error 'native installation unavailable for this device'; return 2 ;; esac
+    if [ "$detected_platform" = linux ] && [ "${ZSETUP_INSTALLER_MODE:-0}" = 1 ] && ddnsto_process_needed; then
+        ddnsto_install "$@"
+        return $?
+    fi
     case "$ACTION" in
         status|start|stop|restart|repair|configure|uninstall)
             if [ "$detected_platform" = openwrt ]; then
