@@ -1,5 +1,6 @@
 """Regressions observed through the public entry on appliance firmware."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -10,6 +11,56 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BootstrapRegression(unittest.TestCase):
+    def macos_fixture(self, architecture='arm64', layout='macos/', corrupt=False, missing=False):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifact = 'zsetup-macos-' + ('aarch64' if architecture == 'arm64' else 'x86_64')
+            release = root / 'site/zsetup' / layout / '0.6.5'
+            release.mkdir(parents=True)
+            (root / 'site/zsetup/stable-macos').write_text('0.6.5\n')
+            binary = b'#!/bin/sh\nprintf "zsetup 0.6.5\\n"\n'
+            (release / artifact).write_bytes(binary + (b'# corrupted\n' if corrupt else b''))
+            (release / 'SHA256SUMS').write_text(hashlib.sha256(binary).hexdigest() +
+                '  ' + ('zsetup-windows-i686.exe' if missing else artifact) + '\n')
+            p = self.shell(f'''
+                WORK_ROOT='{root}/work'; BOOTSTRAP_BASES=https://example.invalid;
+                uname() {{ case "$1" in -s) echo Darwin;; -m) echo {architecture};; esac; }};
+                bootstrap_fetch_from_base() {{
+                    printf '%s\\n' "$3" >> '{root}/requests';
+                    cp '{root}/site/'"$3" "$4" 2>/dev/null;
+                }};
+                confirm_insecure_http() {{ echo HTTP_FORBIDDEN >&2; return 91; }};
+                bootstrap_zsetup;
+                "$ACTIVE_ZSETUP" --version
+            ''')
+            return p, (root / 'requests').read_text()
+
+    def test_macos_platform_directory_both_architectures(self):
+        for architecture in ('arm64', 'x86_64'):
+            with self.subTest(architecture=architecture):
+                p, requests = self.macos_fixture(architecture)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                self.assertIn('zsetup 0.6.5', p.stdout)
+                self.assertIn('zsetup/macos/0.6.5/SHA256SUMS', requests)
+                self.assertNotIn('HTTP_FORBIDDEN', p.stderr)
+
+    def test_macos_flat_directory_still_works(self):
+        p, requests = self.macos_fixture(layout='')
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn('zsetup/0.6.5/zsetup-macos-aarch64', requests)
+
+    def test_macos_platform_directory_rejects_corruption(self):
+        p, _ = self.macos_fixture(corrupt=True)
+        self.assertNotEqual(p.returncode, 0)
+        self.assertIn('checksum mismatch', p.stderr)
+        self.assertNotIn('HTTP_FORBIDDEN', p.stderr)
+
+    def test_macos_platform_directory_requires_matching_digest(self):
+        p, requests = self.macos_fixture(missing=True)
+        self.assertEqual(p.returncode, 11, p.stderr)
+        self.assertNotIn('zsetup/macos/0.6.5/zsetup-macos-aarch64', requests)
+        self.assertNotIn('HTTP_FORBIDDEN', p.stderr)
+
     def shell(self, body):
         return subprocess.run(['sh', '-c', '. "$1"; ' + body, 'probe',
                                str(ROOT / 'lib/bootstrap.sh')], capture_output=True, text=True)
