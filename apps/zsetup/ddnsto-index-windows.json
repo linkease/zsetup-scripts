@@ -10,11 +10,11 @@
       "background": false,
       "min_version": "0.1.0",
       "urls": [
-        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.3/install.ps1",
-        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.3/install.ps1",
-        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.3/install.ps1"
+        "https://dl.istoreos.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.4/install.ps1",
+        "https://fw.d4ctech.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.4/install.ps1",
+        "https://fw20.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.4/install.ps1"
       ],
-      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.3/install.ps1"
+      "fallback_url": "https://fw.koolcenter.com/binary/zsetup-scripts/apps/ddnsto/versions/0.3.4/install.ps1"
     }
   ]
 }

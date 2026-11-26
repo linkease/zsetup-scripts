@@ -240,7 +240,7 @@ ddnsto_install() {
     fi
     case "$ACTION" in install|update) ;; *) return 2 ;; esac
     ddnsto_openwrt_preflight || return $?
-    installer_package_prepare ddnsto || return $?
+    ddnsto_openwrt_prepare || return $?
     # Recheck installed/config state under the machine lease before downloads.
     ddnsto_openwrt_preflight || return $?
     INSTALLER_PACKAGE_CLEANUP=ddnsto_package_restore

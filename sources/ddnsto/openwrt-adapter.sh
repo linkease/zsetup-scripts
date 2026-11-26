@@ -1,4 +1,61 @@
 # OpenWrt owns its package files and procd service, not a Linux systemd unit.
+# Native packages expand directly into their package-owned destinations. They
+# do not create the extra expanded service candidate used by the Linux binary
+# transaction. Keep the existing 32 MiB download / 64 MiB expansion ceilings,
+# allow one extra compressed copy for package-manager scratch/cache, and retain
+# the common 10% margin + 8 MiB reserve (148.8 MiB total, rather than 184 MiB).
+# These are conservative bounds, not claims about an individual package size.
+ddnsto_openwrt_package_policy() {
+    [ "$1" = ddnsto ] || return 2
+    INSTALLER_DOWNLOAD_BYTES=0; INSTALLER_EXPANDED_BYTES=0; INSTALLER_FILE_COUNT=0
+    INSTALLER_RESERVE=8388608
+    INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16
+    installer_space_budget "$INSTALLER_MAX_DOWNLOAD" "$INSTALLER_MAX_EXPANDED" "$INSTALLER_MAX_DOWNLOAD" 0
+}
+
+# Only curated storage facts reach the human result; do not capture arbitrary
+# child stdout/stderr (package hooks may print credentials). Shared helpers and
+# other applications keep their original policy and diagnostics.
+ddnsto_openwrt_storage_error() {
+    ow_storage_code=E_STORAGE
+    case "$*" in
+        'insufficient space at '*)
+            ow_storage_code=E_SPACE
+            ow_storage_reason="路径 $is_path 可用空间不足：需要 $is_needed 字节，可用 $is_available 字节" ;;
+        'memory filesystem at '*) ow_storage_reason="路径 $is_path 位于内存文件系统，不能作为持久安装目录" ;;
+        'cannot establish persistent backing at '*) ow_storage_reason="无法确认路径 $is_path 的持久存储类型" ;;
+        'read-only or unknown mount at '*) ow_storage_reason="路径 $is_path 只读或无法确认挂载读写状态" ;;
+        'execution is unavailable at '*) ow_storage_reason="路径 $is_path 不允许执行程序或无法确认执行权限" ;;
+        'write permission is required at '*) ow_storage_reason="路径 $is_path 不可写或无法确认写权限" ;;
+        'no free inodes at '*) ow_storage_reason="路径 $is_path 的可用 inode 为 0，无法确认是否还能创建文件" ;;
+        'inode availability is unknown at '*) return 0 ;;
+        *) ow_storage_reason='无法完成安装目录存储检查（路径、权限或 zsetup 存储探测异常）' ;;
+    esac
+    if command -v ddnsto_flow_error >/dev/null 2>&1; then
+        ddnsto_flow_error "$ow_storage_code" "$ow_storage_reason" '请保留诊断记录，检查对应存储及权限；不要删除 DDNSTO 配置或放宽目录权限' || :
+    else
+        printf 'DDNSTO [%s]：%s\n' "$ow_storage_code" "$ow_storage_reason" >&2
+    fi
+}
+
+ddnsto_openwrt_prepare() {
+    # The process is already committed to the OpenWrt adapter. Replace only its
+    # policy/error callbacks; the common package transaction remains unchanged.
+    installer_policy() { ddnsto_openwrt_package_policy "$@"; }
+    installer_storage_error() { ddnsto_openwrt_storage_error "$@"; }
+    ow_storage_reason=
+    if command -v ddnsto_flow_note >/dev/null 2>&1; then ddnsto_flow_note checking; fi
+    ow_prepare_rc=0
+    installer_package_prepare ddnsto || ow_prepare_rc=$?
+    if [ "$ow_prepare_rc" != 0 ]; then
+        if [ "$ow_prepare_rc" = 12 ] && [ -z "$ow_storage_reason" ]; then
+            ddnsto_openwrt_storage_error 'package preparation failed'
+        fi
+        return "$ow_prepare_rc"
+    fi
+    if command -v ddnsto_flow_note >/dev/null 2>&1; then ddnsto_flow_note installing; fi
+}
+
 ddnsto_openwrt_paths() {
     binary=${DDNSTO_OPENWRT_BIN_PATH:-/usr/sbin/ddnstod}
     config=${DDNSTO_CONFIG_PATH:-/etc/config/ddnsto}
