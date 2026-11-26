@@ -20,6 +20,7 @@ MAIN_HARNESS = r'''
 . "$APP/business.sh"
 . "$APP/managed-cli.sh"
 . "$LIB/install-launcher.sh"
+. "$LIB/install-storage.sh"
 . "$APP/openwrt-lifecycle.sh"
 . "$APP/openwrt-adapter.sh"
 . "$APP/product-pins.sh"
@@ -56,7 +57,10 @@ bootstrap_and_run() {
     ZSETUP_OS=openwrt; ZSETUP_PACKAGE_MANAGER=$PACKAGE_MANAGER; ZSETUP_ARCH=x86_64
     ddnsto_machine_locked ddnsto_install "$@"
 }
-fixture_native() { [ "$1" = run ] && shift && [ "$1" = -- ] && shift; "$@"; }
+fixture_native() {
+    if [ "$1" = storage ]; then printf '1073741824\n'; return 0; fi
+    [ "$1" = run ] && shift && [ "$1" = -- ] && shift; "$@"
+}
 installer_exec_native() { "$@"; }
 installer_package_prepare() { :; }
 installer_package_cache() { PACKAGE_CACHE=$FIXTURE/cache; mkdir -p "$PACKAGE_CACHE"; }

@@ -17,7 +17,8 @@ class OpenWrtStorage(unittest.TestCase):
             root = Path(temp)
             script = 'set -eu\n' + ''.join(f'. "{ROOT / p}"\n' for p in (
                 'lib/install-storage.sh', 'lib/install-bounds.sh', 'lib/install-package.sh',
-                'sources/ddnsto/auto-install.sh', 'sources/ddnsto/openwrt-adapter.sh'))
+                'sources/ddnsto/auto-install.sh', 'sources/ddnsto/product-pins.sh',
+                'sources/ddnsto/openwrt-adapter.sh'))
             script += '''
 probe() {
     [ "$1" = storage ] || return 99
@@ -32,6 +33,7 @@ probe() {
     esac
 }
 ZSETUP_BIN=probe; package_manager=apk
+arch=aarch64; DDNSTO_MEM_MB=256; FORCE_VERSION=
 installer_prefix="$TMPDIR/prefix"
 installer_require_root() { :; }
 # Stop at the real transaction boundary: no global locks or package operations.
@@ -59,13 +61,18 @@ ddnsto_ensure_entry
         self.assertTrue(reached, result.stderr)
         self.assertEqual(result.returncode, 77)
 
+    def test_router_with_36_mib_reaches_real_transaction_boundary(self):
+        result, reached, _, _ = self.invoke(available=str(36 * 1048576))
+        self.assertTrue(reached, result.stderr)
+        self.assertEqual(result.returncode, 77)
+
     def test_low_space_reports_required_available_path_without_secrets(self):
         result, reached, prefix, log = self.invoke(available="16777216")
         self.assertEqual(result.returncode, 12)
         self.assertFalse(reached or prefix)
         self.assertIn('E_SPACE', result.stderr)
         self.assertIn('16777216', result.stderr)
-        self.assertIn('156028109', result.stderr)
+        self.assertIn('35267027', result.stderr)
         self.assertIn('路径 /', result.stderr)
         self.assertIn('error=E_SPACE', log)
         self.assertNotIn('must-not-appear', result.stdout + result.stderr + log)

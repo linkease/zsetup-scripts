@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Native HTTPS and filesystem policy; package managers/services are stubs."""
 import hashlib
+import json
 import http.server
 import os
 import re
@@ -21,6 +22,8 @@ from tls_fixture import generate_certificate
 
 def inside():
     os.umask(0o022)
+    # This function runs only in jail()'s private mount/PID namespace + chroot.
+    subprocess.run(['mount', '-t', 'tmpfs', '-o', 'size=96m,mode=1777', 'tmpfs', '/tmp'], check=True)
     with tempfile.TemporaryDirectory(prefix='package-suite-') as name:
         root=Path(name); generate_certificate(root)
         server=http.server.ThreadingHTTPServer(('127.0.0.1',0), Handler)
@@ -92,7 +95,8 @@ exit 0
                             Handler.bodies[f'/binary/{remote}/{relative}']=data
                             if app == 'ddnsto': fixture_pins[relative]=hashlib.sha256(data).hexdigest()
                         Handler.bodies[f'/binary/{remote}/{folder}/SHA256SUMS']=''.join(f'{hashlib.sha256(data).hexdigest()}  {filename}\n' for filename,data in files.items()).encode()
-                    script=(ROOT/'apps/ddnsto/versions/0.3.0/install.sh'
+                    ddnsto_version=json.loads((ROOT/'apps/ddnsto/app.json').read_text())['version']
+                    script=(ROOT/f'apps/ddnsto/versions/{ddnsto_version}/install.sh'
                             if app=='ddnsto' else ROOT/'apps/linkease/0.1.9/installer.sh')
                     if app == 'ddnsto':
                         source=script.read_text()
@@ -173,6 +177,34 @@ exit 0
                         assert not list(work.iterdir())
                         if app == 'ddnsto': Handler.bodies[artifact]=original
                         else: Handler.bodies[sums]=original
+                        if app == 'ddnsto' and arch == 'aarch64':
+                            automatic = ['sh', str(script), '--installer-prefix', str(prefix),
+                                         '--action', 'install', '--token', 'fixture-token']
+                            automatic_env = env | {'ZSETUP_WORK_DIR': ''}
+                            previous_lines = len(log.read_text().splitlines())
+                            temporary = subprocess.run(automatic, env=automatic_env, text=True, capture_output=True, timeout=30)
+                            assert temporary.returncode == 0, temporary
+                            assert '临时空间预算' in temporary.stderr, temporary
+                            new_lines = log.read_text().splitlines()[previous_lines:]
+                            assert any('/tmp/ddnsto-package-stage/' in line for line in new_lines), new_lines
+                            temporary_root = Path('/tmp/ddnsto-package-stage')
+                            assert not list(temporary_root.glob('.transaction.*'))
+                            assert not (temporary_root/'.install-lock').exists()
+                            assert list((temporary_root/'.packages').rglob(main)), temporary
+                            package_state.unlink(missing_ok=True)
+                            (config_dir/'ddnsto').unlink(missing_ok=True)
+                            failure = subprocess.run(automatic, env=automatic_env | {'PKG_FAIL': '23'}, text=True, capture_output=True, timeout=30)
+                            assert failure.returncode == 23, failure
+                            assert list((temporary_root/'.packages').rglob(main)), 'verified recovery inputs lost'
+                            assert not list(temporary_root.glob('.transaction.*'))
+                            assert not (temporary_root/'.install-lock').exists()
+                            # Executable temporary scratch is mandatory for package hooks.
+                            subprocess.run(['mount', '-o', 'remount,noexec', '/tmp'], check=True)
+                            try:
+                                blocked = subprocess.run(automatic, env=automatic_env, text=True, capture_output=True, timeout=30)
+                                assert blocked.returncode == 12 and '不允许执行' in blocked.stderr, blocked
+                            finally:
+                                subprocess.run(['mount', '-o', 'remount,exec', '/tmp'], check=True)
                         if app=='ddnsto' and manager=='opkg' and arch=='x86_64':
                             config=case/'legacy-config'
                             config.write_text('global '+('x'*17000))
@@ -205,7 +237,7 @@ exit 0
                 if app=='linkease':
                     unsupported=subprocess.run(['sh',str(script)],env=env|{'ZSETUP_PACKAGE_MANAGER':'apk'},capture_output=True)
                     assert unsupported.returncode==2
-            print('native packages: opkg/apk mappings, persistent PM cache/tmp/lists, bounded inputs, failure and cleanup passed')
+            print('native packages: opkg/apk mappings, persistent/custom and automatic tmpfs scratch/cache, noexec rejection, bounded inputs, failure and cleanup passed')
         finally: server.shutdown(); server.server_close(); thread.join(timeout=2)
 
 

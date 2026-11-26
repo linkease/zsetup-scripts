@@ -224,7 +224,8 @@ if [ "$1" = /proc/111/exe ]; then printf '%s\n' "$TEST_EXPECTED_EXEC"; else exec
                     sums = ''.join(f'{hashlib.sha256(body).hexdigest()}  {filename}\n' for filename, body in files.items()).encode()
                     if app == 'ddnsto': Handler.bodies[f'{folder}/SHA256SUMS'] = Handler.bodies.get(f'{folder}/SHA256SUMS', b'') + sums
                     else: Handler.bodies[f'{folder}/SHA256SUMS'] = sums
-                script = (ROOT / 'apps/ddnsto/versions/0.3.0/install.sh'
+                ddnsto_version = json.loads((ROOT / 'apps/ddnsto/app.json').read_text())['version']
+                script = (ROOT / f'apps/ddnsto/versions/{ddnsto_version}/install.sh'
                           if app == 'ddnsto'
                           else ROOT / 'apps/linkease/0.1.9/installer.sh')
                 if app == 'ddnsto':
@@ -376,12 +377,13 @@ if [ "$1" = /proc/111/exe ]; then printf '%s\n' "$TEST_EXPECTED_EXEC"; else exec
                 assert result.read_text().strip()=='0', background_log
                 assert ('安装成功' in background_log) if app == 'ddnsto' else ('[4/4]' in background_log)
                 assert run(extra=['--installer-scope','user']).returncode == 2
-                # Non-systemd is an explicitly deferred mapping, with no unit mutation.
+                # DDNSTO process fallback refuses the custom service prefix;
+                # it must not mutate an existing system service when selected.
                 actions = (case / 'actions').read_text()
                 Path('/run/systemd/system').rmdir()
                 try:
                     unsupported = run(mode='indexed')
-                    expected_manager_error = 'E_SERVICE_MANAGER' if app == 'ddnsto' else 'legacy'
+                    expected_manager_error = 'E_OPTIONS' if app == 'ddnsto' else 'legacy'
                     assert unsupported.returncode == 2 and expected_manager_error in unsupported.stderr, unsupported
                     assert (case / 'actions').read_text() == actions
                 finally: Path('/run/systemd/system').mkdir()
@@ -402,7 +404,56 @@ if [ "$1" = /proc/111/exe ]; then printf '%s\n' "$TEST_EXPECTED_EXEC"; else exec
                 assert not list((fresh_prefix/'versions').iterdir())
                 assert not list((fresh_prefix/'.staging').iterdir()) and not (fresh_prefix/'.service-lock').exists()
 
-            print('service storage: two apps, protected paths, bounded streams, cache, health, rollback, versions, conflicts passed')
+                if app == 'ddnsto':
+                    # Exercise the current candidate's raw Zig path through the
+                    # actual native download, service transaction and CLI.
+                    raw = b'#!/bin/sh\ncase "$1" in -v) echo 4.2.1 ;; --config) test -s "$2" ;; *) exit 97 ;; esac\n'
+                    Handler.bodies['/binary/ddnsto/ddnsto-zig/ddnsto.x86_64'] = raw
+                    zig_source = script.read_text().replace(
+                        '76e21cb89b623ae57ac928380d2fce3c51b502c04a4b58f36bb59ab5cdd3ca5d',
+                        hashlib.sha256(raw).hexdigest()).replace('PROCESS_DOWNLOAD_BYTES=752664',
+                                                               f'PROCESS_DOWNLOAD_BYTES={len(raw)}')
+                    zig_source = zig_source.replace(') >/dev/null 2>&1 &', ') &')
+                    zig_script = case / 'zig-installer.sh'; zig_script.write_text(zig_source)
+                    zig_prefix = case / 'zig-prefix'
+                    zig_home = case / 'zig-home'; zig_home.mkdir()
+                    zig_env = env | {'DDNSTO_VERSION':'', 'ZSETUP_INSTALL_PREFIX':str(zig_prefix),
+                                     'HOME':str(zig_home),
+                                     'TEST_EXPECTED_EXEC':str(zig_prefix/'versions/4.2.1/bin/ddnsto')}
+                    def zig_run(*args, changes=None):
+                        return subprocess.run(['sh',str(zig_script),*args],
+                                              env=zig_env | (changes or {}), text=True,
+                                              capture_output=True, timeout=30)
+                    failed_zig = zig_run('--token','fixture-token','--force-version','lite',
+                                         changes={'MANAGER_START_FAIL':'37'})
+                    assert failed_zig.returncode != 0, failed_zig
+                    assert not unit.exists() and not (zig_prefix/'current').exists()
+                    assert not Path('/etc/ddnsto/ddnsto-config.json').exists()
+                    assert not Path('/etc/ddnsto/.ddnsto-zig.yaml').exists()
+                    assert not (zig_prefix/'.service-lock').exists()
+                    fresh_zig = zig_run('--token','fixture-token','--force-version','lite')
+                    assert fresh_zig.returncode == 0, fresh_zig.stderr[-24000:]
+                    assert (zig_prefix/'current').resolve().name == '4.2.1'
+                    runtime = Path('/etc/ddnsto/.ddnsto-zig.yaml')
+                    assert 'userToken: "fixture-token"' in runtime.read_text()
+                    verify = subprocess.run(['systemd-analyze','verify',str(unit)], text=True,capture_output=True)
+                    assert verify.returncode == 0, verify
+                    wrapper = subprocess.run(['sh',str(zig_prefix/'current/bin/.service-run')],env=zig_env,capture_output=True)
+                    assert wrapper.returncode == 0, wrapper
+                    for action in ('stop','start','restart','repair'):
+                        result = zig_run('--action',action); assert result.returncode == 0, result
+                    configured = zig_run('--action','configure','--token','changed-token')
+                    assert configured.returncode == 0, configured
+                    assert 'userToken: "changed-token"' in runtime.read_text()
+                    same = zig_run('--token','changed-token'); assert same.returncode == 0, same
+                    wrong = zig_run('--token','other-account')
+                    assert wrong.returncode != 0 and 'E_ACCOUNT' in wrong.stderr, wrong
+                    update = zig_run('--action','update'); assert update.returncode == 0, update
+                    assert (zig_prefix/'current').resolve().name == '4.2.1'
+                    uninstalled = zig_run('--action','uninstall'); assert uninstalled.returncode == 0, uninstalled
+                    assert not unit.exists()
+
+            print('service storage: selected apps, protected paths, bounded streams, cache, health, rollback, versions, conflicts passed')
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=2)
 

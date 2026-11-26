@@ -9,7 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
-    "ddnsto": {"version": "0.3.4", "entrypoints": ["sh", "ps1"], "linux": 20, "windows": 1},
+    "ddnsto": {"version": "0.3.5", "entrypoints": ["sh", "ps1"], "linux": 20, "windows": 1},
     "linkease": {"version": "0.1.9", "entrypoints": ["sh"], "linux": 24, "windows": 0},
     "jq": {"version": "0.1.0", "entrypoints": ["sh", "ps1"], "linux": 22, "windows": 3},
     "kai-skills": {"version": "1.2.6", "entrypoints": ["sh", "ps1"], "linux": 2, "windows": 1},

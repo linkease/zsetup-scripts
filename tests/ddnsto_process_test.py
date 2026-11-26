@@ -100,6 +100,8 @@ set -eu
 . "$REPO/sources/ddnsto/auto-install.sh"
 . "$REPO/sources/ddnsto/managed-cli.sh"
 . "$REPO/sources/ddnsto/process-linux.sh"
+. "$REPO/sources/ddnsto/product-pins.sh"
+. "$REPO/sources/ddnsto/process-product.sh"
 . "$REPO/sources/ddnsto/process-install.sh"
 if [ "$USE_HOME" = 0 ]; then ddnsto_process_paths() { PROCESS_PREFIX=$FIXTURE/owned; }; fi
 ddnsto_process_fetch() {

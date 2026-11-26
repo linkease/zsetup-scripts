@@ -17,6 +17,8 @@ HARNESS = r'''
 . "$BUSINESS"
 . "$LIBRARY/install-bounds.sh"
 . "$LIBRARY/install-package.sh"
+. "$LIBRARY/install-storage.sh"
+. "${PINS%/*}/openwrt-adapter.sh"
 [ ! -f "$PINS" ] || . "$PINS"
 status() { :; }
 id() { printf '0\n'; }
@@ -37,7 +39,9 @@ work_dir=$TEST_ROOT/work
 transaction_dir=$TEST_ROOT/transaction
 package_manager=$PM
 arch=$ARCH
-ZSETUP_BIN=/not-an-installed-native
+fixture_storage() { [ "$1" = storage ] || return 99; printf '1073741824\n'; }
+ZSETUP_BIN=fixture_storage
+ddnsto_openwrt_plan
 ddnsto_openwrt
 '''
 
