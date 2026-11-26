@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "config_version": "apps-d949b9af3386",
+  "config_version": "apps-38c5fd1a091a",
   "source_groups": [
     {
       "id": "koolcenter",
@@ -48,11 +48,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -60,11 +60,11 @@
       "os": "centos",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -72,11 +72,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -84,11 +84,11 @@
       "os": "debian",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -96,11 +96,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -108,11 +108,11 @@
       "os": "linux",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -120,11 +120,11 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -132,11 +132,11 @@
       "os": "macos",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -144,11 +144,11 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -156,11 +156,11 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -168,11 +168,11 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "mipsel",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -180,11 +180,11 @@
       "os": "openwrt",
       "package_manager": "apk",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -192,11 +192,11 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -204,11 +204,11 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "armv7",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -216,11 +216,11 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "mipsel",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -228,11 +228,11 @@
       "os": "openwrt",
       "package_manager": "opkg",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -240,11 +240,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -252,11 +252,11 @@
       "os": "rhel",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -264,11 +264,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "aarch64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {
@@ -276,11 +276,11 @@
       "os": "ubuntu",
       "package_manager": "*",
       "arch": "x86_64",
-      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.4/install.sh",
+      "path": "zsetup-scripts/apps/ddnsto/versions/0.3.5/install.sh",
       "background": false,
       "source_group": "koolcenter",
-      "sha256": "c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541",
-      "size": 618824,
+      "sha256": "469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6",
+      "size": 684229,
       "min_version": "0.5.0"
     },
     {

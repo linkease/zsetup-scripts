@@ -1,5 +1,21 @@
 # Native packages own their installed paths and services. Only their verified
 # inputs, PM scratch/cache/list data and bounded receipts are managed here.
+installer_package_persistent_preflight() {
+    installer_preflight "$1" system "$INSTALLER_REQUIRED_BYTES" 1 || return $?
+    for ip_path in "$INSTALLER_PREFIX" "$INSTALLER_WORK_ROOT"; do
+        [ "$("$ZSETUP_BIN" storage "$ip_path" get system_protected)" = true ] || return 12
+    done
+}
+
+# Adapter hooks retain persistent storage by default. Temporary adapters must
+# validate their own private root and keep the installed target persistent.
+installer_package_preflight() { installer_package_persistent_preflight "$@"; }
+installer_package_work_check() { installer_storage_check "$INSTALLER_WORK_ROOT" "$INSTALLER_RESERVE" 0 1; }
+installer_package_cache_location() { ip_cache_root="$INSTALLER_PREFIX/.packages"; }
+installer_package_cache_protected() {
+    [ "$("$ZSETUP_BIN" storage "$1" get system_protected)" = true ]
+}
+
 installer_package_prepare() {
     PACKAGE_APP=$1; PACKAGE_PHASE=preflight
     PACKAGE_CACHE=; INSTALLER_PACKAGE_CLEANUP=
@@ -14,10 +30,7 @@ installer_package_prepare() {
         printf '%s\n' 'Installer: native package target / is unsuitable; moving its download cache does not relocate package-owned files. Keep the legacy entry until the system target is verified.' >&2
         return 12
     }
-    installer_preflight "$1" system "$INSTALLER_REQUIRED_BYTES" 1 || return $?
-    for ip_path in "$INSTALLER_PREFIX" "$INSTALLER_WORK_ROOT"; do
-        [ "$("$ZSETUP_BIN" storage "$ip_path" get system_protected)" = true ] || return 12
-    done
+    installer_package_preflight "$1" || return $?
     [ ! -L "$INSTALLER_PREFIX/.managed" ] && [ ! -L "$INSTALLER_PREFIX/.package-manager" ] || return 2
     if [ -f "$INSTALLER_PREFIX/.managed" ]; then
         for ip_marker in "$INSTALLER_PREFIX/.managed" "$INSTALLER_PREFIX/.package-manager"; do
@@ -61,7 +74,7 @@ installer_package_prepare() {
     PACKAGE_DEST_LOCK_HELD=1
     printf '%s\n' "$$" > "$INSTALLER_PREFIX/.package-lock/owner"
     mkdir -p "$transaction_dir/pm-tmp" "$transaction_dir/pm-cache" "$transaction_dir/pm-lists"
-    # PMs and their maintainer scripts use disk scratch, rather than default /tmp.
+    # PM scratch is confined to the adapter's validated transaction workspace.
     TMPDIR="$transaction_dir/pm-tmp"; export TMPDIR
     for ip_existing in "/usr/bin/$PACKAGE_APP" "/usr/sbin/$PACKAGE_APP" "/usr/local/bin/$PACKAGE_APP"; do
         [ -e "$ip_existing" ] || [ -L "$ip_existing" ] || continue
@@ -84,7 +97,7 @@ installer_package_prepare() {
 installer_package_cache() {
     installer_service_version "$1" || return 2
     case "$2" in x86_64|aarch64|armv7|arm|mipsel) ;; *) return 2 ;; esac
-    ip_cache_root="$INSTALLER_PREFIX/.packages"
+    installer_package_cache_location || return $?
     ip_key="$package_manager-$1-$2"
     ip_previous=
     [ ! -L "$ip_cache_root/recent" ] || return 2
@@ -97,10 +110,10 @@ installer_package_cache() {
     PACKAGE_CACHE="$ip_cache_root/$ip_key"
     [ ! -L "$PACKAGE_CACHE" ] || return 2
     mkdir -p "$PACKAGE_CACHE" || return 12
-    [ "$("$ZSETUP_BIN" storage "$PACKAGE_CACHE" get system_protected)" = true ] || return 12
+    installer_package_cache_protected "$PACKAGE_CACHE" || return 12
     [ ! -L "$PACKAGE_CACHE/.owned" ] || return 2
     if [ -e "$PACKAGE_CACHE/.owned" ]; then
-        [ "$("$ZSETUP_BIN" storage "$PACKAGE_CACHE/.owned" get system_protected)" = true ] || return 12
+        installer_package_cache_protected "$PACKAGE_CACHE/.owned" || return 12
         installer_file_size "$PACKAGE_CACHE/.owned" || return 2
         [ "$INSTALLER_FILE_SIZE" -le 65 ] || return 2
         IFS= read -r ip_owner < "$PACKAGE_CACHE/.owned" || return 2
@@ -124,7 +137,7 @@ installer_package_cache() {
 
 installer_package_command() {
     installer_storage_check / "$INSTALLER_RESERVE" 1 1 || return $?
-    installer_storage_check "$INSTALLER_WORK_ROOT" "$INSTALLER_RESERVE" 0 1 || return $?
+    installer_package_work_check || return $?
     PACKAGE_PHASE=$1; shift
     ip_query_output=
     if [ "$PACKAGE_PHASE" = query ]; then ip_query_output=$1; shift; fi

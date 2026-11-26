@@ -174,6 +174,11 @@ installer_service_version() {
 installer_service_manager() {
     service_action=$1
     if [ "$SERVICE_BACKEND" = systemd ]; then
+        case "$service_action" in start|restart)
+            if command -v "${SERVICE_APP}_service_before_start" >/dev/null 2>&1; then
+                "${SERVICE_APP}_service_before_start" || return $?
+            fi ;;
+        esac
         case "$service_action" in
             is-active|is-enabled) installer_exec_native "$ZSETUP_BIN" run -- systemctl "$service_action" --quiet "$SERVICE_NAME" ;;
             reload) installer_exec_native "$ZSETUP_BIN" run -- systemctl daemon-reload ;;

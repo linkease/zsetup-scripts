@@ -44,10 +44,11 @@ def compose(root: Path, app: Path) -> str:
     business += "".join(
         (source / name).read_text().rstrip() + "\n\n"
         for name in (
-            "product-pins.sh", "docker-probe.sh", "docker-lifecycle.sh",
+            "product-pins.sh", "linux-storage.sh", "linux-product.sh", "linux-zig-config.sh", "linux-zig-service.sh",
+            "linux-zig-install.sh", "docker-probe.sh", "docker-lifecycle.sh",
             "method-selection.sh", "synology-download.sh", "extra-platforms.sh",
             "openwrt-lifecycle.sh", "openwrt-adapter.sh", "auto-install.sh",
-            "auto-linux.sh", "process-linux.sh", "process-install.sh", "auto-openwrt.sh", "auto-synology.sh",
+            "auto-linux.sh", "process-linux.sh", "process-product.sh", "process-install.sh", "auto-openwrt.sh", "auto-synology.sh",
             "auto-synology-fresh.sh", "asus-platform.sh", "asus-storage.sh",
             "asus-package.sh", "asus-service.sh", "asus-transaction.sh", "auto-asus.sh",
         )

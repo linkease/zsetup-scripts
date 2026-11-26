@@ -61,7 +61,7 @@ ddnsto_ensure_preflight() {
     [ "$REQUESTED_METHOD" != docker ] || {
         ddnsto_flow_error E_METHOD 'Docker 自动安装尚未完成验收' '请使用已验收的原生平台；不会自动切换安装方式'; return 2;
     }
-    [ -z "$FORCE_VERSION" ] && [ "$VERIFY_STATUS" = 0 ] || {
+    { [ -z "$FORCE_VERSION" ] || [ "$detected_platform" = linux ]; } && [ "$VERIFY_STATUS" = 0 ] || {
         ddnsto_flow_error E_OPTIONS '默认流程不接受手选版本或云端检查选项' '请重新复制默认命令'; return 2;
     }
     [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = "$(ddnsto_recommended_version "$detected_platform")" ] || {

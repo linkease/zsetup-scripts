@@ -1,13 +1,17 @@
 # Reuse the native verified, bounded download/extraction and transaction owner.
 ddnsto_process_fetch() {
     INSTALLER_REMOTE_APP=ddnsto
-    installer_download "linux-binary/ddnsto-standard-$PROCESS_VERSION.tar.gz" "$transaction_dir/package.tar.gz" "$PROCESS_DIGEST" || {
+    process_output="$transaction_dir/package.tar.gz"
+    [ "$PROCESS_VARIANT" != zig ] || process_output="$transaction_dir/ddnsto"
+    installer_download "$PROCESS_PRODUCT_PATH" "$process_output" "$PROCESS_DIGEST" 0 "$PROCESS_DOWNLOAD_BYTES" || {
         ddnsto_process_error E_DOWNLOAD '客户端包下载或 SHA-256 校验失败，未更改运行中的客户端'; return 11;
     }
-    installer_extract_member "$transaction_dir/ddnsto" tar -xOzf "$transaction_dir/package.tar.gz" \
+    if [ "$PROCESS_VARIANT" != zig ]; then
+        installer_extract_member "$transaction_dir/ddnsto" tar -xOzf "$transaction_dir/package.tar.gz" \
         "ddnsto-standard-$PROCESS_VERSION/ddnsto.$arch" || {
         ddnsto_process_error E_EXTRACT '无法解出对应架构客户端，请检查空间和 tar 工具'; return 11;
     }
+    fi
     chmod 0700 "$transaction_dir/ddnsto" || return 12
     process_version=$("$transaction_dir/ddnsto" -v 2>/dev/null) || {
         ddnsto_process_error E_BINARY '已校验的客户端无法运行，可能是内核、ABI 或执行权限不兼容'; return 13;
@@ -40,7 +44,14 @@ ddnsto_process_install() {
             [ "$BUSINESS_ENV" != "$PROCESS_OLD_ENV" ] || return 0
         fi
     fi
-    installer_policy ddnsto || return $?
+    ddnsto_process_product_plan || return $?
+    if [ "$PROCESS_OLD_VERSION" = "$PROCESS_VERSION" ]; then
+        [ "$PROCESS_OLD_DIGEST" = "$PROCESS_DIGEST" ] || {
+            ddnsto_process_error E_VERSION '相同版本的客户端摘要发生变化，未替换'; return 11;
+        }
+        [ "$BUSINESS_ENV" != "$PROCESS_OLD_ENV" ] || return 0
+    fi
+    ddnsto_process_product_policy || return $?
     PROCESS_CHANGED=0; PROCESS_WAS_RUNNING=0
     INSTALLER_CLEANUP_HOOK=ddnsto_process_rollback
     ddnsto_flow_note installing
@@ -57,6 +68,10 @@ ddnsto_process_install() {
         process_config_prefix=$service_replaced
         printf "userToken: '%s'\nbootConfigPath: '%s/.ddnsto_boot.cfg'\nlogPath: '%s/logs'\nhttpAddr: '127.0.0.1:0'\n" \
             "$TOKEN" "$process_config_prefix" "$process_config_prefix" > "$PROCESS_PREFIX/config.yaml" || return 12
+        if [ "$PROCESS_VARIANT" = zig ]; then
+            # A tunnel-only fallback must not enable the example's WebDAV server.
+            printf 'webdav:\n  enabled: false\n' >> "$PROCESS_PREFIX/config.yaml" || return 12
+        fi
     fi
     mv "$transaction_dir/ddnsto" "$PROCESS_PREFIX/ddnsto" || return 12
     printf '%s\n' ddnsto-process-v1 "$PROCESS_VERSION" "$PROCESS_DIGEST" "$arch" "$BUSINESS_ENV" > "$transaction_dir/receipt" || return 12

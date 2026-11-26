@@ -67,7 +67,12 @@ installer_storage_check() {
     }
     case "$is_memory" in
         false) ;;
-        true) installer_storage_error "memory filesystem at $is_path; choose a persistent directory"; return 12 ;;
+        true)
+            # Only an adapter-owned temporary workspace may opt in. Installed
+            # files always use the default persistent check.
+            [ "${5:-persistent}" = temporary ] || {
+                installer_storage_error "memory filesystem at $is_path; choose a persistent directory"; return 12;
+            } ;;
         *) installer_storage_error "cannot establish persistent backing at $is_path; choose a verified directory"; return 12 ;;
     esac
     is_readonly=$("$ZSETUP_BIN" storage "$is_path" get read_only) || return 12

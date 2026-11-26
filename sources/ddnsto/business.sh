@@ -33,6 +33,7 @@ ddnsto_package_restore() {
 }
 
 ddnsto_register() {
+    if [ "${LINUX_VARIANT:-standard}" = zig ]; then ddnsto_zig_register; return $?; fi
     if [ "${ACTION:-install}" = update ]; then
         SERVICE_CONFIG_TOUCHED=0
         ddnsto_managed_rewrite_unit || return $?
@@ -62,24 +63,15 @@ ddnsto_register() {
 }
 
 ddnsto_openwrt() {
-    case "$package_manager" in opkg) pkg_ext=ipk ;; apk) pkg_ext=apk ;; *) ddnsto_error 'OpenWrt requires opkg or apk'; return 2 ;; esac
-    case "$arch" in
-        x86_64|aarch64|mipsel) package_arch=$arch ;;
-        armv7|arm) package_arch=arm ;;
-        *) ddnsto_error "unsupported OpenWrt architecture: $arch"; return 2 ;;
-    esac
-    SELECTED_VERSION=$FORCE_VERSION
-    if [ -z "$SELECTED_VERSION" ]; then
-        mem_mb=${DDNSTO_MEM_MB:-${ZSETUP_MEMORY_TOTAL_MB:-$("$ZSETUP_BIN" context get memory_total_mb)}}
-        case "$mem_mb" in ''|*[!0123456789]*) mem_mb=0 ;; esac
-        if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 900 ]; then SELECTED_VERSION=lite; else SELECTED_VERSION=standard; fi
-    fi
+    # Selection and the matching budget were fixed before acquiring the package
+    # transaction. Do not reselect by memory and undo the low-space fallback.
+    [ -n "${OW_REQUIRED_BYTES:-}" ] || return 11
     status "[2/4] Checking DDNSTO $SELECTED_VERSION version ($package_manager/$arch)..."
     version_num=$(ddnsto_pinned_version "$SELECTED_VERSION") || return $?
     version_folder=$SELECTED_VERSION
     [ "$pkg_ext" != apk ] || version_folder="$version_folder-apk"
     relative_folder="openwrt/$version_folder/$version_num"
-    status "      DDNSTO $version_num ($SELECTED_VERSION; Lite below 900 MB)"
+    status "      DDNSTO $version_num ($SELECTED_VERSION; memory and storage checked)"
     status '[3/4] Downloading and verifying DDNSTO packages...'
     installer_package_cache "$version_num-$version_folder" "$arch" || return $?
     package_cache=$PACKAGE_CACHE
@@ -130,7 +122,6 @@ ddnsto_linux_metadata() {
         command -v jq >/dev/null 2>&1 || { ddnsto_error '测试环境首次安装需要 jq，请先通过系统包管理器安装；未修改服务'; return 2; }
     fi
     case "$arch" in x86_64|aarch64) ;; *) ddnsto_error "unsupported Linux architecture: $arch"; return 2 ;; esac
-    [ "$FORCE_VERSION" != lite ] || { ddnsto_error 'Linux only supports standard'; return 2; }
     [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is for OpenWrt'; return 2; }
     if [ -z "$TOKEN" ] && [ "${ACTION:-install}" != update ]; then
         if [ -t 0 ]; then
@@ -141,6 +132,12 @@ ddnsto_linux_metadata() {
         fi
     fi
     [ -n "$TOKEN" ] || [ "${ACTION:-install}" = update ] || { ddnsto_error 'empty token'; return 2; }
+    if [ "${LINUX_VARIANT:-standard}" = zig ]; then
+        ddnsto_process_product_metadata zig || return $?
+        version_num=$PROCESS_VERSION; digest=$PROCESS_DIGEST
+        archive_name=${PROCESS_PRODUCT_PATH##*/}
+        return 0
+    fi
     version_num=${DDNSTO_VERSION:-4.2.8}
     case "$version_num" in ''|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._+-]*) ddnsto_error 'invalid DDNSTO_VERSION'; return 2 ;; esac
     status "[2/4] Checking DDNSTO standard $version_num ($arch)..."
@@ -157,6 +154,7 @@ ddnsto_linux_metadata() {
 ddnsto_linux() {
     ddnsto_linux_metadata || return $?
     installer_service_cached "$version_num" "$digest" || return $?
+    if [ "${LINUX_VARIANT:-standard}" = zig ]; then ddnsto_zig_install; return $?; fi
     if [ "$SERVICE_CACHED" = 0 ]; then
         archive_path="$transaction_dir/product.tar.gz"
         status '[3/4] Downloading DDNSTO with bounded staging...'
@@ -226,6 +224,8 @@ ddnsto_install() {
         if [ "$ACTION" = update ]; then ddnsto_managed_owned || return $?; fi
         ip_uid=$("$ZSETUP_BIN" storage / get effective_uid) || return 12
         if [ "$ip_uid" != 0 ]; then installer_privilege_install ddnsto "$@"; return $?; fi
+        installer_layout ddnsto system || return $?
+        ddnsto_linux_product_select root || return $?
         installer_service_prepare ddnsto || return $?
         if [ "$ACTION" = install ] && { [ -n "$SERVICE_OLD" ] || [ "$SERVICE_HAD_UNIT" = 1 ]; }; then
             ddnsto_error 'already installed; use update to preserve identity or configure to change Token'

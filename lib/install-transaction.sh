@@ -72,6 +72,12 @@ installer_transaction_cleanup() {
             return 12
         }
     fi
+    installer_transaction_release_files
+}
+
+# Also used after a fully rolled-back fresh installation, while its app-wide
+# lease remains held. Deletes only this coordinator's authenticated staging.
+installer_transaction_release_files() {
     if [ -n "$transaction_dir" ]; then
         case "$transaction_dir" in "$INSTALLER_WORK_ROOT"/.transaction.*) ;; *) return 12 ;; esac
         [ ! -L "$transaction_dir" ] && [ ! -L "$transaction_dir/.owner" ] && [ -f "$transaction_dir/.owner" ] || return 12

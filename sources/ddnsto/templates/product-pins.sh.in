@@ -1,7 +1,63 @@
 # Generated from templates/product-pins.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Maintained product metadata; embedded in install.sh, never fetched at runtime.
 # HTTPS bytes verified 2026-11-03; see docs/ddnsto-artifacts-2026-11-03.json.
-# lite retains the package naming used by the Micro client release.
+# lite is the lightweight channel; 4.2.8 temporarily contains Micro binaries.
+# Size metadata is audited per artifact, never inferred from the channel name.
+
+ddnsto_process_product_metadata() {
+    PROCESS_VARIANT=$1
+    case "$1:$arch" in
+        standard:x86_64|standard:aarch64)
+            PROCESS_VERSION=$(ddnsto_pinned_version standard linux) || return 11
+            PROCESS_PRODUCT_PATH="linux-binary/ddnsto-standard-$PROCESS_VERSION.tar.gz"
+            PROCESS_DIGEST=$(ddnsto_pinned_sha "$PROCESS_PRODUCT_PATH") || return 11
+            PROCESS_DOWNLOAD_BYTES=@@linux.standard_download_size@@
+            case "$arch" in
+                x86_64) PROCESS_EXPANDED_BYTES=@@linux.standard_x86_64_installed_size@@ ;;
+                aarch64) PROCESS_EXPANDED_BYTES=@@linux.standard_aarch64_installed_size@@ ;;
+            esac ;;
+        zig:x86_64|zig:aarch64)
+            PROCESS_VERSION=@@linux.zig_client_version@@
+            case "$arch" in
+                x86_64)
+                    PROCESS_PRODUCT_PATH=ddnsto-zig/ddnsto.x86_64
+                    PROCESS_DIGEST=@@linux.zig_x86_64_sha256@@
+                    PROCESS_DOWNLOAD_BYTES=@@linux.zig_x86_64_download_size@@ ;;
+                aarch64)
+                    PROCESS_PRODUCT_PATH=ddnsto-zig/ddnsto.arm64
+                    PROCESS_DIGEST=@@linux.zig_aarch64_sha256@@
+                    PROCESS_DOWNLOAD_BYTES=@@linux.zig_aarch64_download_size@@ ;;
+            esac
+            PROCESS_EXPANDED_BYTES=0 ;;
+        *) return 11 ;;
+    esac
+}
+
+ddnsto_pinned_package_sizes() {
+    case "$1" in
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_aarch64.ipk) printf '%s %s\n' @@openwrt.openwrt_standard_ddnsto_aarch64_ipk_download_size@@ @@openwrt.openwrt_standard_ddnsto_aarch64_ipk_installed_size@@ ;;
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_arm.ipk) printf '%s %s\n' @@openwrt.openwrt_standard_ddnsto_arm_ipk_download_size@@ @@openwrt.openwrt_standard_ddnsto_arm_ipk_installed_size@@ ;;
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_mipsel.ipk) printf '%s %s\n' @@openwrt.openwrt_standard_ddnsto_mipsel_ipk_download_size@@ @@openwrt.openwrt_standard_ddnsto_mipsel_ipk_installed_size@@ ;;
+        openwrt/standard/@@openwrt.client_version@@/ddnsto_x86_64.ipk) printf '%s %s\n' @@openwrt.openwrt_standard_ddnsto_x86_64_ipk_download_size@@ @@openwrt.openwrt_standard_ddnsto_x86_64_ipk_installed_size@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_aarch64.apk) printf '%s %s\n' @@openwrt.openwrt_standard_apk_ddnsto_aarch64_apk_download_size@@ @@openwrt.openwrt_standard_apk_ddnsto_aarch64_apk_installed_size@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_arm.apk) printf '%s %s\n' @@openwrt.openwrt_standard_apk_ddnsto_arm_apk_download_size@@ @@openwrt.openwrt_standard_apk_ddnsto_arm_apk_installed_size@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_mipsel.apk) printf '%s %s\n' @@openwrt.openwrt_standard_apk_ddnsto_mipsel_apk_download_size@@ @@openwrt.openwrt_standard_apk_ddnsto_mipsel_apk_installed_size@@ ;;
+        openwrt/standard-apk/@@openwrt.client_version@@/ddnsto_x86_64.apk) printf '%s %s\n' @@openwrt.openwrt_standard_apk_ddnsto_x86_64_apk_download_size@@ @@openwrt.openwrt_standard_apk_ddnsto_x86_64_apk_installed_size@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_aarch64.ipk) printf '%s %s\n' @@openwrt.openwrt_lite_ddnsto_aarch64_ipk_download_size@@ @@openwrt.openwrt_lite_ddnsto_aarch64_ipk_installed_size@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_arm.ipk) printf '%s %s\n' @@openwrt.openwrt_lite_ddnsto_arm_ipk_download_size@@ @@openwrt.openwrt_lite_ddnsto_arm_ipk_installed_size@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_mipsel.ipk) printf '%s %s\n' @@openwrt.openwrt_lite_ddnsto_mipsel_ipk_download_size@@ @@openwrt.openwrt_lite_ddnsto_mipsel_ipk_installed_size@@ ;;
+        openwrt/lite/@@openwrt.client_version@@/ddnsto_x86_64.ipk) printf '%s %s\n' @@openwrt.openwrt_lite_ddnsto_x86_64_ipk_download_size@@ @@openwrt.openwrt_lite_ddnsto_x86_64_ipk_installed_size@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_aarch64.apk) printf '%s %s\n' @@openwrt.openwrt_lite_apk_ddnsto_aarch64_apk_download_size@@ @@openwrt.openwrt_lite_apk_ddnsto_aarch64_apk_installed_size@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_arm.apk) printf '%s %s\n' @@openwrt.openwrt_lite_apk_ddnsto_arm_apk_download_size@@ @@openwrt.openwrt_lite_apk_ddnsto_arm_apk_installed_size@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_mipsel.apk) printf '%s %s\n' @@openwrt.openwrt_lite_apk_ddnsto_mipsel_apk_download_size@@ @@openwrt.openwrt_lite_apk_ddnsto_mipsel_apk_installed_size@@ ;;
+        openwrt/lite-apk/@@openwrt.client_version@@/ddnsto_x86_64.apk) printf '%s %s\n' @@openwrt.openwrt_lite_apk_ddnsto_x86_64_apk_download_size@@ @@openwrt.openwrt_lite_apk_ddnsto_x86_64_apk_installed_size@@ ;;
+        openwrt/luci-app-ddnsto.ipk) printf '%s %s\n' @@openwrt.openwrt_luci_app_ddnsto_ipk_download_size@@ @@openwrt.openwrt_luci_app_ddnsto_ipk_installed_size@@ ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.ipk) printf '%s %s\n' @@openwrt.openwrt_luci_i18n_ddnsto_zh_cn_ipk_download_size@@ @@openwrt.openwrt_luci_i18n_ddnsto_zh_cn_ipk_installed_size@@ ;;
+        openwrt/luci-app-ddnsto.apk) printf '%s %s\n' @@openwrt.openwrt_luci_app_ddnsto_apk_download_size@@ @@openwrt.openwrt_luci_app_ddnsto_apk_installed_size@@ ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.apk) printf '%s %s\n' @@openwrt.openwrt_luci_i18n_ddnsto_zh_cn_apk_download_size@@ @@openwrt.openwrt_luci_i18n_ddnsto_zh_cn_apk_installed_size@@ ;;
+        *) return 11 ;;
+    esac
+}
 ddnsto_recommended_version() {
     case "$1" in
         linux) printf '%s\n' @@linux.client_version@@ ;;

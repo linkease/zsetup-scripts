@@ -1,7 +1,63 @@
 # Generated from templates/product-pins.sh.in and platform-releases.json; edit those sources, then run scripts/build-entrypoints.py.
 # Maintained product metadata; embedded in install.sh, never fetched at runtime.
 # HTTPS bytes verified 2026-11-03; see docs/ddnsto-artifacts-2026-11-03.json.
-# lite retains the package naming used by the Micro client release.
+# lite is the lightweight channel; 4.2.8 temporarily contains Micro binaries.
+# Size metadata is audited per artifact, never inferred from the channel name.
+
+ddnsto_process_product_metadata() {
+    PROCESS_VARIANT=$1
+    case "$1:$arch" in
+        standard:x86_64|standard:aarch64)
+            PROCESS_VERSION=$(ddnsto_pinned_version standard linux) || return 11
+            PROCESS_PRODUCT_PATH="linux-binary/ddnsto-standard-$PROCESS_VERSION.tar.gz"
+            PROCESS_DIGEST=$(ddnsto_pinned_sha "$PROCESS_PRODUCT_PATH") || return 11
+            PROCESS_DOWNLOAD_BYTES=16757733
+            case "$arch" in
+                x86_64) PROCESS_EXPANDED_BYTES=4547748 ;;
+                aarch64) PROCESS_EXPANDED_BYTES=11075768 ;;
+            esac ;;
+        zig:x86_64|zig:aarch64)
+            PROCESS_VERSION=4.2.1
+            case "$arch" in
+                x86_64)
+                    PROCESS_PRODUCT_PATH=ddnsto-zig/ddnsto.x86_64
+                    PROCESS_DIGEST=76e21cb89b623ae57ac928380d2fce3c51b502c04a4b58f36bb59ab5cdd3ca5d
+                    PROCESS_DOWNLOAD_BYTES=752664 ;;
+                aarch64)
+                    PROCESS_PRODUCT_PATH=ddnsto-zig/ddnsto.arm64
+                    PROCESS_DIGEST=032e14eae082515f355b2199518b68f506fe7579eb22e58238f48a0bc6fab520
+                    PROCESS_DOWNLOAD_BYTES=1483696 ;;
+            esac
+            PROCESS_EXPANDED_BYTES=0 ;;
+        *) return 11 ;;
+    esac
+}
+
+ddnsto_pinned_package_sizes() {
+    case "$1" in
+        openwrt/standard/4.2.8/ddnsto_aarch64.ipk) printf '%s %s\n' 4453031 11124736 ;;
+        openwrt/standard/4.2.8/ddnsto_arm.ipk) printf '%s %s\n' 3912257 4038656 ;;
+        openwrt/standard/4.2.8/ddnsto_mipsel.ipk) printf '%s %s\n' 3914674 4050944 ;;
+        openwrt/standard/4.2.8/ddnsto_x86_64.ipk) printf '%s %s\n' 4475362 4595712 ;;
+        openwrt/standard-apk/4.2.8/ddnsto_aarch64.apk) printf '%s %s\n' 4434096 11149312 ;;
+        openwrt/standard-apk/4.2.8/ddnsto_arm.apk) printf '%s %s\n' 3915642 4063232 ;;
+        openwrt/standard-apk/4.2.8/ddnsto_mipsel.apk) printf '%s %s\n' 3917513 4075520 ;;
+        openwrt/standard-apk/4.2.8/ddnsto_x86_64.apk) printf '%s %s\n' 4477392 4620288 ;;
+        openwrt/lite/4.2.8/ddnsto_aarch64.ipk) printf '%s %s\n' 4665736 10338304 ;;
+        openwrt/lite/4.2.8/ddnsto_arm.ipk) printf '%s %s\n' 3419706 3543040 ;;
+        openwrt/lite/4.2.8/ddnsto_mipsel.ipk) printf '%s %s\n' 4242847 4440064 ;;
+        openwrt/lite/4.2.8/ddnsto_x86_64.ipk) printf '%s %s\n' 4264876 4370432 ;;
+        openwrt/lite-apk/4.2.8/ddnsto_aarch64.apk) printf '%s %s\n' 4661994 10362880 ;;
+        openwrt/lite-apk/4.2.8/ddnsto_arm.apk) printf '%s %s\n' 3422086 3567616 ;;
+        openwrt/lite-apk/4.2.8/ddnsto_mipsel.apk) printf '%s %s\n' 4246808 4464640 ;;
+        openwrt/lite-apk/4.2.8/ddnsto_x86_64.apk) printf '%s %s\n' 4266424 4395008 ;;
+        openwrt/luci-app-ddnsto.ipk) printf '%s %s\n' 75316 327680 ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.ipk) printf '%s %s\n' 1410 40960 ;;
+        openwrt/luci-app-ddnsto.apk) printf '%s %s\n' 74883 344064 ;;
+        openwrt/luci-i18n-ddnsto-zh-cn.apk) printf '%s %s\n' 1290 57344 ;;
+        *) return 11 ;;
+    esac
+}
 ddnsto_recommended_version() {
     case "$1" in
         linux) printf '%s\n' 4.2.8 ;;

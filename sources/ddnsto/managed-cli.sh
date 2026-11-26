@@ -251,7 +251,7 @@ ddnsto_validate_platform_options() {
         [ -z "${OUTPUT_DIR:-}" ] && [ "$ACTION" != download ] || { ddnsto_error 'download and output-dir require Synology'; return 2; }
     fi
     if [ "$detected_platform" = linux ]; then
-        [ "$FORCE_VERSION" != lite ] && [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error 'OpenWrt options are not supported on Linux'; return 2; }
+        [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is only supported on OpenWrt'; return 2; }
     fi
 }
 
@@ -288,9 +288,13 @@ ddnsto_plan() {
     case "$detected_platform:$arch" in
         linux:x86_64|linux:aarch64)
             [ "${DDNSTO_VERSION:-4.2.8}" = 4.2.8 ] || { ddnsto_error 'no pinned artifact for requested version'; return 2; }
-            [ "$FORCE_VERSION" != lite ] && [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error 'OpenWrt options are not supported on Linux'; return 2; }
+            [ "$VERIFY_STATUS" = 0 ] || { ddnsto_error '--verify-status is only supported on OpenWrt'; return 2; }
             native_status=requires-service-preflight
-            client_version=${DDNSTO_VERSION:-4.2.8} ;;
+            client_version=${DDNSTO_VERSION:-4.2.8}
+            if [ "$FORCE_VERSION" = lite ]; then
+                ddnsto_process_product_metadata zig || return $?
+                client_version=$PROCESS_VERSION
+            fi ;;
         openwrt:*)
             native_status=requires-package-preflight
             client_version=standard-4.2.8-or-lite-4.2.8 ;;

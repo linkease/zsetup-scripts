@@ -6,7 +6,14 @@ installer_policy() {
     INSTALLER_RESERVE=8388608
     case "$1" in
         fastnet|fastpve|linkspace|ks-cli|kspeeder) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=0; INSTALLER_MAX_FILES=1 ;;
-        ddnsto) INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16 ;;
+        ddnsto)
+            if [ "${business_platform:-}" = linux ] && command -v ddnsto_linux_storage_policy >/dev/null 2>&1; then
+                if [ -z "${DDNSTO_VERSION:-}" ] || [ "$DDNSTO_VERSION" = "$(ddnsto_pinned_version standard linux)" ]; then
+                    ddnsto_linux_storage_policy
+                    return $?
+                fi
+            fi
+            INSTALLER_MAX_DOWNLOAD=33554432; INSTALLER_MAX_EXPANDED=67108864; INSTALLER_MAX_FILES=16 ;;
         linkease) INSTALLER_MAX_DOWNLOAD=134217728; INSTALLER_MAX_EXPANDED=268435456; INSTALLER_MAX_FILES=128 ;;
         *) return 2 ;;
     esac

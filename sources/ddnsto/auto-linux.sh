@@ -76,7 +76,19 @@ ddnsto_ensure_linux() {
     elif [ -e "$SERVICE_CONFIG" ] || [ -L "$SERVICE_CONFIG" ]; then
         ddnsto_flow_error E_OWNERSHIP '发现未归属的历史配置' '请先人工确认历史安装；不会自动覆盖'; return 2
     fi
-    ddnsto_ensure_decision "$ensure_current" "$(ddnsto_pinned_version standard linux)" || return $?
+    ensure_recommended=$(ddnsto_pinned_version standard linux) || return 2
+    if [ -n "$ensure_current" ] && command -v ddnsto_linux_current_variant >/dev/null 2>&1 &&
+        [ "$(ddnsto_linux_current_variant)" = zig ]; then
+        ddnsto_process_product_metadata zig || return 2
+        ensure_recommended=$PROCESS_VERSION
+        [ "${FORCE_VERSION:-}" != standard ] || {
+            ddnsto_error 'E_PRODUCT: Zig to standard migration is not verified'; return 2;
+        }
+    elif [ -n "$ensure_current" ] && [ "${FORCE_VERSION:-}" = lite ]; then
+        ddnsto_error 'E_PRODUCT: standard to Zig migration or downgrade is not permitted'
+        return 2
+    fi
+    ddnsto_ensure_decision "$ensure_current" "$ensure_recommended" || return $?
     if [ -n "$ensure_current" ] && [ "${BUSINESS_CURRENT_ENV:-production}" != "${BUSINESS_ENV:-production}" ]; then
         [ "$ensure_current" = "$(ddnsto_pinned_version standard linux)" ] || {
             ddnsto_flow_error E_ENV_VERSION '环境切换只支持审核版本，不能借切换降级或覆盖历史安装' '请先完成独立版本迁移'; return 2;
@@ -89,13 +101,15 @@ ddnsto_ensure_linux() {
         ( ACTION=start; TOKEN=; ddnsto_managed_write ) || return $?
     else
         ddnsto_flow_note installing
+        set -- --env "${BUSINESS_ENV:-production}"
+        [ -z "${FORCE_VERSION:-}" ] || set -- "$@" --force-version "$FORCE_VERSION"
         if [ "$ENSURE_ACTION" = install ]; then
-            ddnsto_install --action install --token "$ENSURE_TOKEN" --env "${BUSINESS_ENV:-production}" || return $?
+            ddnsto_install --action install --token "$ENSURE_TOKEN" "$@" || return $?
         else
             if [ "${SWITCH_ENVIRONMENT:-0}" = 1 ]; then
-                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" --switch-environment || return $?
+                ddnsto_install --action update "$@" --switch-environment || return $?
             else
-                ddnsto_install --action update --env "${BUSINESS_ENV:-production}" || return $?
+                ddnsto_install --action update "$@" || return $?
             fi
         fi
         ddnsto_flow_note installed

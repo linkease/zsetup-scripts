@@ -733,9 +733,9 @@ ddnsto_entry_appliance() (
     trap 'exit 129' HUP
     trap 'exit 130' INT
     trap 'exit 143' TERM
-    entry_digest='c352ddf239efe68d7c59edd941f9c2ec9abc8ce696f1320b99f5e1449ceb9541'
-    entry_size='618824'
-    entry_relative='ddnsto/versions/0.3.4/install.sh'
+    entry_digest='469095b39c03c5b6a30dad32f4113146fad65e30b5861fd7536be4c5488a96a6'
+    entry_size='684229'
+    entry_relative='ddnsto/versions/0.3.5/install.sh'
     if [ "$DDNSTO_ENTRY_LEGACY" = 1 ]; then
         entry_ok=0
         for entry_base in $CONFIG_PRIMARY_URLS "$CONFIG_FALLBACK_URL"; do

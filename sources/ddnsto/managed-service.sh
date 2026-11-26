@@ -100,6 +100,11 @@ ddnsto_managed_rewrite_unit() {
 # Only the reviewed 4.2.8 client defines this local health protocol. Historical
 # explicit version overrides retain the upstream systemd health checks.
 ddnsto_service_health() {
+    if command -v ddnsto_linux_current_variant >/dev/null 2>&1 &&
+        [ "$(ddnsto_linux_current_variant)" = zig ]; then
+        ddnsto_ensure_linux_running
+        return $?
+    fi
     if [ "${DDNSTO_ENSURE_ACTIVE:-0}" = 1 ]; then
         ddnsto_ensure_linux_running || return 13
     fi
@@ -181,6 +186,7 @@ ddnsto_managed_owned() {
 # Called by the shared service coordinator for install/update as well as local
 # writes. Same non-stealable machine lease as native packages and Docker.
 ddnsto_service_lock() {
+    DDNSTO_ZIG_NEW_RUNTIME=0
     DDNSTO_GLOBAL_HELD=0; DDNSTO_UNINSTALL_BACKUP=; DDNSTO_UNINSTALL_MOVED=0
     INSTALLER_CLEANUP_HOOK=ddnsto_managed_cleanup
     DDNSTO_GLOBAL_LOCK=/etc/zsetup/install-locks/ddnsto
@@ -254,7 +260,13 @@ ddnsto_managed_receipt() (
     installer_file_size "$dir/bin/.service-run" || exit 2
     [ "$INSTALLER_FILE_SIZE" -le 4096 ] || exit 2
     installer_service_replace "$dir/bin/ddnsto" "'" "'\\''"
-    [ "$(cat "$dir/bin/.service-run")" = "$(printf '#!/bin/sh\nexec '\''%s'\'' run\n' "$service_replaced")" ] || exit 2
+    if [ "$(cat "$dir/bin/.service-run")" = "$(printf '#!/bin/sh\nexec '\''%s'\'' run\n' "$service_replaced")" ]; then exit 0; fi
+    # The alternate wrapper is accepted only with the reviewed Zig product
+    # receipt. A wrapper-shaped arbitrary installation is not a migration.
+    arch=$(cat "$dir/.arch")
+    ddnsto_process_product_metadata zig || exit 2
+    [ "$v" = "$PROCESS_VERSION" ] && [ "$sha" = "$PROCESS_DIGEST" ] || exit 2
+    [ "$(cat "$dir/bin/.service-run")" = "$(ddnsto_zig_service_wrapper "$dir/bin/ddnsto" "${SERVICE_CONFIG%/*}/.ddnsto-zig.yaml")" ] || exit 2
 )
 
 ddnsto_managed_property() {
@@ -323,6 +335,28 @@ ddnsto_managed_cleanup() {
         DDNSTO_UNINSTALL_MOVED=0
     fi
     installer_service_cleanup || return 1
+    if [ "${DDNSTO_ZIG_NEW_RUNTIME:-0}" = 1 ] && [ "${SERVICE_GOOD:-0}" != 1 ]; then
+        managed_runtime="${SERVICE_CONFIG%/*}/.ddnsto-zig.yaml"
+        [ ! -L "$managed_runtime" ] || return 1
+        [ "$("$ZSETUP_BIN" storage "$managed_runtime" get system_protected)" = true ] || return 1
+        rm -f "$managed_runtime" || return 1
+        # Registration was fresh, and rollback above has removed its unit,
+        # configuration and version. Do not leave an empty ownership marker
+        # that makes the same command look like a damaged existing install.
+        [ -z "$SERVICE_OLD" ] && [ "$SERVICE_HAD_CONFIG" = 0 ] && [ "$SERVICE_HAD_UNIT" = 0 ] || return 1
+        [ ! -e "$SERVICE_CONFIG" ] && [ ! -e "$SERVICE_UNIT" ] || return 1
+        [ ! -e "$INSTALLER_PREFIX/current" ] && [ ! -L "$INSTALLER_PREFIX/current" ] || return 1
+        [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX/.managed" get system_protected)" = true ] || return 1
+        [ ! -L "$INSTALLER_PREFIX/.managed" ] && [ "$(cat "$INSTALLER_PREFIX/.managed")" = ddnsto ] || return 1
+        installer_transaction_release_files || return 1
+        rmdir "$INSTALLER_PREFIX/versions" || return 1
+        rm -f "$INSTALLER_PREFIX/.managed" || return 1
+        if [ "$INSTALLER_WORK_ROOT" = "$INSTALLER_PREFIX/.staging" ]; then
+            rmdir "$INSTALLER_WORK_ROOT" || return 1
+        fi
+        rmdir "$INSTALLER_PREFIX" || return 1
+        DDNSTO_ZIG_NEW_RUNTIME=0
+    fi
     if [ "${DDNSTO_GLOBAL_HELD:-0}" = 1 ]; then
         ddnsto_managed_lock_owner "$DDNSTO_GLOBAL_LOCK" || return 1
         rm -f "$DDNSTO_GLOBAL_LOCK/owner" || return 1
@@ -360,6 +394,8 @@ ddnsto_managed_write() (
     ddnsto_managed_owned || exit $?
     INSTALLER_WORK_ROOT="$INSTALLER_PREFIX/.staging"
     INSTALLER_RESERVE=8388608
+    if command -v ddnsto_linux_current_variant >/dev/null 2>&1 &&
+        [ "$(ddnsto_linux_current_variant)" = zig ]; then INSTALLER_RESERVE=1048576; fi
     [ "$("$ZSETUP_BIN" storage "$INSTALLER_WORK_ROOT" get system_protected)" = true ] || exit 12
     installer_transaction_begin || exit $?
     INSTALLER_CLEANUP_HOOK=ddnsto_managed_cleanup

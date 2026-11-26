@@ -194,8 +194,12 @@ installer_privilege_install() {
     }
     installer_layout "$ip_app" system || return $?
     [ "$INSTALLER_SCOPE" = system ] || return 2
-    installer_policy "$ip_app" || return $?
-    installer_space_budget "$INSTALLER_MAX_DOWNLOAD" "$INSTALLER_MAX_EXPANDED" "$INSTALLER_MAX_EXPANDED" "$INSTALLER_MAX_DOWNLOAD" || return $?
+    if command -v "${ip_app}_privilege_policy" >/dev/null 2>&1; then
+        "${ip_app}_privilege_policy" || return $?
+    else
+        installer_policy "$ip_app" || return $?
+        installer_space_budget "$INSTALLER_MAX_DOWNLOAD" "$INSTALLER_MAX_EXPANDED" "$INSTALLER_MAX_EXPANDED" "$INSTALLER_MAX_DOWNLOAD" || return $?
+    fi
     installer_storage_select "$INSTALLER_PREFIX" "$INSTALLER_REQUIRED_BYTES" 1 0 || return $?
     INSTALLER_PREFIX=$INSTALLER_STORAGE_PATH
     [ "$("$ZSETUP_BIN" storage "$INSTALLER_PREFIX" get system_protected)" = true ] || return 12
@@ -212,13 +216,20 @@ installer_privilege_install() {
     case "$ip_app" in
         ddnsto)
             installer_service_cached "$version_num" "$digest" || return $?
-            [ "$SERVICE_CACHED" = 1 ] || installer_download "linux-binary/$archive_name" "$transaction_dir/$archive_name" "$digest" || return $?
+            if [ "$SERVICE_CACHED" != 1 ]; then
+                if command -v ddnsto_privilege_download >/dev/null 2>&1; then ddnsto_privilege_download || return $?
+                else installer_download "linux-binary/$archive_name" "$transaction_dir/$archive_name" "$digest" || return $?; fi
+            fi
             # Older adapters retain their original token-only protocol.
             if command -v ddnsto_privilege_args >/dev/null 2>&1; then
                 ddnsto_privilege_args || return $?
                 set -- --action "$DDNSTO_ROOT_ACTION" --env "$DDNSTO_ROOT_ENV"
                 [ "$DDNSTO_ROOT_SWITCH_ENVIRONMENT" != 1 ] || set -- "$@" --switch-environment
                 [ -z "$DDNSTO_ROOT_TOKEN" ] || set -- "$@" --token "$DDNSTO_ROOT_TOKEN"
+                if [ -n "${LINUX_VARIANT:-}" ]; then
+                    if [ "$LINUX_VARIANT" = zig ]; then set -- "$@" --force-version lite
+                    else set -- "$@" --force-version standard; fi
+                fi
             else
                 set -- --token "$TOKEN"
             fi
